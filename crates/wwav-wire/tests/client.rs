@@ -244,3 +244,46 @@ fn request_returns_the_response_itself() {
     let _: Map<String, Value> = Map::new();
     fake.join().unwrap();
 }
+
+#[test]
+fn a_call_racing_the_close_is_closed_never_a_broken_pipe() {
+    // The engine has gone, but the reader thread may not have seen the end
+    // of the stream yet when the request is written. Either way the caller
+    // must hear Closed.
+    for _ in 0..500 {
+        let (client, _events, engine) = pair();
+        drop(engine);
+        match client.call("ping", Value::Null, T) {
+            Err(CallError::Closed) => {}
+            other => panic!("{other:?}"),
+        }
+        assert!(client.is_closed());
+    }
+}
+
+#[test]
+fn a_write_that_times_out_closes_the_connection() {
+    // An engine that stops reading: once its socket buffer is full, a write
+    // blocks, and half a frame may be out. The stream can't carry another
+    // frame after that, so the connection closes.
+    let (client, _events, _engine) = pair();
+    let big = json!({"blob": "x".repeat(8 * 1024 * 1024)});
+    let started = Instant::now();
+    match client.call("plugin.state", big, T) {
+        Err(CallError::Closed) => {}
+        other => panic!("{other:?}"),
+    }
+    // 2 s with no progress, per write call: one call that sends part of the
+    // frame, then one that sends nothing.
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        started.elapsed()
+    );
+    assert!(client.is_closed());
+    assert!(
+        client.closed_reason().unwrap().contains("Writing"),
+        "{:?}",
+        client.closed_reason()
+    );
+}

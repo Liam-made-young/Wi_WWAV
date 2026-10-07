@@ -106,11 +106,13 @@ fn levels(k: u64, slot: usize) -> [f32; 4] {
 fn no_reader_sees_a_torn_meter_entry_under_a_writer_at_full_rate() {
     let shm = Arc::new(Shm::create_for_app().unwrap());
     let stop = Arc::new(AtomicBool::new(false));
+    let start = Arc::new(Barrier::new(2));
     let writer = {
-        let (shm, stop) = (shm.clone(), stop.clone());
+        let (shm, stop, start) = (shm.clone(), stop.clone(), start.clone());
         thread::spawn(move || {
             let mut k = 0u64;
             let mut slots = vec![[0.0f32; 4]; 40];
+            start.wait();
             while !stop.load(Ordering::Relaxed) {
                 k += 1;
                 for (s, v) in slots.iter_mut().enumerate() {
@@ -122,7 +124,10 @@ fn no_reader_sees_a_torn_meter_entry_under_a_writer_at_full_rate() {
         })
     };
     let (mut torn, mut read, mut changes, mut last) = (0, 0, 0, 0);
-    for _ in 0..200_000 {
+    start.wait();
+    // Count only reads that found an entry, so a writer slow to start on a
+    // busy machine can't leave the test with nothing to check.
+    while read < 200_000 {
         let Some(m) = shm.region().newest_meters() else {
             continue;
         };

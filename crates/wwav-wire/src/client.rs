@@ -55,8 +55,10 @@ struct State {
     closed: Option<String>,
 }
 
-/// A write that blocks this long means the engine has stopped reading;
-/// the call fails rather than hang the app with it.
+/// A write that makes no progress for this long means the engine has
+/// stopped reading; the call fails rather than hang the app with it. (The
+/// socket's timeout is per write call, so a frame that went out in part
+/// first can take up to twice this.)
 const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 
 impl Client {
@@ -131,10 +133,18 @@ impl Client {
         };
         if let Err(e) = sent {
             self.shared.lock().waiting.remove(&id);
-            return Err(if self.is_closed() {
-                CallError::Closed
-            } else {
-                CallError::Frame(e)
+            return Err(match e {
+                // A write that failed usually means the engine has gone, and
+                // it may have left half a frame on the stream: either way the
+                // connection can carry nothing more (§2).
+                FrameError::Io(e) => {
+                    self.shared
+                        .close(format!("Writing to the engine failed: {e}."));
+                    self.close();
+                    CallError::Closed
+                }
+                // Nothing was written: this request can't be framed.
+                e => CallError::Frame(e),
             });
         }
         match rx.recv_timeout(timeout) {
