@@ -254,3 +254,16 @@ export function checkOccurrence(
 export function reopenOccurrence(occurrences: readonly TaskOccurrence[], taskId: Id, date: DayKey): TaskOccurrence[] {
   return occurrences.filter((o) => !(o.taskId === taskId && o.date === date));
 }
+
+/**
+ * The tasks still to do, as heat sees them: not done, and for a recurring
+ * task, a series that hasn't ended, with its due moved to its next open
+ * occurrence.
+ */
+export function openTasks(tasks: readonly Task[], occurrences: readonly TaskOccurrence[], now: number, tz: string): Task[] {
+  return tasks.flatMap((t) => {
+    if (t.done) return [];
+    if (t.rrule && !nextOpenOccurrence(t, occurrences, now, tz)) return [];
+    return [withEffectiveDue(t, occurrences, now, tz)];
+  });
+}

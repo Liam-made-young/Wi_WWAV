@@ -5,6 +5,7 @@ import {
   checkOccurrence,
   nextOpenOccurrence,
   occurrencesBetween,
+  openTasks,
   parseRule,
   presetOf,
   reopenOccurrence,
@@ -250,5 +251,18 @@ describe('recurring tasks', () => {
       at: ny('2026-10-06 00:00'),
     });
     expect(withEffectiveDue(scales, [], ny('2026-10-06 08:00'), NY).due).toBeNull();
+  });
+});
+
+describe('openTasks', () => {
+  it('drops done tasks and ended series, and moves a series’ due to its next occurrence', () => {
+    const now = ny('2026-10-06 08:00');
+    const plain = task({ due: ny('2026-10-09 23:59') });
+    const done = task({ done: true, doneAt: now });
+    const ended = task({ due: ny('2026-10-01 09:00'), rrule: 'FREQ=DAILY;COUNT=3' });
+    const weekly = task({ due: ny('2026-10-02 23:59'), rrule: 'FREQ=WEEKLY' });
+    const open = openTasks([plain, done, ended, weekly], [], now, NY);
+    expect(open.map((t) => t.id)).toEqual([plain.id, weekly.id]);
+    expect(open[1].due).toBe(ny('2026-10-09 23:59'));
   });
 });
