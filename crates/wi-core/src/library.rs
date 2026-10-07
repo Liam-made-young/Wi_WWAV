@@ -20,7 +20,9 @@ use crate::{history, CoreError, Inner};
 /// What 2.5 says of plain audio, and Get Info shows for it.
 pub const PLAIN_AUDIO: &str = "Plain audio comes in as master only.";
 
-const AUDIO: [&str; 9] = ["wav", "aif", "aiff", "flac", "mp3", "m4a", "aac", "ogg", "opus"];
+const AUDIO: [&str; 9] = [
+    "wav", "aif", "aiff", "flac", "mp3", "m4a", "aac", "ogg", "opus",
+];
 
 fn extension(path: &Path) -> String {
     path.extension()
@@ -75,7 +77,11 @@ impl Inspector for Formats {
                 Ok(found)
             }
             ext @ ("swav" | "mp4" | "mov" | "m4v") => {
-                let kind = if ext == "swav" { Kind::Swav } else { Kind::Video };
+                let kind = if ext == "swav" {
+                    Kind::Swav
+                } else {
+                    Kind::Video
+                };
                 let s = match Swav::open(path) {
                     Ok(s) => s,
                     Err(e) if kind == Kind::Swav => return Err(refused(e)),
@@ -153,7 +159,10 @@ fn rule_from(v: Option<&Value>) -> Result<SmartRule, CoreError> {
     match v {
         None => Ok(SmartRule::default()),
         Some(v) => serde_json::from_value(v.clone()).map_err(|e| {
-            CoreError::new("bad_args", format!("A filter is tags, colour, bpm_min, bpm_max, key and kind ({e})."))
+            CoreError::new(
+                "bad_args",
+                format!("A filter is tags, colour, bpm_min, bpm_max, key and kind ({e})."),
+            )
         }),
     }
 }
@@ -166,7 +175,12 @@ pub(crate) fn list(i: &Inner, a: &Args) -> Result<Value, CoreError> {
             .smart_folders()?
             .into_iter()
             .find(|f| f.id == id)
-            .ok_or_else(|| CoreError::new("refused", "That smart folder isn't in the library any more."))?;
+            .ok_or_else(|| {
+                CoreError::new(
+                    "refused",
+                    "That smart folder isn't in the library any more.",
+                )
+            })?;
         let mut tags = folder.rule.tags.clone();
         tags.extend(rule.tags);
         rule = SmartRule {
@@ -184,16 +198,25 @@ pub(crate) fn list(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         "oldest" => clips.reverse(),
         "title" => clips.sort_by_key(|c| c.title.to_lowercase()),
         "artist" => clips.sort_by_key(|c| (c.artist.to_lowercase(), c.title.to_lowercase())),
-        "bpm" => clips.sort_by(|a, b| a.bpm.partial_cmp(&b.bpm).unwrap_or(std::cmp::Ordering::Equal)),
+        "bpm" => clips.sort_by(|a, b| {
+            a.bpm
+                .partial_cmp(&b.bpm)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }),
         other => {
             return Err(CoreError::new(
                 "bad_args",
-                format!("The library sorts by newest, oldest, title, artist or bpm, not '{other}'."),
+                format!(
+                    "The library sorts by newest, oldest, title, artist or bpm, not '{other}'."
+                ),
             ))
         }
     }
     if let Some(after) = a.opt_str("after") {
-        let at = clips.iter().position(|c| c.id == after).map_or(clips.len(), |n| n + 1);
+        let at = clips
+            .iter()
+            .position(|c| c.id == after)
+            .map_or(clips.len(), |n| n + 1);
         clips.drain(..at);
     }
     let limit = a.opt_usize("limit")?.unwrap_or(200).max(1);
@@ -287,7 +310,9 @@ fn chunks_of(clip: &Clip, path: &Path) -> Vec<Value> {
         .into_iter()
         .zip(details)
         .map(|((id, at, size), line)| {
-            let detail = line.split_once(" bytes").map_or("", |(_, d)| d.trim_start_matches(": "));
+            let detail = line
+                .split_once(" bytes")
+                .map_or("", |(_, d)| d.trim_start_matches(": "));
             json!({"id": id, "at": at, "size": size, "detail": detail})
         })
         .collect()
@@ -299,12 +324,18 @@ fn walk(paths: &[PathBuf]) -> Result<Vec<PathBuf>, CoreError> {
     let mut todo: Vec<PathBuf> = paths.iter().rev().cloned().collect();
     while let Some(p) = todo.pop() {
         let meta = std::fs::metadata(&p).map_err(|e| {
-            CoreError::new("not_found", format!("Wi_WWAV can't open '{}': {e}", p.display()))
+            CoreError::new(
+                "not_found",
+                format!("Wi_WWAV can't open '{}': {e}", p.display()),
+            )
         })?;
         if meta.is_dir() {
             let mut kids: Vec<PathBuf> = std::fs::read_dir(&p)?
                 .filter_map(|e| e.ok().map(|e| e.path()))
-                .filter(|k| !k.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
+                .filter(|k| {
+                    !k.file_name()
+                        .is_some_and(|n| n.to_string_lossy().starts_with('.'))
+                })
                 .collect();
             kids.sort();
             todo.extend(kids.into_iter().rev());
@@ -349,7 +380,11 @@ pub fn summary(files: &[PathBuf]) -> String {
     .filter(|(n, _)| *n > 0)
     .map(|(n, what)| format!("{n} {what}"))
     .collect();
-    let mut s = format!("{}: {}.", plural(files.len(), "file", "files"), parts.join(", "));
+    let mut s = format!(
+        "{}: {}.",
+        plural(files.len(), "file", "files"),
+        parts.join(", ")
+    );
     if plain > 0 {
         s += " ";
         s += PLAIN_AUDIO;
@@ -462,6 +497,37 @@ pub(crate) fn tag(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         }
         Ok(())
     })
+}
+
+/// Get Info's title: the library's only. The file keeps its name and bytes.
+pub(crate) fn rename(i: &Inner, a: &Args) -> Result<Value, CoreError> {
+    let title = a.str("title")?.trim().to_string();
+    if title.is_empty() {
+        return Err(CoreError::new("bad_args", "A title needs a word in it."));
+    }
+    let id = a.str("id")?.to_string();
+    edit_one(i, a, &id, |tx| tx.rename_clip(&id, &title))
+}
+
+fn edit_one(
+    i: &Inner,
+    a: &Args,
+    id: &str,
+    f: impl FnOnce(&mut wi_store::Txn) -> wi_store::Result<()>,
+) -> Result<Value, CoreError> {
+    let label = a.label()?;
+    {
+        let mut store = i.store();
+        let mut tx = store.begin(wi_store::Room::Library, label)?;
+        f(&mut tx)?;
+        tx.commit()?;
+    }
+    history::changed(i, &[id.to_string()]);
+    let store = i.store();
+    let clip = store
+        .clip(id)?
+        .ok_or_else(|| CoreError::new("refused", "That clip isn't in the library any more."))?;
+    Ok(json!({"clips": [clip_json(&store, &clip)?]}))
 }
 
 pub(crate) fn colour(i: &Inner, a: &Args) -> Result<Value, CoreError> {

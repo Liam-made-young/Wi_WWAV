@@ -81,7 +81,10 @@ impl EngineSession {
     }
 
     fn name(&self, id: &str) -> String {
-        self.names.get(id).cloned().unwrap_or_else(|| id.to_string())
+        self.names
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| id.to_string())
     }
 }
 
@@ -160,7 +163,10 @@ fn call_error(e: CallError) -> CoreError {
         CallError::Closed => restarting(),
         CallError::Timeout(t) => CoreError::new(
             "engine_timeout",
-            format!("The audio engine didn't answer within {} s.", t.as_secs_f32()),
+            format!(
+                "The audio engine didn't answer within {} s.",
+                t.as_secs_f32()
+            ),
         ),
         other => CoreError::new("engine", other.to_string()),
     }
@@ -198,18 +204,27 @@ impl Engine {
             listener: Mutex::new(None),
         });
         let threads = [
-            ("engine supervisor", Box::new({
-                let s = shared.clone();
-                move || s.supervise(rx)
-            }) as Box<dyn FnOnce() + Send>),
-            ("engine monitor", Box::new({
-                let s = shared.clone();
-                move || s.monitor()
-            })),
-            ("engine ping", Box::new({
-                let s = shared.clone();
-                move || s.pinger()
-            })),
+            (
+                "engine supervisor",
+                Box::new({
+                    let s = shared.clone();
+                    move || s.supervise(rx)
+                }) as Box<dyn FnOnce() + Send>,
+            ),
+            (
+                "engine monitor",
+                Box::new({
+                    let s = shared.clone();
+                    move || s.monitor()
+                }),
+            ),
+            (
+                "engine ping",
+                Box::new({
+                    let s = shared.clone();
+                    move || s.pinger()
+                }),
+            ),
         ]
         .into_iter()
         .filter_map(|(name, f)| thread::Builder::new().name(name.into()).spawn(f).ok())
@@ -290,7 +305,12 @@ impl Engine {
     }
 
     /// Sends one op (`docs/ENGINE.md` §3) and waits for its result.
-    pub fn call(&self, op: &str, args: Value, timeout: Duration) -> Result<Map<String, Value>, CoreError> {
+    pub fn call(
+        &self,
+        op: &str,
+        args: Value,
+        timeout: Duration,
+    ) -> Result<Map<String, Value>, CoreError> {
         self.wait_running(START_WAIT)?;
         self.shared.call(op, args, timeout)
     }
@@ -298,7 +318,11 @@ impl Engine {
     /// Makes `session` the one the engine plays, at `playhead`, and returns
     /// its meter slots by node id. While the engine is restarting, the
     /// session is kept and the restart loads it.
-    pub fn load(&self, session: EngineSession, playhead: i64) -> Result<BTreeMap<String, usize>, CoreError> {
+    pub fn load(
+        &self,
+        session: EngineSession,
+        playhead: i64,
+    ) -> Result<BTreeMap<String, usize>, CoreError> {
         {
             let mut st = lock(&self.shared.st);
             let ids: BTreeSet<String> = session.device_ids().map(String::from).collect();
@@ -336,13 +360,27 @@ impl Engine {
 
     /// The shared-memory clock, as the engine last wrote it.
     pub fn clock(&self) -> Option<ClockFields> {
-        let p = self.shared.process.read().unwrap_or_else(|e| e.into_inner());
+        let p = self
+            .shared
+            .process
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         p.as_ref().and_then(|p| p.shm().region().clock.read())
+    }
+
+    /// Waits for the engine to write its next block (a few ms), so the clock
+    /// shows what a transport command just did.
+    pub fn next_block(&self) {
+        self.shared.settle();
     }
 
     /// The newest meter entry.
     pub fn meters(&self) -> Option<MeterFrame> {
-        let p = self.shared.process.read().unwrap_or_else(|e| e.into_inner());
+        let p = self
+            .shared
+            .process
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         p.as_ref().and_then(|p| p.shm().region().newest_meters())
     }
 
@@ -407,7 +445,8 @@ impl Engine {
             .unwrap_or_else(|e| e.into_inner())
             .take();
         drop(gone);
-        self.shared.set_phase(Phase::Stopped, Some("The app closed it.".into()));
+        self.shared
+            .set_phase(Phase::Stopped, Some("The app closed it.".into()));
     }
 }
 
@@ -528,7 +567,12 @@ impl Shared {
         self.bus.emit("engine", status);
     }
 
-    fn call(&self, op: &str, args: Value, timeout: Duration) -> Result<Map<String, Value>, CoreError> {
+    fn call(
+        &self,
+        op: &str,
+        args: Value,
+        timeout: Duration,
+    ) -> Result<Map<String, Value>, CoreError> {
         let p = self.process.read().unwrap_or_else(|e| e.into_inner());
         let p = p.as_ref().ok_or_else(restarting)?;
         p.client().call(op, args, timeout).map_err(call_error)
@@ -590,18 +634,27 @@ impl Shared {
                 None => json!({"name": self.config.device}),
             }
         };
-        let opened = self.call("device.open", device, CALL_TIMEOUT).map_err(|e| e.message)?;
+        let opened = self
+            .call("device.open", device, CALL_TIMEOUT)
+            .map_err(|e| e.message)?;
         {
             let mut st = lock(&self.st);
             st.device = opened.get("name").and_then(Value::as_str).map(String::from);
-            st.rate = opened.get("sample_rate").and_then(Value::as_u64).unwrap_or(0) as u32;
+            st.rate = opened
+                .get("sample_rate")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u32;
             st.block = opened.get("block").and_then(Value::as_u64).unwrap_or(0) as u32;
             st.hung = None;
         }
         self.load_now(playhead).map_err(|e| e.message)?;
         if playhead > 0 {
-            self.call("transport.locate", json!({"sample": playhead}), CALL_TIMEOUT)
-                .map_err(|e| e.message)?;
+            self.call(
+                "transport.locate",
+                json!({"sample": playhead}),
+                CALL_TIMEOUT,
+            )
+            .map_err(|e| e.message)?;
         }
         self.settle();
         let generation = {
@@ -659,10 +712,7 @@ impl Shared {
 
     fn supervise(self: Arc<Self>, notices: Receiver<Notice>) {
         if let Err(why) = self.bring_up(0) {
-            self.set_phase(
-                Phase::Stopped,
-                Some(format!("It couldn't start: {why}")),
-            );
+            self.set_phase(Phase::Stopped, Some(format!("It couldn't start: {why}")));
         }
         for notice in notices {
             if self.closing() {
@@ -728,7 +778,10 @@ impl Shared {
             });
             match found {
                 Some((plugin, place, id)) => {
-                    st.crashes.entry(id.clone()).or_default().push(Instant::now());
+                    st.crashes
+                        .entry(id.clone())
+                        .or_default()
+                        .push(Instant::now());
                     st.off.insert(id.clone());
                     (Some(id), Some(plugin), Some(place), hung)
                 }

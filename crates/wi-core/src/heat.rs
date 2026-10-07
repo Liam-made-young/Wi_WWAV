@@ -91,7 +91,8 @@ pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
         let mut present = BTreeSet::new();
         for d in docs {
             present.insert(d.key.clone());
-            let gone = snapshot.get(&(kind.clone(), d.key.clone(), "deleted".into())) == Some(&json!(true));
+            let gone = snapshot.get(&(kind.clone(), d.key.clone(), "deleted".into()))
+                == Some(&json!(true));
             if gone {
                 writes.push((kind.clone(), d.key.clone(), "deleted".into(), json!(false)));
             }
@@ -102,7 +103,11 @@ pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
                 }
             }
         }
-        let ids: BTreeSet<&String> = snapshot.keys().filter(|k| &k.0 == kind).map(|k| &k.1).collect();
+        let ids: BTreeSet<&String> = snapshot
+            .keys()
+            .filter(|k| &k.0 == kind)
+            .map(|k| &k.1)
+            .collect();
         for id in ids.into_iter().filter(|id| !present.contains(*id)) {
             if snapshot.get(&(kind.clone(), id.clone(), "deleted".into())) != Some(&json!(true)) {
                 writes.push((kind.clone(), id.clone(), "deleted".into(), json!(true)));
@@ -175,7 +180,8 @@ pub(crate) fn sync_now(i: &Inner) -> Result<Value, CoreError> {
             Ok(json!({"sentence": sentence, "changed": touched.len()}))
         }
         Err(Fail::Offline) => {
-            i.bus.status("sync", "Offline. Heat syncs when you're back.");
+            i.bus
+                .status("sync", "Offline. Heat syncs when you're back.");
             Err(Fail::Offline.into())
         }
         Err(f) => Err(f.into()),
@@ -338,7 +344,10 @@ pub(crate) fn assist_call(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     let task = a.str("task")?;
     let body = a.get("body").cloned().unwrap_or_else(|| json!({}));
     let Some((_, switch)) = TASKS.iter().find(|(t, _)| *t == task) else {
-        return Err(CoreError::new("bad_args", format!("Claude has no job called '{task}'.")));
+        return Err(CoreError::new(
+            "bad_args",
+            format!("Claude has no job called '{task}'."),
+        ));
     };
     if let Some(switch) = switch {
         let settings = crate::settings::read(i)?;
@@ -356,12 +365,19 @@ pub(crate) fn assist_call(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         }
     }
     if !i.net.signed_in() {
-        return Err(CoreError::new("signed_out", "Sign in to mi-wwav.com to ask Claude."));
+        return Err(CoreError::new(
+            "signed_out",
+            "Sign in to mi-wwav.com to ask Claude.",
+        ));
     }
     let mut rng = rand::thread_rng();
     let mut attempt = 1;
     loop {
-        let outcome = match i.net.api("POST", &format!("/api/assist/{}", encode(task)), Some(&body)) {
+        let outcome = match i.net.api(
+            "POST",
+            &format!("/api/assist/{}", encode(task)),
+            Some(&body),
+        ) {
             Ok(v) => Outcome::Answered {
                 status: 200,
                 body: v.to_string(),
@@ -372,7 +388,10 @@ pub(crate) fn assist_call(i: &Inner, a: &Args) -> Result<Value, CoreError> {
             },
             Err(Fail::Offline) => Outcome::Offline,
             Err(Fail::SignedOut) => {
-                return Err(CoreError::new("signed_out", "Sign in to mi-wwav.com to ask Claude."))
+                return Err(CoreError::new(
+                    "signed_out",
+                    "Sign in to mi-wwav.com to ask Claude.",
+                ))
             }
         };
         match assist::step(attempt, outcome, &mut rng) {

@@ -216,7 +216,10 @@ pub(crate) fn load(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         (clip, path)
     };
     if !matches!(clip.kind, Kind::Wwav | Kind::Audio) {
-        return Err(CoreError::new("not_a_song", "Only songs play in the player."));
+        return Err(CoreError::new(
+            "not_a_song",
+            "Only songs play in the player.",
+        ));
     }
     let frames = frames_of(&path)?;
     let file = path.to_string_lossy().into_owned();
@@ -249,7 +252,14 @@ pub(crate) fn load(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         // Plain audio, or a song whose stems don't read: the master alone.
         let id = wwav_ids::ulid();
         names.insert(id.clone(), "Master".to_string());
-        vec![track(&id, TrackKind::Audio, Role::Other, &file, Source::Master, frames)]
+        vec![track(
+            &id,
+            TrackKind::Audio,
+            Role::Other,
+            &file,
+            Source::Master,
+            frames,
+        )]
     };
     let session = EngineSession {
         graph: Graph {
@@ -268,6 +278,7 @@ pub(crate) fn load(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     let slots = i.engine.load(session.clone(), 0)?;
     i.engine
         .call("transport.locate", json!({"sample": 0}), CALL)?;
+    i.engine.next_block();
     p.loaded = Some(Loaded {
         clip: clip.id,
         title: clip.title,
@@ -300,6 +311,7 @@ pub(crate) fn play(i: &Inner) -> Result<Value, CoreError> {
         p.on_engine = true;
     }
     i.engine.call("transport.play", Value::Null, CALL)?;
+    i.engine.next_block();
     p.paused_for = None;
     Ok(json!({"state": emit(i, &p)}))
 }
@@ -312,6 +324,7 @@ pub(crate) fn pause(i: &Inner) -> Result<Value, CoreError> {
     if p.on_engine {
         let r = i.engine.call("transport.stop", Value::Null, CALL)?;
         p.kept_at = r.get("sample").and_then(Value::as_i64).unwrap_or(p.kept_at);
+        i.engine.next_block();
     }
     Ok(json!({"state": emit(i, &p)}))
 }
@@ -327,6 +340,7 @@ pub(crate) fn seek(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     if p.on_engine {
         i.engine
             .call("transport.locate", json!({"sample": sample}), CALL)?;
+        i.engine.next_block();
     }
     p.kept_at = sample;
     Ok(json!({"state": emit(i, &p)}))
@@ -395,8 +409,12 @@ pub(crate) fn pause_for(i: &Inner, why: PausedFor) -> Result<Value, CoreError> {
         if let Some(c) = p.clock(i) {
             if c.state == STATE_PLAYING {
                 let r = i.engine.call("transport.stop", Value::Null, CALL)?;
-                p.kept_at = r.get("sample").and_then(Value::as_i64).unwrap_or(c.sample_pos);
+                p.kept_at = r
+                    .get("sample")
+                    .and_then(Value::as_i64)
+                    .unwrap_or(c.sample_pos);
                 p.paused_for = Some(why);
+                i.engine.next_block();
             } else {
                 p.kept_at = c.sample_pos.max(0);
             }

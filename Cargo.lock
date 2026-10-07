@@ -5329,6 +5329,7 @@ name = "wi-devbridge"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "tempfile",
  "tungstenite",
  "wi-core",
 ]

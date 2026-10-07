@@ -65,8 +65,7 @@ fn key(clip: &str) -> String {
 }
 
 fn read_upload(i: &Inner, clip: &str) -> Result<Upload, CoreError> {
-    Ok(i
-        .kv
+    Ok(i.kv
         .get(&key(clip))?
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default())
@@ -123,7 +122,9 @@ fn work(i: &Inner) {
             if i.closing() {
                 return;
             }
-            let Ok(mut u) = read_upload(i, &clip.id) else { continue };
+            let Ok(mut u) = read_upload(i, &clip.id) else {
+                continue;
+            };
             if u.refused.is_some() {
                 continue;
             }
@@ -134,12 +135,17 @@ fn work(i: &Inner) {
             match upload(i, clip) {
                 Ended::Up | Ended::Interrupted => {}
                 Ended::Failed(f) => {
-                    let Ok(fresh) = read_upload(i, &clip.id) else { continue };
+                    let Ok(fresh) = read_upload(i, &clip.id) else {
+                        continue;
+                    };
                     u = fresh;
                     let permanent = matches!(f.status(), Some(400 | 403 | 404 | 409 | 413 | 422));
                     if permanent {
                         u.refused = Some(f.sentence());
-                        say(i, format!("'{}' didn't go up: {}", clip.title, f.sentence()));
+                        say(
+                            i,
+                            format!("'{}' didn't go up: {}", clip.title, f.sentence()),
+                        );
                     } else {
                         u.failures += 1;
                         let wait = backoff(u.failures, &mut rand::thread_rng());
@@ -208,7 +214,12 @@ fn upload(i: &Inner, clip: &Clip) -> Ended {
 fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
     let path = i.store().path_of(clip);
     let size = std::fs::metadata(&path)
-        .map_err(|e| failed(Fail::Status { status: 410, body: json!({"error": format!("'{}' isn't on disk: {e}", clip.title)}) }))?
+        .map_err(|e| {
+            failed(Fail::Status {
+                status: 410,
+                body: json!({"error": format!("'{}' isn't on disk: {e}", clip.title)}),
+            })
+        })?
         .len();
     let mut u = read_upload(i, &clip.id).unwrap_or_default();
     let kind = file_type(clip);
@@ -223,11 +234,20 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
         // Sign just before the PUT. The first sign mints the trackId; a
         // retry signs again under the same one.
         let signed = match &u.track_id {
-            None => api(i, "GET", &format!("/api/upload/sign?fileType={}&size={size}", encode(kind)), None)?,
+            None => api(
+                i,
+                "GET",
+                &format!("/api/upload/sign?fileType={}&size={size}", encode(kind)),
+                None,
+            )?,
             Some(t) => api(
                 i,
                 "GET",
-                &format!("/api/upload/sign-replace?trackId={}&fileType={}&size={size}", encode(t), encode(kind)),
+                &format!(
+                    "/api/upload/sign-replace?trackId={}&fileType={}&size={size}",
+                    encode(t),
+                    encode(kind)
+                ),
                 None,
             )?,
         };
@@ -237,8 +257,16 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
         u.s3_key = signed["s3Key"].as_str().map(String::from);
         let _ = write_upload(i, &clip.id, &u);
         let bytes = std::fs::read(&path).map_err(disk)?;
-        put(i, signed["signedUrl"].as_str().unwrap_or_default(), &bytes, kind)?;
-        (u.track_id.clone().unwrap_or_default(), u.s3_key.clone().unwrap_or_default())
+        put(
+            i,
+            signed["signedUrl"].as_str().unwrap_or_default(),
+            &bytes,
+            kind,
+        )?;
+        (
+            u.track_id.clone().unwrap_or_default(),
+            u.s3_key.clone().unwrap_or_default(),
+        )
     };
     let body = json!({
         "trackId": track_id,
@@ -248,12 +276,20 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
     });
     api(i, "POST", "/api/publish", Some(&body))?;
     let kept = i.store().mark_uploaded(&clip.id, &track_id).map_err(|e| {
-        failed(Fail::Status { status: 500, body: json!({"error": e.to_string()}) })
+        failed(Fail::Status {
+            status: 500,
+            body: json!({"error": e.to_string()}),
+        })
     })?;
     let _ = i.kv.delete(&key(&clip.id));
     if !kept {
         // Unpublished while it went up: take it down again.
-        api(i, "POST", "/api/unpublish", Some(&json!({"trackId": track_id})))?;
+        api(
+            i,
+            "POST",
+            "/api/unpublish",
+            Some(&json!({"trackId": track_id})),
+        )?;
         say(i, format!("'{}' isn't published.", clip.title));
         return Ok(Ended::Up);
     }
@@ -299,10 +335,18 @@ fn parts(
             return Ok(None);
         }
         say(i, format!("Uploading {} · part {n} of {total}", clip.title));
-        let signed = match i.net.api("GET", &format!("/api/upload/parts/{}/{n}", encode(&upload_id)), None) {
+        let signed = match i.net.api(
+            "GET",
+            &format!("/api/upload/parts/{}/{n}", encode(&upload_id)),
+            None,
+        ) {
             Ok(v) => v,
             // The server forgot the upload (or finished it): start again under the same trackId.
-            Err(f @ Fail::Status { status: 404 | 409, .. }) => {
+            Err(
+                f @ Fail::Status {
+                    status: 404 | 409, ..
+                },
+            ) => {
                 u.upload_id = None;
                 let _ = write_upload(i, &clip.id, u);
                 return Err(failed(f));
@@ -315,10 +359,20 @@ fn parts(
         file.seek(SeekFrom::Start(at))
             .and_then(|_| file.read_exact(&mut bytes))
             .map_err(disk)?;
-        let etag = put(i, signed["signedUrl"].as_str().unwrap_or_default(), &bytes, "")?;
+        let etag = put(
+            i,
+            signed["signedUrl"].as_str().unwrap_or_default(),
+            &bytes,
+            "",
+        )?;
         i.store()
             .record_upload_part(&clip.id, n, &etag)
-            .map_err(|e| failed(Fail::Status { status: 500, body: json!({"error": e.to_string()}) }))?;
+            .map_err(|e| {
+                failed(Fail::Status {
+                    status: 500,
+                    body: json!({"error": e.to_string()}),
+                })
+            })?;
     }
     let parts: Vec<Value> = i
         .store()
@@ -345,7 +399,11 @@ fn place(i: &Inner, clip: &Clip, track_id: &str) -> Result<(), Ended> {
     for t in tags.into_iter().filter(|t| t.kind == TagKind::System) {
         if let Some(system) = t.name.strip_prefix("system ") {
             let body = json!({"kind": "song", "trackId": track_id});
-            match i.net.api("POST", &format!("/api/v2/systems/{}/planets", encode(system)), Some(&body)) {
+            match i.net.api(
+                "POST",
+                &format!("/api/v2/systems/{}/planets", encode(system)),
+                Some(&body),
+            ) {
                 Ok(_) => {}
                 Err(f) if f.code() == Some("already_placed") => {}
                 Err(f) => return Err(failed(f)),

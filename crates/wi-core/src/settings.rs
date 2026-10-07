@@ -55,7 +55,10 @@ fn check(s: &Value) -> Result<(), CoreError> {
     if !matches!(s["appearance"].as_str(), Some("light" | "dark" | "system")) {
         return bad("Appearance is light, dark or system.");
     }
-    if !s["textSize"].as_f64().is_some_and(|n| (13.0..=20.0).contains(&n)) {
+    if !s["textSize"]
+        .as_f64()
+        .is_some_and(|n| (13.0..=20.0).contains(&n))
+    {
         return bad("Text size is from 13 to 20 pt.");
     }
     let buffer = s["audio"]["buffer"].as_u64().unwrap_or(0);
@@ -63,7 +66,10 @@ fn check(s: &Value) -> Result<(), CoreError> {
         return bad("The buffer is 64, 128, 256, 512 or 1024 samples.");
     }
     let claude = s["claude"].as_object().into_iter().flat_map(|m| m.values());
-    if claude.clone().any(|v| !matches!(v.as_str(), Some("unasked" | "on" | "off"))) {
+    if claude
+        .clone()
+        .any(|v| !matches!(v.as_str(), Some("unasked" | "on" | "off")))
+    {
         return bad("Each Claude feature is on, off, or not asked yet.");
     }
     for flag in ["reduceMotion"] {
