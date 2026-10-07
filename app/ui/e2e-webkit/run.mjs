@@ -1,6 +1,7 @@
 // The real app on Linux, driven through WebKitGTK's own WebDriver (S0.1,
 // docs/PLAN.md; docs/DECISIONS.md on why WebKitGTK stands in for WKWebView).
 //
+//   cargo build -p mock-engine
 //   cd app/src-tauri && cargo tauri build --debug --no-bundle
 //   node app/ui/e2e-webkit/run.mjs [--app target/debug/wi-wwav]
 //
@@ -19,6 +20,8 @@
 //   they come through the menu or straight to the page.
 // - A song the app was opened with (as a file manager opens it: a path on
 //   the command line) doesn't come into the library through the core.
+// - The engine's meters (mock-engine's here) don't reach the page as raw
+//   bytes on the channel it named.
 // The cold start to the first paint is printed for information: the 1.5 s
 // budget is measured on the reference Mac (docs/SPEC.md 9.13).
 
@@ -33,6 +36,7 @@ import { WebDriver } from './webdriver.mjs';
 const ROOT = resolve(import.meta.dirname, '../../..');
 const ROOMS = ['Heat', 'Space', 'Console', 'Unquantized'];
 const SONG = join(ROOT, 'tests/corpus/original.wwav');
+const ENGINE = join(ROOT, 'target/debug/mock-engine');
 const argApp = process.argv.indexOf('--app');
 const app = resolve(argApp > 0 ? process.argv[argApp + 1] : join(ROOT, 'target/debug/wi-wwav'));
 
@@ -105,6 +109,15 @@ const CALL = `
   const [cmd, args, done] = arguments;
   window.__TAURI_INTERNALS__.invoke('core', { cmd, args }).then(done, (error) => done({ error }));`;
 
+// Names a channel for the meters, as the web UI's bridge does with
+// @tauri-apps/api's Channel, and records each frame's size in bytes.
+const METERS = `
+  const done = arguments[arguments.length - 1];
+  const t = window.__TAURI_INTERNALS__;
+  window.__meters = [];
+  const id = t.transformCallback(({ message }) => window.__meters.push(message instanceof ArrayBuffer ? message.byteLength : typeof message));
+  t.invoke('core', { cmd: 'meters.listen', args: { channel: '__CHANNEL__:' + id } }).then(done, (error) => done({ error }));`;
+
 // Collects the shell's events in the page, as @tauri-apps/api's listen() does.
 const LISTEN = `
   const done = arguments[arguments.length - 1];
@@ -115,11 +128,13 @@ const LISTEN = `
 
 async function main() {
   if (!existsSync(app)) throw new Error(`no app at ${app}; build it: cd app/src-tauri && cargo tauri build --debug --no-bundle`);
+  if (!existsSync(ENGINE)) throw new Error(`no engine at ${ENGINE}; build it: cargo build -p mock-engine`);
   const DISPLAY = await display();
   const port = 4444 + Math.floor(Math.random() * 1000);
   const driver = start('tauri-driver', ['--port', String(port), '--native-port', String(port + 1)], {
     DISPLAY,
     WI_WWAV_LIBRARY: library,
+    WI_WWAV_ENGINE: ENGINE,
   });
   const wd = new WebDriver(`http://127.0.0.1:${port}`);
   await until('tauri-driver', () => wd.status()).catch((e) => {
@@ -154,6 +169,17 @@ async function main() {
     }, 10000).catch((e) => ({ error: e.message, clips: [] }));
     const clip = library.clips[0];
     check(library.clips.length === 1 && clip.verdict === '4 stems, and the master', 'a song opened with the app comes into the library', clip ? `${clip.title}: ${clip.verdict}` : JSON.stringify(library.error));
+
+    const meters = await wd.runAsync(METERS);
+    const frames = await until('meters', async () => {
+      const got = await wd.run('return window.__meters');
+      return got.length >= 5 ? got : undefined;
+    }, 5000).catch(() => wd.run('return window.__meters'));
+    check(
+      meters !== null && typeof meters === 'object' && !meters.error && frames.length >= 5 && frames.every((f) => typeof f === 'number' && f > 0),
+      'the meters reach the page as raw bytes',
+      `${frames.length} frames${frames.length ? ` of ${frames[0]}` : ''}${meters?.error ? `; ${JSON.stringify(meters.error)}` : ''}`,
+    );
 
     const rect = await wd.rect();
     check(rect.width === 1280 && rect.height === 800, 'it opens at 1280 × 800', `${rect.width} × ${rect.height}`);
