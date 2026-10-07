@@ -49,9 +49,13 @@ cd app && cargo tauri dev
 
 The window opens on Heat. Your library is made at `~/Music/Wi_WWAV/` the first time.
 
-**What this build holds.** It is being finished today (7 Oct 2026): Heat in full, plus the frames of Space and the Console. The checklist at the top of `docs/PLAN.md` says what has landed so far. The audio engine isn't built by these steps (it needs JUCE and CMake), so the Console says the engine is off; Heat never needs it.
+**What this build holds** (7 Oct 2026; `docs/PLAN.md` has the details):
 
-**Calendars.** Settings → Heat: paste your Brightspace calendar's iCal link (Brightspace → Calendar → Subscribe). It stays in the Keychain.
+- **Heat** (⌘1): Today with the time column, Plan my day and the Pomodoro timer; Tasks; Calendar; Grades; Habits; Mail; Get Info with the Public switch; capture (⌘⇧N). Not built yet: the Settings panes for Heat, Claude and Privacy, sharing to your galaxy and the public view page, the space sheet, notes and the weekly review.
+- **Space** (⌘2): the frame, drawing a sample sky in 3D.
+- **Console** (⌘3): the frame, listing your library. The audio engine isn't built by these steps (it needs JUCE and CMake), so it says the engine is off; Heat never needs it.
+
+**Calendars.** The core reads iCal feeds (the Brightspace link stays in the Keychain), but the Settings → Heat pane that takes the link isn't built yet.
 
 **Claude.** Build the helper once, from the `Wi_WWAV` folder in a second terminal:
 
@@ -59,4 +63,9 @@ The window opens on Heat. Your library is made at `~/Music/Wi_WWAV/` the first t
 cargo build -p wi-mcp
 ```
 
-Then open Settings → Claude in the app. It shows the exact line for Claude Code and the block for Claude Desktop's config, with this helper's path filled in. Restart Claude Desktop after adding it. Ask Claude "What's on my list today?" to check that it works.
+Then tell Claude where it is (Settings → Claude will show these lines once its pane is built). Use the full path of your `Wi_WWAV` folder.
+
+- Claude Code: `claude mcp add --scope user wi-wwav -- /path/to/Wi_WWAV/target/debug/wi-mcp`
+- Claude Desktop: in `~/Library/Application Support/Claude/claude_desktop_config.json`, add `{"mcpServers": {"wi-wwav": {"command": "/path/to/Wi_WWAV/target/debug/wi-mcp"}}}`, then restart Claude Desktop.
+
+Open the app once first so your library exists, then ask Claude "What's on my list today?".

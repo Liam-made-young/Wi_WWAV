@@ -22,18 +22,19 @@ Rules for this work, from the founder (7 Oct 2026): the main agent plus at most 
 
 The spec rewrite is done: `docs/SPEC.md`, with the decisions in `docs/SCOPE_CUT.md`. Edit the spec directly from now on.
 
-**Today: Heat to 100%.**
+**Where 7 Oct ended** (the founder asked to wrap up; everything below is merged and pushed on `claude/relaxed-cori-x2igz9`):
 
-- [x] Spec: the founder's later decisions of 7 Oct (no commerce, gallery uploads, WAV-only plain export, Heat's maths in Rust, the dates)
-- [x] Milestones re-scoped to the new spec (below)
 - [x] A. Heat's maths in Rust (`crates/wi-heat/src/model/`): 242 tests mirroring the TS ones, and 59,067 generated vectors where Rust and TS agree byte for byte (S2.1)
-- [ ] B. Merge `build/tauri` (which holds `build/core`) and `build/shell` into the working branch, brought to the new spec: three views on ⌘1–⌘3, the galaxy chip, no Unquantized; the review tests' findings fixed (stage 1)
-- [ ] C. Heat's records in `library.sqlite` through the journal, and `heat.*` commands backed by A (S2.2–S2.6)
-- [x] D. `wi-mcp`: the eight tools over stdio through `wi-heat-store`, one journal entry per write with `actor` claude, "Undo Claude's …"; 8.12's suite passes (S2.8)
-- [ ] E. Heat's UI: Today, Tasks, Calendar, Grades, Habits, Mail; spaces; capture, notes and the weekly review (S2.2–S2.4, S2.10)
-- [ ] F. iCal: the Brightspace feed and other calendars, fetched by the core (S2.5)
-- [ ] G. Public switches, the public Heat view's preview, Settings → Claude and Privacy (S2.9, S2.11)
-- [ ] H. Review, fix, merge to the working branch, push
+- [x] B. The shell branches merged and brought to the spec: three views on ⌘1–⌘3, the galaxy chip, no Unquantized, first launch and Settings → Account per 2.13–2.14, the review findings fixed
+- [x] C. Heat's store and commands: `crates/wi-heat-store` and every `heat.*` command in wi-core, the journal's `actor`/`tool`/`reason`, the 500 ms watcher, calendars with addresses in the Keychain, Heat sync of public copies, export (`heat.json` and Obsidian markdown), and Heat running with no audio engine (S2.2–S2.6, S2.9–S2.11 through the commands: 43 core tests)
+- [x] D. `wi-mcp`: the eight tools over stdio; 8.12's suite passes (S2.8)
+- [x] E, part 1. Heat's screens: the frame, Today (time column, Plan my day, Pomodoro, the five widgets), Tasks, Calendar, Grades, Habits, Mail, Get Info with the Public switch, capture and inbox triage
+- [x] The frames of Space (the sky in three.js, a sample catalogue marked as one) and the Console (its regions per 5.2, the real library, the engine's state)
+- [x] An end-to-end check through the real core: Claude's helper adds a task from its own process while the app runs, it shows as Claude's, and ⌘Z takes it back (`app/ui/e2e/heat/claude.spec.ts`)
+- [ ] E, part 2. Not built yet in the UI, though every command behind them exists: Settings → Heat (the School sheet and calendars), Settings → Claude (the config lines, the switches, recent changes) and Settings → Privacy; dropping a task on "Your galaxy" and the public Heat view page; the space sheet; notes; the weekly review; hiding widgets from the View menu
+- [ ] Mac checks: the Tauri build itself has not been run on a Mac or under Xvfb with today's code (the container's disk couldn't hold it), nor the WebKit pass
+
+**Green on the last merge (520fe28):** `cargo clippy --workspace --all-targets -D warnings` clean; wi-core, wi-store, wi-heat-store and wi-mcp tests all pass (97 in wi-core); `tsc` clean; Vitest 703 pass; the Claude end-to-end check passes. The agents' own runs: `cargo test --workspace` 900 pass, mock server 128, Playwright 29 (shell) and 30 (Heat on the fake core).
 
 **Then, to the weekend:** Console audio, VST effects and MIDI → Space in three.js → Console video and `.swav` → Demucs.
 
