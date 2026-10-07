@@ -2,7 +2,7 @@
 
 How Learn (`docs/SPEC.md` chapter 3) and its MCP server (3.13, 8.8) are built:
 where each part lives, what is stored, the core's `heat.*` commands, and the
-twenty-one tools. The spec says what Learn does; this file says how the parts talk.
+twenty-three tools. The spec says what Learn does; this file says how the parts talk.
 Where they disagree, the spec wins and this file is fixed.
 
 ## Where things live
@@ -12,7 +12,7 @@ Where they disagree, the spec wins and this file is fixed.
 | `crates/wi-heat` | The rules and the maths, as plain functions over plain records: `model/` (heat, the estimate chain, grades, Plan my day, focus, habits, recurrence, the weekly review's facts, moving in), the iCal and Brightspace parsers, the mail rules, sync's clock | I/O, the clock (time comes in as `now`), global state |
 | `crates/wi-heat-store` | Learn's reads and writes on `library.sqlite`, through `wi-store`'s journal: one function per operation below, each one transaction. The core and `wi-mcp` both call it, so a rule exists once | the network, the Keychain, the engine |
 | `crates/wi-core` | The `heat.*` commands (thin wrappers over `wi-heat-store`), the iCal fetch (network, addresses from the Keychain), Learn sync, and the watcher that notices other processes' commits | maths of its own |
-| `crates/wi-mcp` | The stdio helper: MCP over JSON-RPC, the twenty-one tools, the switches. Calls `wi-heat-store` with `actor = claude` | the network, the Keychain, any write a tool's table doesn't name |
+| `crates/wi-mcp` | The stdio helper: MCP over JSON-RPC, the twenty-three tools, the switches. Calls `wi-heat-store` with `actor = claude` | the network, the Keychain, any write a tool's table doesn't name |
 | `app/ui/src/heat/` | The views. Reads `heat.snapshot`, writes through `heat.*`, refetches on the `heat` event | sorting by heat, clamping, planning, grade arithmetic: the snapshot carries every derived value |
 
 The TS model in `app/ui/src/heat/model/` is the reference the Rust was ported
@@ -210,7 +210,7 @@ is error -32601.
   `--library <dir>` as an override for tests. No library, or a newer layout
   than it knows: one sentence, nothing written: "No Wi_WWAV library yet. Open
   the app once."
-- **Tools.** The twenty-one in 3.13, with those arguments, results and labels:
+- **Tools.** The twenty-three in 3.13, with those arguments, results and labels:
   the first eight for mail and planning, then `get_schedule`, `draft_block`,
   `list_habits`, `list_projects`, `add_project`, `add_milestone`, `get_notes`,
   `add_note`, `list_inbox` and `add_capture`. The four that add a record go
@@ -223,7 +223,8 @@ is error -32601.
   the two lines of 3.13. A result is `content: [{type: "text", text: <the JSON>}]`
   plus `structuredContent` with the same object.
 - **Mail accounts** are the setting `mail.accounts` (`crates/wi-heat-store/src/mail.rs`), set whole by `heat.mail.accounts.set {accounts}` and read back as the snapshot's `mailAccounts`. `list_mail_accounts` and `list_mail` read them and the recorded threads; a `mailThread` carries `account`, `priority` and `category`. A thread's text is a `mailText` record keyed by Gmail's thread id (`{threadId, savedAt, messages: [{id?, from, to?, sentAt, text}]}`), written by `save_mail_text` with `set_doc`, outside the journal, and read by `heat.mail.text {threadId}`. `mailText` is in the core's `local_only` list and left out of the export.
-- **Prompts.** Two. `read_mail {account?, days?}` words the whole job for every account. `school_mail {days?}` (1–60, default 7): the job of 3.12's
+- **Mail as a client** (3.10): `crates/wi-heat-store/src/mail.rs` keeps each thread's place (`mailState`: unread, archived), the outbox (`mailAction`: send, reply, archive, unarchive, markRead, markUnread; queued, done or failed) and `search`. All of it, like `mailText`, is outside the journal and in the core's `local_only` list. `crates/wi-core/src/mail_cmd.rs` answers `heat.mail.send`, `.reply`, `.archive`, `.mark`, `.search`, `.outbox`, `.outbox.retry`, `.outbox.discard`, `.sync` and `.background.set`, adds `mailState` and `mailSync` to the snapshot, and runs the worker. The worker asks Claude through `crates/wi-core/src/claude_cli.rs` (one `claude -p` run, built-in tools and skills off, only the named MCP tools allowed) for the read job and the send job, whose tool lists share nothing. `Config::background_mail` turns the timed read on; `Config::claude` or `WI_WWAV_CLAUDE` names the binary.
+- **Prompts.** Three, the third being `send_mail` (the outbox job). The first two: `read_mail {account?, days?}` words the whole job for every account. `school_mail {days?}` (1–60, default 7): the job of 3.12's
   mail rows written out for Claude, naming the school and its Brightspace
   host from Settings → Learn in a Gmail query. A prompt calls no tool and
   writes nothing; it is how the person starts the job in one step

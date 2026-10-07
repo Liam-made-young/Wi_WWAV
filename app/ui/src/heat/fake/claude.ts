@@ -28,6 +28,8 @@ export const TOOLS = [
   'list_mail_accounts',
   'list_mail',
   'save_mail_text',
+  'list_mail_outbox',
+  'finish_mail_action',
 ] as const;
 
 const HELPER = '/Applications/Wi_WWAV.app/Contents/Helpers/wi-mcp';

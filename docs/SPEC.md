@@ -1,3 +1,24 @@
+**A mail client** (**Decided** by the founder, 7 Oct 2026: Mail has to be useful to its owner before anyone else, so it answers, files and searches mail, and stays current on its own). This reverses the earlier "Mail has no reply, send or delete".
+
+- **Reply** (R) and **Compose** (the tab's "+") open a plain composer: To, Cc, Subject and the mail. **Send** (⌘Return) puts it in the **outbox** as written and sends it at once.
+- **Archive** (E) takes a thread out of the inbox, and **Mark unread** (U) flags it. Choosing an unread thread reads it. Each shows in Learn at once and reaches Gmail within the minute.
+- **Search** reads the subject, the sender and the saved text of every recorded thread.
+- **Sort** by Priority, Date, Unread first or Tag (the category).
+- The sidebar holds **Inbox**, **Unread**, **Archived** and **Outbox**. The outbox lists what is waiting, what failed and why (with **Try again** and **Discard**), and the last twenty that went.
+- **Open in Gmail** is still the secondary action, and **Make a task** (T) still opens the task sheet with the subject and notes that start "From mail:".
+- Mail has no delete, trash or spam.
+
+**How mail moves.** The app still holds no password and no token for any mailbox, and has no Google sign-in. It runs the person's own Claude Code (`claude -p`), which has their Gmail connector, for two jobs that never share a run:
+
+| Job | May | May not | Runs |
+|---|---|---|---|
+| **Read** | search and read mail; record threads, their text, tasks and pending grades in Learn | send, reply, label, archive or delete anything | on **Read mail now**, and every half hour while the app is open unless "Read on its own" is off |
+| **Send** | read the outbox; send, reply, add and remove labels; mark an outbox action done or failed | read or search any mail | at once for a send or a reply; on the minute for archives and marks |
+
+The built-in tools (shell, files, the web) and the skills are off for both. So a message that tries to instruct the read job can at most make it record something wrong, which is labelled and undoable, and nothing but what the person wrote in Learn can reach the job that sends. A mail is sent character for character; a run that can't start (Claude Code missing or signed out) fails each waiting action with that sentence. Both jobs run on the smallest model, because they run often.
+
+The status line under the header says how it is going: "Reading your mail…", "Mail read 3:41 PM: 2 new threads", or why it couldn't.
+
 # Wi_WWAV
 
 *One desktop app with three views: Learn, where you plan your time and keep a private profile with a simple public face; Space, where you live among other people's work as a galaxy; and the Console, where you make songs and films on one clock.*
@@ -735,10 +756,10 @@ Estimates and drafts. Never decides: the person accepts, edits or undoes every c
 Never invent metrics: only restate numbers this app returned.
 ```
 
-- **What no tool can do.** No tool marks a task or a milestone done, ticks a habit, triages a capture, accepts a draft, edits or deletes anything the person made, changes a due date, writes a score, sends mail, or reads or sets a **Public** switch. Privacy is yours alone (3.15).
+- **What no tool can do.** Apart from the outbox's two (which only carry out what the person wrote in Mail), no tool marks a task or a milestone done, ticks a habit, triages a capture, accepts a draft, edits or deletes anything the person made, changes a due date, writes a score, sends mail, or reads or sets a **Public** switch. Privacy is yours alone (3.15).
 - **Consent.** Claude's own tool-permission prompts ask before a tool you haven't allowed. Settings → Claude has a switch for each tool, and a tool switched off is missing from the list the server offers.
 
-**The tools.** There are twenty-one: the eight for mail and planning, ten that read the rest of Learn and draft into it (**Decided** by the founder, 7 Oct 2026: more tools, the same rule), two that read the mail accounts and what is recorded from each, and one that saves a thread's text for the reader.
+**The tools.** There are twenty-three: the eight for mail and planning, ten that read the rest of Learn and draft into it (**Decided** by the founder, 7 Oct 2026: more tools, the same rule), two that read the mail accounts and what is recorded from each, one that saves a thread's text for the reader, and two for the outbox.
 
 | Tool | Arguments | Result | Undo label |
 |---|---|---|---|
@@ -749,7 +770,7 @@ Never invent metrics: only restate numbers this app returned.
 | `get_grades` | `course?` (a code) | `{ term, courses[] }`: each course has `code`, `name`, `scale`, categories with weights, `items[]` (`name`, `category`, `score?`, `out_of`, `dropped`, `pending`), and Learn's `current_pct`, `decided_pct` and `letter` | none |
 | `add_pending_grade` | `course`; `item`; `posted_at?`; `link?` (the Brightspace address); `mail_thread_id?`; `reason`. There is no score argument | `{ grade, created }`. A grade for the same course and item is not made twice | "Undo Claude's pending grade" |
 | `log_focus` | `task_id`; `minutes` (1–600); `started_at?` (default: now minus `minutes`); `reason` | `{ focus_record, actual_min }` | "Undo Claude's focus log" |
-| `record_mail_thread` | `thread_id` (Gmail's); `subject`; `from`; `received_at`; `course?`; `state` (`grade`, `task` or `nothing`); `task_id?`; `account?` (an address from `list_mail_accounts`; default the only account); `priority?` (default `normal`); `category?`; `reason` | `{ thread, created }`. The same `thread_id` again updates the state and reason and leaves one row | "Undo Claude's mail note" |
+| `record_mail_thread` | `thread_id` (Gmail's); `subject`; `from`; `received_at`; `course?`; `state` (`grade`, `task` or `nothing`); `task_id?`; `account?` (an address from `list_mail_accounts`; default the only account); `priority?` (default `normal`); `category?`; `unread?` (Gmail's own flag); `reason` | `{ thread, created }`. The same `thread_id` again updates the state and reason and leaves one row | "Undo Claude's mail note" |
 
 | `get_schedule` | `from?` (a day, default today); `to?` (default `from`; at most 31 days on) | `{ from, to, blocks[], events[], due[], drafts[] }`: blocks with `id`, `title`, `start`, `minutes` and `task_id` or `habit_id`; calendar events with `title`, `start`, `end`, `all_day`; open tasks due in the window; the drafts that wait | none |
 | `draft_block` | `task_id`; `date?` (default today); `start` (`HH:MM`); `minutes` (15–240); `reason`. Both are rounded to 15 minutes, between 7 AM and midnight | `{ draft, drafts_waiting }`. A time a block, a draft or a timed calendar event holds is refused; a second draft for the same task and day replaces the first. Claude cannot accept it | none; a draft is not a change |
@@ -761,6 +782,8 @@ Never invent metrics: only restate numbers this app returned.
 | `add_note` | `title`; `text` (Markdown, at most 20,000 characters); `project_id?`; `reason` | `{ note }`. It never edits a note the person wrote, and never the daily note | "Undo Claude's note" |
 | `list_inbox` | none | `{ captures[] }`: the ones not triaged, with `id`, `text` and `by` | none |
 | `add_capture` | `text`; `reason` | `{ capture, in_inbox }`. Only the person triages it | "Undo Claude's capture" |
+| `list_mail_outbox` | none | `{ actions[] }`, oldest first: `id`, `kind` (`send`, `reply`, `archive`, `unarchive`, `markRead`, `markUnread`), `thread_id`, `to`, `cc`, `subject`, `body`, `account` | none |
+| `finish_mail_action` | `id`; `result` (`done` or `failed`); `error?` | `{ id, status }`. A done action is never done again | none: the mail has gone |
 | `list_mail_accounts` | none | `{ accounts[], priorities, categories }`: each account has `address`, `name`, `arrives`, the `gmail_query` that finds its mail and no other's, and `recorded` | none |
 | `list_mail` | `account?`; `state?`; `priority?`; `category?`; `since?`; `limit?` (default 50, at most 200) | `{ threads[], recorded }`, newest first: `thread_id`, `account`, `subject`, `from`, `received_at`, `course`, `state`, `priority`, `category`, `reason`, `task_id` | none |
 
@@ -2078,7 +2101,7 @@ This is the engineering plan. The two-process split, Tauri, JUCE hosting third-p
 | `Wi_WWAV.app` | Tauri 2: a Rust core, and the web UI in WKWebView (WebView2 on Windows) | windows, menus, the three views, the library, undo, sync, the account, video | Tauri's event loop |
 | `wwav-engine` (`Contents/Helpers/wwav-engine.app`) | JUCE 8 (C++) with PRANA's `prana/core` | the audio device, the graph, MIDI, third-party plugins and their windows | JUCE's message loop |
 | `wwav-scan` | JUCE, command line | one pass over the plugin folders, then exits | none |
-| `wi-mcp` (in `Contents/Helpers/`) | Rust, command line | the twenty-one tools over the library (8.8); no window, no network | none; a stdio loop |
+| `wi-mcp` (in `Contents/Helpers/`) | Rust, command line | the twenty-three tools over the library (8.8); no window, no network | none; a stdio loop |
 
 The app and the engine are the split. Why two:
 
@@ -2333,7 +2356,7 @@ A read (`list_tasks`, `get_grades`) writes nothing. `plan_day` writes only the d
 
 - **Local only, by default.** stdio has no address to reach. Nothing outside your Mac can call a tool.
 - **No network credentials.** The helper holds no account token, never opens the Keychain, and makes no network call. The iCal addresses and the account's JWT are out of its reach.
-- **The door is the list.** The helper offers twenty-one tools, and the store functions behind them take only the fields in 3.13's table. There is no argument that can set `done`, a score or the `public` flag, delete a record, change an existing due date, send mail or read the Public switch.
+- **The door is the list.** The helper offers twenty-three tools, and the store functions behind them take only the fields in 3.13's table. There is no argument that can set `done`, a score or the `public` flag, delete a record, change an existing due date, send mail or read the Public switch.
 - **Switches.** Settings → Claude has a switch for each tool, kept in the library. The helper reads them on every list and every call, so a tool switched off is missing from what it offers, and a call to it is refused: "This tool is switched off in Wi_WWAV."
 - **Claude's words are data.** Titles, notes and reasons Claude sends are length-limited and drawn as plain text, never HTML, like words other people wrote (8.9).
 - **What Claude reads.** The Public switch decides what other people see. It does not stop Claude reading your Mac's library through a tool you allowed. That is Claude's own permission prompt (3.13).
@@ -2907,7 +2930,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Lineage link | A claim between works (influence, sample, collab, cover, custom) that waits for the other owner's **Agree** | 4.9 |
 | LMY | Liam, the founder; how the letters are signed | 9.3 |
 | Mail thread | A row in Mail made by Claude's `record_mail_thread`: subject, sender, time, state and a reason, never the body | 3.10 |
-| MCP server | A server that speaks the Model Context Protocol so Claude can call its tools. Wi_WWAV is one, with twenty-one tools | 2.11, 3.13, 8.8 |
+| MCP server | A server that speaks the Model Context Protocol so Claude can call its tools. Wi_WWAV is one, with twenty-three tools | 2.11, 3.13, 8.8 |
 | Message door | A message to one person. It opens once two people have added each other, with no read receipts and no unread badge | 4.11 |
 | mi-wwav.com | The existing server, which stays: Heroku, Express, Postgres and Cloudflare R2 | 8.7 |
 | Mi_cro_WWAV, Mi_pro_WWAV | Mi's pocket tier and its desktop-studio tier | 9.2 |

@@ -194,6 +194,37 @@ export interface MailMessage {
   text: string;
 }
 
+/** Where a thread sits in the mailbox. A thread with no entry is read and in the inbox. */
+export interface MailPlace {
+  unread: boolean;
+  archived: boolean;
+}
+
+/** Something asked for in Mail, waiting for Claude to do it in Gmail, or done, or failed. */
+export interface MailAction {
+  id: Id;
+  kind: 'send' | 'reply' | 'archive' | 'unarchive' | 'markRead' | 'markUnread';
+  status: 'queued' | 'done' | 'failed';
+  threadId?: string;
+  to?: string;
+  cc?: string;
+  subject?: string;
+  body?: string;
+  error?: string;
+  createdAt: number;
+  doneAt?: number;
+}
+
+/** How mail is kept in step: the last read's line, what a run is doing now, and the outbox's counts. */
+export interface MailSync {
+  line: string | null;
+  at: number | null;
+  doing: 'reading' | 'sending' | null;
+  background: boolean;
+  queued: number;
+  failed: number;
+}
+
 /** A mail account Claude reads (docs/SPEC.md 3.10). Learn holds no password for it. */
 export interface MailAccount {
   address: string;
@@ -343,6 +374,9 @@ export interface Snapshot {
   school?: School | null;
   /** The mail accounts, for Mail's switcher; beyond docs/HEAT.md. */
   mailAccounts?: MailAccount[];
+  /** Each thread's place, by Gmail's thread id. */
+  mailState?: Record<string, MailPlace>;
+  mailSync?: MailSync;
   derived: {
     tasks: Record<Id, TaskDerived>;
     today: {
@@ -454,6 +488,21 @@ export function heatClient(t: Transport = real) {
     mail: {
       /** A thread's saved text, by Gmail's thread id; null before Claude has saved it. */
       text: (threadId: string) => c<{ messages: MailMessage[] | null }>('heat.mail.text', { threadId }),
+      /** A new mail, into the outbox and out at once. */
+      send: (mail: { to: string; cc?: string; subject: string; body: string }) =>
+        c<{ action: MailAction }>('heat.mail.send', mail),
+      reply: (threadId: string, body: string, to?: string, cc?: string) =>
+        c<{ action: MailAction }>('heat.mail.reply', { threadId, body, to, cc }),
+      archive: (threadId: string, archived: boolean) => c<{ action: MailAction }>('heat.mail.archive', { threadId, archived }),
+      mark: (threadId: string, unread: boolean) => c<{ action: MailAction }>('heat.mail.mark', { threadId, unread }),
+      /** Threads whose subject, sender or saved text hold every word. */
+      search: (q: string) => c<{ threadIds: string[] }>('heat.mail.search', { q }),
+      outbox: () => c<{ actions: MailAction[] }>('heat.mail.outbox'),
+      retry: (id: Id) => c<Record<string, never>>('heat.mail.outbox.retry', { id }),
+      discard: (id: Id) => c<Record<string, never>>('heat.mail.outbox.discard', { id }),
+      /** Sends what waits, then reads what is new. Answers at once; `mailSync` says how it goes. */
+      sync: () => c<{ started: boolean }>('heat.mail.sync'),
+      setBackground: (on: boolean) => c<Record<string, never>>('heat.mail.background.set', { on }),
     },
     calendars: {
       add: (name: string, kind: Calendar['kind'], url: string) => c<{ calendar: Calendar }>('heat.calendars.add', { name, kind, url }),
