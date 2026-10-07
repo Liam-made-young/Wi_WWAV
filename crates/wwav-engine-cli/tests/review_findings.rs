@@ -1,7 +1,6 @@
-//! Adversarial review of build/wire. Each test here exposes a defect the
-//! review found in wwav-engine-cli; it is `#[ignore]`d, with the finding
-//! named, until fixed. Run them with
-//! `cargo test -p wwav-engine-cli --test review_findings -- --ignored`.
+//! Adversarial review of build/wire. Each test here exposed a defect the
+//! review found in wwav-engine-cli, named in its doc comment; the defects are
+//! fixed, and the tests stay to keep them so.
 
 use serde_json::{json, Value};
 use std::io::Write;
@@ -65,7 +64,6 @@ fn run_against(
 /// And over `--connect` nothing waits at the end of the script, so an event
 /// that follows the last response is never printed at all.
 #[test]
-#[ignore = "finding: wwav-engine-cli reorders events before responses and drops trailing events"]
 fn every_event_prints_after_the_response_it_followed() {
     // The engine's wire order, every time: the response, then one event.
     fn reply(id: u64, op: &str) -> Vec<u8> {
@@ -104,13 +102,14 @@ fn every_event_prints_after_the_response_it_followed() {
 /// script line that doesn't parse fails the run, so a CI step that runs a
 /// script to prove the contract passes when the engine breaks it.
 #[test]
-#[ignore = "finding: wwav-engine-cli exits 0 when a request fails"]
 fn a_request_that_fails_fails_the_run() {
     // An engine that never answers.
     fn silent(_: u64, _: &str) -> Vec<u8> {
         Vec::new()
     }
     let (code, lines) = run_against("silent", "ping\n", &["--timeout", "200ms"], silent);
-    assert_eq!(lines.last().unwrap()["failed"]["error"], "timeout");
+    let failed: Vec<&Value> = lines.iter().filter_map(|l| l.get("failed")).collect();
+    assert_eq!(failed.len(), 1, "{lines:?}");
+    assert_eq!(failed[0]["error"], "timeout");
     assert_ne!(code, 0, "the ping timed out, yet the run passed");
 }

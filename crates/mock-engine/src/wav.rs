@@ -22,6 +22,13 @@ impl SampleFormat {
     }
 }
 
+/// The data chunk's size for `frames` stereo frames, if a WAVE file can
+/// hold it: the RIFF chunk's size, 36 header bytes plus the data, is a u32.
+pub fn data_bytes(frames: u64, format: SampleFormat) -> Option<u32> {
+    let data = u32::try_from(frames.checked_mul(2 * format.bytes() as u64)?).ok()?;
+    data.checked_add(36).map(|_| data)
+}
+
 pub struct WavWriter {
     out: BufWriter<File>,
     hash: Sha256,
@@ -36,9 +43,8 @@ impl WavWriter {
         format: SampleFormat,
         frames: u64,
     ) -> io::Result<WavWriter> {
-        let data = frames * 2 * format.bytes() as u64;
-        let data = u32::try_from(data)
-            .map_err(|_| io::Error::other("a render over 4 GB doesn't fit a WAVE file"))?;
+        let data = data_bytes(frames, format)
+            .ok_or_else(|| io::Error::other("a render over 4 GB doesn't fit a WAVE file"))?;
         let block_align = 2 * format.bytes();
         let mut h = Vec::with_capacity(44);
         h.extend_from_slice(b"RIFF");
@@ -118,6 +124,30 @@ mod tests {
         assert_eq!(&bytes[36..40], b"data");
         assert_eq!(f32::from_le_bytes(bytes[44..48].try_into().unwrap()), 0.5);
         assert_eq!(sha, hex::encode(Sha256::digest(&bytes)));
+    }
+
+    #[test]
+    fn the_largest_render_that_fits_a_wave_file() {
+        // The RIFF size, 36 + data, must fit a u32.
+        let f32_max = (u32::MAX as u64 - 36) / 8;
+        assert_eq!(
+            data_bytes(f32_max, SampleFormat::F32),
+            Some(f32_max as u32 * 8)
+        );
+        assert_eq!(data_bytes(f32_max + 1, SampleFormat::F32), None);
+        assert_eq!(data_bytes(536_870_911, SampleFormat::F32), None);
+        let s16_max = (u32::MAX as u64 - 36) / 4;
+        assert!(data_bytes(s16_max, SampleFormat::S16).is_some());
+        assert_eq!(data_bytes(s16_max + 1, SampleFormat::S16), None);
+        assert_eq!(data_bytes(u64::MAX, SampleFormat::S16), None);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.wav");
+        assert!(WavWriter::create(&path, 48000, SampleFormat::F32, f32_max + 1).is_err());
+        assert!(
+            !path.exists(),
+            "nothing is written for a render that can't fit"
+        );
     }
 
     #[test]

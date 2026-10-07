@@ -1,7 +1,6 @@
-//! Adversarial review of build/wire. Each test here exposes a defect the
-//! review found in mock-engine; it is `#[ignore]`d, with the finding named,
-//! until fixed. Run them with
-//! `cargo test -p mock-engine --test review_findings -- --ignored`.
+//! Adversarial review of build/wire. Each test here exposed a defect the
+//! review found in mock-engine, named in its doc comment; the defects are
+//! fixed, and the tests stay to keep them so.
 
 use serde_json::{json, Value};
 use std::path::Path;
@@ -42,7 +41,6 @@ fn engine(tmp: &Path) -> EngineProcess {
 /// `state: playing, rate: 48000`. From 10 minutes in with a loop of 0..1000
 /// it runs backwards at about 330,000 samples a second for some 90 s.
 #[test]
-#[ignore = "finding: mock-engine runs the playhead backwards under a loop behind it"]
 fn a_loop_behind_the_playhead_never_runs_the_clock_backwards() {
     let tmp = tempfile::tempdir().unwrap();
     let p = engine(tmp.path());
@@ -79,7 +77,6 @@ fn a_loop_behind_the_playhead_never_runs_the_clock_backwards() {
 /// a second (one minute of audio here) gets the mock killed mid-render by the
 /// supervisor it stands in for. §3.6 puts render on a non-real-time thread.
 #[test]
-#[ignore = "finding: mock-engine answers no ping during a render"]
 fn a_ping_is_answered_during_a_render() {
     let tmp = tempfile::tempdir().unwrap();
     let p = Arc::new(engine(tmp.path()));
@@ -109,7 +106,6 @@ fn a_ping_is_answered_during_a_render() {
 /// render should be refused like any longer one ("a render over 4 GB doesn't
 /// fit a WAVE file").
 #[test]
-#[ignore = "finding: a render at the WAVE size limit crashes mock-engine"]
 fn a_render_at_the_wave_size_limit_is_refused_not_a_crash() {
     let tmp = tempfile::tempdir().unwrap();
     let mut p = engine(tmp.path());
@@ -126,7 +122,6 @@ fn a_render_at_the_wave_size_limit_is_refused_not_a_crash() {
 /// the engine reports back (see wwav-wire's review_findings for the cause).
 /// The state blob, its sha256 and the session hash S3.4 compares move with it.
 #[test]
-#[ignore = "finding: F8 - serde_json without float_roundtrip changes f64s by one ULP"]
 fn a_plugin_param_reads_back_as_it_was_set() {
     let tmp = tempfile::tempdir().unwrap();
     let p = engine(tmp.path());
@@ -151,7 +146,6 @@ fn a_plugin_param_reads_back_as_it_was_set() {
 /// engine can't bind and exits). wi-core's supervisor tests, run in parallel
 /// in one test binary with the default tmp_dir, would trip over each other.
 #[test]
-#[ignore = "finding: two EngineProcesses in one process share one socket path"]
 fn two_engines_in_one_process_keep_their_own_sockets() {
     let tmp = tempfile::tempdir().unwrap();
     let mut c = EngineConfig::new(MOCK);

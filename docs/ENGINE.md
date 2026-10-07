@@ -29,9 +29,12 @@ The app creates two things before it starts the engine, so both outlive it:
 Then it runs:
 
 ```
-wwav-engine --socket <dir>/engine.sock --shm <name> [--device <name|null>]
+wwav-engine --socket <dir>/engine-<n>.sock --shm <name> [--device <name|null>]
             [--rate 48000] [--block 128] [--test]
 ```
+
+`<n>` is the region's (`/wwav-<app pid>-<n>`), so every engine the app
+starts has a socket and a region of its own.
 
 - The engine **listens** on `--socket` (a Unix domain socket, mode 0600; a
   named pipe on Windows) and accepts one client at a time.
@@ -289,9 +292,13 @@ Rust mirror.
 
 Every audio callback writes it: `seq += 1` (odd), the fields, `seq += 1`
 (even), with release ordering. A reader loads `seq`, reads the fields, loads
-`seq` again, and retries if it changed or is odd. `sample_pos` has output
-latency and plugin delay already subtracted. The UI extrapolates the cursor
-from `sample_pos + (now - host_time_ns) × rate / 1e9`.
+`seq` again, and retries if it changed or is odd. An engine killed between
+the two increments leaves `seq` odd: before it starts the next engine on the
+region, the app writes a whole clock over it (stopped, at the `sample_pos` it
+holds) with `seq` even, and an engine that finds `seq` odd rounds it up to
+even before its first write. `sample_pos` has output latency and plugin delay
+already subtracted. The UI extrapolates the cursor from
+`sample_pos + (now - host_time_ns) × rate / 1e9`.
 
 ### 4.3 Crumb (offset 128, 64 bytes)
 

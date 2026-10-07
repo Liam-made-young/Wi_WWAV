@@ -5,7 +5,8 @@
 //! (responses may come in any order), an event goes on the event channel.
 //! When the connection ends, for any reason, every waiting call fails with
 //! `Closed` and the event channel ends, which is how the app sees an engine
-//! die.
+//! die. `request_ordered` also says how many events came before a response,
+//! for a caller (the CLI) that shows both in the wire's order.
 
 use crate::frame::{self, FrameError};
 use crate::msg::{ErrorBody, Event, Incoming, Request, Response};
@@ -48,9 +49,19 @@ struct Shared {
     closed: Condvar,
 }
 
+/// A response and its place among the events.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Answer {
+    pub response: Response,
+    /// How many events the connection had delivered when the response
+    /// arrived: the ones that came before it on the wire. They are on the
+    /// event channel ahead of any that came after it.
+    pub events_before: u64,
+}
+
 #[derive(Default)]
 struct State {
-    waiting: HashMap<u64, SyncSender<Response>>,
+    waiting: HashMap<u64, SyncSender<Answer>>,
     /// Why the connection ended, once it has.
     closed: Option<String>,
 }
@@ -106,6 +117,17 @@ impl Client {
 
     /// Like `call`, but an engine's refusal comes back as the response it is.
     pub fn request(&self, op: &str, args: Value, timeout: Duration) -> Result<Response, CallError> {
+        self.request_ordered(op, args, timeout).map(|a| a.response)
+    }
+
+    /// Like `request`, with the number of events that came before the
+    /// response.
+    pub fn request_ordered(
+        &self,
+        op: &str,
+        args: Value,
+        timeout: Duration,
+    ) -> Result<Answer, CallError> {
         let args = match args {
             Value::Null => None,
             Value::Object(m) => Some(m),
@@ -148,7 +170,7 @@ impl Client {
             });
         }
         match rx.recv_timeout(timeout) {
-            Ok(response) => Ok(response),
+            Ok(answer) => Ok(answer),
             Err(RecvTimeoutError::Timeout) => {
                 // A late answer finds no one waiting and is dropped.
                 self.shared.lock().waiting.remove(&id);
@@ -186,6 +208,13 @@ impl Client {
         true
     }
 
+    /// Says this side has nothing more to send (a half close). The engine
+    /// reads the end of its input and closes the connection, and everything
+    /// it sent before that still arrives.
+    pub fn close_writes(&self) {
+        let _ = self.stream.shutdown(Shutdown::Write);
+    }
+
     /// Ends the connection from this side.
     pub fn close(&self) {
         let _ = self.stream.shutdown(Shutdown::Both);
@@ -216,6 +245,8 @@ impl Shared {
 }
 
 fn read_loop(mut stream: UnixStream, shared: Arc<Shared>, events: Sender<Event>) {
+    // Events handed to the channel so far, whether or not anyone listens.
+    let mut delivered: u64 = 0;
     let why = loop {
         let m = match frame::read(&mut stream) {
             Ok(Some(m)) => m,
@@ -223,13 +254,17 @@ fn read_loop(mut stream: UnixStream, shared: Arc<Shared>, events: Sender<Event>)
             Err(e) => break format!("The connection broke: {e}."),
         };
         match Incoming::from_object(m) {
-            Ok(Incoming::Response(r)) => {
-                if let Some(tx) = shared.lock().waiting.remove(&r.id) {
-                    let _ = tx.send(r);
+            Ok(Incoming::Response(response)) => {
+                if let Some(tx) = shared.lock().waiting.remove(&response.id) {
+                    let _ = tx.send(Answer {
+                        response,
+                        events_before: delivered,
+                    });
                 }
             }
             Ok(Incoming::Event(e)) => {
                 let _ = events.send(e);
+                delivered += 1;
             }
             Err(e) => break e,
         }

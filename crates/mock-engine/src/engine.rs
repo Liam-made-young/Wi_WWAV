@@ -2,7 +2,7 @@
 //! It speaks the contract exactly; only the audio is fake (`model`).
 
 use crate::model::{self, Mix, Strip};
-use crate::wav::{SampleFormat, WavWriter};
+use crate::wav::{self, SampleFormat, WavWriter};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use serde::Serialize;
@@ -11,6 +11,8 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 use wwav_wire::frame;
@@ -456,6 +458,10 @@ fn change(
     }
 }
 
+fn unknown(op: &str) -> Reply {
+    fail("unknown_op", format!("No op named \"{op}\"."))
+}
+
 fn whole(v: Option<&Value>) -> Option<i64> {
     let v = v?;
     v.as_i64().or_else(|| {
@@ -465,13 +471,35 @@ fn whole(v: Option<&Value>) -> Option<i64> {
     })
 }
 
+/// A request waiting its turn on the worker.
+struct Job {
+    /// The connection it came on: its answer goes there or nowhere.
+    conn: u64,
+    id: u64,
+    op: String,
+    args: Map<String, Value>,
+}
+
+/// What the message thread answers at once. Everything else runs on the
+/// worker, one request at a time in the order they came, as the engine runs
+/// them, so a render (§3.6) holds up the session and the transport but never
+/// a ping (§3.1).
+fn at_once(op: &str) -> bool {
+    matches!(op, "hello" | "ping" | "shutdown") || op.starts_with("debug.")
+}
+
 pub struct Engine {
     shm: Shm,
     test: bool,
     socket: PathBuf,
     state: Mutex<State>,
-    /// The connected client, for replies and events.
-    out: Mutex<Option<UnixStream>>,
+    /// The connected client and which connection it is, for replies and
+    /// events.
+    out: Mutex<Option<(u64, UnixStream)>>,
+    connections: AtomicU64,
+    jobs: Sender<Job>,
+    /// Taken by `work`.
+    queue: Mutex<Option<Receiver<Job>>>,
 }
 
 impl Engine {
@@ -503,12 +531,16 @@ impl Engine {
             plugins_dirty: false,
             plugins_sent: Instant::now(),
         };
+        let (jobs, queue) = mpsc::channel();
         Engine {
             shm,
             test,
             socket,
             state: Mutex::new(state),
             out: Mutex::new(None),
+            connections: AtomicU64::new(0),
+            jobs,
+            queue: Mutex::new(Some(queue)),
         }
     }
 
@@ -516,10 +548,19 @@ impl Engine {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// To whoever is connected: events, which say what the engine is doing.
     fn send<T: Serialize>(&self, msg: &T) {
         let mut out = self.out.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(stream) = out.as_mut() {
+        if let Some((_, stream)) = out.as_mut() {
             // A client that has gone is noticed by the read side.
+            let _ = frame::write(stream, msg);
+        }
+    }
+
+    /// Only on connection `conn`: an answer is meaningless to the next client.
+    fn send_on<T: Serialize>(&self, conn: u64, msg: &T) {
+        let mut out = self.out.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((_, stream)) = out.as_mut().filter(|(c, _)| *c == conn) {
             let _ = frame::write(stream, msg);
         }
     }
@@ -540,9 +581,12 @@ impl Engine {
         std::process::exit(0)
     }
 
-    /// One client, until it goes. Requests are answered in order.
+    /// One client, until it goes. The few ops `at_once` names are answered
+    /// here; the rest go to the worker in the order they came.
     pub fn serve(&self, mut stream: UnixStream) {
-        *self.out.lock().unwrap_or_else(|e| e.into_inner()) = stream.try_clone().ok();
+        let conn = self.connections.fetch_add(1, Ordering::Relaxed) + 1;
+        *self.out.lock().unwrap_or_else(|e| e.into_inner()) =
+            stream.try_clone().ok().map(|s| (conn, s));
         let mut greeted = false;
         while let Ok(Some(m)) = frame::read(&mut stream) {
             // A request without an id can't be answered: the client is broken.
@@ -565,7 +609,19 @@ impl Engine {
                         Some(fail("hello_first", "Send hello first.")),
                         After::Nothing,
                     ),
-                    Ok(req) => self.handle(&req.op, &req.args(), &mut greeted),
+                    Ok(req) if at_once(&req.op) => self.handle(&req.op, &req.args(), &mut greeted),
+                    Ok(req) => {
+                        let args = req.args();
+                        let job = Job {
+                            conn,
+                            id,
+                            op: req.op,
+                            args,
+                        };
+                        // The worker lives as long as the engine.
+                        let _ = self.jobs.send(job);
+                        (None, After::Nothing)
+                    }
                 }
             };
             if let Some(outcome) = reply {
@@ -585,16 +641,48 @@ impl Engine {
         *self.out.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 
+    /// The ops answered at once, on the message thread.
     fn handle(
         &self,
         op: &str,
         args: &Map<String, Value>,
         greeted: &mut bool,
     ) -> (Option<Reply>, After) {
-        let reply = match op {
-            "hello" => return self.hello(args, greeted),
-            "ping" => done(json!({"t": shm::monotonic_ns()})),
-            "shutdown" => return (Some(done(json!({}))), After::Exit),
+        match op {
+            "hello" => self.hello(args, greeted),
+            "ping" => (
+                Some(done(json!({"t": shm::monotonic_ns()}))),
+                After::Nothing,
+            ),
+            "shutdown" => (Some(done(json!({}))), After::Exit),
+            "debug.crash" | "debug.hang" | "debug.crumb" if self.test => self.debug(op, args),
+            _ => (Some(unknown(op)), After::Nothing),
+        }
+    }
+
+    /// The worker: every other request, one at a time, in the order they
+    /// came. Its answers go back on the connection that asked.
+    pub fn work(&self) {
+        let queue = self
+            .queue
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+            .expect("one worker");
+        for job in queue {
+            let outcome = self.run(&job.op, &job.args);
+            self.send_on(
+                job.conn,
+                &Response {
+                    id: job.id,
+                    outcome,
+                },
+            );
+        }
+    }
+
+    fn run(&self, op: &str, args: &Map<String, Value>) -> Reply {
+        match op {
             "device.list" => self.device_list(),
             "device.open" => self.device_open(args),
             "session.load" => self.session_load(args),
@@ -612,12 +700,8 @@ impl Engine {
             }
             "midi.inputs" => done(json!({"inputs": [{"id": MIDI_INPUT.0, "name": MIDI_INPUT.1}]})),
             "midi.route" => self.midi_route(args),
-            "debug.crash" | "debug.hang" | "debug.crumb" if self.test => {
-                return self.debug(op, args)
-            }
-            _ => fail("unknown_op", format!("No op named \"{op}\".")),
-        };
-        (Some(reply), After::Nothing)
+            _ => unknown(op),
+        }
     }
 
     fn hello(&self, args: &Map<String, Value>, greeted: &mut bool) -> (Option<Reply>, After) {
@@ -911,6 +995,13 @@ impl Engine {
             Some("s16") => SampleFormat::S16,
             Some(_) => return fail("bad_args", "render's format is f32 or s16."),
         };
+        // Refused before anything stops or a file is made.
+        if wav::data_bytes(len as u64, format).is_none() {
+            return fail(
+                "render_failed",
+                format!("A WAVE file holds 4 GB, and {len} frames don't fit in one."),
+            );
+        }
         let (mix, rate) = {
             let mut st = self.lock();
             let Some(s) = &st.session else {
@@ -1231,9 +1322,12 @@ impl Engine {
         region.write_meters(st.callbacks, load, st.dropouts, &slots);
         if playing {
             st.pos += block;
+            // A block that crosses the loop's end goes round. A playhead
+            // already past the end (located there, or the loop was set
+            // behind it) plays on, as it would without the loop.
             if let Some((a, b)) = st.looping {
-                if st.pos >= b {
-                    st.pos = a + (st.pos - b);
+                if pos < b && st.pos >= b {
+                    st.pos = a + (st.pos - b) % (b - a);
                 }
             }
         }

@@ -1,6 +1,6 @@
-//! Adversarial review of build/wire. Each test here exposes a defect the
-//! review found; it is `#[ignore]`d, with the finding named, until fixed.
-//! Run them with `cargo test -p wwav-wire --test review_findings -- --ignored`.
+//! Adversarial review of build/wire. Each test here exposed a defect the
+//! review found, named in its doc comment; the defects are fixed, and the
+//! tests stay to keep them so.
 
 use serde_json::{json, Map};
 use std::io::Cursor;
@@ -34,7 +34,6 @@ fn through_the_envelope(value: f64) -> f64 {
 /// A pan, a gain or a plugin param the app sends is not the one the engine
 /// gets, and plugin states and graphs drift each time they cross.
 #[test]
-#[ignore = "finding: F8 - serde_json without float_roundtrip changes f64s by one ULP"]
 fn a_float_crosses_the_envelope_bit_for_bit() {
     for x in [
         0.9856906946328695f64,
@@ -104,15 +103,18 @@ fn start(body: &str) -> (StartError, Duration) {
 /// (the app's start-up and every restart) until the engine exits on its own,
 /// and then reports "exited before it was listening".
 #[test]
-#[ignore = "finding: EngineProcess::spawn ignores start_timeout when the first line isn't UTF-8"]
 fn a_garbled_listening_line_is_refused_within_the_start_timeout() {
     let (err, took) = start("printf '\\377\\n'\nexec sleep 10");
     assert!(took < Duration::from_secs(3), "spawn took {took:?}: {err}");
+    assert!(
+        matches!(&err, StartError::Stdout(line) if line == "\u{FFFD}"),
+        "{err}"
+    );
 }
 
 #[test]
-#[ignore = "finding: EngineProcess::spawn ignores start_timeout when the engine closes stdout"]
 fn an_engine_that_closes_stdout_is_given_up_on_within_the_start_timeout() {
     let (err, took) = start("exec 1>&-\nexec sleep 10");
     assert!(took < Duration::from_secs(3), "spawn took {took:?}: {err}");
+    assert!(matches!(err, StartError::NoListen(_)), "{err}");
 }

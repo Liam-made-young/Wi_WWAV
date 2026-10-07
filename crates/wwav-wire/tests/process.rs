@@ -42,9 +42,14 @@ const ETXTBSY: i32 = 26;
 fn the_engine_gets_its_flags_a_private_dir_and_a_region() {
     let tmp = tempfile::tempdir().unwrap();
     let args = tmp.path().join("args");
+    let dir_mode = tmp.path().join("dir-mode");
     let bin = fake_engine(
         tmp.path(),
-        &format!("echo \"$@\" > {}\nexit 3", args.display()),
+        &format!(
+            "echo \"$@\" > {}\nls -ld \"$(dirname \"$2\")\" > {}\nexit 3",
+            args.display(),
+            dir_mode.display()
+        ),
     );
     let mut c = config(tmp.path(), bin);
     c.device = Some("null".into());
@@ -60,15 +65,28 @@ fn the_engine_gets_its_flags_a_private_dir_and_a_region() {
     let pid = std::process::id();
     let dir = tmp.path().join(format!("wwav-{pid}"));
     let got = std::fs::read_to_string(&args).unwrap();
-    let want_start = format!("--socket {}/engine.sock --shm /wwav-{pid}-", dir.display());
-    assert!(got.starts_with(&want_start), "{got}");
+    // The socket is named for the region: /wwav-<pid>-<n> listens on engine-<n>.sock.
+    let words: Vec<&str> = got.split_whitespace().collect();
+    let n = words[3]
+        .strip_prefix(&format!("/wwav-{pid}-"))
+        .unwrap_or_else(|| panic!("{got}"));
+    let socket = format!("{}/engine-{n}.sock", dir.display());
+    assert_eq!(
+        words[..4],
+        ["--socket", &socket, "--shm", words[3]],
+        "{got}"
+    );
     assert!(
         got.trim_end()
             .ends_with("--device null --rate 44100 --block 256 --test"),
         "{got}"
     );
-    let mode = std::fs::metadata(&dir).unwrap().permissions().mode();
-    assert_eq!(mode & 0o777, 0o700);
+    let mode = std::fs::read_to_string(&dir_mode).unwrap();
+    assert!(mode.starts_with("drwx------"), "{mode}");
+    assert!(
+        !dir.exists(),
+        "an engine that didn't start leaves no directory"
+    );
 }
 
 #[test]

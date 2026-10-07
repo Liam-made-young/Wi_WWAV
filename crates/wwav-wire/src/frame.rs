@@ -178,6 +178,33 @@ mod tests {
     }
 
     #[test]
+    fn every_f64_crosses_bit_for_bit() {
+        // serde_json's default float parser is off by one ULP on about one
+        // value in ten; the workspace turns on `float_roundtrip` (F8).
+        let mut s: u64 = 0x2545_F491_4F6C_DD1D;
+        for _ in 0..200_000 {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            // Any finite f64 (JSON has no NaN or infinity), then a pan in -1..1.
+            let any = f64::from_bits(s);
+            let pan = -1.0 + 2.0 * ((s >> 11) as f64 / (1u64 << 53) as f64);
+            for x in [any, pan] {
+                if !x.is_finite() {
+                    continue;
+                }
+                let mut m = Map::new();
+                m.insert("value".into(), json!(x));
+                let back = read(&mut Cursor::new(encode(&m).unwrap()))
+                    .unwrap()
+                    .unwrap();
+                let got = back["value"].as_f64().unwrap();
+                assert_eq!(got.to_bits(), x.to_bits(), "sent {x:?}, read {got:?}");
+            }
+        }
+    }
+
+    #[test]
     fn unicode_survives() {
         let ev = Event {
             ev: "key".into(),

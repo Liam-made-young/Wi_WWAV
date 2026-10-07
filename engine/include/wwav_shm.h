@@ -42,7 +42,9 @@ typedef struct wwav_shm_header {
     uint8_t reserved[16];
 } wwav_shm_header;
 
-/* Offset 64, 64 bytes: a seqlock. seq is odd while the fields are written. */
+/* Offset 64, 64 bytes: a seqlock. seq is odd while the fields are written.
+   An engine killed mid-write leaves it odd; the next one rounds it up to even
+   before its first write (docs/ENGINE.md §4.2). */
 typedef struct wwav_shm_clock {
     uint64_t seq;
     int64_t sample_pos;        /* where the playhead will be when this block reaches the speaker */
