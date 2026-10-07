@@ -1819,6 +1819,16 @@ dependencies = [
 [[package]]
 name = "mock-engine"
 version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "wwav-engine-cli",
+ "wwav-wire",
+]
 
 [[package]]
 name = "muda"
@@ -4409,6 +4419,11 @@ version = "0.1.0"
 [[package]]
 name = "wwav-engine-cli"
 version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde_json",
+ "wwav-wire",
+]
 
 [[package]]
 name = "wwav-formats"
@@ -4436,6 +4451,14 @@ version = "0.1.0"
 [[package]]
 name = "wwav-wire"
 version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "wwav-ids",
+]
 
 [[package]]
 name = "x11"

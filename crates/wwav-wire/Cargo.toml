@@ -7,3 +7,11 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+wwav-ids.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true
