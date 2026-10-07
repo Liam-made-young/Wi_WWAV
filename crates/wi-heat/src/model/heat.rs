@@ -282,9 +282,9 @@ pub fn due_phrase(due: f64, now: f64, tz: &TimeZone) -> String {
 ///
 /// The TypeScript's search never returns for a due that isn't a whole
 /// millisecond: its midpoint rounds down onto `lo` and the bracket stops
-/// narrowing. Here the search stops when it can't narrow (docs/QUESTIONS.md,
-/// "TS bug: nextHeatChange never returns"); for a whole-millisecond due, the
-/// only kind a stored record holds, the answer is the TypeScript's.
+/// narrowing. Here the search stops when it can't narrow (docs/QUESTIONS.md
+/// #158); for a whole-millisecond due, the only kind a stored record holds,
+/// the answer is the TypeScript's.
 pub fn next_heat_change<T: HeatInput>(items: &[T], now: f64) -> Option<f64> {
     let mut soonest: Option<f64> = None;
     for t in items {

@@ -201,8 +201,7 @@ pub fn parse_rule(text: &str) -> Option<Rule> {
 // The days of the k-th period of the series, in order. None once the period
 // is past the calendar altogether (a year beyond the years a Date holds): the
 // series has ended there. The TypeScript gives an empty period instead, and
-// keeps asking for the next one for ever (docs/QUESTIONS.md, "TS bug:
-// recurrence never returns for a huge INTERVAL").
+// keeps asking for the next one for ever (docs/QUESTIONS.md #159).
 fn period_days(rule: &Rule, start: &str, k: f64) -> Option<Vec<DayKey>> {
     let (sy, sm, sd) = key_parts(start);
     let step = k * rule.interval;

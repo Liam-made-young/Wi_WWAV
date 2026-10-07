@@ -583,7 +583,7 @@ fn a_rule_with_a_huge_interval_ends_where_the_calendar_does() {
 }
 
 #[test]
-#[ignore = "TS bug: parseRule reads FREQ=YEARLY;INTERVAL=999999 (and any MONTHLY or YEARLY interval past the years a Date holds) as a rule, and its series walk then never returns. The Rust ends the series instead; the cure is for parseRule to refuse such an interval. See docs/QUESTIONS.md"]
+#[ignore = "TS bug: parseRule reads FREQ=YEARLY;INTERVAL=200000 (and any MONTHLY or YEARLY interval that reaches past the years a Date holds) as a rule, and its series walk then never returns. The Rust ends the series instead; the cure is for parseRule to refuse such an interval. See docs/QUESTIONS.md #159"]
 fn parse_rule_refuses_an_interval_no_plan_could_reach() {
-    assert_eq!(parse_rule("FREQ=YEARLY;INTERVAL=999999"), None);
+    assert_eq!(parse_rule("FREQ=YEARLY;INTERVAL=200000"), None);
 }

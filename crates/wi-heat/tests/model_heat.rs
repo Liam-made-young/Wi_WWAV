@@ -363,7 +363,7 @@ fn next_heat_change_stops_for_a_due_that_is_not_a_whole_millisecond() {
 }
 
 #[test]
-#[ignore = "TS bug: nextHeatChange never returns for a due that is not a whole millisecond (its midpoint floors onto lo, so the bracket stops narrowing); the Rust stops instead and gives due + 1, where a whole millisecond is floor(due) + 1. See docs/QUESTIONS.md"]
+#[ignore = "TS bug: nextHeatChange never returns for a due that is not a whole millisecond (its midpoint floors onto lo, so the bracket stops narrowing); the Rust stops instead and gives due + 1, where a whole millisecond is floor(due) + 1. See docs/QUESTIONS.md #158"]
 fn next_heat_change_gives_a_whole_millisecond_for_a_due_that_is_not_one() {
     let now = ny("2026-10-06 08:40");
     let t = task(|t| {
