@@ -30,6 +30,9 @@ describe('the six tabs and their acts (3.3)', () => {
   });
 
   it('turn Habits’ "+" off at 6, saying why', () => {
-    expect(tabActs('Habits', { inboxCount: 0, habitCount: 6 }).plus).toEqual({ adds: 'A habit', disabled: 'Habit limit reached' });
+    expect(tabActs('Habits', { inboxCount: 0, habitCount: 6 }).plus).toEqual({
+      adds: 'A habit',
+      disabled: 'Habit limit reached',
+    });
   });
 });

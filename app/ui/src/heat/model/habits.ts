@@ -69,7 +69,9 @@ export function yearGrid(h: Habit, today: DayKey): ({ date: DayKey; done: boolea
 
 /** The record that only grows: "Done 41 days since August 26". */
 export function doneRecord(h: Habit, today: DayKey): string {
-  const days = Object.keys(h.log).filter((d) => h.log[d]).sort();
+  const days = Object.keys(h.log)
+    .filter((d) => h.log[d])
+    .sort();
   if (days.length === 0) return copy.habits.notYet;
   const first = days[0];
   const year = keyParts(first).year;

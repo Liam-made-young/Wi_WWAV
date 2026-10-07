@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  addDays,
-  dayKey,
-  daysBetween,
-  epochOf,
-  minuteOfDay,
-  startOfDay,
-  wallTime,
-  weekdayOf,
-  atMinute,
-} from './zone';
+import { addDays, dayKey, daysBetween, epochOf, minuteOfDay, startOfDay, wallTime, weekdayOf, atMinute } from './zone';
 
 const NY = 'America/New_York';
 
@@ -33,16 +23,12 @@ describe('wall time in a zone', () => {
     expect(epochOf({ year: 2026, month: 10, day: 7, hour: 23, minute: 59 }, NY)).toBe(
       Date.parse('2026-10-08T03:59:00Z'),
     );
-    expect(epochOf({ year: 2026, month: 12, day: 1, hour: 9, minute: 0 }, NY)).toBe(
-      Date.parse('2026-12-01T14:00:00Z'),
-    );
+    expect(epochOf({ year: 2026, month: 12, day: 1, hour: 9, minute: 0 }, NY)).toBe(Date.parse('2026-12-01T14:00:00Z'));
   });
 
   it('moves a time that does not exist forward by the gap, as RFC 5545 does', () => {
     // March 8, 2026: 2:00 AM jumps to 3:00 AM, so 2:30 AM is read as 3:30 AM EDT.
-    expect(epochOf({ year: 2026, month: 3, day: 8, hour: 2, minute: 30 }, NY)).toBe(
-      Date.parse('2026-03-08T07:30:00Z'),
-    );
+    expect(epochOf({ year: 2026, month: 3, day: 8, hour: 2, minute: 30 }, NY)).toBe(Date.parse('2026-03-08T07:30:00Z'));
   });
 
   it('takes the first of a time that happens twice', () => {

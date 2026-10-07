@@ -9,7 +9,9 @@ describe('patterns fill in to the spec’s own sentences', () => {
     expect(copy.sync.synced('8:41 AM', { newTasks: 2, dateChanges: 1, newGrades: 0 })).toBe(
       'Synced 8:41 AM: 2 new tasks, 1 date change',
     );
-    expect(copy.sync.synced('8:41 AM', { newTasks: 0, dateChanges: 0, newGrades: 0 })).toBe('Synced 8:41 AM: nothing new');
+    expect(copy.sync.synced('8:41 AM', { newTasks: 0, dateChanges: 0, newGrades: 0 })).toBe(
+      'Synced 8:41 AM: nothing new',
+    );
     expect(copy.capture.footer(4, true)).toBe('4 in inbox · captured ✓');
     expect(copy.capture.footer(3, false)).toBe('3 in inbox');
     expect(copy.status.saved('3:41 PM')).toBe('Saved on this Mac · Synced 3:41 PM');
@@ -19,7 +21,9 @@ describe('patterns fill in to the spec’s own sentences', () => {
   });
 
   it('Claude, projects, grades and connections', () => {
-    expect(copy.claude.estimate('45m')).toBe("Claude's estimate: 45m. It read the title, the notes and your past averages.");
+    expect(copy.claude.estimate('45m')).toBe(
+      "Claude's estimate: 45m. It read the title, the notes and your past averages.",
+    );
     expect(copy.projects.makeTasks(4)).toBe('Make 4 tasks from To finish?');
     expect(copy.grades.syllabusFound(5, '100')).toBe(
       'Claude found 5 categories adding to 100%. Check them against the syllabus.',
@@ -65,8 +69,14 @@ describe('the voice (8.10)', () => {
       copy.widgets.startFocus,
     ];
     for (const b of buttons) {
-      const rest = b.split(' ').slice(1).filter((w) => w !== 'Gmail' && w !== 'Claude');
-      expect(rest.every((w) => w === w.toLowerCase()), b).toBe(true);
+      const rest = b
+        .split(' ')
+        .slice(1)
+        .filter((w) => w !== 'Gmail' && w !== 'Claude');
+      expect(
+        rest.every((w) => w === w.toLowerCase()),
+        b,
+      ).toBe(true);
     }
   });
 });

@@ -86,9 +86,15 @@ const nextRound = (round: number) => (round % ROUNDS) + 1;
 // A habit with a length ticks once the session on it reaches that length.
 function habitTick(s: FocusState, leftNow: number): { state: FocusState; effects: FocusEffect[] } {
   const t = s.target;
-  if (!s.session || s.session.habitTicked || t?.kind !== 'habit' || t.minutes === undefined) return { state: s, effects: [] };
-  if (s.session.fromLeftMs - leftNow < t.minutes * MIN) return { state: s, effects: [] };
-  return { state: { ...s, session: { ...s.session, habitTicked: true } }, effects: [{ kind: 'tickHabit', habitId: t.id }] };
+  const session = s.session;
+  if (!session || session.habitTicked || t?.kind !== 'habit' || t.minutes === undefined) {
+    return { state: s, effects: [] };
+  }
+  if (session.fromLeftMs - leftNow < t.minutes * MIN) return { state: s, effects: [] };
+  return {
+    state: { ...s, session: { ...session, habitTicked: true } },
+    effects: [{ kind: 'tickHabit', habitId: t.id }],
+  };
 }
 
 // Closes the session in progress; it is logged if it rounds to a minute or more.
@@ -150,7 +156,10 @@ export function focusStep(
 ): { state: FocusState; effects: FocusEffect[] } {
   const settled = settle(state, now, settings);
   const s = settled.state;
-  const done = (next: FocusState, effects: FocusEffect[] = []) => ({ state: next, effects: [...settled.effects, ...effects] });
+  const done = (next: FocusState, effects: FocusEffect[] = []) => ({
+    state: next,
+    effects: [...settled.effects, ...effects],
+  });
 
   switch (event.type) {
     case 'tick':
@@ -238,13 +247,12 @@ export function focusLcd(s: FocusState, now: number): FocusLcd {
 /** The Now strip's focus half: "focus 18:40 left". */
 export function focusStrip(s: FocusState, now: number): string | null {
   if (s.phase === 'focus') return copy.focus.strip(countdown(leftAt(s, now)));
-  if (s.phase === 'break' && (s.running || leftAt(s, now) < s.lengthMs)) return copy.focus.breakStrip(countdown(leftAt(s, now)));
+  if (s.phase === 'break' && (s.running || leftAt(s, now) < s.lengthMs))
+    return copy.focus.breakStrip(countdown(leftAt(s, now)));
   return null;
 }
 
-export type CheckOff =
-  | { kind: 'done'; task: Task; message: string }
-  | { kind: 'ask'; title: string; hint: string };
+export type CheckOff = { kind: 'done'; task: Task; message: string } | { kind: 'ask'; title: string; hint: string };
 
 /**
  * Checking a task off. With logged time it is done at once and the status

@@ -37,7 +37,15 @@ function cat(id: string, weight: number, keywords: string[] = []): GradeCategory
 }
 
 function course(categories: GradeCategory[], over: Partial<Course> = {}): Course {
-  return { id: 'jpn201', termId: 'fall26', code: 'JPN 201', name: 'Intermediate Japanese', categories, notes: '', ...over };
+  return {
+    id: 'jpn201',
+    termId: 'fall26',
+    code: 'JPN 201',
+    name: 'Intermediate Japanese',
+    categories,
+    notes: '',
+    ...over,
+  };
 }
 
 describe('the grade maths (3.1), unchanged', () => {
@@ -71,7 +79,9 @@ describe('the grade maths (3.1), unchanged', () => {
 
   it('reads "Based on 65% of the course so far"', () => {
     const c = course([cat('hw', 25), cat('quiz', 20), cat('mid', 20), cat('final', 35)]);
-    expect(basedOnLine(c, [grade('hw', 92), grade('quiz', 88), grade('mid', 74.8)])).toBe('Based on 65% of the course so far');
+    expect(basedOnLine(c, [grade('hw', 92), grade('quiz', 88), grade('mid', 74.8)])).toBe(
+      'Based on 65% of the course so far',
+    );
   });
 });
 
@@ -161,9 +171,13 @@ describe('what it would take (3.8)', () => {
   it('rounds what you need up and the highest possible down, so neither flatters', () => {
     const d = course([cat('a', 50), cat('final', 50)]);
     // 83 = 0.5 × 80.1 + 0.5 × x, so x is 85.9 exactly; 80.13 needs 85.87, shown as 85.9.
-    expect(whatItWouldTake(d, [grade('a', 80.13)], 'B')).toBe('To finish with a B (83%), you need 85.9% on the remaining 50%.');
+    expect(whatItWouldTake(d, [grade('a', 80.13)], 'B')).toBe(
+      'To finish with a B (83%), you need 85.9% on the remaining 50%.',
+    );
     // The best is 0.5 × 61.97 + 50 = 80.985, shown as 80.9, still a B-.
-    expect(whatItWouldTake(d, [grade('a', 61.97)], 'B')).toBe('A B is out of reach; the highest possible is 80.9% (B-).');
+    expect(whatItWouldTake(d, [grade('a', 61.97)], 'B')).toBe(
+      'A B is out of reach; the highest possible is 80.9% (B-).',
+    );
     expect(whatItWouldTake(d, [grade('a', 60)], 'B')).toBe('A B is out of reach; the highest possible is 80% (B-).');
   });
 
@@ -179,8 +193,15 @@ describe('what it would take (3.8)', () => {
   });
 
   it('uses the course’s scale for the target', () => {
-    const d = course([cat('a', 50), cat('final', 50)], { scale: [{ letter: 'A', min: 90 }, { letter: 'F', min: 0 }] });
-    expect(whatItWouldTake(d, [grade('a', 90)], 'A')).toBe('To finish with an A (90%), you need 90% on the remaining 50%.');
+    const d = course([cat('a', 50), cat('final', 50)], {
+      scale: [
+        { letter: 'A', min: 90 },
+        { letter: 'F', min: 0 },
+      ],
+    });
+    expect(whatItWouldTake(d, [grade('a', 90)], 'A')).toBe(
+      'To finish with an A (90%), you need 90% on the remaining 50%.',
+    );
   });
 
   it('returns nothing for a letter the scale doesn’t have', () => {

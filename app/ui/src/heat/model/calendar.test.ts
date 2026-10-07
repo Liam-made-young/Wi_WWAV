@@ -43,6 +43,12 @@ describe('the month grid (3.1)', () => {
     expect(monthGrid('2026-10-01', data({ tasks: tasks.slice(0, 3) }), now, NY)[11].more).toBeNull();
   });
 
+  it('shows a task whose rule Heat can’t read on its own due date', () => {
+    const odd = task({ title: 'Odd', due: ny('2026-10-09 23:59'), rrule: 'FREQ=HOURLY' });
+    const cells = monthGrid('2026-10-01', data({ tasks: [odd] }), now, NY);
+    expect(cells.filter((c) => c.pills.length > 0).map((c) => c.date)).toEqual(['2026-10-09']);
+  });
+
   it('puts a recurring task on each of its days, and shows done tasks last without a colour', () => {
     const weekly = task({ title: 'Weekly quiz', due: ny('2026-10-02 23:59'), rrule: 'FREQ=WEEKLY' });
     const shut = task({ title: 'Shipped', done: true, doneAt: now, due: ny('2026-10-09 12:00') });
@@ -72,19 +78,55 @@ describe('the week and day views (3.7)', () => {
 
   it('lays out events behind blocks, and a heat-coloured due flag at its time', () => {
     const quiz = task({ title: 'Grammar quiz 4', difficulty: 2, due: ny('2026-10-07 23:59') });
-    const lecture: CalendarEvent = { id: 'e1', title: 'JPN 201', start: ny('2026-10-07 09:00'), end: ny('2026-10-07 10:15'), allDay: false };
-    const overnight: CalendarEvent = { id: 'e2', title: 'Flight', start: ny('2026-10-06 22:00'), end: ny('2026-10-07 01:00'), allDay: false };
-    const holiday: CalendarEvent = { id: 'e3', title: 'Fall break', start: ny('2026-10-07 00:00'), end: ny('2026-10-08 00:00'), allDay: true };
-    const bead: Milestone = { id: 'm1', spaceId: 'wwav', title: 'Enclosure v2', date: '2026-10-07', done: false, order: 1 };
+    const lecture: CalendarEvent = {
+      id: 'e1',
+      title: 'JPN 201',
+      start: ny('2026-10-07 09:00'),
+      end: ny('2026-10-07 10:15'),
+      allDay: false,
+    };
+    const overnight: CalendarEvent = {
+      id: 'e2',
+      title: 'Flight',
+      start: ny('2026-10-06 22:00'),
+      end: ny('2026-10-07 01:00'),
+      allDay: false,
+    };
+    const holiday: CalendarEvent = {
+      id: 'e3',
+      title: 'Fall break',
+      start: ny('2026-10-07 00:00'),
+      end: ny('2026-10-08 00:00'),
+      allDay: true,
+    };
+    const bead: Milestone = {
+      id: 'm1',
+      spaceId: 'wwav',
+      title: 'Enclosure v2',
+      date: '2026-10-07',
+      done: false,
+      order: 1,
+    };
     const b = block({ taskId: quiz.id, date: '2026-10-07', start: 9 * 60 + 30, minutes: 45 });
-    const layout = dayLayout('2026-10-07', data({ tasks: [quiz], events: [lecture, overnight, holiday], blocks: [b], milestones: [bead] }), now, NY);
+    const layout = dayLayout(
+      '2026-10-07',
+      data({ tasks: [quiz], events: [lecture, overnight, holiday], blocks: [b], milestones: [bead] }),
+      now,
+      NY,
+    );
     expect(layout.items.map((i) => [i.kind, i.title, i.top, i.height, i.colour])).toEqual([
       ['event', 'Flight', 0, GRID_HOUR_PX, null],
       ['event', 'JPN 201', 9 * GRID_HOUR_PX, 1.25 * GRID_HOUR_PX, null],
       ['block', 'Grammar quiz 4', 9.5 * GRID_HOUR_PX, 0.75 * GRID_HOUR_PX, '#efa431'],
     ]);
     expect(layout.dueFlags).toEqual([
-      { taskId: quiz.id, title: 'Grammar quiz 4', top: ((23 * 60 + 59) / 60) * GRID_HOUR_PX, label: 'due 11:59 PM', colour: '#efa431' },
+      {
+        taskId: quiz.id,
+        title: 'Grammar quiz 4',
+        top: ((23 * 60 + 59) / 60) * GRID_HOUR_PX,
+        label: 'due 11:59 PM',
+        colour: '#efa431',
+      },
     ]);
     expect(layout.allDay).toEqual({
       due: [{ taskId: quiz.id, title: 'Grammar quiz 4', colour: '#efa431' }],
@@ -117,7 +159,10 @@ describe('the unscheduled tray (3.7)', () => {
     const done = task({ title: 'done', done: true, doneAt: now, due: ny('2026-10-08 12:00') });
     const tray = unscheduledTray(
       '2026-10-06',
-      data({ tasks: [blocked, warm, scheduled, next, done, hot], blocks: [block({ taskId: blocked.id, date: '2026-10-05' })] }),
+      data({
+        tasks: [blocked, warm, scheduled, next, done, hot],
+        blocks: [block({ taskId: blocked.id, date: '2026-10-05' })],
+      }),
       now,
       NY,
     );

@@ -185,7 +185,10 @@ describe('Plan my day (3.5)', () => {
   });
 
   it('accepts all on Return, clears on Esc, and ignores other keys', () => {
-    const tasks = [task({ estMin: 30, due: ny('2026-10-07 09:00') }), task({ estMin: 15, due: ny('2026-10-07 10:00') })];
+    const tasks = [
+      task({ estMin: 30, due: ny('2026-10-07 09:00') }),
+      task({ estMin: 15, due: ny('2026-10-07 10:00') }),
+    ];
     const drafts = planMyDay(day({ tasks }), now, NY);
     const accepted = draftKey(drafts, 'Enter', ids('blk'))!;
     expect(accepted.drafts).toEqual([]);
@@ -239,7 +242,9 @@ describe('making and changing blocks by hand', () => {
       origin: 'you',
     });
     // Dropped too low, it ends at midnight rather than past it.
-    expect(dragOntoColumn({ taskId: t.id }, minutesToY(hm(23, 30)), TODAY, day({ tasks: [t] }), ids())?.start).toBe(hm(23));
+    expect(dragOntoColumn({ taskId: t.id }, minutesToY(hm(23, 30)), TODAY, day({ tasks: [t] }), ids())?.start).toBe(
+      hm(23),
+    );
   });
 
   it('resizing changes the block, never the estimate', () => {
@@ -248,7 +253,11 @@ describe('making and changing blocks by hand', () => {
     const before = estimateMin(t, estimateContext([t], []));
     expect(resizeBlock(b, minutesToY(hm(10, 10)))).toEqual({ ...b, minutes: 75 });
     expect(resizeBlock(b, minutesToY(hm(9, 2)))).toEqual({ ...b, minutes: 15 });
-    expect(resizeBlock({ ...b, start: hm(23) }, minutesToY(hm(24)) + 200)).toEqual({ ...b, start: hm(23), minutes: 60 });
+    expect(resizeBlock({ ...b, start: hm(23) }, minutesToY(hm(24)) + 200)).toEqual({
+      ...b,
+      start: hm(23),
+      minutes: 60,
+    });
     expect(t.estMin).toBe(30);
     expect(estimateMin(t, estimateContext([t], []))).toBe(before);
   });
@@ -302,7 +311,9 @@ describe('the plan list (3.5)', () => {
       'Hot, not planned',
     ]);
     const [planned, due, recurring, hot] = sections;
-    expect(planned.kind === 'planned' && planned.items.map((r) => [r.title, r.time, r.length, r.current, r.finished])).toEqual([
+    expect(
+      planned.kind === 'planned' && planned.items.map((r) => [r.title, r.time, r.length, r.current, r.finished]),
+    ).toEqual([
       ['Read chapter 3', '9:45 AM', '45m', true, false],
       ['Mix the second verse', '2:00 PM', '1h 30m', false, false],
     ]);
@@ -349,6 +360,8 @@ describe('the header and subtitle', () => {
     const tomorrow = block({ taskId: mix.id, date: '2026-10-07' });
     const data = day({ tasks: [quiz, lab, shut, mix], habits: [kanji], blocks: [...blocks, tomorrow] });
     expect(planSubtitle(data, now, NY)).toBe('4 blocks · 3h 10m planned · 2 due today');
-    expect(planSubtitle(day({ tasks: [mix], blocks: [blocks[3]] }), now, NY)).toBe('1 block · 1h 30m planned · 0 due today');
+    expect(planSubtitle(day({ tasks: [mix], blocks: [blocks[3]] }), now, NY)).toBe(
+      '1 block · 1h 30m planned · 0 due today',
+    );
   });
 });

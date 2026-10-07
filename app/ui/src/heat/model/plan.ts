@@ -93,7 +93,11 @@ function firstGap(spans: readonly Span[], from: number, until: number, length: n
   return null;
 }
 
-function targetLength(target: BlockTarget, data: Pick<PlanData, 'tasks' | 'habits'>, ctx: EstimateContext): number | null {
+function targetLength(
+  target: BlockTarget,
+  data: Pick<PlanData, 'tasks' | 'habits'>,
+  ctx: EstimateContext,
+): number | null {
   if ('taskId' in target) {
     const t = data.tasks.find((x) => x.id === target.taskId);
     return t ? blockLength(estimateMin(t, ctx)) : null;
@@ -107,7 +111,13 @@ function newBlock(target: BlockTarget, date: DayKey, start: number, minutes: num
 }
 
 /** P: the selected task or habit into the next free gap after now. */
-export function planNext(target: BlockTarget, data: PlanData, now: number, tz: string, newId: () => Id): TimeBlock | null {
+export function planNext(
+  target: BlockTarget,
+  data: PlanData,
+  now: number,
+  tz: string,
+  newId: () => Id,
+): TimeBlock | null {
   const length = targetLength(target, data, estimateContext(data.tasks, data.sessions));
   if (length === null) return null;
   const today = dayKey(now, tz);
@@ -250,7 +260,7 @@ export function planSections(data: PlanData, now: number, tz: string, spaceId?: 
   const open = openTasks(data.tasks.filter(inSpace(spaceId)), data.occurrences, now, tz);
 
   const recurringTasks = data.tasks.filter(
-    (t) => inSpace(spaceId)(t) && t.rrule && !t.done && taskOccurrences(t, tz, today, today).length > 0,
+    (t) => inSpace(spaceId)(t) && !t.done && taskOccurrences(t, tz, today, today).length > 0,
   );
   const recurringIds = new Set(recurringTasks.map((t) => t.id));
   const tickedToday = new Set(data.occurrences.filter((o) => o.date === today).map((o) => o.taskId));
@@ -261,7 +271,10 @@ export function planSections(data: PlanData, now: number, tz: string, spaceId?: 
       .map((h) => ({ kind: 'habit' as const, id: h.id, title: h.title, done: h.log[today] === true })),
   ];
 
-  const unplanned = byHeat(open.filter((t) => !planned.has(t.id) && !recurringIds.has(t.id)), now);
+  const unplanned = byHeat(
+    open.filter((t) => !planned.has(t.id) && !recurringIds.has(t.id)),
+    now,
+  );
   const dueToday = unplanned.filter((t) => isDueOn(t, today, tz));
   const hot = unplanned
     .filter((t) => !isDueOn(t, today, tz) && ['Hot', 'Overdue'].includes(heatOf(t, now).level))

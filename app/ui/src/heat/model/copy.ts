@@ -196,7 +196,8 @@ export const grades = {
     `To finish with ${withArticle(letter, false)} (${min}%), you need ${need}% on the remaining ${left}%.`,
   outOfReach: (letter: string, best: string, bestLetter: string) =>
     `${withArticle(letter, true)} is out of reach; the highest possible is ${best}% (${bestLetter}).`,
-  safe: (letter: string, left: string) => `You keep ${withArticle(letter, false)} even with 0% on the remaining ${left}%.`,
+  safe: (letter: string, left: string) =>
+    `You keep ${withArticle(letter, false)} even with 0% on the remaining ${left}%.`,
   allGraded: (pct: string, letter: string) => `Every category is graded. The course stands at ${pct}% (${letter}).`,
   save: 'Save',
 };

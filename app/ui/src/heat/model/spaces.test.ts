@@ -25,7 +25,12 @@ describe('the three default spaces (3.1, 3.4)', () => {
 
   it('are Classes, WWAV and Personal, with today’s groups and types plus Other', () => {
     expect([classes, wwav, personal].map((s) => [s.name, s.groupKind, s.groupLabel, s.types])).toEqual([
-      ['Classes', 'course', 'Course', ['Homework', 'Quiz', 'Listening', 'Reading', 'Lab', 'Project', 'Exam prep', 'Other']],
+      [
+        'Classes',
+        'course',
+        'Course',
+        ['Homework', 'Quiz', 'Listening', 'Reading', 'Lab', 'Project', 'Exam prep', 'Other'],
+      ],
       ['WWAV', 'milestone', 'Milestone', ['Hardware', 'Software', 'Design', 'Music', 'Business', 'Content', 'Other']],
       ['Personal', 'free', 'Area', ['Errand', 'Admin', 'Money', 'Health', 'Home', 'Social', 'Other']],
     ]);
@@ -85,7 +90,10 @@ describe('the Tasks sidebar (3.6)', () => {
     const parked = task({ title: 'parked', projectId: someday.id });
     const live = task({ title: 'live', projectId: active.id });
     const done = task({ title: 'done', done: true, doneAt: now });
-    const captures: Capture[] = [{ id: 'c1', text: 'fix the snare at 1:32' }, { id: 'c2', text: 'old', triagedAt: now }];
+    const captures: Capture[] = [
+      { id: 'c1', text: 'fix the snare at 1:32' },
+      { id: 'c2', text: 'old', triagedAt: now },
+    ];
     const lists = libraryLists(
       data({ tasks: [hot, week, late, scheduled, parked, live, done], captures, projects: [someday, active] }),
       now,

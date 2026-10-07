@@ -96,7 +96,9 @@ export function basedOnLine(course: Course, grades: readonly Grade[]): string {
 export function weightsLine(course: Course): string | null {
   const total = Math.round(totalWeight(course) * 10) / 10;
   if (total === 100) return null;
-  return total < 100 ? copy.grades.weightsShort(pct(total), pct(100 - total)) : copy.grades.weightsOver(pct(total), pct(total - 100));
+  return total < 100
+    ? copy.grades.weightsShort(pct(total), pct(100 - total))
+    : copy.grades.weightsOver(pct(total), pct(total - 100));
 }
 
 /**

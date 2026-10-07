@@ -124,7 +124,14 @@ describe('a round, as 1.6 runs it', () => {
     expect(effects).toEqual([
       {
         kind: 'log',
-        session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 18 * MIN + 40_000, focusMin: 19, interruptions: 0, room: 'heat' },
+        session: {
+          taskId: 'mix',
+          startedAt: t0,
+          endedAt: t0 + 18 * MIN + 40_000,
+          focusMin: 19,
+          interruptions: 0,
+          room: 'heat',
+        },
       },
     ]);
     expect(state.phase).toBe('idle');
@@ -133,7 +140,12 @@ describe('a round, as 1.6 runs it', () => {
   });
 
   it('logs nothing for a stop under half a minute', () => {
-    expect(run([[t0, press(mix)], [t0 + 20_000, { type: 'stop' }]]).effects).toEqual([]);
+    expect(
+      run([
+        [t0, press(mix)],
+        [t0 + 20_000, { type: 'stop' }],
+      ]).effects,
+    ).toEqual([]);
   });
 
   it('marks "Pulled away" with I: it pauses and records an interruption', () => {
@@ -226,8 +238,21 @@ describe('minutes go to the current task', () => {
       [t0 + 25 * MIN, tick],
     ]);
     expect(effects).toEqual([
-      { kind: 'log', session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 10 * MIN, focusMin: 10, interruptions: 0, room: 'heat' } },
-      { kind: 'log', session: { taskId: 'quiz', startedAt: t0 + 10 * MIN, endedAt: t0 + 25 * MIN, focusMin: 15, interruptions: 0, room: 'heat' } },
+      {
+        kind: 'log',
+        session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 10 * MIN, focusMin: 10, interruptions: 0, room: 'heat' },
+      },
+      {
+        kind: 'log',
+        session: {
+          taskId: 'quiz',
+          startedAt: t0 + 10 * MIN,
+          endedAt: t0 + 25 * MIN,
+          focusMin: 15,
+          interruptions: 0,
+          room: 'heat',
+        },
+      },
     ]);
     expect(focusLcd(state, t0 + 25 * MIN).note).toBe('Focus done. 15m logged to Grammar quiz 4.');
   });
@@ -240,7 +265,17 @@ describe('minutes go to the current task', () => {
       [t0 + 25 * MIN, tick],
     ]);
     expect(effects).toEqual([
-      { kind: 'log', session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 24 * MIN + 50_000, focusMin: 25, interruptions: 0, room: 'heat' } },
+      {
+        kind: 'log',
+        session: {
+          taskId: 'mix',
+          startedAt: t0,
+          endedAt: t0 + 24 * MIN + 50_000,
+          focusMin: 25,
+          interruptions: 0,
+          room: 'heat',
+        },
+      },
     ]);
     expect(focusLcd(state, t0 + 25 * MIN).note).toBe('Focus done.');
   });
@@ -256,7 +291,17 @@ describe('minutes go to the current task', () => {
     expect(r2.effects).toEqual([{ kind: 'tickHabit', habitId: 'kanji' }]);
     const r3 = focusStep(r2.state, tick, t0 + 25 * MIN);
     expect(r3.effects).toEqual([
-      { kind: 'log', session: { habitId: 'kanji', startedAt: t0, endedAt: t0 + 25 * MIN, focusMin: 25, interruptions: 0, room: 'heat' } },
+      {
+        kind: 'log',
+        session: {
+          habitId: 'kanji',
+          startedAt: t0,
+          endedAt: t0 + 25 * MIN,
+          focusMin: 25,
+          interruptions: 0,
+          room: 'heat',
+        },
+      },
     ]);
   });
 });

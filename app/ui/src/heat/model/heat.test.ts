@@ -177,6 +177,8 @@ describe('nextHeatChange', () => {
   });
 
   it('gives nothing when no level will change', () => {
-    expect(nextHeatChange([task({ due: null }), task({ done: true, due: now + DAY_MS }), task({ due: now - 1 })], now)).toBeNull();
+    expect(
+      nextHeatChange([task({ due: null }), task({ done: true, due: now + DAY_MS }), task({ due: now - 1 })], now),
+    ).toBeNull();
   });
 });

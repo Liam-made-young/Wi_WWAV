@@ -95,9 +95,14 @@ describe('your average time', () => {
       types: ['Homework', 'Quiz', 'Listening'],
       persona: '',
     };
-    const homework = [60, 70, 80, 70, 80, 90].map((m) => task({ type: 'Homework', done: true, doneAt: 1, adjustMin: m }));
+    const homework = [60, 70, 80, 70, 80, 90].map((m) =>
+      task({ type: 'Homework', done: true, doneAt: 1, adjustMin: m }),
+    );
     const quiz = [task({ type: 'Quiz', done: true, doneAt: 1, adjustMin: 20 })];
-    expect(averageLines(space, estimateContext([...quiz, ...homework], []))).toEqual(['Homework 1h 15m (6)', 'Quiz 20m (1)']);
+    expect(averageLines(space, estimateContext([...quiz, ...homework], []))).toEqual([
+      'Homework 1h 15m (6)',
+      'Quiz 20m (1)',
+    ]);
   });
 });
 

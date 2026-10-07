@@ -8,7 +8,17 @@
 // A task with a rule but no due date runs from its scheduled date. Each
 // finished occurrence is a TaskOccurrence row; the series never flips to done.
 
-import { addDays, atMinute, type DayKey, daysInMonth, dayKey, keyOf, keyParts, minuteOfDay, weekdayOf } from '../../shared/time/zone';
+import {
+  addDays,
+  atMinute,
+  type DayKey,
+  daysInMonth,
+  dayKey,
+  keyOf,
+  keyParts,
+  minuteOfDay,
+  weekdayOf,
+} from '../../shared/time/zone';
 import * as copy from './copy';
 import type { Id, Task, TaskOccurrence } from './records';
 
@@ -80,7 +90,10 @@ export function parseRule(text: string): Rule | null {
         rule.interval = +value;
         break;
       case 'BYDAY': {
-        const days = value.toUpperCase().split(',').map((c) => WEEKDAY_CODES.indexOf(c));
+        const days = value
+          .toUpperCase()
+          .split(',')
+          .map((c) => WEEKDAY_CODES.indexOf(c));
         if (days.some((d) => d < 0)) return null;
         rule.byDay = [...new Set(days)].sort((a, b) => a - b);
         break;
@@ -227,13 +240,16 @@ export function nextOpenOccurrence(
   return null;
 }
 
+/** Whether a task repeats. A rule Heat can't read leaves it a plain task, so it never vanishes. */
+export const recurs = (task: Task) => task.rrule !== undefined && parseRule(task.rrule) !== null;
+
 /**
  * The task as heat sees it: a recurring task's due becomes its next open
- * occurrence (null once the series has ended). A task without a rule comes
- * back unchanged.
+ * occurrence (null once the series has ended). Any other task comes back
+ * unchanged.
  */
 export function withEffectiveDue(task: Task, occurrences: readonly TaskOccurrence[], now: number, tz: string): Task {
-  if (!task.rrule) return task;
+  if (!recurs(task)) return task;
   const next = task.due === null ? null : nextOpenOccurrence(task, occurrences, now, tz);
   return { ...task, due: next ? next.at : null };
 }
@@ -260,10 +276,17 @@ export function reopenOccurrence(occurrences: readonly TaskOccurrence[], taskId:
  * task, a series that hasn't ended, with its due moved to its next open
  * occurrence.
  */
-export function openTasks(tasks: readonly Task[], occurrences: readonly TaskOccurrence[], now: number, tz: string): Task[] {
+export function openTasks(
+  tasks: readonly Task[],
+  occurrences: readonly TaskOccurrence[],
+  now: number,
+  tz: string,
+): Task[] {
   return tasks.flatMap((t) => {
     if (t.done) return [];
-    if (t.rrule && !nextOpenOccurrence(t, occurrences, now, tz)) return [];
-    return [withEffectiveDue(t, occurrences, now, tz)];
+    if (!recurs(t)) return [t];
+    const next = nextOpenOccurrence(t, occurrences, now, tz);
+    if (!next) return [];
+    return [{ ...t, due: t.due === null ? null : next.at }];
   });
 }

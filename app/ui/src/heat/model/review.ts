@@ -90,6 +90,8 @@ export function factLines(f: WeekFacts): string[] {
     ...f.spaces.map((s) => copy.review.space(s.name, s.tasksDone, formatMinutes(s.focusMin))),
     ...(f.habitFocusMin > 0 ? [copy.review.habits(formatMinutes(f.habitFocusMin))] : []),
     ...f.milestonesReached.map((m) => copy.review.milestone(m.title)),
-    ...f.accuracy.map((a) => copy.review.accuracy(a.label, formatMinutes(a.estimatedMin), formatMinutes(a.tookMin), a.count)),
+    ...f.accuracy.map((a) =>
+      copy.review.accuracy(a.label, formatMinutes(a.estimatedMin), formatMinutes(a.tookMin), a.count),
+    ),
   ];
 }

@@ -5,12 +5,22 @@
 // flag at its time. Brightspace items are tasks, so they never draw as events.
 
 import { clock, longDay, MONTHS, shortMonthDay } from '../../shared/time/format';
-import { addDays, atMinute, type DayKey, dayKey, keyOf, keyParts, minuteOfDay, startOfDay, weekdayOf } from '../../shared/time/zone';
+import {
+  addDays,
+  atMinute,
+  type DayKey,
+  dayKey,
+  keyOf,
+  keyParts,
+  minuteOfDay,
+  startOfDay,
+  weekdayOf,
+} from '../../shared/time/zone';
 import * as copy from './copy';
 import { byHeat, heatOf, type HeatLevel, LEVEL_COLOUR } from './heat';
 import { HOUR_PX } from './plan';
 import type { CalendarEvent, Habit, Id, Milestone, Task, TaskOccurrence, TimeBlock } from './records';
-import { openTasks, taskOccurrences, withEffectiveDue } from './recurrence';
+import { openTasks, recurs, taskOccurrences, withEffectiveDue } from './recurrence';
 
 export const GRID_HOUR_PX = HOUR_PX;
 const MIN_ITEM_PX = 16;
@@ -42,7 +52,7 @@ function dueItems(data: CalendarData, from: DayKey, to: DayKey, now: number, tz:
   const today = dayKey(now, tz);
   const ticked = new Set(data.occurrences.map((o) => `${o.taskId}\u0000${o.date}`));
   return data.tasks.flatMap((t) => {
-    if (!t.rrule) {
+    if (!recurs(t)) {
       if (t.due === null) return [];
       const date = dayKey(t.due, tz);
       return date < from || date > to ? [] : [{ task: t, date, level: heatOf(t, now).level as HeatLevel | null }];
@@ -121,7 +131,14 @@ export function dayLayout(day: DayKey, data: CalendarData, now: number, tz: stri
     .map((e) => {
       const from = e.start <= dayStart ? 0 : minuteOfDay(e.start, tz);
       const to = e.end >= dayEnd ? 1440 : minuteOfDay(e.end, tz);
-      return { kind: 'event', id: e.id, title: e.title, top: toY(from), height: Math.max(MIN_ITEM_PX, toY(to - from)), colour: null };
+      return {
+        kind: 'event',
+        id: e.id,
+        title: e.title,
+        top: toY(from),
+        height: Math.max(MIN_ITEM_PX, toY(to - from)),
+        colour: null,
+      };
     });
   const blocks: LaidOut[] = data.blocks
     .filter((b) => b.date === day)
@@ -131,7 +148,16 @@ export function dayLayout(day: DayKey, data: CalendarData, now: number, tz: stri
       const title = t?.title ?? data.habits?.find((h) => h.id === b.habitId)?.title;
       if (title === undefined) return [];
       const colour = t ? colourOf(heatOf(withEffectiveDue(t, data.occurrences, now, tz), now).level) : null;
-      return [{ kind: 'block' as const, id: b.id, title, top: toY(b.start), height: Math.max(MIN_ITEM_PX, toY(b.minutes)), colour }];
+      return [
+        {
+          kind: 'block' as const,
+          id: b.id,
+          title,
+          top: toY(b.start),
+          height: Math.max(MIN_ITEM_PX, toY(b.minutes)),
+          colour,
+        },
+      ];
     });
   const due = dueItems(data, day, day, now, tz).filter((x) => x.level !== null && x.level !== 'Done');
   return {

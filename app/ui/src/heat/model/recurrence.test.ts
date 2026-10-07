@@ -33,7 +33,9 @@ describe('parsing the RRULE subset', () => {
       byMonthDay: [1, -1],
       count: 6,
     });
-    expect(parseRule('FREQ=DAILY;UNTIL=20261231T235959Z')?.until).toEqual({ instant: Date.parse('2026-12-31T23:59:59Z') });
+    expect(parseRule('FREQ=DAILY;UNTIL=20261231T235959Z')?.until).toEqual({
+      instant: Date.parse('2026-12-31T23:59:59Z'),
+    });
     expect(parseRule('FREQ=DAILY;UNTIL=20261231')?.until).toEqual({ day: '2026-12-31' });
   });
 
@@ -85,7 +87,10 @@ describe('expanding occurrences', () => {
   });
 
   it('counts COUNT from the start of the series, not the window', () => {
-    expect(dates('FREQ=DAILY;COUNT=5', '2026-10-06', 0, '2026-10-09', '2026-10-20')).toEqual(['2026-10-09', '2026-10-10']);
+    expect(dates('FREQ=DAILY;COUNT=5', '2026-10-06', 0, '2026-10-09', '2026-10-20')).toEqual([
+      '2026-10-09',
+      '2026-10-10',
+    ]);
   });
 
   it('repeats weekly on the start’s weekday, or on BYDAY, never before the start', () => {
@@ -175,7 +180,13 @@ describe('expanding occurrences', () => {
   });
 
   it('keeps the wall-clock time across DST', () => {
-    const fridays = occurrencesBetween(parseRule('FREQ=WEEKLY')!, { day: '2026-10-23', minute: 23 * 60 + 59 }, NY, '2026-10-01', '2026-11-13');
+    const fridays = occurrencesBetween(
+      parseRule('FREQ=WEEKLY')!,
+      { day: '2026-10-23', minute: 23 * 60 + 59 },
+      NY,
+      '2026-10-01',
+      '2026-11-13',
+    );
     expect(fridays.map((o) => o.at)).toEqual([
       ny('2026-10-23 23:59'),
       ny('2026-10-30 23:59'),
@@ -187,7 +198,13 @@ describe('expanding occurrences', () => {
   });
 
   it('moves a time inside the spring gap forward by the gap', () => {
-    const days = occurrencesBetween(parseRule('FREQ=DAILY')!, { day: '2026-03-07', minute: 2 * 60 + 30 }, NY, '2026-03-07', '2026-03-09');
+    const days = occurrencesBetween(
+      parseRule('FREQ=DAILY')!,
+      { day: '2026-03-07', minute: 2 * 60 + 30 },
+      NY,
+      '2026-03-07',
+      '2026-03-09',
+    );
     expect(days.map((o) => o.at)).toEqual([ny('2026-03-07 02:30'), ny('2026-03-08 03:30'), ny('2026-03-09 02:30')]);
   });
 });
@@ -255,6 +272,13 @@ describe('recurring tasks', () => {
 });
 
 describe('openTasks', () => {
+  it('keeps a task whose rule Heat can’t read as a plain task, rather than losing it', () => {
+    const now = ny('2026-10-06 08:00');
+    const odd = task({ due: ny('2026-10-09 23:59'), rrule: 'FREQ=HOURLY' });
+    expect(openTasks([odd], [], now, NY)).toEqual([odd]);
+    expect(withEffectiveDue(odd, [], now, NY)).toBe(odd);
+  });
+
   it('drops done tasks and ended series, and moves a series’ due to its next occurrence', () => {
     const now = ny('2026-10-06 08:00');
     const plain = task({ due: ny('2026-10-09 23:59') });

@@ -10,7 +10,13 @@ function dump(): HeatExport {
     exportedAt: '2026-10-06T12:40:00.000Z',
     timeZone: 'America/New_York',
     workspaces: [
-      { key: 'classes', name: 'Classes', groupLabel: 'Course', types: ['Homework', 'Quiz', 'Other'], persona: 'a student' },
+      {
+        key: 'classes',
+        name: 'Classes',
+        groupLabel: 'Course',
+        types: ['Homework', 'Quiz', 'Other'],
+        persona: 'a student',
+      },
       { key: 'wwav', name: 'WWAV', groupLabel: 'Milestone', types: ['Hardware', 'Other'], persona: 'a founder' },
       { key: 'personal', name: 'Personal', groupLabel: 'Area', types: ['Errand', 'Other'], persona: 'a person' },
     ],
@@ -91,7 +97,16 @@ function dump(): HeatExport {
       },
     ],
     grades: [
-      { id: 'gr-31', course: 'JPN 201', title: 'Kanji quiz 6', category: 'Quizzes', score: 18, outOf: 20, dropped: false, pending: false },
+      {
+        id: 'gr-31',
+        course: 'JPN 201',
+        title: 'Kanji quiz 6',
+        category: 'Quizzes',
+        score: 18,
+        outOf: 20,
+        dropped: false,
+        pending: false,
+      },
       {
         id: 'gp-91be2c',
         course: 'JPN 201',
@@ -127,11 +142,19 @@ describe('moving in (3.15)', () => {
   const result = importArtifact(dump(), [], ids('new'));
 
   it('keeps every id: event ids, em- and gp- hashes, and the processed Gmail ids', () => {
-    expect(result.tasks.map((t) => t.id)).toEqual(['5h3k2j1abcdefg_20261008T035900Z', 'em-3f2a9c71', 't-1001', 't-1002']);
+    expect(result.tasks.map((t) => t.id)).toEqual([
+      '5h3k2j1abcdefg_20261008T035900Z',
+      'em-3f2a9c71',
+      't-1001',
+      't-1002',
+    ]);
     expect(result.grades.map((g) => g.id)).toEqual(['gr-31', 'gp-91be2c']);
     expect(result.milestones.map((m) => m.id)).toEqual(['ms-7']);
     expect(result.habits.map((h) => h.id)).toEqual(['hb-1']);
-    expect(result.sync).toEqual({ processedMailIds: ['18f2a', '18f2b', '18f2c'], lastSyncAt: Date.parse('2026-10-06T12:41:00.000Z') });
+    expect(result.sync).toEqual({
+      processedMailIds: ['18f2a', '18f2b', '18f2c'],
+      lastSyncAt: Date.parse('2026-10-06T12:41:00.000Z'),
+    });
   });
 
   it('maps each workspace to a space with its group kind', () => {
@@ -174,7 +197,12 @@ describe('moving in (3.15)', () => {
       doneAt: null,
       source: 'calendar',
     });
-    expect(reading).toMatchObject({ adjustMin: 75, done: true, doneAt: Date.parse('2026-10-05T20:00:00.000Z'), source: 'mail' });
+    expect(reading).toMatchObject({
+      adjustMin: 75,
+      done: true,
+      doneAt: Date.parse('2026-10-05T20:00:00.000Z'),
+      source: 'mail',
+    });
   });
 
   it('brings habits with their whole log and the counter off', () => {
@@ -194,7 +222,13 @@ describe('moving in (3.15)', () => {
       ['Exit tickets', 60, ['exit ticket']],
     ]);
     expect(jpn.notes).toBe('Office hours Tue 2 PM');
-    expect(result.grades[0]).toMatchObject({ courseId: jpn.id, categoryId: jpn.categories[0].id, score: 18, outOf: 20, source: 'you' });
+    expect(result.grades[0]).toMatchObject({
+      courseId: jpn.id,
+      categoryId: jpn.categories[0].id,
+      score: 18,
+      outOf: 20,
+      source: 'you',
+    });
     expect(result.grades[1]).toMatchObject({ categoryId: null, score: null, pending: true, source: 'mail' });
   });
 

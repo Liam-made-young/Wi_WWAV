@@ -143,7 +143,15 @@ export function importArtifact(dump: HeatExport, existing: readonly Space[], new
     if (!space) {
       const groupKind = w.groupLabel === 'Course' ? 'course' : w.groupLabel === 'Milestone' ? 'milestone' : 'free';
       const hue = defaults.find(same)?.hue ?? (spaces.length * 120) % 360;
-      space = { id: newId(), name: w.name, hue, groupKind, groupLabel: w.groupLabel, types: w.types, persona: w.persona };
+      space = {
+        id: newId(),
+        name: w.name,
+        hue,
+        groupKind,
+        groupLabel: w.groupLabel,
+        types: w.types,
+        persona: w.persona,
+      };
       spaces.push(space);
     }
     spaceFor.set(w.key, space);
