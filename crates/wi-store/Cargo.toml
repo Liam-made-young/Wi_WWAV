@@ -7,3 +7,14 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+wwav-ids.workspace = true
+
+[dev-dependencies]
+rand.workspace = true
+tempfile.workspace = true
