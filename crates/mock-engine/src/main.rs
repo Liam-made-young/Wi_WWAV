@@ -116,6 +116,10 @@ fn main() {
         let engine = engine.clone();
         move || audio(&engine)
     });
+    spawn("worker", {
+        let engine = engine.clone();
+        move || engine.work()
+    });
     spawn("stdin", {
         let engine = engine.clone();
         move || {

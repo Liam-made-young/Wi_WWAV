@@ -977,3 +977,174 @@ fn a_bad_frame_closes_the_connection_and_the_engine_takes_the_next_client() {
     assert_eq!(hello["protocol"], 1);
 }
 
+#[test]
+fn a_loop_goes_round_when_the_playhead_crosses_its_end() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = engine(tmp.path());
+    let c = p.client();
+    let loaded = c
+        .call("session.load", json!({"graph": graph()}), T)
+        .unwrap();
+    // The tape plugin's delay comes off the clock (the null device has no
+    // output latency).
+    let delay = loaded["latency"]["tape"].as_i64().unwrap();
+    // 100 ms of loop.
+    c.call(
+        "transport.loop",
+        json!({"on": true, "start": 48000, "end": 52800}),
+        T,
+    )
+    .unwrap();
+    c.call("transport.locate", json!({"sample": 48000}), T)
+        .unwrap();
+    c.call("transport.play", Value::Null, T).unwrap();
+    clock_when(&p, |k| k.state == 1);
+    let start = p.shm().region().clock.read().unwrap().callbacks;
+    // Three times round.
+    let mut seen = Vec::new();
+    while p.shm().region().clock.read().unwrap().callbacks < start + 3 * 4800 / 128 {
+        seen.push(p.shm().region().clock.read().unwrap().sample_pos + delay);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        seen.iter().all(|s| (48000..52800).contains(s)),
+        "the playhead stays in the loop: {seen:?}"
+    );
+    assert!(
+        seen.windows(2).any(|w| w[1] < w[0]),
+        "and goes back to its start: {seen:?}"
+    );
+}
+
+#[test]
+fn a_request_behind_a_render_waits_for_it_and_a_ping_does_not() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut c = EngineConfig::new(MOCK);
+    c.tmp_dir = tmp.path().to_path_buf();
+    let (p, events) = EngineProcess::spawn(c).unwrap();
+    let p = std::sync::Arc::new(p);
+    p.hello("e2e").unwrap();
+    p.client()
+        .call("session.load", json!({"graph": graph()}), T)
+        .unwrap();
+    let render = {
+        let p = p.clone();
+        let out = tmp.path().join("out");
+        std::thread::spawn(move || {
+            p.client().request_ordered(
+                "render",
+                json!({"out_dir": out, "start": 0, "len": 48000 * 40, "stems": false}),
+                Duration::from_secs(60),
+            )
+        })
+    };
+    std::thread::sleep(Duration::from_millis(50));
+    let ping = p.client().request_ordered("ping", Value::Null, T).unwrap();
+    let play = p
+        .client()
+        .request_ordered("transport.play", Value::Null, T)
+        .unwrap();
+    let rendered = render.join().unwrap().unwrap();
+    assert!(rendered.response.outcome.is_ok(), "{rendered:?}");
+    // Where each answer fell among the render's progress events, in the
+    // order they came off the wire.
+    let got: Vec<_> = events.try_iter().collect();
+    let progress = got.iter().filter(|e| e.ev == "render.progress").count() as u64;
+    assert_eq!(rendered.events_before, progress, "{got:?}");
+    assert!(
+        ping.events_before < progress,
+        "the ping was answered during the render ({} of {progress} progress events before it)",
+        ping.events_before
+    );
+    assert!(
+        play.events_before >= rendered.events_before,
+        "play waited its turn behind the render, as on the engine's worker"
+    );
+    clock_when(&p, |k| k.state == 1);
+}
+
+#[test]
+fn a_render_too_big_for_a_wave_file_is_refused_before_playback_stops() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = engine(tmp.path());
+    p.client()
+        .call("session.load", json!({"graph": graph()}), T)
+        .unwrap();
+    p.client().call("transport.play", Value::Null, T).unwrap();
+    clock_when(&p, |k| k.state == 1);
+    let out = tmp.path().join("out");
+    for (len, format) in [
+        (536_870_908u64, "f32"),
+        (1_073_741_815, "s16"),
+        (1_u64 << 40, "f32"),
+    ] {
+        let r = p
+            .client()
+            .request(
+                "render",
+                json!({"out_dir": out, "len": len, "format": format}),
+                T,
+            )
+            .unwrap();
+        assert_eq!(
+            r.outcome.unwrap_err().code,
+            "render_failed",
+            "{len} {format}"
+        );
+    }
+    assert!(!out.exists(), "no files, not even the directory");
+    let now = p.shm().region().clock.read().unwrap().callbacks;
+    let k = clock_when(&p, |k| k.callbacks > now);
+    assert_eq!(k.state, 1, "still playing");
+}
+
+/// An engine that dies between the two halves of a clock write leaves `seq`
+/// odd. The app writes a whole clock before it starts the next engine, so a
+/// readable clock never depends on the next engine knowing to round `seq`
+/// up (ENGINE.md §4.2).
+#[test]
+fn a_respawn_repairs_a_clock_its_engine_died_writing() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::atomic::Ordering::Relaxed;
+    let tmp = tempfile::tempdir().unwrap();
+    // The first engine is mock-engine; the next one never starts, so the
+    // region is only ever what the app left in it.
+    let ran = tmp.path().join("ran");
+    let bin = tmp.path().join("first-time-only");
+    std::fs::write(
+        &bin,
+        format!(
+            "#!/bin/sh\n[ -e {ran} ] && exit 3\ntouch {ran}\nexec {MOCK} \"$@\"\n",
+            ran = ran.display()
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut c = EngineConfig::new(&bin);
+    c.tmp_dir = tmp.path().to_path_buf();
+    let (mut p, _events) = EngineProcess::spawn(c).unwrap();
+    p.hello("e2e").unwrap();
+    p.client()
+        .call(
+            "session.load",
+            json!({"graph": graph(), "playhead": 96000}),
+            T,
+        )
+        .unwrap();
+    p.client().call("transport.play", Value::Null, T).unwrap();
+    clock_when(&p, |k| k.state == 1);
+    p.kill().unwrap();
+    p.wait(T).unwrap().unwrap();
+    let last = p.shm().region().clock.read().unwrap();
+    // Killed mid-write.
+    let seq = &p.shm().region().clock.seq;
+    seq.store(seq.load(Relaxed) | 1, Relaxed);
+    assert_eq!(p.shm().region().clock.read(), None);
+
+    assert!(p.respawn().is_err(), "the second engine exits at once");
+    let clock = &p.shm().region().clock;
+    let k = clock.read().expect("a whole clock again");
+    assert_eq!((k.state, k.rate), (0, 0.0), "stopped");
+    assert_eq!(k.sample_pos, last.sample_pos, "where it stood");
+    assert_eq!(clock.seq.load(Relaxed) % 2, 0);
+}
