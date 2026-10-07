@@ -383,3 +383,14 @@ export const gradesUi = {
   noScale: 'This course uses the usual scale.',
   scaleOwn: 'This course has its own scale',
 };
+
+// --- Habits, as the tab words it (3.9) ---------------------------------------------------
+
+export const habitsUi = {
+  noHabits: 'No habits yet. Add one, and keep it small enough that you never skip.',
+  showYear: 'Show the year',
+  hideYear: 'Hide the year',
+  lengthRange: 'A length is between 1 and 600 minutes.',
+  today: 'Today still counts until midnight.',
+  counterHint: 'A counter that shows the days in a row. Off by default: the record above only grows.',
+};

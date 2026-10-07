@@ -242,6 +242,7 @@ function show(fake: Fake, s: FocusState) {
     lengthMs: s.lengthMs,
     focusMin: s.focusMin,
     taskId: s.target?.kind === 'task' ? s.target.id : null,
+    habitId: s.target?.kind === 'habit' ? s.target.id : null,
     note: s.note,
   };
   fake.state.timer = timer;
@@ -250,6 +251,17 @@ function show(fake: Fake, s: FocusState) {
 function apply(fake: Fake, effects: FocusEffect[]): FocusSession | undefined {
   let logged: FocusSession | undefined;
   for (const e of effects) {
+    if (e.kind === 'tickHabit') {
+      // A habit with a length ticks itself once a focus session on it reaches that length (3.9); never an untick.
+      const habit = fake.store.habit.get(e.habitId);
+      const day = dayKey(fake.now, fake.zone);
+      if (habit && !habit.log[day]) {
+        fake.write('tick habit', ['habit'], () =>
+          fake.store.habit.set(habit.id, { ...habit, log: { ...habit.log, [day]: true } }),
+        );
+      }
+      continue;
+    }
     if (e.kind !== 'log') continue;
     const session: FocusSession = {
       id: fake.newId(),
@@ -291,12 +303,17 @@ register('heat.current.set', (args, fake) => {
 
 register('heat.focus.start', (args, fake) => {
   const e = extra(fake);
+  // A focus session can be on a habit, which ticks itself when the session reaches the habit's length.
+  const habit = typeof args.habitId === 'string' ? fake.store.habit.get(args.habitId) : undefined;
+  if (typeof args.habitId === 'string' && !habit) refuse('No habit has that id.');
   const id = (args.taskId as Id | undefined) ?? fake.state.currentTaskId ?? undefined;
-  const t = target(fake, id);
+  const t: FocusTarget | null = habit
+    ? { kind: 'habit', id: habit.id, title: habit.title, ...(habit.minutes !== undefined ? { minutes: habit.minutes } : {}) }
+    : target(fake, id);
   if (e.focus.phase === 'idle') {
     if (!t) refuse('Pick a task and press C first.');
     if (typeof args.length === 'number') step(fake, { type: 'setLength', minutes: args.length });
-    fake.state.currentTaskId = t.id;
+    if (t.kind === 'task') fake.state.currentTaskId = t.id;
     return step(fake, { type: 'press', target: t });
   }
   // A break that waits for a press starts with the same call.

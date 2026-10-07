@@ -255,6 +255,8 @@ export interface HeatTimer {
   focusMin?: number;
   /** What the round in progress is on. */
   taskId?: Id | null;
+  /** Or the habit it is on, which ticks itself when the round reaches the habit's length; beyond docs/HEAT.md. */
+  habitId?: Id | null;
   /** What just ended ("Focus done. 25m logged to Mix the second verse."), until the next press. */
   note?: string | null;
 }
@@ -327,7 +329,7 @@ export interface Snapshot {
         categories?: Record<Id, number | null>;
       }
     >;
-    habits: Record<Id, { today: boolean; record: string }>;
+    habits: Record<Id, { today: boolean; record: string; /** The streak sentence, only for a habit whose counter is switched on; beyond docs/HEAT.md. */ counter?: string }>;
     status: string;
     /** A recurring task's occurrences in the snapshot's window, for Calendar's pills and flags. */
     occurrences?: { taskId: Id; date: DayKey; done: boolean }[];
@@ -391,7 +393,10 @@ export function heatClient(t: Transport = real) {
     putBlock: (block: Omit<TimeBlock, 'id' | 'origin'> & { id?: Id }) => c<{ block: TimeBlock } & Undo>('heat.block.put', block),
 
     setCurrent: (taskId: Id | null) => c<Record<string, never>>('heat.current.set', { taskId }),
-    focus: (step: 'start' | 'pause' | 'resume' | 'interrupt' | 'stop' | 'finish', args: { taskId?: Id; length?: number } = {}) =>
+    focus: (
+      step: 'start' | 'pause' | 'resume' | 'interrupt' | 'stop' | 'finish',
+      args: { taskId?: Id; habitId?: Id; length?: number } = {},
+    ) =>
       c<{ heatState: HeatState; logged?: FocusSession } & Undo>(`heat.focus.${step}`, args),
 
     capture: (text: string, link?: Link) => c<{ capture: Capture; inbox: string } & Undo>('heat.capture.add', { text, link }),
