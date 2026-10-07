@@ -248,3 +248,28 @@ pub(crate) fn sign_out(i: &Inner) -> Result<Value, CoreError> {
     i.bus.emit("account", json!({"signedIn": false}));
     Ok(json!({"signedIn": false}))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_verifier_is_43_characters_and_the_challenge_its_s256() {
+        let (verifier, challenge) = pkce_pair();
+        assert_eq!(verifier.len(), 43);
+        assert!(verifier
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'));
+        assert_eq!(
+            challenge,
+            URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
+        );
+        // RFC 7636 appendix B's example.
+        let v = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        assert_eq!(
+            URL_SAFE_NO_PAD.encode(Sha256::digest(v.as_bytes())),
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        );
+        assert_ne!(pkce_pair().0, verifier);
+    }
+}

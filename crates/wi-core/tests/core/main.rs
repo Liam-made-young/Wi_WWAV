@@ -8,5 +8,6 @@ mod heat;
 mod history;
 mod library;
 mod player;
+mod review;
 mod supervisor;
 mod upload;

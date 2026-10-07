@@ -337,6 +337,28 @@ fn failure(f: Failure) -> CoreError {
     CoreError::new(failure_code(&f), f.sentence())
 }
 
+/// wi-heat's rules on what an answer may say, where the answer's shape is
+/// the one wi-heat reads: an estimate is clamped and needs its reason, and a
+/// review draft holding a number the facts don't is dropped, leaving the
+/// facts alone ("never invent metrics").
+fn held_to_the_rules(task: &str, body: &Value, result: Value) -> Result<Value, CoreError> {
+    match task {
+        "score" => assist::parse_score(&result.to_string())
+            .map(|s| json!({"difficulty": s.difficulty, "minutes": s.minutes, "reason": s.reason}))
+            .ok_or_else(|| failure(Failure::Unavailable)),
+        "review-note" => {
+            let facts: Vec<String> = body["facts"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|f| f.as_str().map(String::from))
+                .collect();
+            Ok(json!({"draft": assist::check_review(&result.to_string(), &facts)}))
+        }
+        _ => Ok(result),
+    }
+}
+
 /// `assist.call {task, body}`: one Claude job through mi-wwav.com, with
 /// 2.11's consent, failures and one retry. The answer is a draft for the
 /// person; nothing here applies it.
@@ -397,7 +419,8 @@ pub(crate) fn assist_call(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         match assist::step(attempt, outcome, &mut rng) {
             Step::Done(Ok(text)) => {
                 let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
-                return Ok(json!({"result": v.get("result").cloned().unwrap_or(v)}));
+                let result = v.get("result").cloned().unwrap_or(v);
+                return held_to_the_rules(task, &body, result).map(|r| json!({"result": r}));
             }
             Step::Done(Err(f)) => return Err(failure(f)),
             Step::RetryAfter(d) => {

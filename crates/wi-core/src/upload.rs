@@ -151,11 +151,13 @@ fn work(i: &Inner) {
                         let wait = backoff(u.failures, &mut rand::thread_rng());
                         u.next_at = wwav_ids::now_ms() + wait.as_millis() as u64;
                         soonest = soonest.min(wait);
-                        let offline = matches!(f, Fail::Offline);
-                        lock(&i.uploads).offline = offline;
-                        if offline {
+                        if matches!(f, Fail::Offline) {
+                            lock(&i.uploads).offline = true;
                             let n = i.store().upload_queue().map_or(0, |q| q.len());
                             say(i, format!("Offline. {} when you're back.", works(n)));
+                            // The rest would fail the same way: wait it out.
+                            let _ = write_upload(i, &clip.id, &u);
+                            break;
                         }
                     }
                     let _ = write_upload(i, &clip.id, &u);
@@ -177,6 +179,12 @@ fn file_type(clip: &Clip) -> &'static str {
             _ => "audio/wav",
         },
     }
+}
+
+/// The server answered, so whatever the status bar said about being
+/// offline is over.
+fn reached(i: &Inner) {
+    lock(&i.uploads).offline = false;
 }
 
 fn failed(f: Fail) -> Ended {
@@ -223,14 +231,12 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
         .len();
     let mut u = read_upload(i, &clip.id).unwrap_or_default();
     let kind = file_type(clip);
-    lock(&i.uploads).offline = false;
     let (track_id, s3_key) = if size > SINGLE_MAX {
         match parts(i, clip, &path, size, kind, &mut u)? {
             Some(done) => done,
             None => return Ok(Ended::Interrupted),
         }
     } else {
-        say(i, format!("Uploading {}", clip.title));
         // Sign just before the PUT. The first sign mints the trackId; a
         // retry signs again under the same one.
         let signed = match &u.track_id {
@@ -251,6 +257,8 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
                 None,
             )?,
         };
+        reached(i);
+        say(i, format!("Uploading {}", clip.title));
         if let Some(t) = signed["trackId"].as_str() {
             u.track_id = Some(t.to_string());
         }
@@ -334,13 +342,16 @@ fn parts(
         if i.closing() {
             return Ok(None);
         }
-        say(i, format!("Uploading {} · part {n} of {total}", clip.title));
         let signed = match i.net.api(
             "GET",
             &format!("/api/upload/parts/{}/{n}", encode(&upload_id)),
             None,
         ) {
-            Ok(v) => v,
+            Ok(v) => {
+                reached(i);
+                say(i, format!("Uploading {} · part {n} of {total}", clip.title));
+                v
+            }
             // The server forgot the upload (or finished it): start again under the same trackId.
             Err(
                 f @ Fail::Status {
@@ -497,4 +508,38 @@ pub(crate) fn queue(i: &Inner) -> Result<Value, CoreError> {
             .unwrap_or_else(|| format!("{} shortly.", works(n)))
     };
     Ok(json!({"waiting": rows, "sentence": sentence}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+
+    #[test]
+    fn retries_back_off_from_two_seconds_to_five_minutes() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        for _ in 0..200 {
+            let first = backoff(1, &mut rng);
+            assert!(
+                first >= Duration::from_secs(2) && first <= Duration::from_millis(2500),
+                "{first:?}"
+            );
+            let fourth = backoff(4, &mut rng);
+            assert!(
+                fourth >= Duration::from_secs(16) && fourth <= Duration::from_secs(20),
+                "{fourth:?}"
+            );
+            for n in 9..40 {
+                let late = backoff(n, &mut rng);
+                assert!(
+                    late >= Duration::from_secs(256) && late <= LONGEST_WAIT,
+                    "{n}: {late:?}"
+                );
+            }
+        }
+        // The jitter spreads retries out.
+        let spread: std::collections::BTreeSet<Duration> =
+            (0..50).map(|_| backoff(3, &mut rng)).collect();
+        assert!(spread.len() > 10);
+    }
 }

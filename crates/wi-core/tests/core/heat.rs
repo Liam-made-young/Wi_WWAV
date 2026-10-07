@@ -54,7 +54,16 @@ fn two_libraries_of_one_account_meet_field_by_field() {
         ["AM", "PM"].contains(&ampm) && synced_at.contains(':'),
         "{sentence}"
     );
-    let status = wait_event(&events, "status", Duration::from_secs(2));
+    let status = loop {
+        let e = wait_event(&events, "status", Duration::from_secs(2));
+        if e.payload["area"] == "sync" {
+            break e;
+        }
+        assert_eq!(
+            e.payload,
+            json!({"area": "save", "sentence": "Saved on this Mac"})
+        );
+    };
     assert_eq!(
         status.payload,
         json!({"area": "sync", "sentence": sentence})
@@ -148,8 +157,21 @@ fn claude_asks_first_and_fails_in_plain_words() {
         json!({"patch": {"claude": {"scoring": "on"}}}),
     );
     let answer = ok(&core, "assist.call", json!({"task": "score", "body": body}));
-    assert!(answer["result"]["difficulty"].is_number(), "{answer}");
+    let difficulty = answer["result"]["difficulty"].as_u64().unwrap();
+    let minutes = answer["result"]["minutes"].as_u64().unwrap();
+    assert!(
+        (1..=5).contains(&difficulty) && (5..=600).contains(&minutes),
+        "{answer}"
+    );
     assert!(answer["result"]["reason"].is_string());
+    let facts = json!({"facts": ["Classes: 6 tasks done, 4h 10m of focus"]});
+    let review = ok(
+        &core,
+        "assist.call",
+        json!({"task": "review-note", "body": facts}),
+    );
+    let draft = review["result"]["draft"].as_str().unwrap();
+    assert!(draft.contains("6 tasks done"), "{draft}");
 
     // Ten a minute, then the server's limit, in 2.11's words.
     let mut limited = None;
