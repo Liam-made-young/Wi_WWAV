@@ -106,19 +106,35 @@ fn the_settings_window_reaches_only_what_settings_need() {
     let settings = app
         .get_webview_window("settings")
         .expect("Settings… opens the settings window");
-    for cmd in [
+    // Heat's panes: spaces, school and calendars; Claude; Privacy.
+    let allowed = [
         "app.settings.get",
         "app.settings.set",
         "account.signOut",
         "engine.status",
         "library.trash.empty",
-    ] {
+        "heat.snapshot",
+        "heat.put",
+        "heat.patch",
+        "heat.delete",
+        "heat.school.set",
+        "heat.calendars.add",
+        "heat.calendars.remove",
+        "heat.calendars.sync",
+        "heat.claude.get",
+        "heat.claude.setTool",
+        "heat.public.set",
+        "heat.publicView",
+        "history.undoEntry",
+    ];
+    for cmd in allowed {
         assert_eq!(
             core_call(&settings, cmd),
             Ok(json!({ "ran": cmd })),
             "{cmd}"
         );
     }
+    // Heat's day-to-day commands are the main window's.
     for cmd in [
         "library.delete",
         "publish.drop",
@@ -126,13 +142,19 @@ fn the_settings_window_reaches_only_what_settings_need() {
         "history.undo",
         "player.play",
         "export.everything",
+        "heat.done",
+        "heat.focus.start",
+        "heat.capture.add",
+        "heat.import",
+        "heat.plan.accept",
+        "heat.share.now",
     ] {
         let refused = core_call(&settings, cmd).expect_err(cmd);
         assert_eq!(refused["code"], "not_allowed", "{cmd}");
     }
     assert_eq!(
         core.0.lock().unwrap().len(),
-        5,
+        allowed.len(),
         "a refused command never reaches the core"
     );
 }

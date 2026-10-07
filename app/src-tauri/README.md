@@ -35,7 +35,12 @@ The settings window loads `index.html?window=settings`.
 - `main.json`: every `core` cmd, listening to events, dragging the title bar,
   and the system's open and save pickers (`plugin:dialog|open`, `save`).
 - `settings.json`: `app.hello`, `app.settings.*`, `account.*`, `engine.*`,
-  `library.cleanup.*`, `library.trash.empty`, and the open picker.
+  `library.cleanup.*`, `library.trash.empty`, the open picker, and what
+  Heat's panes need: `heat.snapshot`, `heat.put`, `heat.patch`, `heat.delete`
+  (spaces), `heat.school.set`, `heat.calendars.*`, `heat.claude.*`,
+  `heat.public.set`, `heat.publicView` and `history.undoEntry` (Claude's
+  list). Heat's day-to-day commands (`heat.done`, `heat.focus.*`, …) are the
+  main window's.
 - A window in no file, such as one that shows someone else's page, can call
   nothing. No window can drive the updater.
 - No window can leave the app: a navigation to anything but the app's own
