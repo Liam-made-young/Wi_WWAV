@@ -23,6 +23,7 @@ mod args;
 mod bus;
 mod calendars;
 mod claude;
+mod claude_cli;
 pub mod engine;
 mod export;
 mod heat;
@@ -161,6 +162,12 @@ pub struct Config {
     /// A fixed "now" in milliseconds since 1970, for tests of what the time
     /// decides. None: the clock.
     pub now: Option<f64>,
+    /// The Claude Code command line, for the jobs that ask Claude. None:
+    /// `WI_WWAV_CLAUDE`, else where it is installed (claude_cli.rs).
+    pub claude: Option<PathBuf>,
+    /// Whether mail is read on its own while the app is open (3.10). Off
+    /// unless the app says so: a test's core never starts a run by itself.
+    pub background_mail: bool,
 }
 
 impl Config {
@@ -181,6 +188,8 @@ impl Config {
             tmp_dir: std::env::temp_dir(),
             helper: None,
             now: None,
+            claude: None,
+            background_mail: false,
         }
     }
 }
@@ -196,6 +205,8 @@ pub(crate) struct Inner {
     /// The Keychain, for the calendars' addresses as well as the account.
     secrets: Arc<dyn SecretStore>,
     helper: Option<PathBuf>,
+    /// The Claude Code command line, when the config names one.
+    claude: Option<PathBuf>,
     /// The journal entries this process made, so the watcher tells the views
     /// only about other processes' (the MCP helper's).
     own: Mutex<BTreeSet<String>>,
@@ -314,6 +325,7 @@ impl Core {
             net,
             secrets,
             helper: config.helper.clone(),
+            claude: config.claude.clone(),
             own: Mutex::new(BTreeSet::new()),
             fixed_now: Mutex::new(config.now),
             uploads: Mutex::new(upload::Status::default()),
