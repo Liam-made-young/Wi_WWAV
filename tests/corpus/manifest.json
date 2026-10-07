@@ -184,6 +184,12 @@
       "sha256": "411133963ec5aedb0119df5687c642b71e6b772bbec553f5a79a6689284cfa2c"
     },
     {
+      "file": "dup-data.wwav",
+      "why": "A second, shorter data chunk after wlin: the first chunk of each id is the one read, so the master is the first.",
+      "verdict": "4 stems, and the master",
+      "sha256": "8000b11a33a23f4fe95f59c6aa94a36afc7e54eb1aebd73677a0b30206d273bd"
+    },
+    {
       "file": "dup-wmet.wwav",
       "why": "A second wmet after wlin with another title: the first chunk of each id is the one read.",
       "verdict": "4 stems, and the master",

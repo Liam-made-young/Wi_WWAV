@@ -99,6 +99,10 @@ def riff(chunks, pad_last=True):
     return bytes(out)
 
 
+def chunk_bytes(cid, body):
+    return cid + struct.pack("<I", len(body)) + body + b"\0" * (len(body) & 1)
+
+
 def chunks_of(b):
     """[(id, payload)] of a whole RIFF file, as wwav_pack.py walks it."""
     out, at = [], 12
@@ -304,6 +308,10 @@ def make(out):
     add("junk-cut-off.wwav", song + b"JUNK" + struct.pack("<I", 4096) + bytes(100),
         "The original, then a JUNK chunk that says 4096 bytes and has 100: a cut-off last chunk after a whole song.",
         STEMS)
+
+    add("dup-data.wwav", song + chunk_bytes(b"data", data[:400]),
+        "A second, shorter data chunk after wlin: the first chunk of each id is the one read, so the master is the "
+        "first.", STEMS)
 
     second = wmet.replace('"title": "Tést \\"Song\\""'.encode(), b'"title": "Second"')
     assert second != wmet
