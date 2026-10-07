@@ -1,0 +1,274 @@
+/* Tasks (docs/SPEC.md 3.6): the list with its columns, the sidebar's lists,
+   the timeline and the inbox. Rows are 26 px, white and Aqua stripes; the
+   level is a tube and a word, never colour alone. */
+
+.heat-tasks {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.heat-tasks-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  padding: var(--space-s2) var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-tasks-head .heat-heading {
+  margin: 0;
+}
+
+.heat-tasks-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-filter {
+  width: 160px;
+}
+
+.heat-tasks-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.heat-table {
+  min-width: 0;
+}
+
+/* One grid for the heading and every row, so the columns line up. */
+.heat-trow {
+  display: grid;
+  grid-template-columns: 28px 104px minmax(120px, 1fr) 76px 84px 112px 34px 54px 66px;
+  align-items: center;
+  min-height: 26px;
+  cursor: default;
+}
+
+.heat-trow:nth-child(odd):not(.heat-thead) {
+  background: var(--desk-stripe);
+}
+
+.heat-thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 22px;
+  background: linear-gradient(var(--desk-case-metal));
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-th {
+  padding: 0 var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.heat-td {
+  min-width: 0;
+  padding: 0 var(--space-s1);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-td-tick {
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.heat-td-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s1);
+}
+
+.heat-td-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heat-td-group,
+.heat-td-type,
+.heat-td-due,
+.heat-td-time,
+.heat-td-when {
+  font-size: var(--type-desk-small);
+}
+
+.heat-td-diff {
+  text-align: center;
+}
+
+.heat-trow[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.heat-trow[aria-selected='true'] .heat-source,
+.heat-trow[aria-selected='true'] .heat-disclose {
+  color: var(--desk-select-ink);
+}
+
+.heat-trow[data-done='true'] .heat-td-name,
+.heat-trow[data-done='true'] .heat-td-group {
+  opacity: 0.65;
+}
+
+.heat-disclose {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--desk-ink);
+}
+
+.heat-disclose-gap {
+  flex: none;
+  width: 24px;
+}
+
+.heat-repeat {
+  flex: none;
+}
+
+.heat-source {
+  flex: none;
+  padding: 0 var(--space-s1);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-chip);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+/* "Your average time" in the sidebar. */
+.heat-averages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heat-average {
+  padding: 2px var(--space-s3);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+}
+
+/* The timeline: a blue groove filled to a red "Today" marker, with glass beads. */
+.heat-timeline {
+  padding: var(--space-s3) var(--space-s5) var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-groove {
+  position: relative;
+  height: 8px;
+  margin-top: var(--space-s3);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--heat-cool) 22%, var(--desk-well));
+}
+
+.heat-groove-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-pill);
+  background: var(--heat-cool);
+}
+
+.heat-today-marker {
+  position: absolute;
+  top: -24px;
+  padding: 0 var(--space-s1);
+  translate: -50% 0;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+}
+
+.heat-today-marker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  height: 18px;
+  border-left: 2px solid var(--heat-hot);
+}
+
+.heat-bead {
+  position: absolute;
+  left: var(--at);
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  translate: -50% -50%;
+}
+
+.heat-bead-glass {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--desk-ink);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at calc(var(--light-sun-x) * 100%) calc(var(--light-sun-y) * 100%),
+    var(--gloss),
+    var(--desk-well) 60%
+  );
+}
+
+.heat-bead[data-done='true'] .heat-bead-glass {
+  background: radial-gradient(
+    circle at calc(var(--light-sun-x) * 100%) calc(var(--light-sun-y) * 100%),
+    var(--gloss),
+    var(--heat-cool) 60%
+  );
+}
+
+.heat-bead[aria-pressed='true'] .heat-bead-glass {
+  box-shadow:
+    0 0 0 2px var(--desk-well),
+    0 0 0 4px var(--desk-ink);
+}
+
+/* The inbox */
+.heat-inbox-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.heat-inbox-acts {
+  display: flex;
+  gap: var(--space-s1);
+}
+
+.heat-inbox-act {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 var(--space-s2);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+  background: var(--desk-well);
+  color: var(--desk-ink);
+  font-size: var(--type-desk-small);
+}
+
+.heat-inbox .heat-row:nth-child(even) {
+  background: var(--desk-stripe);
+}
