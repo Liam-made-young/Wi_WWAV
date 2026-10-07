@@ -57,9 +57,17 @@ fn with_replica<T>(i: &Inner, f: impl FnOnce(&mut Replica) -> T) -> Result<T, Co
 /// has no use for this one's), what isn't a record, and the text of your
 /// mail, which stays on this Mac (3.10).
 fn local_only(kind: &str) -> bool {
-    ["calendar", "calendarEvent", "heatState", "heatSetting", "mailText"]
-        .iter()
-        .any(|k| kind.eq_ignore_ascii_case(k))
+    [
+        "calendar",
+        "calendarEvent",
+        "heatState",
+        "heatSetting",
+        "mailText",
+    ]
+    .iter()
+    // The Database tab's own tables, columns and views stay on this Mac.
+    .chain(crate::db::KINDS.iter())
+    .any(|k| kind.eq_ignore_ascii_case(k))
 }
 
 fn is_grade(kind: &str) -> bool {
@@ -221,7 +229,9 @@ fn load(i: &Inner) -> Result<Replica, CoreError> {
     match i.kv.get(REPLICA)? {
         Some(v) => serde_json::from_value::<Saved>(v)
             .map(Replica::restore)
-            .map_err(|e| CoreError::new("library", format!("Learn's sync state doesn't read: {e}"))),
+            .map_err(|e| {
+                CoreError::new("library", format!("Learn's sync state doesn't read: {e}"))
+            }),
         None => Ok(Replica::new(&wwav_ids::ulid())),
     }
 }

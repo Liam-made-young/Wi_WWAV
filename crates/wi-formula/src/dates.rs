@@ -97,19 +97,36 @@ pub fn parse_date(s: &str) -> Option<f64> {
         }
         return Some(day + parse_time(rest)?);
     }
-    // 10/7/2026
-    let slash: Vec<&str> = t.split('/').collect();
+    // 10/7/2026, with an optional time after a space
+    let (date_part, time_part) = match t.split_once(' ') {
+        Some((d, rest)) if d.contains('/') => (d, Some(rest)),
+        _ => (t, None),
+    };
+    let slash: Vec<&str> = date_part.split('/').collect();
     if slash.len() == 3 {
         let (m, d, y) = (int(slash[0])?, int(slash[1])?, int(slash[2])?);
         let y = if y < 100 { 2000 + y } else { y };
-        return valid(y, m, d).then(|| days_from_civil(y, m, d));
+        if !valid(y, m, d) {
+            return None;
+        }
+        let day = days_from_civil(y, m, d);
+        return match time_part {
+            Some(time) => Some(day + parse_time(time)?),
+            None => Some(day),
+        };
     }
-    // Oct 7, 2026 and 7 Oct 2026
-    let words: Vec<String> = t
+    // Oct 7, 2026 and 7 Oct 2026, with an optional time after them
+    let mut words: Vec<String> = t
         .split([' ', ','])
         .filter(|w| !w.is_empty())
         .map(|w| w.to_ascii_lowercase())
         .collect();
+    let time = if words.len() > 3 {
+        let rest = words.split_off(3).join(" ");
+        Some(parse_time(rest.trim_start_matches("at ").trim())?)
+    } else {
+        None
+    };
     if words.len() == 3 {
         let month = |w: &str| {
             MONTHS
@@ -122,7 +139,7 @@ pub fn parse_date(s: &str) -> Option<f64> {
         } else {
             (month(&words[1])?, int(&words[0])?, int(&words[2])?)
         };
-        return valid(y, m, d).then(|| days_from_civil(y, m, d));
+        return valid(y, m, d).then(|| days_from_civil(y, m, d) + time.unwrap_or(0.0));
     }
     None
 }
@@ -146,11 +163,15 @@ fn parse_time(s: &str) -> Option<f64> {
     };
     let body = body.split('.').next().unwrap_or(body);
     let parts: Vec<&str> = body.split(':').collect();
-    if parts.len() < 2 || parts.len() > 3 {
+    // "5pm" has no minutes; a bare "5" is not a time.
+    if parts.len() > 3 || (parts.len() < 2 && !pm && !am) {
         return None;
     }
-    let mut h = int(parts[0])?;
-    let m = int(parts[1])?;
+    let mut h = int(parts[0].trim())?;
+    let m = if parts.len() > 1 { int(parts[1])? } else { 0 };
+    if (pm || am) && !(1..=12).contains(&h) {
+        return None;
+    }
     let sec = if parts.len() == 3 { int(parts[2])? } else { 0 };
     if pm && h < 12 {
         h += 12;
@@ -196,6 +217,13 @@ mod tests {
         assert_eq!(parse_date("7 October 2026"), Some(day));
         assert_eq!(parse_date("2026-10-07T12:00:00-04:00"), Some(day + 0.5));
         assert_eq!(parse_date("2026-10-07 6:00 PM"), Some(day + 0.75));
+        assert_eq!(parse_date("Oct 7, 2026 6:00 PM"), Some(day + 0.75));
+        assert_eq!(parse_date("7 Oct 2026 at 18:00"), Some(day + 0.75));
+        assert_eq!(parse_date("10/7/2026 6pm"), Some(day + 0.75));
+        assert_eq!(parse_date("10/7/2026 12:00 am"), Some(day));
+        assert_eq!(parse_date("Oct 7, 2026 sometime"), None);
+        assert_eq!(parse_date("10/7/2026 25:00"), None);
+        assert_eq!(parse_date("10/7/2026 13pm"), None);
         for not in [
             "",
             "JPN 101",

@@ -31,10 +31,10 @@ mod functions;
 mod parse;
 mod value;
 
-pub use dates::{civil_from_days, days_from_civil, parse_date};
-pub use eval::Context;
+pub use dates::{civil_from_days, days_from_civil, format_date, parse_date, time_of};
+pub use eval::{compare, Context};
 pub use parse::{Formula, ParseError, Ref};
-pub use value::{Error, Value};
+pub use value::{format_number, parse_number, Error, Value};
 
 /// Every function a formula may call, for the editor's list and for Claude.
 pub fn function_names() -> Vec<&'static str> {

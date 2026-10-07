@@ -19,6 +19,7 @@
 mod clips;
 mod journal;
 mod media;
+mod merge;
 mod organise;
 mod records;
 mod schema;

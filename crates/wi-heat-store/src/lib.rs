@@ -22,6 +22,7 @@ pub mod mcp;
 pub mod ops;
 mod schema;
 pub mod snapshot;
+pub mod tables;
 pub mod timer;
 
 use std::collections::BTreeMap;

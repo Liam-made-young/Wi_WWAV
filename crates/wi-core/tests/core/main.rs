@@ -3,6 +3,7 @@
 
 mod account;
 mod common;
+mod db;
 mod export;
 mod heat;
 mod heat_calendars;
@@ -15,3 +16,4 @@ mod player;
 mod review;
 mod supervisor;
 mod upload;
+mod wiki;

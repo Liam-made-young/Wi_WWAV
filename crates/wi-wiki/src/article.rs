@@ -236,6 +236,17 @@ fn push_text(out: &mut Vec<Value>, text: &str) {
     out.push(Value::String(body));
 }
 
+/// Adds inline content to what is there, joining text that meets text, so a
+/// link shown as plain words reads as one run with the words around it.
+fn append(out: &mut Vec<Value>, items: Vec<Value>) {
+    for item in items {
+        match (out.last_mut(), &item) {
+            (Some(Value::String(last)), Value::String(more)) => last.push_str(more),
+            _ => out.push(item),
+        }
+    }
+}
+
 /// Inline content with no white space at either end, or nothing at all.
 fn trimmed(mut c: Vec<Value>) -> Vec<Value> {
     while let Some(Value::String(s)) = c.first() {
@@ -380,7 +391,8 @@ impl Out {
                 let wiki = rel.split_ascii_whitespace().any(|r| r == "mw:WikiLink")
                     || href.starts_with("./");
                 if wiki {
-                    out.extend(self.wiki_link(e, c));
+                    let link = self.wiki_link(e, c);
+                    append(out, link);
                     return;
                 }
                 let href = if let Some(rest) = href.strip_prefix("//") {
@@ -393,7 +405,7 @@ impl Out {
                 } else if let Some(frag) = href.strip_prefix('#') {
                     out.push(json!({"t": "j", "frag": percent_decode(frag), "c": c}));
                 } else {
-                    out.extend(c);
+                    append(out, c);
                 }
             }
             "b" | "strong" => self.mark("b", e, out),
