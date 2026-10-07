@@ -5345,6 +5345,21 @@ dependencies = [
  "serde",
  "serde_json",
  "wwav-ids",
+ "wwav-tokens",
+]
+
+[[package]]
+name = "wi-heat-store"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "wi-heat",
+ "wi-store",
+ "wwav-ids",
 ]
 
 [[package]]
@@ -5352,6 +5367,9 @@ name = "wi-mcp"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "tempfile",
+ "wi-heat-store",
+ "wi-store",
 ]
 
 [[package]]

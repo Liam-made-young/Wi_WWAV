@@ -1,19 +1,20 @@
 [package]
-name = "wi-heat"
+name = "wi-heat-store"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+description = "Heat's reads and writes on library.sqlite, shared by the core and wi-mcp (docs/HEAT.md)"
 
 [dependencies]
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
-rand.workspace = true
-regex = "1"
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+wi-heat.workspace = true
+wi-store.workspace = true
 wwav-ids.workspace = true
-wwav-tokens.workspace = true
 
 [dev-dependencies]
-proptest.workspace = true
+tempfile.workspace = true
