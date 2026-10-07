@@ -74,7 +74,7 @@
   flex-wrap: wrap;
 }
 
-.habit-cell {
+.heat-day {
   display: grid;
   place-items: center;
   width: 24px;
@@ -84,7 +84,7 @@
   background: none;
 }
 
-.habit-cell-square {
+.heat-day-square {
   width: 13px;
   height: 13px;
   border: 1px solid var(--desk-ink2);
@@ -92,12 +92,12 @@
   background: var(--desk-well);
 }
 
-.habit-cell[data-done='true'] .habit-cell-square {
+.heat-day[data-done='true'] .heat-day-square {
   background: var(--desk-select);
   border-color: var(--desk-select);
 }
 
-.habit-cell[data-today='true'][data-done='false'] .habit-cell-square {
+.heat-day[data-today='true'][data-done='false'] .heat-day-square {
   border-style: dashed;
 }
 

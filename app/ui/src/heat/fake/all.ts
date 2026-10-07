@@ -5,5 +5,8 @@ import './today';
 import './tasks';
 import './grades';
 import './habits';
+import './public';
+import './claude';
+import './settings';
 
 export { createFake, type Fake } from './core';

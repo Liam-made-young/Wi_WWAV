@@ -384,3 +384,15 @@ export const habitsUi = {
   today: 'Today still counts until midnight.',
   counterHint: 'A counter that shows the days in a row. Off by default: the record above only grows.',
 };
+
+// --- Mail, as the tab words it (3.10) ----------------------------------------------------
+
+export const mailUi = {
+  empty: 'No school mail recorded yet. Ask Claude to read it.',
+  all: 'All',
+  claudeReason: 'Claude’s reason',
+  made: 'What it made',
+  openGrades: 'Open Grades',
+  noBody: 'Heat keeps only the subject, the sender, the time and Claude’s reason. The message itself stays in Gmail.',
+  gmailUrl: (threadId: string) => `https://mail.google.com/mail/u/0/#all/${threadId}`,
+};

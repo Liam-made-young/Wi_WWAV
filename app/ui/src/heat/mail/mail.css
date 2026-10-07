@@ -1,0 +1,137 @@
+/* Mail (docs/SPEC.md 3.10): a 320 px thread list and a pane. Text read for
+   more than a line (Claude's reason) sits on white; chips are shapes with
+   words, never colour alone. */
+
+.heat-mailtab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.heat-mail-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  padding: var(--space-s2) var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-mail-head .heat-heading {
+  margin: 0;
+}
+
+.heat-mail-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.heat-threads {
+  overflow-y: auto;
+  border-right: 1px solid var(--desk-deck-edge);
+}
+
+.heat-thread {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-s2);
+  align-items: center;
+  min-height: 26px;
+  padding: var(--space-s1) var(--space-s3);
+  cursor: default;
+}
+
+.heat-thread:nth-of-type(even) {
+  background: var(--desk-stripe);
+}
+
+.heat-thread[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.heat-thread-from {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: bold;
+}
+
+.heat-thread-time {
+  font-size: var(--type-desk-small);
+}
+
+.heat-thread-subject {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-thread-chips {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: var(--space-s1);
+}
+
+.heat-pane {
+  min-width: 0;
+  padding: var(--space-s3) var(--space-s4);
+  overflow-y: auto;
+}
+
+.heat-pane-subject {
+  margin: 0;
+  font-size: var(--type-desk-large);
+  font-weight: normal;
+}
+
+.heat-pane-from,
+.heat-pane-reason-label {
+  margin: var(--space-s1) 0;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-pane-facts {
+  display: flex;
+  gap: var(--space-s5);
+  margin: var(--space-s2) 0;
+}
+
+.heat-pane-facts div {
+  display: grid;
+}
+
+.heat-pane-facts dt {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-pane-facts dd {
+  margin: 0;
+}
+
+.heat-pane-made {
+  margin: var(--space-s2) 0;
+}
+
+.heat-pane-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s2);
+  margin-top: var(--space-s3);
+}
+
+/* Claude's reason is the sentence it gave, set apart as a quotation. */
+.heat-mail-reason {
+  margin: 0 0 var(--space-s2);
+  padding: var(--space-s1) var(--space-s2);
+  border-left: var(--desk-select-bar) solid var(--desk-highlight);
+  background: var(--desk-stripe);
+}
