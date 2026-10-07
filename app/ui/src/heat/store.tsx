@@ -177,29 +177,28 @@ export function HeatProvider({ client, clock = Date.now, children }: Props) {
     [say],
   );
 
-  // A round or break whose time is up is finished here, once, whichever room
-  // is open (2.3). The core ends it at its own endsAt whatever the call, so a
-  // call that comes early or twice changes nothing; if the round is still
-  // running afterwards, try again a moment later.
+  // A round or break whose time is up is finished here, whichever room is open
+  // (2.3). The core ends it at its own endsAt whatever the call, so a call that
+  // comes early or twice changes nothing: this looks twice a second while a
+  // round runs, and asks again a few times if the round is somehow still on.
   const timer = snap?.heatState.timer;
   const running = timer ? (timer.running ?? timer.endsAt !== null) : false;
   const endsAt = running ? (timer?.endsAt ?? null) : null;
-  const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (endsAt === null) return;
-    let id: ReturnType<typeof setTimeout>;
-    const wait = Math.max(0, endsAt - now()) + 30;
-    id = setTimeout(() => {
+    let asking = false;
+    let asked = 0;
+    const look = setInterval(() => {
+      if (asking || asked >= 8 || now() < endsAt) return;
+      asking = true;
+      asked += 1;
       c.focus('finish').then(
-        () => {
-          id = setTimeout(() => setRetry((n) => (n < 8 ? n + 1 : n)), 250);
-        },
-        () => {},
+        () => (asking = false),
+        () => (asking = false),
       );
-    }, wait);
-    return () => clearTimeout(id);
-  }, [endsAt, retry, c, now]);
-  useEffect(() => setRetry(0), [endsAt]);
+    }, 500);
+    return () => clearInterval(look);
+  }, [endsAt, c, now]);
 
   const idx = useMemo(() => buildIndex(snap), [snap]);
   const date = snap?.date ?? dayKey(clock(), zone.current);

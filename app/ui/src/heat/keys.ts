@@ -6,7 +6,7 @@
 //   1-6        Today, Tasks, Calendar, Grades, Habits, Mail (no field focused)
 //   N          New item          C  make current       P  plan into the next free gap
 //   ↑ ↓        move              F  focus start or pause
-//   Return     edit              ⇧F stop and log       I  pulled away
+//   Return     edit the row under the cursor   ⇧F stop and log   I  pulled away
 //   ⌘↩ · ⌫     mark done · delete (with Undo)
 //   ⌥↑ ⌥↓      move the selected block 15 minutes; with ⇧, make it 15 shorter or longer
 //   ⌘F · ⌥⌘R   filter the list · sync calendars
@@ -70,7 +70,7 @@ export function heatRoute(e: HeatKey, ctx: HeatKeyContext): HeatCommand | null {
     if (e.shift) return null; // ⇧Return is the shell's: the tab's secondary act
     // The drafts are what Return is for while they wait, whichever button was clicked last.
     if (ctx.drafts) return { type: 'acceptDrafts' };
-    return ctx.focus === null && ctx.selected ? { type: 'edit' } : null;
+    return ctx.focus === null ? { type: 'edit' } : null;
   }
 
   if (key === 'ArrowUp') return e.shift ? null : { type: 'move', by: -1 };

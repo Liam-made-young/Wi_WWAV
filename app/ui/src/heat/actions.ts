@@ -35,9 +35,11 @@ export function useActions() {
         const t = idx.task.get(taskId);
         if (!t) return;
         if (t.rrule) {
-          const target = day ?? derived(taskId)?.next ?? date;
-          const ticked = idx.ticked.get(taskId)?.has(target) ?? false;
-          const r = await act(client.done(taskId, !ticked, target));
+          // The tick shows today's occurrence: ticking again unticks it; otherwise the next open one is done.
+          const ticked = day === undefined && (idx.ticked.get(taskId)?.has(date) ?? false);
+          const target = ticked ? date : (day ?? derived(taskId)?.next ?? date);
+          const was = idx.ticked.get(taskId)?.has(target) ?? false;
+          const r = await act(client.done(taskId, !was, target));
           if (r?.took) say(r.took);
           return;
         }
@@ -123,6 +125,15 @@ export function useActions() {
       async removeBlock(blockId: Id) {
         const r = await act(client.delete('timeBlock', blockId));
         if (r && selection.blockId === blockId) selectBlock(null);
+      },
+
+      /** → task, → note, → project or → upload on an inbox item. A new task opens for editing. */
+      async triage(captureId: Id, to: 'task' | 'note' | 'project' | 'upload') {
+        const r = await act(client.triage(captureId, to));
+        if (!r) return;
+        const made = (r.result as { id?: Id } | null)?.id;
+        if (to === 'task' && made) selectTask(made);
+        else say(to === 'upload' ? 'Marked for upload.' : `Made a ${to} from the capture.`);
       },
 
       async schedule(taskId: Id, day: DayKey) {

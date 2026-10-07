@@ -120,6 +120,8 @@ export interface FrameApi {
   newTask(options?: NewTaskOptions): void;
   /** Checking off a task with no logged time asks "Time it took" first (3.5). */
   askTook(taskId: Id): void;
+  /** Return and ⌘I: the keyboard goes to Get Info's first field, if something is selected. */
+  focusInfo(): void;
   /** The focus length the LCD offers when idle: 25, 50 or a custom 10-90. */
   focusLength: number;
   setFocusLength(minutes: number): void;

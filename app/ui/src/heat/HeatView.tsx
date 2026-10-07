@@ -132,6 +132,7 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
         setSheet({ kind: 'new', options });
       },
       askTook: (taskId) => setSheet({ kind: 'took', taskId }),
+      focusInfo: () => document.querySelector<HTMLElement>('.heat-info [data-info-first]')?.focus(),
       focusLength,
       setFocusLength,
       registerActs,
@@ -282,7 +283,7 @@ function Frame(p: FrameProps) {
         repeat: e.repeat,
       };
       const focus = focusKind(document.activeElement);
-      if (focus === 'text') return false;
+      if (focus === 'text' || sheet) return false;
       if (p.keysRef.current[tab]?.current.key?.(hk)) return true;
       const cmd = heatRoute(hk, {
         tab,

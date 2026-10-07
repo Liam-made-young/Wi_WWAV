@@ -53,6 +53,8 @@ export async function settle(times = 4) {
 export interface Rig {
   fake: Fake;
   client: HeatClient;
+  /** The fake core's own line, for the calls the shell makes (history.undo). */
+  call<T>(cmd: string, args?: Record<string, unknown>): Promise<T>;
   seeded: Seeded;
   host: HTMLElement;
   view: RefObject<HeatHandle | null>;
@@ -103,6 +105,7 @@ export async function mountHeat(options: Options = {}): Promise<Rig> {
   return {
     fake,
     client,
+    call: transport.call,
     seeded,
     host,
     view,
@@ -159,3 +162,25 @@ export const button = (rig: Rig, name: string | RegExp) =>
 function matches(text: string, name: string | RegExp) {
   return typeof name === 'string' ? text.trim() === name : name.test(text.trim());
 }
+
+/** Types into a field the way a person does: React sees an input event with the new value. */
+export async function type(el: Element | null | undefined, value: string) {
+  if (!el) throw new Error('Nothing to type into.');
+  const proto =
+    el instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : el instanceof HTMLSelectElement
+        ? HTMLSelectElement.prototype
+        : HTMLInputElement.prototype;
+  const set = Object.getOwnPropertyDescriptor(proto, 'value')!.set!;
+  await act(async () => {
+    set.call(el, value);
+    el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
+  });
+}
+
+/** Lets real time pass, with the renders it causes. */
+export const wait = (ms: number) =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, ms));
+  });
