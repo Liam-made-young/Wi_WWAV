@@ -232,6 +232,19 @@ describe('minutes go to the current task', () => {
     expect(focusLcd(state, t0 + 25 * MIN).note).toBe('Focus done. 15m logged to Grammar quiz 4.');
   });
 
+  it('says only "Focus done." when the round’s last session was too short to log', () => {
+    const quiz: FocusTarget = { kind: 'task', id: 'quiz', title: 'Grammar quiz 4' };
+    const { effects, state } = run([
+      [t0, press(mix)],
+      [t0 + 24 * MIN + 50_000, { type: 'setTarget', target: quiz }],
+      [t0 + 25 * MIN, tick],
+    ]);
+    expect(effects).toEqual([
+      { kind: 'log', session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 24 * MIN + 50_000, focusMin: 25, interruptions: 0, room: 'heat' } },
+    ]);
+    expect(focusLcd(state, t0 + 25 * MIN).note).toBe('Focus done.');
+  });
+
   it('logs a habit’s minutes to the habit, and ticks it once the session reaches its length', () => {
     const kanji: FocusTarget = { kind: 'habit', id: 'kanji', title: 'Practise kanji', minutes: 20 };
     const r1 = run([

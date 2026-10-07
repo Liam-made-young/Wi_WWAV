@@ -1,9 +1,13 @@
 // Every user-facing Heat string, in the spec's words (docs/SPEC.md chapter 3,
-// 2.11 and 8.10). Plain, second person, present tense; no exclamation marks.
-// Where the spec gives a pattern rather than a sentence, the function here is
-// the one place that fills it in.
+// 2.2, 2.11 and 8.10). Plain, second person, present tense; no exclamation
+// marks; real numbers instead of adjectives. Where the spec gives a pattern
+// rather than a sentence, the function here is the one place that fills it in.
 
-// Due phrases (3.1): "Today 4:00 PM", "Tomorrow 11:59 PM", "2d overdue".
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// --- 3.1: heat, the LCD and the sidebar -------------------------------------
+
+// Due phrases: "Today 4:00 PM", "Tomorrow 11:59 PM", "2d overdue".
 export const due = {
   today: (time: string) => `Today ${time}`,
   tomorrow: (time: string) => `Tomorrow ${time}`,
@@ -11,15 +15,79 @@ export const due = {
   overdue: (amount: string) => `${amount} overdue`,
 };
 
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-// The sidebar's "Your average time" (3.1).
+// "Homework 1h 15m (6)"
 export const averageTime = (type: string, time: string, count: number) => `${type} ${time} (${count})`;
 
-// The LCD's second line (3.1).
+// "This week: 3h 20m across 5 tasks"
 export const weeklyLoad = (time: string, count: number) => `This week: ${time} across ${plural(count, 'task')}`;
 
-// Repeat presets, as the PKM's task panel offers them (3.6).
+// The Now strip's task half (2.2): "Hot: Grammar quiz 4".
+export const strip = {
+  task: (level: string, title: string) => `${level}: ${title}`,
+  allClear: 'All clear',
+  nothingOpen: 'Nothing open right now.',
+};
+
+// Where a task came from, as Get Info names it.
+export const source = {
+  you: 'Added by you',
+  calendar: 'Brightspace calendar',
+  ical: 'Brightspace calendar',
+  mail: 'Mail',
+  capture: 'Quick capture',
+};
+
+// --- 3.3: the tabs ----------------------------------------------------------
+
+// Each tab's "+" and its one secondary act. Mail has no "+".
+export const tabs = {
+  plus: {
+    Today: 'A task straight into the plan',
+    Tasks: 'A task',
+    Calendar: 'A task due 11:59 PM on the selected day',
+    Grades: 'A grade',
+    Habits: 'A habit',
+  },
+  secondary: {
+    Today: 'Plan my day',
+    Tasks: 'Triage inbox',
+    Calendar: 'Today',
+    Grades: 'Add course',
+    Habits: 'Show the year',
+    Mail: 'Sync now',
+  },
+};
+
+// ⌘Z names what it will undo: "Undo mark done", "Undo move block".
+export const undo = {
+  label: (action: string) => `Undo ${action}`,
+  markDone: 'mark done',
+  moveBlock: 'move block',
+};
+
+// --- 3.4 and 3.6: spaces and Tasks -------------------------------------------
+
+export const tasks = {
+  empty: (space: string | null) => `Add your first ${space ? `${space} ` : ''}task and Heat will rank it.`,
+  rankIt: 'Heat will rank it.',
+  nameFirst: 'Give the task a name first.',
+  all: 'All',
+  newSpace: 'New space…',
+  library: 'Library',
+  inbox: 'Inbox',
+  allOpen: 'All open',
+  hot: 'Hot',
+  dueThisWeek: 'Due this week',
+  scheduled: 'Scheduled',
+  someday: 'Someday',
+  done: 'Done',
+  averageTime: 'Your average time',
+  markDone: 'Mark done',
+  took: 'Took',
+  edit: 'Edit',
+};
+
+// Repeat presets, as the PKM's task panel offers them.
 export const repeat = {
   none: 'Does not repeat',
   daily: 'Daily',
@@ -29,7 +97,8 @@ export const repeat = {
   custom: 'Custom…',
 };
 
-// Today (3.5).
+// --- 3.5: Today ---------------------------------------------------------------
+
 export const today = {
   header: (day: string) => `Today, ${day}`,
   subtitle: (blocks: number, planned: string, dueToday: number) =>
@@ -43,7 +112,7 @@ export const today = {
   blockEnds: (time: string) => `Block ends ${time}`,
 };
 
-// Plan my day's drafts (3.5): "Due tomorrow 11:59 PM, Hot."
+// Plan my day's drafts: "Due tomorrow 11:59 PM, Hot."
 export const draft = {
   reason: (phrase: string, level: string) =>
     `Due ${phrase.replace(/^(Today|Tomorrow) /, (w) => w.toLowerCase())}, ${level}.`,
@@ -52,20 +121,22 @@ export const draft = {
   leftToPlan: (time: string) => `${time} left to plan`,
 };
 
-// The Pomodoro LCD (3.5) and the Now strip (2.2).
+// The Pomodoro LCD, and the strip's "focus 18:40 left" (2.2).
 export const focus = {
   line: (round: number, of: number, title: string) => `Focus ${round} of ${of} · ${title}`,
   done: (time: string, title: string) => `Focus done. ${time} logged to ${title}.`,
+  doneUnlogged: 'Focus done.',
   breakWaits: (length: string) => `Break ${length}. Press F to start it.`,
   breakLine: 'Break',
   stopped: (time: string, title: string) => `Focus stopped. ${time} logged to ${title}.`,
   breakDone: (round: number, of: number) => `Break done. Press F to start focus ${round} of ${of}.`,
   strip: (left: string) => `focus ${left} left`,
   breakStrip: (left: string) => `break ${left} left`,
+  pulledAway: 'Pulled away',
   chime: 'Chime when focus ends',
 };
 
-// Checking a task off (3.1, 3.5).
+// Checking a task off.
 export const check = {
   title: 'Time it took',
   hint: 'This trains your time averages for this type of task.',
@@ -73,7 +144,7 @@ export const check = {
     sessions > 0 ? `Done. Took ${time} across ${plural(sessions, 'focus session')}.` : `Done. Took ${time}.`,
 };
 
-// The right column's widgets (3.5).
+// The right column's widgets.
 export const widgets = {
   now: 'Now',
   habits: 'Habits',
@@ -88,7 +159,22 @@ export const widgets = {
   done: 'Done',
   openLink: 'Open link',
   openSession: 'Open session',
+  openGrades: 'Open Grades',
+  openInMail: 'Open in Mail',
 };
+
+// --- 3.7: Calendar ------------------------------------------------------------
+
+export const calendar = {
+  more: (n: number) => `${n} more`,
+  dueFlag: (time: string) => `due ${time}`,
+  unscheduled: 'Unscheduled',
+  month: 'Month',
+  week: 'Week',
+  day: 'Day',
+};
+
+// --- 3.8: Grades --------------------------------------------------------------
 
 // "An A", "a B": the article a letter takes when read aloud.
 const withArticle = (letter: string, capital: boolean) => {
@@ -96,7 +182,6 @@ const withArticle = (letter: string, capital: boolean) => {
   return `${capital ? a[0].toUpperCase() + a.slice(1) : a} ${letter}`;
 };
 
-// Grades (3.1, 3.8).
 export const grades = {
   header: (term: string) => `${term} grades`,
   basedOn: (pct: string) => `Based on ${pct}% of the course so far`,
@@ -113,11 +198,11 @@ export const grades = {
     `${withArticle(letter, true)} is out of reach; the highest possible is ${best}% (${bestLetter}).`,
   safe: (letter: string, left: string) => `You keep ${withArticle(letter, false)} even with 0% on the remaining ${left}%.`,
   allGraded: (pct: string, letter: string) => `Every category is graded. The course stands at ${pct}% (${letter}).`,
-  addCourse: 'Add course',
-  addGrade: 'Add grade',
+  save: 'Save',
 };
 
-// Habits (3.9).
+// --- 3.9: Habits --------------------------------------------------------------
+
 export const habits = {
   limit: 'Habit limit reached',
   nameFirst: 'Give the habit a name first.',
@@ -127,47 +212,105 @@ export const habits = {
   notYet: 'Not done yet',
   streak: (days: number) => `${days}-day streak`,
   showCounter: 'Show a streak counter',
-  showYear: 'Show the year',
 };
 
-// Tasks and the sidebar (3.1, 3.4, 3.6).
-export const tasks = {
-  empty: (space: string | null) => `Add your first ${space ? `${space} ` : ''}task and Heat will rank it.`,
-  rankIt: 'Heat will rank it.',
-  nameFirst: 'Give the task a name first.',
-  all: 'All',
-  newSpace: 'New space…',
-  library: 'Library',
-  inbox: 'Inbox',
-  allOpen: 'All open',
-  hot: 'Hot',
-  dueThisWeek: 'Due this week',
-  scheduled: 'Scheduled',
-  someday: 'Someday',
-  done: 'Done',
-  averageTime: 'Your average time',
-  triageInbox: 'Triage inbox',
-  markDone: 'Mark done',
-  took: 'Took',
-  edit: 'Edit',
+// --- 3.10: Mail -----------------------------------------------------------------
+
+export const mail = {
+  brightspace: 'Brightspace',
+  school: 'School',
+  gradePosted: 'Grade posted',
+  taskMade: 'Task made',
+  nothingToDo: 'Nothing to do',
+  loadImages: 'Load images',
+  makeTask: 'Make a task',
+  openInGmail: 'Open in Gmail',
+  fromMail: 'From mail:',
+  testing: 'Google asks you to sign in again every 7 days while Heat is in testing.',
 };
 
-// Where a task came from, as Get Info names it (3.1).
-export const source = {
-  you: 'Added by you',
-  calendar: 'Brightspace calendar',
-  ical: 'Brightspace calendar',
-  mail: 'Mail',
-  capture: 'Quick capture',
+// --- 3.1 and 3.11: syncing -----------------------------------------------------
+
+// "Synced 3:41 PM: 2 new tasks, 1 date change, 1 new grade posted"
+export const sync = {
+  synced: (time: string, n: { newTasks: number; dateChanges: number; newGrades: number }) => {
+    const parts = [
+      n.newTasks > 0 ? plural(n.newTasks, 'new task') : null,
+      n.dateChanges > 0 ? plural(n.dateChanges, 'date change') : null,
+      n.newGrades > 0 ? `${plural(n.newGrades, 'new grade')} posted` : null,
+    ].filter((p) => p !== null);
+    return `Synced ${time}: ${parts.length > 0 ? parts.join(', ') : 'nothing new'}`;
+  },
+  syncing: 'Syncing…',
+  syncNow: 'Sync now',
+  gone: 'No longer in Brightspace',
+  signInExpired: 'Google sign-in has expired. Sign in again to read Brightspace mail.',
 };
 
-// Calendar (3.1, 3.7).
-export const calendar = {
-  more: (n: number) => `${n} more`,
-  dueFlag: (time: string) => `due ${time}`,
-  today: 'Today',
-  unscheduled: 'Unscheduled',
-  month: 'Month',
-  week: 'Week',
-  day: 'Day',
+// --- 2.11 and 3.12: Claude ----------------------------------------------------------
+
+export const claude = {
+  estimate: (time: string) => `Claude's estimate: ${time}. It read the title, the notes and your past averages.`,
+  askToScore: 'Ask Claude to score',
+  consent: "Heat will send this task's title, type and notes, and your average minutes per type. Nothing else.",
+  turnOn: 'Turn on scoring',
+  notNow: 'Not now',
+  off: 'Claude scoring is off. Set difficulty yourself.',
+  tooMany: 'Too many requests. Wait a minute, then try again.',
+  needsConnection: 'Needs a connection',
+  dailyLimit: "Claude's 50 calls for today are used. They come back at midnight.",
+  moreEmails: "More emails left, they'll come in on the next sync.",
+};
+
+// --- 3.13: capture, projects and the weekly review ------------------------------------
+
+// "4 in inbox · captured ✓"
+export const capture = {
+  footer: (inInbox: number, justCaptured: boolean) => `${inInbox} in inbox${justCaptured ? ' · captured ✓' : ''}`,
+  toTask: '→ task',
+  toNote: '→ note',
+  toProject: '→ project',
+  toUpload: '→ upload',
+  inboxZero: 'Inbox zero ✓',
+};
+
+export const projects = {
+  makeTasks: (n: number) => `Make ${plural(n, 'task')} from To finish?`,
+  newReleasePlan: 'New release plan',
+  releasePhases: ['Pre-release', 'Release day', 'Post-release'],
+};
+
+export const review = {
+  steps: ['Inbox', 'Last week', 'Projects', 'Next week', 'Note'],
+  space: (name: string, done: number, focus: string) => `${name}: ${plural(done, 'task')} done, ${focus} of focus`,
+  habits: (focus: string) => `Habits: ${focus} of focus`,
+  milestone: (title: string) => `Milestone reached: ${title}`,
+  accuracy: (type: string, estimated: string, took: string, n: number) =>
+    `${type}: estimated ${estimated}, took ${took} across ${n}`,
+  noteHeadings: ['What moved', 'What slipped', "Next week's one thing"],
+  complete: 'Review complete ✓',
+};
+
+// --- 3.14: connections ----------------------------------------------------------------
+
+export const connections = {
+  yourGalaxy: 'Your galaxy',
+  lineHint: 'This line will show on your galaxy',
+  show: 'Show',
+  nowMaking: (text: string) => `Now making: ${text}`,
+  payoutTask: 'Finish payout setup so your shelf can open',
+};
+
+// --- 3.15: data and moving in --------------------------------------------------------
+
+export const status = {
+  saved: (syncedAt: string | null) => `Saved on this Mac${syncedAt ? ` · Synced ${syncedAt}` : ''}`,
+  failed: "Couldn't save that change. Check your connection and try again.",
+  empty: 'Nothing here right now.',
+  end: "That's everything.",
+};
+
+export const moving = {
+  notExport: 'This file isn’t a Heat export.',
+  newer: 'This export is from a newer Heat. Update Wi_WWAV, then try again.',
 };

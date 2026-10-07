@@ -128,7 +128,7 @@ function settle(s: FocusState, now: number, settings: FocusSettings): { state: F
       endsAt: null,
       leftMs: lengthMs,
       session: null,
-      note: copy.focus.done(formatMinutes(minutes), s.target?.title ?? ''),
+      note: minutes >= 1 ? copy.focus.done(formatMinutes(minutes), s.target?.title ?? '') : copy.focus.doneUnlogged,
     },
     effects: settings.chime ? [...effects, { kind: 'chime' }] : effects,
   };
