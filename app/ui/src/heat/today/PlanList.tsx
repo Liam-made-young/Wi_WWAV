@@ -65,7 +65,13 @@ export function PlanList({ view, note, onPlan }: { view: PlanView; note: DailyNo
           {copy.tabs.secondary.Today}
         </button>
       </div>
-      <div role="listbox" aria-label="Today’s plan" className="heat-plan-rows">
+      <div
+        role="listbox"
+        aria-label="Today’s plan"
+        className="heat-plan-rows"
+        tabIndex={0}
+        aria-activedescendant={blockId ? `heat-row-b-${blockId}` : taskId ? `heat-row-t-${taskId}` : undefined}
+      >
         {view.drafts.length > 0 && (
           <Section title="Plan my day" hint="Return accepts all. A click accepts one. Esc clears them.">
             <div ref={draftsRef} tabIndex={-1} className="heat-drafts" aria-label="Drafts">

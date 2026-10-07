@@ -20,7 +20,13 @@ export function Inbox({ ids, cursor, onCursor }: { ids: Id[]; cursor: Id | null;
 
   if (ids.length === 0) return <p className="heat-empty">{copy.capture.inboxZero}</p>;
   return (
-    <div role="listbox" aria-label="Inbox" className="heat-inbox">
+    <div
+      role="listbox"
+      aria-label="Inbox"
+      className="heat-inbox"
+      tabIndex={0}
+      aria-activedescendant={cursor ? `heat-row-c-${cursor}` : undefined}
+    >
       {ids.map((id) => {
         const c = idx.capture.get(id);
         if (!c) return null;

@@ -368,7 +368,7 @@
 .heat-orb[data-done='true'] .heat-orb-disc {
   color: var(--desk-select-ink);
   border-color: var(--desk-select);
-  background: linear-gradient(var(--gloss) 0 45%, transparent 55%), linear-gradient(var(--desk-gel-selected));
+  background: linear-gradient(var(--desk-gel-selected));
 }
 
 /* Compact rows: hot tasks, mail */
@@ -540,4 +540,16 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Fields in Heat: a border that shows in both appearances (the desk's deck edge is the well itself in dark). */
+.heat input:not([type='checkbox'], [type='radio'], [type='range']),
+.heat select,
+.heat textarea {
+  background: color-mix(in srgb, var(--desk-ink) 5%, var(--desk-well));
+  border-color: color-mix(in srgb, var(--desk-ink) 40%, var(--desk-well));
+}
+
+.heat-note-line {
+  border-color: color-mix(in srgb, var(--desk-ink) 40%, var(--desk-well));
 }

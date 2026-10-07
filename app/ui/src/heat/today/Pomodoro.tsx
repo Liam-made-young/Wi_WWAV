@@ -5,7 +5,9 @@
 // The timer lives in the core and the store, so it keeps running when you
 // switch views; the Now strip reads it as "focus 18:42 left".
 
+import { useState } from 'react';
 import { useActions } from '../actions';
+import { chimeOn, setChime } from '../chime';
 import { copy } from '../fmt';
 import { useFrame } from '../frame';
 import { useHeat, useNow } from '../store';
@@ -17,6 +19,7 @@ export function Pomodoro() {
   const { snap, idx } = useHeat();
   const { focusLength, setFocusLength } = useFrame();
   const actions = useActions();
+  const [chime, setChimeState] = useState(chimeOn);
   const timer = snap?.heatState.timer;
   const running = timer ? (timer.running ?? timer.endsAt !== null) : false;
   const now = useNow(running ? 1000 : 30_000);
@@ -35,6 +38,17 @@ export function Pomodoro() {
         <span className="heat-lcd-digits" aria-live="off">
           {v.digits}
         </span>
+        <label className="check heat-chime" data-dense title={`${copy.focus.chime}. Off until you turn it on.`}>
+          <input
+            type="checkbox"
+            checked={chime}
+            onChange={(e) => {
+              setChime(e.target.checked);
+              setChimeState(e.target.checked);
+            }}
+          />
+          Chime
+        </label>
         <span className="heat-lcd-line" data-text="secondary">
           {lcdLine(v, target)}
         </span>

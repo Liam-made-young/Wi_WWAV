@@ -51,7 +51,8 @@
   cursor: default;
 }
 
-.heat-trow:nth-child(odd):not(.heat-thead) {
+/* Stripes sit in :where() so a selected row's fill always beats them. */
+.heat-trow:where(:nth-child(odd):not(.heat-thead)) {
   background: var(--desk-stripe);
 }
 
@@ -267,8 +268,4 @@
   background: var(--desk-well);
   color: var(--desk-ink);
   font-size: var(--type-desk-small);
-}
-
-.heat-inbox .heat-row:nth-child(even) {
-  background: var(--desk-stripe);
 }

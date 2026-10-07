@@ -30,8 +30,10 @@ export function StatusBar({ screen, undo, status }: Props) {
   );
   return (
     <footer className="case-status">
-      <span className="status-left">{left.join(' · ')}</span>
-      <span className="status-right" role="status">
+      <span className="status-left" data-text="secondary">
+        {left.join(' · ')}
+      </span>
+      <span className="status-right" role="status" data-text="secondary">
         {right.join(' · ')}
       </span>
     </footer>

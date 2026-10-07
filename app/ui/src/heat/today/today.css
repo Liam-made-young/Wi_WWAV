@@ -273,8 +273,8 @@
   cursor: default;
 }
 
-.heat-section .heat-row:nth-of-type(even),
-.heat-section .heat-drafts .heat-row:nth-child(even) {
+/* Stripes sit in :where() so a selected row's fill, which comes later, always beats them. */
+.heat-row:where(:nth-of-type(even)) {
   background: var(--desk-stripe);
 }
 
@@ -372,7 +372,7 @@
   overflow: hidden;
   border: 1px solid var(--desk-deck-edge);
   border-radius: var(--radius-chip);
-  background: var(--desk-well);
+  background: color-mix(in srgb, var(--desk-ink) 5%, var(--desk-well));
   text-align: left;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -481,4 +481,13 @@
 
 .heat-length-custom input {
   width: 64px;
+}
+
+/* The chime switch sits in the LCD's corner. */
+.heat-chime {
+  position: absolute;
+  top: var(--space-s1);
+  right: var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-lcd-ink);
 }

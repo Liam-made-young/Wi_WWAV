@@ -145,6 +145,7 @@ export function TimeGrid({ days, selected, due, onPick, spaceId }: Props) {
               key={day}
               type="button"
               className="heat-cal-dayhead"
+              data-dense
               data-today={day === date}
               data-selected={day === selected}
               aria-label={longDay(day)}

@@ -26,7 +26,9 @@ export function SpacesFilter({ onNewSpace }: { onNewSpace(): void }) {
 
   return (
     <nav className="heat-spaces" aria-label="Spaces">
-      <h2 className="heat-side-heading">Spaces</h2>
+      <h2 className="heat-side-heading" data-text="secondary">
+        Spaces
+      </h2>
       <Row label={copy.tasks.all} count={open.length} on={spaceId === null} off={!!why} onPick={() => setSpace(null)} />
       {(snap?.records.space ?? []).map((s) => (
         <Row

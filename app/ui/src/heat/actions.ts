@@ -186,7 +186,12 @@ export function useActions() {
       async focusKey() {
         if (!timer || !snap) return;
         if (timer.phase === 'idle') {
-          const target = selection.taskId ?? snap.heatState.currentTaskId ?? null;
+          // The selection's task, or the task of the block selected, else the current one.
+          const target =
+            selection.taskId ??
+            (selection.blockId ? idx.block.get(selection.blockId)?.taskId : undefined) ??
+            snap.heatState.currentTaskId ??
+            null;
           if (target) await act(client.focus('start', { taskId: target, length: focusLength }));
           return;
         }

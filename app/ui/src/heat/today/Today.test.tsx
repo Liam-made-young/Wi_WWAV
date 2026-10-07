@@ -1,7 +1,8 @@
 import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TASK_DRAG } from '../frame';
-import { $, $$, button, click, escape, mountHeat, press, type Rig, settle } from '../testkit';
+import { $, $$, button, click, escape, mountHeat, press, type Rig, settle, type, wait } from '../testkit';
+import { chimeOn, setChime } from '../chime';
 import { COLUMN_HEIGHT, minutesToY } from './gap';
 
 // docs/PLAN.md S2.2 and S2.3 against the fake core (docs/SPEC.md 3.5). What
@@ -24,10 +25,6 @@ const row = (text: string | RegExp) =>
     typeof text === 'string' ? r.textContent!.includes(text) : text.test(r.textContent!),
   )!;
 const undoLabel = async () => (await rig.call<{ undo: string | null }>('history.get', {})).undo;
-const wait = (ms: number) =>
-  act(async () => {
-    await new Promise((r) => setTimeout(r, ms));
-  });
 
 describe('Today’s header and plan list', () => {
   it('reads "Today, Wednesday, October 7" over the core’s subtitle', async () => {
@@ -209,6 +206,34 @@ describe('the time column', () => {
     await click(row('Grammar quiz 4'));
     await press(rig, 'p');
     expect(rig.status().count).toBe('No free gap is left today.');
+  });
+});
+
+describe('"+" on Today', () => {
+  it('adds a task straight into the plan, in the next free gap, as a block as long as its estimate', async () => {
+    rig = await mountHeat();
+    await click($(rig, '.heat-plus'));
+    const sheet = $(rig, '[role="dialog"][aria-label="New task"]')!;
+    await type(sheet.querySelector('input'), 'Write the liner notes');
+    await click([...sheet.querySelectorAll('button')].find((b) => b.textContent === 'Add task'));
+    const made = [...rig.fake.store.task.values()].find((t) => t.title === 'Write the liner notes')!;
+    expect(made).toMatchObject({ spaceId: 'sp-classes', due: null });
+    // A new task has no average yet, so difficulty 3 makes an hour; the lecture holds the morning until 11:15.
+    expect(blocks().find((b) => b.taskId === made.id)).toMatchObject({
+      date: '2026-10-07',
+      start: 11 * 60 + 15,
+      minutes: 60,
+    });
+    expect(rowsIn('Planned').some((r) => r!.includes('Write the liner notes'))).toBe(true);
+    expect(rig.status().count).toBe('Planned ‘Write the liner notes’ at 11:15 AM, 1h.');
+  });
+
+  it('asks for a name first, and N opens the same sheet', async () => {
+    rig = await mountHeat();
+    expect(await press(rig, 'n')).toBe(true);
+    await click($$(rig, '[aria-label="New task"] button').find((b) => b.textContent === 'Add task'));
+    expect($(rig, '#heat-new-why')!.textContent).toBe('Give the task a name first.');
+    expect(rig.fake.store.task.size).toBe(12);
   });
 });
 
@@ -533,5 +558,63 @@ describe('P, ⌘↩ and ⌫', () => {
     await press(rig, 'ArrowDown', { altKey: true, shiftKey: true });
     expect(rig.fake.store.timeBlock.get('b-pset')).toMatchObject({ start: 15 * 60 + 45, minutes: 75 });
     expect(await undoLabel()).toBe('Undo resize block');
+  });
+});
+
+describe('Heat’s chime', () => {
+  const rings: number[] = [];
+  const stub = class {
+    constructor() {
+      rings.push(Date.now());
+    }
+    currentTime = 0;
+    destination = {};
+    createGain() {
+      const gain = { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+      return { gain, connect: (n: unknown) => n };
+    }
+    createOscillator() {
+      return { type: '', frequency: { value: 0 }, connect: (n: unknown) => n, start() {}, stop() {} };
+    }
+    close() {
+      return Promise.resolve();
+    }
+  };
+
+  const round = async () => {
+    await press(rig, 'f');
+    rig.fake.now += 26 * MIN;
+    rig.fake.emit([]);
+    await wait(700);
+    await settle();
+  };
+
+  it('is off until it is turned on, and a round that ends makes no sound', async () => {
+    rings.length = 0;
+    (window as unknown as { AudioContext: unknown }).AudioContext = stub;
+    localStorage.removeItem('wi.heat.chime');
+    rig = await mountHeat();
+    expect(chimeOn()).toBe(false);
+    expect(($(rig, '.heat-chime input') as HTMLInputElement).checked).toBe(false);
+    await round();
+    expect(rig.fake.state.timer.phase).toBe('break');
+    expect(rings).toEqual([]);
+  });
+
+  it('rings once when a round ends, if its switch is on, and never for a break', async () => {
+    rings.length = 0;
+    (window as unknown as { AudioContext: unknown }).AudioContext = stub;
+    rig = await mountHeat();
+    await click($(rig, '.heat-chime input'));
+    expect(chimeOn()).toBe(true);
+    await round();
+    expect(rings).toHaveLength(1);
+    // The break waits for a press, and its end calls nobody back.
+    await press(rig, 'f');
+    rig.fake.now += 6 * MIN;
+    rig.fake.emit([]);
+    await wait(700);
+    expect(rings).toHaveLength(1);
+    setChime(false);
   });
 });

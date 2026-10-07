@@ -36,6 +36,7 @@ export function TaskTable({ rows, collapsed, selected, groupLabel, onToggle, onS
       role="grid"
       aria-label="Tasks"
       className="heat-table"
+      tabIndex={0}
       aria-activedescendant={selected ? `heat-row-t-${selected}` : undefined}
     >
       <div role="row" className="heat-trow heat-thead">

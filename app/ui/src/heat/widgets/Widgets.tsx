@@ -97,7 +97,7 @@ export function Widgets({
       <aside className="heat-right" aria-label="Widgets">
         {shown.map((id) => (
           <section key={id} className="heat-widget" aria-labelledby={`heat-widget-${id}`}>
-            <h2 id={`heat-widget-${id}`} className="heat-widget-title">
+            <h2 id={`heat-widget-${id}`} className="heat-widget-title" data-text="secondary">
               {TITLES[id]}
             </h2>
             <div className="heat-widget-well">{body(id)}</div>
@@ -126,7 +126,9 @@ export function Widgets({
       ))}
       {popover && (shown as string[]).includes(popover) && (
         <section className="heat-popover" role="dialog" aria-label={TITLES[popover as WidgetId]}>
-          <h2 className="heat-widget-title">{TITLES[popover as WidgetId]}</h2>
+          <h2 className="heat-widget-title" data-text="secondary">
+            {TITLES[popover as WidgetId]}
+          </h2>
           <div className="heat-widget-well">{body(popover as WidgetId, () => setPopover(null))}</div>
         </section>
       )}

@@ -24,6 +24,7 @@ import {
   type Task,
   type TimeBlock,
 } from './client';
+import { chimeOn, ringChime } from './chime';
 import { sentenceOf } from './fmt';
 
 /** Every record by id, built once per snapshot, so a view looks a task up instead of searching. */
@@ -199,7 +200,11 @@ export function HeatProvider({ client, clock = Date.now, children }: Props) {
       asking = true;
       asked += 1;
       c.focus('finish').then(
-        () => (asking = false),
+        (r) => {
+          asking = false;
+          // The round ended (it logged, and a break now waits): ring if the person asked for the chime.
+          if (r.logged && r.heatState.timer.phase === 'break' && chimeOn()) ringChime();
+        },
         () => (asking = false),
       );
     }, 500);

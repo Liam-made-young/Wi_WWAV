@@ -333,7 +333,7 @@ function TaskInfo({ id }: { id: Id }) {
         <button type="button" className="gel" onClick={() => void actions.toggleDone(id)} title="Mark done (⌘↩)">
           {task.done || (task.rrule && idx.ticked.get(id)?.has(date)) ? 'Mark not done' : copy.tasks.markDone}
         </button>
-        <button type="button" className="gel plain" onClick={() => void actions.remove(id)} title="Delete (⌫)">
+        <button type="button" className="gel" onClick={() => void actions.remove(id)} title="Delete (⌫)">
           Delete
         </button>
       </div>
@@ -422,7 +422,7 @@ function BlockInfo({ id }: { id: Id }) {
           estimate.
         </p>
         {task && (
-          <button type="button" className="gel plain" onClick={() => selectTask(task.id)}>
+          <button type="button" className="gel" onClick={() => selectTask(task.id)}>
             Open the task
           </button>
         )}
@@ -435,12 +435,7 @@ function BlockInfo({ id }: { id: Id }) {
         A block follows its task’s Public switch.
       </p>
       <div className="heat-info-actions">
-        <button
-          type="button"
-          className="gel plain"
-          onClick={() => void actions.removeBlock(id)}
-          title="Remove block (⌫)"
-        >
+        <button type="button" className="gel" onClick={() => void actions.removeBlock(id)} title="Remove block (⌫)">
           Remove block
         </button>
       </div>

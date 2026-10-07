@@ -90,5 +90,13 @@ export function installFakeCore(options: { now?: number; zone?: string } = {}): 
     },
   };
   installStandIn(standIn);
+  // End-to-end specs move the clock on: as if minutes had passed, without waiting for them.
+  (window as unknown as { __wiFake: unknown }).__wiFake = {
+    fake,
+    advance(ms: number) {
+      fake.now += ms;
+      fake.emit([]);
+    },
+  };
   return fake;
 }
