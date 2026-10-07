@@ -570,3 +570,28 @@ fn review_every_claude_job_asks_first() {
         "sent before the person turned the feature on: {went_out:#?}"
     );
 }
+
+/// Finding: only a change made with `room: "heat"` reaches Heat sync. A
+/// Heat record written from another room (Space's "Plan in Heat" adds a
+/// milestone from your sun, 2.6) never syncs, and an undo of it in that
+/// room isn't seen either, so the other Mac never gets it.
+#[test]
+#[ignore = "review finding: Heat records changed from another room never sync"]
+fn review_a_milestone_planned_from_space_syncs() {
+    let server = MockServer::start();
+    let (a, b) = (Setup::new(), Setup::new());
+    let mac = sign_in(&a, &server);
+    let air = sign_in(&b, &server);
+    ok(
+        &mac,
+        "records.mutate",
+        json!({"label": "plan in Heat", "room": "space", "ops": [{"op": "put", "kind": "milestone", "id": "m1", "value": {"title": "EP v1 mixed", "projectId": "p1"}}]}),
+    );
+    mac.sync_heat().unwrap();
+    air.sync_heat().unwrap();
+    assert!(
+        air.invoke("records.get", json!({"kind": "milestone", "id": "m1"}))
+            .is_ok(),
+        "the milestone planned from Space never reached the other Mac"
+    );
+}
