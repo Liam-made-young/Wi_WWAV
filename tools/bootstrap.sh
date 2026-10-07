@@ -20,6 +20,6 @@ if [ ! -e formats/.git ]; then
     || git submodule update --no-checkout formats
 fi
 git -C formats sparse-checkout init --no-cone
-printf '%s\n' "${PATHS[@]}" > "$(git -C formats rev-parse --git-path info/sparse-checkout)"
+printf '%s\n' "${PATHS[@]}" > "$(git -C formats rev-parse --path-format=absolute --git-path info/sparse-checkout)"
 git -C formats checkout --quiet "$(git ls-tree HEAD formats | awk '{print $3}')"
 echo "formats/ at $(git -C formats rev-parse --short HEAD), sparse"

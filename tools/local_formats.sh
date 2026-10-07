@@ -13,6 +13,6 @@ git clone --quiet --shared --no-checkout "$SRC" formats
 git -C formats sparse-checkout init --no-cone
 printf '%s\n' /prana/core/ /prana/tools/ /prana/tests/ /prana/hal/native/ /prana/SPEC.md \
   /prana/CMakeLists.txt /prana/web/src/sim/ /formats/swav/ /wi/src/formats/ /wi/test/ /wi/GATES.md \
-  > "$(git -C formats rev-parse --git-path info/sparse-checkout)"
+  > "$(git -C formats rev-parse --path-format=absolute --git-path info/sparse-checkout)"
 git -C formats checkout --quiet "$PIN"
 echo "formats/ at $(git -C formats rev-parse --short HEAD), from $SRC"
