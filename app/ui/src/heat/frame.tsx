@@ -8,7 +8,8 @@
 //   useSelection()                           the selected task or block (Get Info follows it)
 //   useSpaceFilter()                         the sidebar's space, or null for All
 //   useSidebarSlot()                         where the tab may portal its own sidebar sections
-//   useSheets()                              the frame's sheets: a new task, "Time it took"
+//   useSheets()                              the frame's sheets: a new task, "Time it took", and a tab's own
+//   useDraft(key, initial)                   a field's text that Esc keeps for the next time its sheet opens
 //
 // Every tab stays mounted while another is showing, so its scroll, selection
 // and half-typed text are where you left them (2.3 applies to Heat's tabs
@@ -18,9 +19,11 @@ import {
   createContext,
   type MutableRefObject,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
+  useReducer,
   useRef,
 } from 'react';
 import type { DayKey } from '../shared/time/zone';
@@ -122,6 +125,11 @@ export interface FrameApi {
   askTook(taskId: Id): void;
   /** Return and ⌘I: the keyboard goes to Get Info's first field, if something is selected. */
   focusInfo(): void;
+  /** A tab's own sheet: the frame drops it from the top over its backdrop, and Esc closes it (2.7). */
+  openSheet(sheet: ReactNode): void;
+  closeSheet(): void;
+  /** What sheets' fields held when Esc closed them (see useDraft). */
+  drafts: Map<string, unknown>;
   /** The focus length the LCD offers when idle: 25, 50 or a custom 10-90. */
   focusLength: number;
   setFocusLength(minutes: number): void;
@@ -190,8 +198,29 @@ export function useSidebarSlot(): HTMLElement | null {
 }
 
 export function useSheets() {
-  const { newTask, askTook } = useFrame();
-  return { newTask, askTook };
+  const { newTask, askTook, openSheet, closeSheet } = useFrame();
+  return { newTask, askTook, openSheet, closeSheet };
+}
+
+/**
+ * Text that outlives its sheet: Esc on a sheet keeps what was typed for the
+ * next time it opens (2.7). `clear` once it is saved.
+ */
+export function useDraft<T>(key: string, initial: T): [T, (value: T) => void, () => void] {
+  const { drafts } = useFrame();
+  const [, redraw] = useReducer((n: number) => n + 1, 0);
+  const set = useCallback(
+    (value: T) => {
+      drafts.set(key, value);
+      redraw();
+    },
+    [drafts, key],
+  );
+  const clear = useCallback(() => {
+    drafts.delete(key);
+    redraw();
+  }, [drafts, key]);
+  return [(drafts.has(key) ? drafts.get(key) : initial) as T, set, clear];
 }
 
 /** The tab the other tabs can jump to: Mail's widget opens Mail. */

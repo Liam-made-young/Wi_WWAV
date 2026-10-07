@@ -1,0 +1,138 @@
+/* Habits (docs/SPEC.md 3.9, 7.2): a white card per habit, a 34 px gel orb in a
+   44 pt target, a 14-day grid of 13 px squares in 24 pt targets, and the year
+   as a picture. State is a shape: a ticked orb is filled with a check, today's
+   square is open and dashed because today still counts until midnight. */
+
+.heat-habits {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.heat-habits-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  padding: var(--space-s2) var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-habits-head .heat-heading {
+  margin: 0;
+}
+
+.heat-habits-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-s3);
+  min-height: 0;
+  padding: var(--space-s3) var(--space-s4) var(--space-s5);
+  overflow: auto;
+}
+
+.heat-habits-body > * {
+  flex: none;
+}
+
+.heat-habit {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 250px);
+  align-items: start;
+  column-gap: var(--space-s3);
+  padding: var(--space-s2) var(--space-s3);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 28%, var(--desk-well));
+  border-radius: var(--radius-card);
+  background: var(--desk-well);
+}
+
+.heat-habit-orb .heat-orb-disc {
+  width: 34px;
+  height: 34px;
+}
+
+.heat-habit-main {
+  min-width: 0;
+}
+
+.heat-habit-title {
+  margin: var(--space-s1) 0 0;
+  font-size: var(--type-desk-large);
+  font-weight: normal;
+}
+
+.heat-habit-record {
+  margin: 0 0 var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-grid14 {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.heat-cell {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.heat-cell-square {
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--desk-ink2);
+  border-radius: 2px;
+  background: var(--desk-well);
+}
+
+.heat-cell[data-done='true'] .heat-cell-square {
+  background: var(--desk-select);
+  border-color: var(--desk-select);
+}
+
+.heat-cell[data-today='true'][data-done='false'] .heat-cell-square {
+  border-style: dashed;
+}
+
+.heat-year {
+  max-width: 100%;
+  margin: var(--space-s2) 0;
+  overflow-x: auto;
+}
+
+.heat-year-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 11px);
+  grid-auto-columns: 11px;
+  gap: 2px;
+  width: max-content;
+}
+
+.heat-year-cell {
+  border: 1px solid var(--desk-ink3);
+  border-radius: 2px;
+  background: var(--desk-well);
+}
+
+.heat-year-cell[data-done='true'] {
+  background: var(--desk-select);
+  border-color: var(--desk-select);
+}
+
+.heat-year-cell[data-future='true'] {
+  visibility: hidden;
+}
+
+.heat-habit-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s1);
+}

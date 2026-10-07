@@ -285,8 +285,11 @@ export function seed(now: number, tz: string): Seeded {
           outOf: 100,
           dropped: false,
           pending: true,
+          link: 'https://brightspace.uri.edu/d2l/lms/grades/my_grades/main.d2l',
+          postedAt: now - 26 * 3_600_000,
           source: 'claude',
           public: false,
+          mailThreadId: 'mail-2',
         },
         {
           id: 'g-4',

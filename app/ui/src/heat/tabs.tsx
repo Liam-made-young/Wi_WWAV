@@ -6,14 +6,14 @@
 // secondary act, useTabKeys for the keys it answers, useSidebarSlot for its
 // sidebar sections.
 //
-// Grades, Habits and Mail are stubs here until their screens are built: each
-// shows what the tab will hold and nothing else, so the frame and its tests
-// run with all six.
+// Mail is a stub here until its screen is built: it shows what the tab will
+// hold and nothing else, so the frame and its tests run with all six.
 
 import type { ComponentType } from 'react';
 import { Calendar } from './calendar/Calendar';
-import { copy } from './fmt';
 import type { TabId } from './frame';
+import { Grades } from './grades/Grades';
+import { Habits } from './habits/Habits';
 import { Tasks } from './tasks/Tasks';
 import { Today } from './today/Today';
 
@@ -28,10 +28,6 @@ function Stub({ title, line }: { title: string; line: string }) {
   );
 }
 
-const GradesStub = () => (
-  <Stub title="Grades" line="Grades isn’t built yet. Each course will show its percentage and letter here." />
-);
-const HabitsStub = () => <Stub title="Habits" line={`Habits isn’t built yet. ${copy.habits.advice}`} />;
 const MailStub = () => (
   <Stub title="Mail" line="Mail isn’t built yet. It will list the school threads Claude has recorded." />
 );
@@ -40,7 +36,7 @@ export const HEAT_TABS: Record<TabId, ComponentType> = {
   today: Today,
   tasks: Tasks,
   calendar: Calendar,
-  grades: GradesStub,
-  habits: HabitsStub,
+  grades: Grades,
+  habits: Habits,
   mail: MailStub,
 };

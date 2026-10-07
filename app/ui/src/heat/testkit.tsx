@@ -200,12 +200,17 @@ export async function click(el: Element | null | undefined) {
   await settle();
 }
 
-export const $ = (rig: Rig, selector: string) => rig.host.querySelector<HTMLElement>(selector);
-export const $$ = (rig: Rig, selector: string) => [...rig.host.querySelectorAll<HTMLElement>(selector)];
-export const byRole = (rig: Rig, role: string, name: string | RegExp) =>
-  $$(rig, `[role="${role}"]`).find((el) => matches(el.getAttribute('aria-label') ?? el.textContent ?? '', name));
-export const button = (rig: Rig, name: string | RegExp) =>
-  $$(rig, 'button').find((el) => matches(el.getAttribute('aria-label') ?? el.textContent ?? '', name));
+/** Where a query looks: the whole rig, or inside one element found already. */
+type Scope = Rig | ParentNode | null | undefined;
+const rootOf = (scope: Scope): ParentNode | null =>
+  scope && 'host' in scope && 'fake' in scope ? (scope as Rig).host : (scope as ParentNode | null | undefined) ?? null;
+
+export const $ = (scope: Scope, selector: string) => rootOf(scope)?.querySelector<HTMLElement>(selector) ?? null;
+export const $$ = (scope: Scope, selector: string) => [...(rootOf(scope)?.querySelectorAll<HTMLElement>(selector) ?? [])];
+export const byRole = (scope: Scope, role: string, name: string | RegExp) =>
+  $$(scope, `[role="${role}"]`).find((el) => matches(el.getAttribute('aria-label') ?? el.textContent ?? '', name));
+export const button = (scope: Scope, name: string | RegExp) =>
+  $$(scope, 'button').find((el) => matches(el.getAttribute('aria-label') ?? el.textContent ?? '', name));
 
 function matches(text: string, name: string | RegExp) {
   return typeof name === 'string' ? text.trim() === name : name.test(text.trim());

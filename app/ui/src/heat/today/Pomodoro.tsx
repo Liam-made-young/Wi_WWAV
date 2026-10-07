@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { useActions } from '../actions';
+import type { Task } from '../client';
 import { chimeOn, setChime } from '../chime';
 import { copy } from '../fmt';
 import { useFrame } from '../frame';
@@ -26,7 +27,9 @@ export function Pomodoro() {
   if (!snap || !timer) return <section className="heat-pomo" aria-label="Pomodoro timer" />;
 
   const v = timerView(timer, now, focusLength);
-  const target = idx.task.get(timer.taskId ?? snap.heatState.currentTaskId ?? '');
+  // A round can be on a habit with a length instead of the current task (3.9).
+  const habit = timer.habitId ? idx.habit.get(timer.habitId) : undefined;
+  const target = habit ? ({ title: habit.title } as Task) : idx.task.get(timer.taskId ?? snap.heatState.currentTaskId ?? '');
   const idle = v.phase === 'idle';
   const verb = idle ? copy.widgets.startFocus : v.waiting ? 'Start break' : v.running ? 'Pause' : 'Resume';
   const canStart = !idle || target !== undefined;

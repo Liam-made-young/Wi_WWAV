@@ -12,6 +12,7 @@
 import {
   forwardRef,
   type MutableRefObject,
+  type ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -71,7 +72,11 @@ export interface HeatHandle {
   getInfo(): void;
 }
 
-type Sheet = { kind: 'new'; options: NewTaskOptions } | { kind: 'took'; taskId: Id } | null;
+type Sheet =
+  | { kind: 'new'; options: NewTaskOptions }
+  | { kind: 'took'; taskId: Id }
+  | { kind: 'custom'; node: ReactNode }
+  | null;
 
 const NO_SELECTION: Selection = { taskId: null, blockId: null };
 
@@ -89,6 +94,8 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
   const [popover, setPopover] = useState<string | null>(null);
   // A new task's title stays typed until it is saved: Esc on a sheet keeps the draft (2.7).
   const [draft, setDraft] = useState('');
+  // What the tabs' own sheets held when Esc closed them.
+  const drafts = useRef(new Map<string, unknown>()).current;
 
   const actsRef = useRef<Partial<Record<TabId, MutableRefObject<TabActs>>>>({});
   const keysRef = useRef<Partial<Record<TabId, MutableRefObject<TabKeys>>>>({});
@@ -132,6 +139,9 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
         setSheet({ kind: 'new', options });
       },
       askTook: (taskId) => setSheet({ kind: 'took', taskId }),
+      openSheet: (node) => setSheet({ kind: 'custom', node }),
+      closeSheet: () => setSheet(null),
+      drafts,
       focusInfo: () => document.querySelector<HTMLElement>('.heat-info [data-info-first]')?.focus(),
       focusLength,
       setFocusLength,
@@ -139,7 +149,7 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
       registerKeys,
       touch,
     }),
-    [tab, spaceId, selection, selectTask, selectBlock, sidebar, focusLength, registerActs, registerKeys],
+    [tab, spaceId, selection, selectTask, selectBlock, sidebar, focusLength, registerActs, registerKeys, drafts],
   );
 
   // The frame's acts and keys live where the tabs are, so the tabs read them from the frame.
@@ -434,6 +444,7 @@ function Frame(p: FrameProps) {
             />
           )}
           {sheet.kind === 'took' && <TookSheet taskId={sheet.taskId} onClose={() => setSheet(null)} />}
+          {sheet.kind === 'custom' && sheet.node}
         </>
       )}
       <p className="heat-sr" aria-live="polite">

@@ -1,0 +1,417 @@
+/* Grades (docs/SPEC.md 3.8, 7.2): one white card per course on the desk, a
+   yellow sticky for a grade waiting for its score, and the items by category
+   as striped rows. Colours, sizes and durations are tokens; a letter pill's
+   fill is a label colour mixed into the well, with the letter itself in ink,
+   so colour is never alone. */
+
+:root {
+  --sticky-mix: 34%;
+  /* A card's edge, which shows in both appearances (the deck edge is the well itself in dark). */
+  --card-edge: color-mix(in srgb, var(--desk-ink) 28%, var(--desk-well));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance='light']) {
+    --sticky-mix: 20%;
+  }
+}
+
+:root[data-appearance='dark'] {
+  --sticky-mix: 20%;
+}
+
+.heat-grades {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.heat-grades-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  padding: var(--space-s2) var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-grades-head .heat-heading {
+  margin: 0;
+}
+
+/* A column that scrolls: a card keeps its own height, never shared out of the window's. */
+.heat-grades-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-s3);
+  min-height: 0;
+  padding: var(--space-s3) var(--space-s4) var(--space-s5);
+  overflow: auto;
+}
+
+.heat-grades-body > * {
+  flex: none;
+}
+
+.heat-grades-term {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s3);
+}
+
+.heat-grades-term > * {
+  flex: none;
+}
+
+.heat-grades-termname {
+  margin: var(--space-s2) 0 0;
+  font-size: var(--type-desk-small);
+  font-weight: normal;
+  color: var(--desk-source-list-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---- A course ------------------------------------------------------------- */
+
+.heat-course {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-card);
+  background: var(--desk-well);
+}
+
+.heat-course-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  padding: var(--space-s2) var(--space-s3);
+  border-bottom: 1px solid var(--card-edge);
+  background: var(--desk-stripe);
+}
+
+.heat-course-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-s2);
+  min-width: 0;
+}
+
+.heat-course-name > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-course-code {
+  margin: 0;
+  font-size: var(--type-desk-large);
+  white-space: nowrap;
+}
+
+.heat-course-mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-course-pct {
+  font-size: var(--type-desk-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-letter[data-tone] {
+  background: color-mix(in srgb, var(--tone) 28%, var(--desk-well));
+}
+
+.heat-letter[data-tone='green'] {
+  --tone: var(--label-green);
+}
+
+.heat-letter[data-tone='blue'] {
+  --tone: var(--label-blue);
+}
+
+.heat-letter[data-tone='amber'] {
+  --tone: var(--heat-warm);
+}
+
+.heat-letter[data-tone='red'] {
+  --tone: var(--heat-hot);
+}
+
+.heat-letter[data-tone='none'] {
+  background: none;
+}
+
+.heat-course-based,
+.heat-course-weights {
+  margin: var(--space-s1) var(--space-s3) 0;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+/* ---- The yellow sticky for a grade waiting for its score ------------------- */
+
+.heat-sticky {
+  margin: var(--space-s2) var(--space-s3) 0;
+  padding: var(--space-s1) var(--space-s3);
+  border: 1px solid color-mix(in srgb, var(--label-yellow) 65%, var(--desk-ink));
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--label-yellow) var(--sticky-mix), var(--desk-well));
+}
+
+.heat-sticky-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-sticky-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.heat-sticky-title {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-link {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 var(--space-s1);
+  border: 0;
+  background: none;
+  color: var(--desk-ink);
+  text-decoration: underline;
+}
+
+.heat-sticky-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-s2);
+  padding-bottom: var(--space-s1);
+}
+
+.heat-sticky-field {
+  display: grid;
+  gap: 2px;
+}
+
+.heat-sticky-field input {
+  width: 96px;
+}
+
+.heat-sticky-why {
+  flex-basis: 100%;
+  margin: 0;
+  min-height: 1em;
+  font-size: var(--type-desk-small);
+}
+
+/* ---- What it would take ---------------------------------------------------- */
+
+.heat-take {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s3);
+  margin: var(--space-s2) var(--space-s3) 0;
+}
+
+.heat-take-aim {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-take-text {
+  margin: 0;
+  min-width: 0;
+}
+
+/* ---- Items by category ----------------------------------------------------- */
+
+.heat-cats {
+  margin-top: var(--space-s2);
+}
+
+.heat-cat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-s1) var(--space-s3);
+  margin: var(--space-s2) var(--space-s3) var(--space-s1);
+  font-size: var(--type-desk-small);
+  font-weight: normal;
+  color: var(--desk-source-list-heading);
+}
+
+.heat-cat-name {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.heat-cat-empty {
+  margin: 0 var(--space-s3) var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-grade-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heat-grade:nth-child(even) {
+  background: var(--desk-stripe);
+}
+
+.heat-grade-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  width: 100%;
+  min-height: 26px;
+  padding: 0 var(--space-s3);
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--desk-ink);
+}
+
+.heat-grade-main[aria-expanded='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.heat-grade[data-dropped='true'] .heat-grade-title {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.heat-grade-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-grade-score {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-tag {
+  flex: none;
+  padding: 0 var(--space-s2);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-desk-small);
+}
+
+.heat-grade-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s2);
+  padding: var(--space-s1) var(--space-s3) var(--space-s2);
+}
+
+.heat-switch-block {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.heat-switch-hint {
+  margin: 0;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-course-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s2);
+  padding: var(--space-s2) var(--space-s3);
+  border-top: 1px solid var(--card-edge);
+}
+
+/* ---- The sheets: the course editor and a grade ------------------------------ */
+
+.heat-sheet-wide {
+  width: 640px;
+  max-height: calc(100% - var(--space-s2));
+  overflow: auto;
+}
+
+.heat-set {
+  min-width: 0;
+  margin: 0 0 var(--space-s2);
+  padding: var(--space-s2) var(--space-s3);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+}
+
+.heat-set legend {
+  padding: 0 var(--space-s1);
+  font-size: var(--type-desk-small);
+}
+
+.heat-cat-rows {
+  display: grid;
+  gap: var(--space-s1);
+  margin-bottom: var(--space-s2);
+}
+
+.heat-cat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1.4fr) auto;
+  align-items: end;
+  column-gap: var(--space-s2);
+}
+
+.heat-cat-row .field {
+  margin-bottom: 0;
+}
+
+.heat-weights {
+  margin: var(--space-s1) 0 0;
+  min-height: 1.35em;
+  font-size: var(--type-desk-small);
+}
+
+.heat-scale {
+  display: grid;
+  gap: var(--space-s1);
+  margin-top: var(--space-s2);
+}
+
+.heat-scale-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-scale-row input {
+  width: 72px;
+}
+
+.heat-grade-waiting {
+  align-self: center;
+}
