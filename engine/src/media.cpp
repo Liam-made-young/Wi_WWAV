@@ -386,11 +386,14 @@ void Reader::remove(ClipSource* s) {
 
 void Reader::run() {
   while (!quit_.load(std::memory_order_relaxed)) {
+    // One run per clip per pass, so every clip moves ahead together. The
+    // lock is held for one run at a time, so remove() waits for one read at
+    // most; a clip removed mid-pass can make the pass skip one other.
     bool busy = false;
-    {
-      // One run per clip per pass, so every clip moves ahead together.
+    for (size_t i = 0;; i++) {
       std::lock_guard<std::mutex> lock(mutex_);
-      for (ClipSource* s : sources_) busy = s->fill() || busy;
+      if (i >= sources_.size()) break;
+      busy = sources_[i]->fill() || busy;
     }
     if (!busy) std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
