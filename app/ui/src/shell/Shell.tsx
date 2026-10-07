@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { call } from '../bridge';
+import type { HeatHandle } from '../heat/HeatView';
 import { idleGesture, stemGesture } from '../shared/stems/gesture';
 import { Capture, type CaptureHandle } from './Capture';
 import { listenForDrops } from './drop';
@@ -65,6 +66,9 @@ export function Shell() {
   const [room, showRoom] = useState<RoomId>('heat');
   const [stack, setStack] = useState<Overlay[]>(() => (firstLaunchDone() ? [] : ['first']));
   const [heatTask, setHeatTask] = useState<string | null>(null);
+  // Each opening of Heat on a task counts, so the same task opens again.
+  const [heatOpen, setHeatOpen] = useState<{ id: string; n: number } | null>(null);
+  const [heatStatus, setHeatStatus] = useState<ScreenStatus>({ count: null, act: null });
   const [infoId, setInfoId] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>('account');
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
@@ -75,12 +79,12 @@ export function Shell() {
   const status = useStatus();
   const menus = useHistory();
   const player = usePlayer();
-  const tz = settings?.heat.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const { half, tasks } = useTaskHalf(tz);
+  const { half, tasks } = useTaskHalf();
 
   const palette = useRef<PaletteHandle>(null);
   const capture = useRef<CaptureHandle>(null);
   const drawer = useRef<DrawerHandle>(null);
+  const heat = useRef<HeatHandle>(null);
   const first = useRef<FirstLaunchHandle>(null);
 
   // Leaving a room takes the keyboard out of it first, and coming back
@@ -147,6 +151,7 @@ export function Shell() {
   const showTask = (id: string | null) => {
     setRoom('heat');
     setHeatTask(id);
+    if (id) setHeatOpen((was) => ({ id, n: (was?.n ?? 0) + 1 }));
   };
 
   const isSong = (c: Clip) => c.kind === 'wwav' || c.kind === 'audio';
@@ -170,7 +175,9 @@ export function Shell() {
   };
 
   const escape = () => {
-    if (top === null || top === 'first') return;
+    if (top === 'first') return;
+    // Nothing open over the room: Esc is the room's own (Heat closes a sheet or Get Info, clears drafts).
+    if (top === null) return room === 'heat' ? heat.current?.escape() : undefined;
     if (top === 'drawer' && drawer.current?.deselect()) return;
     close(top);
   };
@@ -192,8 +199,9 @@ export function Shell() {
       case 'escape':
         return escape();
       case 'secondary':
-        // The screen's one secondary act: the library's adds the row under the cursor.
+        // The screen's one secondary act: the library's adds the row under the cursor, Heat's tab runs its own.
         if (top === 'drawer') drawer.current?.addToSelection();
+        else if (top === null && room === 'heat') heat.current?.secondary();
         return;
       case 'openInConsole':
         return notInConsole(shown('drawer') ? (drawer.current?.current() ?? null) : null);
@@ -206,7 +214,7 @@ export function Shell() {
         if (clip) {
           setInfoId(clip.id);
           open('info');
-        }
+        } else if (top === null && room === 'heat') heat.current?.getInfo();
         return;
       }
       case 'move':
@@ -228,8 +236,8 @@ export function Shell() {
   };
 
   // The one keyboard listener. Everything else learns of keys through `run`.
-  const latest = useRef({ run, top });
-  latest.current = { run, top };
+  const latest = useRef({ run, top, room });
+  latest.current = { run, top, room };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // A field in a sheet that has just closed still holds focus for a
@@ -238,7 +246,15 @@ export function Shell() {
       const focused = active?.checkVisibility() ? active : null;
       const stem = focused?.getAttribute('data-stem') as KeyContext['stem'];
       const command = route(e, { mac: IS_MAC, field: fieldOf(focused), stem, overlay: latest.current.top });
-      if (!command) return;
+      if (!command) {
+        // What the router leaves is the current room's: Heat's tabs and lists have their own keys (3.17).
+        const { room: here, top: over } = latest.current;
+        if (here === 'heat' && over === null && heat.current?.key(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       latest.current.run(command);
@@ -286,7 +302,8 @@ export function Shell() {
     ];
   }, []);
 
-  const screen: ScreenStatus = top === 'drawer' ? drawerStatus : { count: null, act: null };
+  const screen: ScreenStatus =
+    top === 'drawer' ? drawerStatus : room === 'heat' ? heatStatus : { count: null, act: null };
   const menu = menus[undoRoom];
 
   return (
@@ -311,7 +328,19 @@ export function Shell() {
         }
       />
       <div className="room-area">
-        <Rooms current={room} heatTask={heatTask} />
+        <Rooms
+          current={room}
+          heatTask={heatTask}
+          heat={{
+            handle: heat,
+            open: heatOpen,
+            onStatus: setHeatStatus,
+            onSettings: () => {
+              setPane('heat');
+              open('settings');
+            },
+          }}
+        />
         {top && MODAL.includes(top) && <div className="backdrop" data-overlay={top} onClick={() => close(top)} />}
         <LibraryDrawer
           ref={drawer}
@@ -343,7 +372,7 @@ export function Shell() {
           }}
           onClose={() => close('palette')}
         />
-        <Capture ref={capture} shown={shown('capture')} room={undoRoom} onError={say} />
+        <Capture ref={capture} shown={shown('capture')} onError={say} />
         <Settings
           shown={shown('settings')}
           pane={pane}

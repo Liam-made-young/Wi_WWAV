@@ -238,9 +238,28 @@ export interface Draft {
   leftLine: string | null;
 }
 
+export interface HeatTimer {
+  phase: 'focus' | 'break' | 'idle';
+  round: number;
+  /** Epoch ms while the round or break is running; null while paused, waiting or idle. */
+  endsAt: number | null;
+  /** Beyond 3.16's three fields, so the LCD can draw a paused round and a break that waits for a press. */
+  running?: boolean;
+  /** Time left while paused or waiting. */
+  leftMs?: number;
+  /** The whole length of this focus round or break. */
+  lengthMs?: number;
+  /** The focus length chosen: 25, 50 or a custom 10-90. */
+  focusMin?: number;
+  /** What the round in progress is on. */
+  taskId?: Id | null;
+  /** What just ended ("Focus done. 25m logged to Mix the second verse."), until the next press. */
+  note?: string | null;
+}
+
 export interface HeatState {
   currentTaskId?: Id | null;
-  timer: { phase: 'focus' | 'break' | 'idle'; round: number; endsAt: number | null };
+  timer: HeatTimer;
   planDrafts: Draft[];
 }
 
@@ -298,6 +317,8 @@ export interface Snapshot {
     courses: Record<Id, { currentPct: number | null; decidedPct: number; letter: string | null; weights: string | null }>;
     habits: Record<Id, { today: boolean; record: string }>;
     status: string;
+    /** A recurring task's occurrences in the snapshot's window, for Calendar's pills and flags. */
+    occurrences?: { taskId: Id; date: DayKey; done: boolean }[];
   };
 }
 

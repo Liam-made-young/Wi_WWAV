@@ -180,7 +180,7 @@ register('heat.delete', (args, fake) => {
   const map = fake.store[kind] as Map<string, unknown>;
   if (!map.has(args.id as string)) refuse(`No ${kind} has that id.`);
   const kinds: Kind[] = kind === 'task' ? ['task', 'timeBlock', 'taskOccurrence'] : [kind];
-  return fake.write(`delete ${kind}`, kinds, () => {
+  return fake.write(kind === 'timeBlock' ? 'remove block' : `delete ${kind}`, kinds, () => {
     map.delete(args.id as string);
     if (kind === 'task') {
       for (const [id, b] of fake.store.timeBlock) if (b.taskId === args.id) fake.store.timeBlock.delete(id);

@@ -6,15 +6,10 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { call } from '../bridge';
-import { KINDS } from '../heat/kinds';
-import type { Capture as CaptureRecord } from '../heat/model/records';
-import { ulid } from './ids';
-import { type UndoRoom, useCoreEvent } from './hooks';
+import { useHeat } from '../heat/store';
 
 interface Props {
   shown: boolean;
-  /** Where the capture is journaled: ⌘Z there takes it back. */
-  room: UndoRoom;
   onError(message: string): void;
 }
 
@@ -25,46 +20,35 @@ export interface CaptureHandle {
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-export const Capture = forwardRef<CaptureHandle, Props>(function Capture({ shown, room, onError }, ref) {
+export const Capture = forwardRef<CaptureHandle, Props>(function Capture({ shown, onError }, ref) {
+  const { client, snap } = useHeat();
   const [text, setText] = useState('');
-  const [inbox, setInbox] = useState(0);
-  const [captured, setCaptured] = useState(false);
+  // The core's own line after a capture ("4 in inbox · captured ✓"), until the next keystroke.
+  const [said, setSaid] = useState<string | null>(null);
   const field = useRef<HTMLTextAreaElement>(null);
 
-  const count = () =>
-    call<{ records: CaptureRecord[] }>('records.list', { kind: KINDS.capture }).then(
-      (r) => setInbox(r.records.filter((c) => !c.triagedAt).length),
-      () => {},
-    );
-  useEffect(() => void count(), []);
-  useCoreEvent<{ kinds: string[] }>('records', ({ kinds }) => {
-    if (kinds.includes(KINDS.capture)) void count();
-  });
+  const inbox = snap?.derived.lists.inbox.length ?? 0;
   useEffect(() => {
     if (shown) field.current?.focus();
   }, [shown]);
 
-  const put = async (value: Record<string, unknown>) => {
-    await call('records.mutate', {
-      label: 'capture',
-      room,
-      ops: [{ op: 'put', kind: KINDS.capture, id: ulid(), value }],
-    });
-    setCaptured(true);
+  const put = async (value: string) => {
+    const r = await client.capture(value);
+    setSaid(r.inbox);
   };
 
   useImperativeHandle(ref, () => ({
     save() {
       const typed = text.trim();
       if (!typed) return;
-      put({ text: typed }).then(
+      put(typed).then(
         () => setText(''),
         (e: Error) => onError(e.message),
       );
     },
     drop(paths) {
-      call<{ clips: { id: string }[] }>('library.import', { paths, label: 'import' })
-        .then(({ clips }) => put({ text: paths.map(fileName).join(', '), clips: clips.map((c) => c.id) }))
+      call('library.import', { paths, label: 'import' })
+        .then(() => put(paths.map(fileName).join(', ')))
         .catch((e: Error) => onError(e.message));
     },
   }));
@@ -82,11 +66,11 @@ export const Capture = forwardRef<CaptureHandle, Props>(function Capture({ shown
         value={text}
         onChange={(e) => {
           setText(e.target.value);
-          setCaptured(false);
+          setSaid(null);
         }}
       />
       <p className="capture-foot" data-text="secondary">
-        {inbox} in inbox{captured ? ' · captured ✓' : ''}
+        {said ?? `${inbox} in inbox`}
       </p>
     </div>
   );

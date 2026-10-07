@@ -1,0 +1,543 @@
+/* Heat's frame and what every tab shares (docs/SPEC.md 3.3, 7.2): the desk
+   register, Aqua stripes on white, a source list on the left, brushed-metal
+   panels on the right. Every colour, size and duration is a token
+   (styles/tokens.css); this file only arranges them. Text on metal is
+   secondary (a label); running text sits on white (8.9). */
+
+.heat {
+  position: relative;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 290px;
+  grid-template-rows: 48px minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
+  background: var(--desk-well);
+}
+
+/* Below 1240 pt the right column is a 44 px strip of widget icons. */
+.heat[data-folded='true'] {
+  grid-template-columns: 190px minmax(0, 1fr) 44px;
+}
+
+/* ---- Toolbar: "+", the six tabs, Sync ------------------------------------- */
+
+.heat-toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-s3);
+  padding: 0 var(--space-s3);
+  overflow: hidden;
+  color: var(--desk-ink);
+  background:
+    radial-gradient(
+      120% 160% at calc(var(--light-sun-x) * 100%) 0%,
+      color-mix(in srgb, var(--desk-select-ink) 28%, transparent),
+      transparent 70%
+    ),
+    repeating-linear-gradient(90deg, transparent 0 2px, color-mix(in srgb, var(--desk-ink) 3%, transparent) 2px 3px),
+    linear-gradient(var(--desk-case-metal));
+  box-shadow: inset 0 1px 0 var(--gloss);
+  border-bottom: 1px solid var(--desk-deck-edge);
+  user-select: none;
+}
+
+.heat-toolbar-gap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.heat-why {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-desk-small);
+}
+
+/* A round gel: the control is a 44 pt target, a 28 pt disc drawn inside it. */
+.gel.heat-plus {
+  flex: none;
+  width: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.gel.heat-plus::before {
+  inset: 8px;
+  border-radius: 50%;
+}
+
+.heat-tabs .segment {
+  width: 72px;
+}
+
+/* ---- Sidebar: the spaces filter, and the showing tab's own sections ------- */
+
+.heat-sidebar {
+  grid-row: 2;
+  grid-column: 1;
+  overflow-y: auto;
+  padding-bottom: var(--space-s3);
+  background: var(--desk-source-list-ground);
+  border-right: 1px solid var(--desk-deck-edge);
+}
+
+.heat-side-heading {
+  margin: var(--space-s3) var(--space-s3) var(--space-s1);
+  font-size: var(--type-desk-small);
+  font-weight: normal;
+  color: var(--desk-source-list-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.heat-side-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  width: 100%;
+  min-height: 24px;
+  padding: 2px var(--space-s3);
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--desk-ink);
+}
+
+.heat-side-row[aria-disabled='true'] {
+  color: var(--desk-ink2);
+}
+
+.heat-side-row[aria-current='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.heat-side-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-side-count {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-side-row[aria-current='true'] .heat-side-count {
+  color: var(--desk-select-ink);
+}
+
+.heat-side-new {
+  color: var(--desk-ink2);
+}
+
+.heat-side-why {
+  margin: var(--space-s1) var(--space-s3);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+/* A space's hue, as a dot: the name beside it is what says which. */
+.heat-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--desk-ink);
+  border-radius: 50%;
+  background: hsl(var(--hue) 70% 52%);
+}
+
+/* ---- The main view: every tab stays built, one shows --------------------- */
+
+.heat-main {
+  position: relative;
+  grid-row: 2;
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.heat-tabpanel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.heat-tabpanel[data-current='true'] {
+  visibility: visible;
+}
+
+.heat-stub {
+  padding: var(--space-s5);
+}
+
+.heat-heading {
+  margin: 0 0 var(--space-s2);
+  font-size: var(--type-desk-title);
+  font-weight: normal;
+}
+
+/* ---- Right column: five metal panels, or a strip of icons ---------------- */
+
+.heat-right {
+  position: relative;
+  grid-row: 2;
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s2);
+  padding: var(--space-s2);
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--desk-ink) 9%, var(--desk-well));
+  border-left: 1px solid var(--desk-deck-edge);
+}
+
+.heat-strip {
+  align-items: center;
+  gap: 0;
+  padding: var(--space-s1) 0;
+  overflow: visible;
+}
+
+.heat-widget {
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-sheet);
+  background: linear-gradient(var(--gloss) 0 12%, transparent 40%), linear-gradient(var(--desk-case-metal));
+}
+
+.heat-widget-title {
+  margin: 0;
+  padding: var(--space-s1) var(--space-s3);
+  font-size: var(--type-desk-small);
+  font-weight: normal;
+  color: var(--desk-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.heat-widget-well {
+  margin: 0 var(--space-s1) var(--space-s1);
+  padding: var(--space-s2);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+}
+
+.heat-widget-well p {
+  margin: 0 0 var(--space-s2);
+}
+
+.heat-widget-well > :last-child {
+  margin-bottom: 0;
+}
+
+.heat-widget-empty {
+  color: var(--desk-ink2);
+}
+
+.heat-widget-empty[data-over='true'],
+.heat-now[data-over='true'] {
+  outline: var(--desk-focus-width) dashed var(--desk-focus);
+  outline-offset: 2px;
+}
+
+.heat-widget-line {
+  font-size: var(--type-desk-body);
+}
+
+.heat-letter {
+  display: inline-block;
+  min-width: 26px;
+  padding: 0 var(--space-s2);
+  border: 1px solid var(--desk-ink);
+  border-radius: var(--radius-pill);
+  text-align: center;
+  font-weight: bold;
+}
+
+.heat-widget-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--desk-ink);
+}
+
+.heat-widget-icon[aria-expanded='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+/* A folded widget opens beside its icon, over the main view. */
+.heat-popover {
+  position: absolute;
+  top: var(--space-s1);
+  right: 44px;
+  z-index: 25;
+  width: 290px;
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-sheet);
+  background: linear-gradient(var(--desk-case-metal));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--desk-ink) 30%, transparent);
+  animation: fade-in var(--motion-beat) linear;
+}
+
+/* Now */
+.heat-now {
+  display: grid;
+  gap: var(--space-s1);
+  justify-items: start;
+}
+
+.heat-now-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  max-width: 100%;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--type-desk-large);
+}
+
+.heat-now-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heat-now-line {
+  margin: 0;
+  font-size: var(--type-desk-body);
+}
+
+.heat-now-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s1);
+  margin-top: var(--space-s1);
+}
+
+/* Habits: orbs are 44 pt targets with a 28 pt disc, so state is a shape: filled with a tick, or open. */
+.heat-orbs {
+  display: flex;
+  flex-wrap: wrap;
+  margin: -4px -4px 0;
+}
+
+.heat-orb {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--desk-ink);
+}
+
+.heat-orb-disc {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: 50%;
+  background: var(--desk-well);
+  font-weight: bold;
+}
+
+.heat-orb[data-done='true'] .heat-orb-disc {
+  color: var(--desk-select-ink);
+  border-color: var(--desk-select);
+  background: linear-gradient(var(--gloss) 0 45%, transparent 55%), linear-gradient(var(--desk-gel-selected));
+}
+
+/* Compact rows: hot tasks, mail */
+.heat-lines {
+  display: grid;
+  margin: 0;
+}
+
+.heat-plain {
+  padding: 0;
+  list-style: none;
+}
+
+.heat-line,
+.heat-mail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-s2);
+  align-items: center;
+  min-height: 26px;
+  padding: 2px var(--space-s2);
+}
+
+.heat-line:nth-child(even),
+.heat-mail:nth-child(even) {
+  background: var(--desk-stripe);
+}
+
+.heat-line[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.heat-line-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-line-sub {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-line[aria-selected='true'] .heat-line-sub {
+  color: var(--desk-select-ink);
+}
+
+/* ---- The heat badge: a 46 × 11 glossy tube filled to v, with its level in words ---- */
+
+.heat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s2);
+  white-space: nowrap;
+}
+
+.heat-tube {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 11px;
+  overflow: hidden;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--desk-ink) 10%, var(--desk-well));
+}
+
+.heat-tube-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--v) * 100%);
+  background: var(--tube, var(--heat-cool));
+}
+
+.heat-tube::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(var(--gloss) 0 45%, transparent 55%);
+}
+
+.heat-badge[data-level='cool'] {
+  --tube: var(--heat-cool);
+}
+
+.heat-badge[data-level='warm'] {
+  --tube: var(--heat-warm);
+}
+
+.heat-badge[data-level='hot'] {
+  --tube: var(--heat-hot);
+}
+
+.heat-badge[data-level='overdue'] {
+  --tube: var(--heat-overdue);
+}
+
+.heat-level {
+  font-size: var(--type-desk-small);
+}
+
+/* ---- Get Info slides over the right column; Esc slides it back ------------ */
+
+.heat-info-slot {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  bottom: 0;
+  z-index: 22;
+  width: 290px;
+}
+
+.heat-info {
+  height: 100%;
+  overflow: auto;
+  padding: var(--space-s3);
+  background: var(--desk-well);
+  border-left: 1px solid var(--desk-deck-edge);
+  box-shadow: -4px 0 12px color-mix(in srgb, var(--desk-ink) 18%, transparent);
+  animation: heat-info-in var(--motion-fade) var(--motion-sheet);
+}
+
+@keyframes heat-info-in {
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+}
+
+:root[data-reduce-motion='true'] .heat-info {
+  animation: fade-in var(--motion-beat) linear;
+}
+
+/* ---- Sheets drop from the top of Heat ------------------------------------ */
+
+.heat-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: var(--desk-backdrop);
+}
+
+.heat-sheet {
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  width: 440px;
+  max-width: calc(100% - var(--space-s4));
+  padding: var(--space-s3) var(--space-s4);
+}
+
+.heat-sheet-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--space-s3);
+}
+
+/* Words for assistive technology only. */
+.heat-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
