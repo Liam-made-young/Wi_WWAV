@@ -1,6 +1,6 @@
 // Export everything… (⌘⇧E, docs/SPEC.md 2.9): one action that writes every
-// file, session, purchase and record to a folder or a zip. It is never
-// behind a paywall and works while you are signed out.
+// file, session and record to a folder or a zip. It is never behind a
+// paywall and works while you are signed out.
 
 import { useEffect, useState } from 'react';
 import { call } from '../bridge';
@@ -39,8 +39,7 @@ export function ExportSheet({ shown, library }: { shown: boolean; library: strin
     <div className="sheet export register-desk" role="dialog" aria-label="Export everything" hidden={!shown}>
       <h2 className="sheet-title">Export everything</h2>
       <p>
-        Every file byte for byte, your sessions, purchases, Heat, notes and galaxy, and a page that plays it all
-        offline.
+        Every file byte for byte, your sessions, Heat, notes and galaxy, and a page that plays it all offline.
       </p>
       <form
         onSubmit={(e) => {

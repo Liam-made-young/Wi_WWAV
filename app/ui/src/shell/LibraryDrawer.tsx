@@ -1,5 +1,5 @@
 // ⌘L, the library drawer (docs/SPEC.md 2.5): a 280 pt source list that
-// slides over any room. Sources on top, the clips below with each one's
+// slides over any view. Sources on top, the clips below with each one's
 // verdict, bulk tag, colour and delete for a selection, and import by
 // dropping files or folders, which first says what they hold ("214 files:
 // 38 .wwav, 12 .swav, 160 plain audio, 4 other. Plain audio comes in as
@@ -39,7 +39,6 @@ type Source =
   | { kind: 'clips'; value: 'wwav' | 'swav' | 'audio'; label: string }
   | { kind: 'tag'; value: string }
   | { kind: 'colour'; value: string }
-  | { kind: 'purchases' }
   | { kind: 'takes' };
 
 const LIBRARY: { source: Source; label: string }[] = [
@@ -47,13 +46,11 @@ const LIBRARY: { source: Source; label: string }[] = [
   { source: { kind: 'clips', value: 'wwav', label: 'Songs' }, label: 'Songs' },
   { source: { kind: 'clips', value: 'swav', label: 'Films' }, label: 'Films' },
   { source: { kind: 'clips', value: 'audio', label: 'Plain audio' }, label: 'Plain audio' },
-  { source: { kind: 'purchases' }, label: 'Purchases' },
   { source: { kind: 'takes' }, label: 'Takes' },
 ];
 
 // What an empty source says, and why (8.10).
 const EMPTY: Partial<Record<Source['kind'], string>> = {
-  purchases: 'Purchases land here when you buy from a shelf.',
   takes: 'Takes land here when you record in the Console.',
 };
 

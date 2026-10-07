@@ -6,7 +6,8 @@ import type { DayKey } from '../../shared/time/zone';
 
 export type { DayKey };
 export type Id = string;
-export type Room = 'heat' | 'space' | 'console' | 'unquantized';
+/** Where a focus session was started: the three views (docs/SPEC.md 2.1). */
+export type View = 'heat' | 'space' | 'console';
 
 export interface Space {
   id: Id;
@@ -76,7 +77,7 @@ export interface FocusSession {
   endedAt: number;
   focusMin: number;
   interruptions: number;
-  room: Room;
+  view: View;
 }
 
 export interface Project {
@@ -158,7 +159,7 @@ export interface Capture {
   resultId?: Id;
 }
 
-/** A Google Calendar event: read-only, drawn grey behind blocks (3.5). */
+/** An event from a calendar's private iCal address (Google's included): read-only, drawn grey behind blocks (3.5). */
 export interface CalendarEvent {
   id: Id;
   title: string;

@@ -20,14 +20,11 @@ describe('patterns fill in to the spec’s own sentences', () => {
     expect(copy.undo.label(copy.undo.moveBlock)).toBe('Undo move block');
   });
 
-  it('Claude, projects, grades and connections', () => {
+  it('Claude, projects and connections', () => {
     expect(copy.claude.estimate('45m')).toBe(
       "Claude's estimate: 45m. It read the title, the notes and your past averages.",
     );
     expect(copy.projects.makeTasks(4)).toBe('Make 4 tasks from To finish?');
-    expect(copy.grades.syllabusFound(5, '100')).toBe(
-      'Claude found 5 categories adding to 100%. Check them against the syllabus.',
-    );
     expect(copy.connections.nowMaking('the second verse of More Love')).toBe(
       'Now making: the second verse of More Love',
     );
@@ -60,8 +57,6 @@ describe('the voice (8.10)', () => {
       copy.tabs.secondary.Grades,
       copy.tabs.secondary.Habits,
       copy.tabs.secondary.Mail,
-      copy.claude.turnOn,
-      copy.claude.askToScore,
       copy.mail.makeTask,
       copy.mail.openInGmail,
       copy.mail.loadImages,

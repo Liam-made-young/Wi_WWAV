@@ -1,7 +1,7 @@
 // The case's title bar (docs/SPEC.md 2.1): 52 pt of brushed metal in every
-// room, light and dark, holding the traffic lights, the room switcher, the
-// Now strip, the search pill and the astronaut chip. The case never
-// changes, so the controls never move.
+// view, light and dark, holding the traffic lights, the view switcher, the
+// Now strip, the search pill and the galaxy chip. The case never changes, so
+// the controls never move.
 
 import type { ReactNode } from 'react';
 import { keys } from './platform';
@@ -22,7 +22,7 @@ export function TitleBar({ room, narrow, strip, menuOpen, onRoom, onSearch, onMe
     <header className="case-bar" data-tauri-drag-region>
       {/* The window's own traffic lights sit here, drawn by the system. */}
       <div className="traffic" data-tauri-drag-region />
-      <div className="switcher" role="tablist" aria-label="Rooms">
+      <div className="switcher" role="tablist" aria-label="Views">
         {ROOMS.map((id, i) => (
           <button
             key={id}
@@ -52,13 +52,13 @@ export function TitleBar({ room, narrow, strip, menuOpen, onRoom, onSearch, onMe
       </button>
       <button
         type="button"
-        className="astronaut-chip"
+        className="galaxy-chip"
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         aria-label="You"
         onClick={onMenu}
       >
-        <Astronaut />
+        <Galaxy />
       </button>
     </header>
   );
@@ -73,15 +73,40 @@ function Magnifier() {
   );
 }
 
-// The starter astronaut's helmet until the account carries its own: the
-// astronaut stores ids, never art (2.4), and Space draws the real one.
-function Astronaut() {
+// A 28 pt miniature of your own galaxy (2.1): the night, a sun, two orbits and
+// a few worlds. Until the account has a galaxy to draw (Space isn't in this
+// build yet) it is the starter one: the same sky for everyone, in the night
+// register's own tokens. Space draws the real one from the galaxy's `skySeed`.
+const STARTER_WORLDS = [
+  { orbit: 0, angle: 200 },
+  { orbit: 1, angle: 40 },
+  { orbit: 1, angle: 280 },
+] as const;
+const ORBITS = [6.5, 10.5];
+
+function Galaxy() {
   return (
-    <svg className="portrait" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-      <circle cx="14" cy="14" r="13" className="portrait-helmet" />
-      <rect x="5" y="9" width="18" height="11" rx="5.5" className="portrait-visor" />
-      <circle cx="9.5" cy="12" r="1.25" className="portrait-glint" />
-    </svg>
+    <span className="galaxy" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="13.5" className="galaxy-ground" />
+        {ORBITS.map((r) => (
+          <circle key={r} cx="14" cy="14" r={r} className="galaxy-orbit" />
+        ))}
+        {STARTER_WORLDS.map(({ orbit, angle }) => {
+          const a = (angle * Math.PI) / 180;
+          return (
+            <circle
+              key={`${orbit}-${angle}`}
+              cx={(14 + ORBITS[orbit] * Math.cos(a)).toFixed(2)}
+              cy={(14 + ORBITS[orbit] * Math.sin(a)).toFixed(2)}
+              r="1.4"
+              className="galaxy-world"
+            />
+          );
+        })}
+      </svg>
+      <span className="galaxy-sun" />
+    </span>
   );
 }
 
@@ -90,8 +115,8 @@ export interface MenuItem {
   run(): void;
 }
 
-/** The astronaut chip's menu: "Your galaxy", "Your shelf", "Settings…", "Export everything…", "Sign out". */
-export function AstronautMenu({ items }: { items: MenuItem[] }) {
+/** The galaxy chip's menu: "Your galaxy", "Your public Heat view", "Settings…", "Export everything…", "Sign out". */
+export function GalaxyMenu({ items }: { items: MenuItem[] }) {
   return (
     <div className="chip-menu" role="menu" aria-label="You">
       {items.map((item) => (

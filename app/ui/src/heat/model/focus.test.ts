@@ -32,7 +32,7 @@ function run(events: [number, FocusEvent][], state = initialFocus(), chime = fal
   return { state, effects };
 }
 
-const press = (target?: FocusTarget): FocusEvent => ({ type: 'press', target, room: 'heat' });
+const press = (target?: FocusTarget): FocusEvent => ({ type: 'press', target, view: 'heat' });
 const tick: FocusEvent = { type: 'tick' };
 
 describe('lengths', () => {
@@ -85,7 +85,7 @@ describe('a round, as 1.6 runs it', () => {
     expect(end.effects).toEqual([
       {
         kind: 'log',
-        session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 25 * MIN, focusMin: 25, interruptions: 0, room: 'heat' },
+        session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 25 * MIN, focusMin: 25, interruptions: 0, view: 'heat' },
       },
     ]);
     expect(focusLcd(s, t0 + 25 * MIN)).toEqual({
@@ -130,7 +130,7 @@ describe('a round, as 1.6 runs it', () => {
           endedAt: t0 + 18 * MIN + 40_000,
           focusMin: 19,
           interruptions: 0,
-          room: 'heat',
+          view: 'heat',
         },
       },
     ]);
@@ -240,7 +240,7 @@ describe('minutes go to the current task', () => {
     expect(effects).toEqual([
       {
         kind: 'log',
-        session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 10 * MIN, focusMin: 10, interruptions: 0, room: 'heat' },
+        session: { taskId: 'mix', startedAt: t0, endedAt: t0 + 10 * MIN, focusMin: 10, interruptions: 0, view: 'heat' },
       },
       {
         kind: 'log',
@@ -250,7 +250,7 @@ describe('minutes go to the current task', () => {
           endedAt: t0 + 25 * MIN,
           focusMin: 15,
           interruptions: 0,
-          room: 'heat',
+          view: 'heat',
         },
       },
     ]);
@@ -273,7 +273,7 @@ describe('minutes go to the current task', () => {
           endedAt: t0 + 24 * MIN + 50_000,
           focusMin: 25,
           interruptions: 0,
-          room: 'heat',
+          view: 'heat',
         },
       },
     ]);
@@ -299,7 +299,7 @@ describe('minutes go to the current task', () => {
           endedAt: t0 + 25 * MIN,
           focusMin: 25,
           interruptions: 0,
-          room: 'heat',
+          view: 'heat',
         },
       },
     ]);

@@ -1,10 +1,10 @@
-// The four rooms inside the case (docs/SPEC.md 2.3). Each is built once and
-// lives until you quit: a room that isn't current is hidden, never
+// The three views inside the case (docs/SPEC.md 2.3). Each is built once and
+// lives until you quit: a view that isn't current is hidden, never
 // unmounted, so switching back finds its scroll, selection, open sheet and
-// half-typed text where you left them. A room change is a 140 ms
+// half-typed text where you left them. A view change is a 140 ms
 // cross-fade, and a cut under Reduce Motion (shell.css).
 //
-// Until their stages fill them, each room is its register's ground and its
+// Until their stages fill them, each view is its register's ground and its
 // empty line.
 
 import type { ReactNode } from 'react';
@@ -54,11 +54,6 @@ const BODIES: Record<RoomId, ReactNode> = {
   console: (
     <div className="room-empty">
       <p className="dmg-screen">{EMPTY.toUpperCase()}</p>
-    </div>
-  ),
-  unquantized: (
-    <div className="room-empty">
-      <p className="paper-tag">{EMPTY}</p>
     </div>
   ),
 };

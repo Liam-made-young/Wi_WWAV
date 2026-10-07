@@ -1,7 +1,9 @@
 // The shell (docs/SPEC.md 2): everything that stays put when you change
-// rooms. The case (title bar and status bar), the four rooms inside it,
-// and what opens over any room: ⌘K, ⌘⇧N, ⌘L, the player, Settings, Export
-// everything and first launch. One keyboard router serves all of it.
+// views. The case (title bar and status bar), the three views inside it,
+// and what opens over any view: ⌘K, ⌘⇧N, ⌘L, the player, Settings, Export
+// everything and first launch. One keyboard router serves all of it, and the
+// app's menus (app/src-tauri) reach it as `menu` events: on Linux the menu
+// takes ⌘1 before the page does, so a key is a menu event there.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { call } from '../bridge';
@@ -11,7 +13,7 @@ import { listenForDrops } from './drop';
 import { ExportSheet } from './ExportSheet';
 import { FirstLaunch, type FirstLaunchHandle } from './FirstLaunch';
 import { GetInfo } from './GetInfo';
-import { type UndoRoom, useCoreEvent, useHistory, useMedia, useNarrow, useStatus } from './hooks';
+import { type UndoRoom, useAppearance, useCoreEvent, useHistory, useNarrow, useStatus } from './hooks';
 import { type Command, type KeyContext, type Overlay, route } from './keys';
 import { type Clip, type DrawerHandle, LibraryDrawer } from './LibraryDrawer';
 import { NowStrip } from './NowStrip';
@@ -20,17 +22,11 @@ import { IS_MAC, keys } from './platform';
 import { PlayerSheet } from './PlayerSheet';
 import { ROOM_NAMES, ROOMS, type RoomId } from './rooms';
 import { Rooms } from './Rooms';
-import { PANES, type Pane, Settings, type SettingsValue } from './Settings';
+import { type Account, PANES, type Pane, Settings, type SettingsValue } from './Settings';
 import { type ScreenStatus, StatusBar } from './StatusBar';
-import { AstronautMenu, TitleBar } from './TitleBar';
+import { GalaxyMenu, TitleBar } from './TitleBar';
 import { usePlayer } from './usePlayer';
 import { useTaskHalf } from './useTaskHalf';
-
-interface Account {
-  signedIn: boolean;
-  username?: string;
-  galaxy?: string;
-}
 
 // First launch is this Mac's: once its five steps are through, they stay
 // through. Kept in the web view's own storage because the core's settings
@@ -71,7 +67,6 @@ export function Shell() {
   const [drawerStatus, setDrawerStatus] = useState<ScreenStatus>({ count: null, act: null });
 
   const narrow = useNarrow();
-  const systemReduce = useMedia('(prefers-reduced-motion: reduce)');
   const status = useStatus();
   const menus = useHistory();
   const player = usePlayer();
@@ -82,10 +77,11 @@ export function Shell() {
   const capture = useRef<CaptureHandle>(null);
   const drawer = useRef<DrawerHandle>(null);
   const first = useRef<FirstLaunchHandle>(null);
+  const keyedUndo = useRef(0);
 
-  // Leaving a room takes the keyboard out of it first, and coming back
+  // Leaving a view takes the keyboard out of it first, and coming back
   // returns it where it was. A browser scrolls a focused field into view
-  // when its room is hidden around it, which would lose the room's scroll.
+  // when its view is hidden around it, which would lose the view's scroll.
   const focusIn = useRef<Partial<Record<RoomId, HTMLElement>>>({});
   const setRoom = (next: RoomId) => {
     if (next === room) return;
@@ -102,8 +98,15 @@ export function Shell() {
 
   const top = stack.at(-1) ?? null;
   const shown = (o: Overlay) => stack.includes(o);
-  // ⌘Z acts on the room you are in; with the library drawer open, that is the library.
+  // ⌘Z acts on the view you are in; with the library drawer open, that is the library.
   const undoRoom: UndoRoom = shown('drawer') ? 'library' : room;
+
+  // The app's Edit menu names that view's undo, and the View menu ticks it.
+  // (In a browser, on the dev bridge, there is no shell to tell: the core
+  // answers that it has no such command, and nothing is lost.)
+  useEffect(() => {
+    call('shell.room', { room: undoRoom }).catch(() => {});
+  }, [undoRoom]);
 
   useEffect(() => {
     call<{ library: string }>('app.hello').then(
@@ -116,15 +119,7 @@ export function Shell() {
   useCoreEvent<SettingsValue>('settings', setSettings);
   useCoreEvent<Account>('account', (a) => setAccount((was) => ({ ...was, ...a })));
 
-  // Appearance, text size and Reduce Motion, from Settings and the system.
-  const reduce = systemReduce || settings?.reduceMotion === true;
-  useEffect(() => {
-    const root = document.documentElement;
-    if (!settings || settings.appearance === 'system') delete root.dataset.appearance;
-    else root.dataset.appearance = settings.appearance;
-    root.style.setProperty('--text-size', `${settings?.textSize ?? 13}px`);
-    root.dataset.reduceMotion = String(reduce);
-  }, [settings, reduce]);
+  useAppearance(settings);
 
   useEffect(() => {
     if (!toast) return;
@@ -156,6 +151,7 @@ export function Shell() {
         ? `The Console isn’t in this build yet, so it can’t open ‘${c.title}’.`
         : 'Select a work to open in the Console.',
     );
+  const notInSpace = (what: string) => say(`${what} comes with Space, which isn’t in this build yet.`);
 
   const undo = (redo: boolean) =>
     call<{ label: string }>(redo ? 'history.redo' : 'history.undo', { room: undoRoom }).then(
@@ -188,6 +184,7 @@ export function Shell() {
         return open('capture');
       case 'undo':
       case 'redo':
+        keyedUndo.current = Date.now();
         return void undo(c.type === 'redo');
       case 'escape':
         return escape();
@@ -227,6 +224,42 @@ export function Shell() {
     }
   };
 
+  // What the app's menus ask of the page (app/src-tauri/README.md): the view
+  // keys, Undo and Redo, the library, Export everything and New session.
+  useCoreEvent<{ action: string }>('menu', ({ action }) => {
+    const view = /^room\.(heat|space|console)$/.exec(action);
+    if (view) return setRoom(view[1] as RoomId);
+    switch (action) {
+      case 'history.undo':
+      case 'history.redo': {
+        // On a Mac the page may take the same keys first: that one is this one.
+        if (Date.now() - keyedUndo.current < 150) return;
+        const redo = action === 'history.redo';
+        // The menu's Undo replaces the system's, so a text field keeps its own typing undo.
+        if (fieldOf(document.activeElement) === 'text') return void document.execCommand(redo ? 'redo' : 'undo');
+        return void undo(redo);
+      }
+      case 'library.toggle':
+        return toggle('drawer');
+      case 'export.everything':
+        return open('export');
+      case 'session.new':
+        return say('The Console isn’t in this build yet, so there is no new session.');
+    }
+  });
+
+  // Files opened from outside (a double-click, File → Open…, a second launch):
+  // songs and films are already in the library, and the drawer hears of them
+  // through `library`. Sessions are the Console's.
+  useCoreEvent<{ clips?: { title: string }[]; sessions?: string[]; error?: { message: string } }>('open', (o) => {
+    if (o.error) return say(o.error.message);
+    const said: string[] = [];
+    const n = o.clips?.length ?? 0;
+    if (n) said.push(n === 1 ? `Opened ‘${o.clips![0].title}’.` : `Opened ${n} files.`);
+    if (o.sessions?.length) said.push('The Console isn’t in this build yet, so it can’t open that session.');
+    if (said.length) say(said.join(' '));
+  });
+
   // The one keyboard listener. Everything else learns of keys through `run`.
   const latest = useRef({ run, top });
   latest.current = { run, top };
@@ -260,7 +293,6 @@ export function Shell() {
   const undoLabel = menus[undoRoom]?.undo;
   const actions: Item[] = [
     ...ROOMS.map((r, i) => ({ label: `Go to ${ROOM_NAMES[r]}`, hint: keys(`⌘${i + 1}`), run: () => setRoom(r) })),
-    { label: 'Go to shelf', run: () => setRoom('unquantized') },
     { label: 'Quick capture', hint: keys('⌘⇧N'), run: () => open('capture') },
     { label: 'Library', hint: keys('⌘L'), run: () => open('drawer') },
     { label: 'Export everything…', hint: keys('⌘⇧E'), run: () => open('export') },
@@ -373,10 +405,13 @@ export function Shell() {
           }}
         />
         {shown('menu') && (
-          <AstronautMenu
+          <GalaxyMenu
             items={[
               { label: 'Your galaxy', run: () => (setRoom('space'), close('menu')) },
-              { label: 'Your shelf', run: () => (setRoom('unquantized'), close('menu')) },
+              {
+                label: 'Your public Heat view',
+                run: () => (setRoom('space'), close('menu'), notInSpace('Your public Heat view, behind your sun,')),
+              },
               { label: 'Settings…', run: () => (close('menu'), open('settings')) },
               { label: 'Export everything…', run: () => (close('menu'), open('export')) },
               account.signedIn

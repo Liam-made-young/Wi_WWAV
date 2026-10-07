@@ -1,7 +1,7 @@
 // Calendar (docs/SPEC.md 3.1 and 3.7). The month grid stays as Heat has it:
 // from Sunday, 3 pills a cell with a heat border, "N more", today circled.
 // Week and Day views sit on the PKM's grid (44 px an hour, the whole day):
-// Google events grey behind blocks, and each deadline a small heat-coloured
+// calendar events grey behind blocks, and each deadline a small heat-coloured
 // flag at its time. Brightspace items are tasks, so they never draw as events.
 
 import { clock, longDay, MONTHS, shortMonthDay } from '../../shared/time/format';

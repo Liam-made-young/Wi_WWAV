@@ -25,7 +25,7 @@ export function StatusBar({ screen, undo, status }: Props) {
   );
   const right = [status.upload, status.sync, status.save].filter(Boolean);
   return (
-    <footer className="case-status">
+    <footer className="case-status" data-text="secondary">
       <span className="status-left">{left.join(' · ')}</span>
       <span className="status-right" role="status">
         {right.join(' · ')}

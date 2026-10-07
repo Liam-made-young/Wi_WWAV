@@ -22,7 +22,7 @@ export interface KeyLike {
   repeat: boolean;
 }
 
-/** What has the keyboard: the topmost thing open over the rooms. */
+/** What has the keyboard: the topmost thing open over the views. */
 export type Overlay = 'palette' | 'capture' | 'drawer' | 'info' | 'player' | 'settings' | 'export' | 'menu' | 'first';
 
 export interface KeyContext {
@@ -88,7 +88,7 @@ export function route(e: KeyLike, ctx: KeyContext): Command | null {
 
 function commandKey(e: KeyLike, ctx: KeyContext): Command | null {
   if (e.altKey) return null;
-  const digit = /^Digit([1-4])$/.exec(e.code);
+  const digit = /^Digit([1-3])$/.exec(e.code);
   if (digit && !e.shiftKey) return { type: 'room', room: ROOMS[Number(digit[1]) - 1] };
   if (e.key === 'Enter') return ctx.overlay === 'palette' ? { type: 'open', other: true } : null;
   if (e.repeat) return null;
@@ -119,16 +119,16 @@ function commandKey(e: KeyLike, ctx: KeyContext): Command | null {
 
 /** Every shortcut the shell answers, for Settings → Keyboard (2.13). */
 export const SHORTCUTS: readonly { keys: string; does: string; where: string }[] = [
-  { keys: '⌘1 · ⌘2 · ⌘3 · ⌘4', does: 'Heat · Space · Console · Unquantized', where: 'everywhere' },
+  { keys: '⌘1 · ⌘2 · ⌘3', does: 'Heat · Space · Console', where: 'everywhere' },
   { keys: 'Space', does: 'Play or pause', where: 'outside text' },
   { keys: '⌘K', does: 'Search everything', where: 'everywhere' },
   { keys: '⌘⇧N', does: 'Quick capture', where: 'everywhere' },
   { keys: '⌘L', does: 'Library drawer', where: 'everywhere' },
-  { keys: '⌘Z', does: 'Undo, labelled', where: 'the room you are in' },
-  { keys: '⌘⇧Z', does: 'Redo, labelled', where: 'the room you are in' },
+  { keys: '⌘Z', does: 'Undo, labelled', where: 'the view you are in' },
+  { keys: '⌘⇧Z', does: 'Redo, labelled', where: 'the view you are in' },
   { keys: 'Esc', does: 'Close, collapse, deselect; never deletes', where: 'everywhere' },
   { keys: '⇧Return', does: 'The screen’s one secondary act, named in the status bar', where: 'everywhere' },
-  { keys: '⌘Return', does: 'Open a result in its other room', where: 'search' },
+  { keys: '⌘Return', does: 'Open a result in its other view', where: 'search' },
   { keys: '↑ ↓', does: 'Move the selection', where: 'lists' },
   { keys: '← → ↑ ↓ · M · S', does: 'Level ±5% · mute · solo the focused stem', where: 'stem lights' },
   { keys: '⌘I', does: 'Get Info', where: 'the library' },
