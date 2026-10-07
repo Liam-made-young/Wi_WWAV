@@ -58,7 +58,7 @@ export const TAB_TABLE: Record<TabId, { name: string; plus: string | null; adds:
   habits: { name: 'Habits', plus: 'New habit', adds: 'A habit', secondary: 'Show the year' },
   mail: { name: 'Mail', plus: null, adds: null, secondary: 'Open in Gmail' },
   database: { name: 'Database', plus: 'New row', adds: 'A row in this table', secondary: 'Fill down' },
-  wiki: { name: 'Wiki', plus: null, adds: null, secondary: 'Open on Wikipedia' },
+  wiki: { name: 'Wiki', plus: null, adds: null, secondary: 'Search Wikipedia' },
 };
 
 export interface Act {

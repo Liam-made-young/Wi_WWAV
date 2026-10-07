@@ -121,9 +121,9 @@ The request comes with what the person is looking at: the tab, what is selected,
 
 # Answering
 
-Answer in the panel under the box, briefly, in Markdown: short paragraphs, a list or a small table when it helps. No headings.
+Call your tools first, without writing anything in between: no "let me check". When they are done, write the whole answer once. It shows in the panel under the box, so keep it brief, in Markdown: short paragraphs, a list or a small table when it helps. No headings.
 - Every Learn record you mention is a link: [its title](learn://<table id>/<row id>), such as [Kanji quiz](learn://task/01JABC). The table id is the lower-case word in the tool's answers ("task", "course", "note"), and for the person's own tables the id of the table.
-- For a question of general knowledge, answer it yourself, plainly, then call wiki_search for the most relevant article or two and end with a line: Wikipedia: [Article title](wiki://Article title). Use the titles exactly as the search gives them. Do this from any tab.
+- For a question of general knowledge, call wiki_search for the most relevant article or two, then answer the question yourself, plainly and in full, and end with a line: Wikipedia: [Article title](wiki://Article title). Use the titles exactly as the search gives them. Do this from any tab.
 - Dates read as people say them ("Friday, Oct 9"), not as ISO.
 "#,
         now = clock.iso(clock.now_ms),
@@ -180,7 +180,10 @@ fn run_claude(
     let mut command = Command::new(binary);
     command
         .arg("-p")
-        .args(["--output-format", "json"])
+        // Every message as it is written, a line of JSON each, so words
+        // Claude wrote before calling a tool are not lost with the turn.
+        .args(["--output-format", "stream-json"])
+        .arg("--verbose")
         .arg("--no-session-persistence")
         .arg("--disable-slash-commands")
         // No built-in tools: no shell, no files, no web. Only the core's.
@@ -249,8 +252,9 @@ fn run_claude(
         out.join().unwrap_or_default(),
         err.join().unwrap_or_default(),
     );
-    let envelope: Value = serde_json::from_str(out.trim()).unwrap_or(Value::Null);
-    let said = envelope["result"].as_str().unwrap_or_default();
+    let mut envelope = read_stream(&out);
+    let said = envelope["result"].as_str().unwrap_or_default().to_string();
+    let said = said.as_str();
     let all = format!("{said}\n{out}\n{err}").to_lowercase();
     if [
         "/login",
@@ -291,7 +295,45 @@ fn run_claude(
         let why: String = why.chars().take(200).collect();
         return Err(error(format!("Claude couldn't finish: {why}")));
     }
+    // The answer is everything Claude wrote, not only what came after its last tool call.
+    let whole = envelope["said"].as_str().map(String::from);
+    if let Some(whole) = whole.filter(|w| w.len() > said.len()) {
+        envelope["result"] = json!(whole);
+    }
     Ok(envelope)
+}
+
+/// The run's output, a line of JSON per event, as its result event with
+/// `said` added: every piece of text Claude wrote, in order. A run that
+/// printed one object (a test's stand-in) reads the same way.
+fn read_stream(out: &str) -> Value {
+    let mut envelope = Value::Null;
+    let mut texts: Vec<String> = Vec::new();
+    for line in out.lines() {
+        let Ok(event) = serde_json::from_str::<Value>(line.trim()) else {
+            continue;
+        };
+        match event["type"].as_str() {
+            Some("assistant") => {
+                for block in event["message"]["content"].as_array().into_iter().flatten() {
+                    if block["type"] != "text" {
+                        continue;
+                    }
+                    let text = block["text"].as_str().unwrap_or("").trim();
+                    if !text.is_empty() && texts.last().map(String::as_str) != Some(text) {
+                        texts.push(text.to_string());
+                    }
+                }
+            }
+            Some("result") => envelope = event,
+            _ if envelope.is_null() && event.get("result").is_some() => envelope = event,
+            _ => {}
+        }
+    }
+    if envelope.is_object() && !texts.is_empty() {
+        envelope["said"] = json!(texts.join("\n\n"));
+    }
+    envelope
 }
 
 /// The Wikipedia articles an answer links, in order, each once.
@@ -586,6 +628,33 @@ mod tests {
             ["Fourier transform", "Erdős–Rényi model"]
         );
         assert!(wiki_links("No links here ](wiki://").is_empty());
+    }
+
+    #[test]
+    fn what_claude_wrote_before_a_tool_call_is_part_of_the_answer() {
+        let out = [
+            r#"{"type":"system","subtype":"init"}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"hm"}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"A Fourier transform splits a signal into frequencies."},{"type":"tool_use","name":"mcp__learn__wiki_search","input":{}}]}}"#,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","content":"x"}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Wikipedia: [Fourier transform](wiki://Fourier transform)"}]}}"#,
+            r#"{"type":"result","subtype":"success","is_error":false,"result":"Wikipedia: [Fourier transform](wiki://Fourier transform)"}"#,
+            "not json at all",
+        ]
+        .join("\n");
+        let e = read_stream(&out);
+        assert_eq!(e["is_error"], false);
+        assert_eq!(
+            e["said"],
+            "A Fourier transform splits a signal into frequencies.\n\nWikipedia: [Fourier transform](wiki://Fourier transform)"
+        );
+        // One object and nothing else reads as that object.
+        let one = read_stream(r#"{"type":"result","is_error":true,"result":"Please run /login"}"#);
+        assert_eq!(
+            (one["is_error"].clone(), one["said"].clone()),
+            (json!(true), Value::Null)
+        );
+        assert!(read_stream("").is_null());
     }
 
     #[test]

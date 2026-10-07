@@ -560,6 +560,7 @@ fn claude_is_given_the_screen_the_tables_and_only_these_tools() {
         "--no-session-persistence",
         "--disable-slash-commands",
         "--system-prompt",
+        "--verbose",
     ] {
         assert!(flags.contains(&needed), "{needed}");
     }
