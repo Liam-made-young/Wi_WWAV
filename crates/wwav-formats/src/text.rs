@@ -5,6 +5,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::Error;
+
 /// python's `str.isspace()`: Rust's whitespace and the four information
 /// separators U+001C to U+001F.
 pub fn is_py_space(c: char) -> bool {
@@ -74,12 +76,16 @@ pub fn py_float(s: &str) -> Option<f64> {
 /// A song.txt or film.txt: `key = value` lines, keys lowercased, both
 /// trimmed, `#` lines and lines without "=" skipped, later lines winning.
 /// Read as python opens it: UTF-8 with U+FFFD for bad bytes, and "\r\n",
-/// "\r" and "\n" all ending a line. No file reads as no lines.
-pub fn key_values(path: &Path) -> HashMap<String, String> {
+/// "\r" and "\n" all ending a line. A file that isn't there reads as no
+/// lines, as the tools' `os.path.exists` has it (a path it can't look up
+/// isn't there either); one that is there but can't be read, a folder or
+/// a file without permission, is an error, where the tools die.
+pub fn key_values(path: &Path) -> Result<HashMap<String, String>, Error> {
     let mut info = HashMap::new();
-    let Ok(bytes) = std::fs::read(path) else {
-        return info;
-    };
+    if std::fs::metadata(path).is_err() {
+        return Ok(info);
+    }
+    let bytes = std::fs::read(path).map_err(|e| Error::Msg(format!("{}: {e}", path.display())))?;
     let text = String::from_utf8_lossy(&bytes)
         .replace("\r\n", "\n")
         .replace('\r', "\n");
@@ -92,7 +98,7 @@ pub fn key_values(path: &Path) -> HashMap<String, String> {
             info.insert(py_strip(k).to_lowercase(), py_strip(v).to_string());
         }
     }
-    info
+    Ok(info)
 }
 
 /// `os.path.normpath` on POSIX: "a//b/./c/../" is "a/b".

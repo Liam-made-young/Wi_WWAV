@@ -150,7 +150,6 @@ fn a_wmet_with_many_keys_opens_in_linear_time() {
 /// work. The same holds for an unreadable song.txt (EACCES, EIO) and for
 /// film.txt in swav pack.
 #[test]
-#[ignore = "review finding: an unreadable song.txt is ignored, not refused (text.rs key_values)"]
 fn pack_refuses_a_song_txt_it_cannot_read() {
     let dir = tmp("review-song-txt");
     let folder = dir.join("01 Song");
@@ -261,7 +260,6 @@ fn unpack_then_pack_keeps_a_title_from_the_folder() {
 /// with "failed to fill whole buffer" after the song is gone; a hard link
 /// to it loses the song too. wwav_pack.py loses it the same way.
 #[test]
-#[ignore = "review finding: wwav unpack and pack write over their input (pack.rs has no not_same)"]
 fn unpack_never_writes_over_its_input() {
     let dir = tmp("review-over");
     let song = dir.join("master.wav");
@@ -339,4 +337,72 @@ fn many_chunks_and_many_floats_read_in_linear_time() {
             );
         }
     }
+}
+
+/// The same finding for films: a film.txt swav_pack.py can't read (here a
+/// folder) makes it die without writing; the Rust pack has to refuse too,
+/// and only after the refusals swav_pack.py makes first.
+#[test]
+fn swav_pack_refuses_a_film_txt_it_cannot_read() {
+    let dir = tmp("review-film-txt");
+    let film = dir.join("film.mp4");
+    std::fs::copy(corpus().join("plain.mp4"), &film).unwrap();
+    std::fs::create_dir_all(dir.join("film.txt")).unwrap();
+    if swav_pack().exists() && has("python3") {
+        let o = python(
+            &swav_pack(),
+            &["pack", s(&film), "-o", s(&dir.join("py.swav"))],
+        );
+        assert_eq!(o.status.code(), Some(1));
+        assert!(!dir.join("py.swav").exists());
+    }
+    let out = dir.join("rs.swav");
+    let r = swav::pack_original(s(&film), s(&out), "", "", "");
+    assert!(r.is_err(), "packed {:?}", r.map(|(m, _)| m.film_id));
+    assert!(!out.exists());
+    // a film that's already a .swav is refused for that first, as python does
+    let packed = dir.join("packed.mp4");
+    std::fs::copy(corpus().join("plain.swav"), &packed).unwrap();
+    std::fs::create_dir_all(dir.join("packed.txt")).unwrap();
+    let e = swav::pack_original(s(&packed), s(&out), "", "", "").unwrap_err();
+    assert!(
+        e.to_string()
+            .ends_with("already has a wmet or wlin box (unpack it first)"),
+        "{e}"
+    );
+}
+
+/// The same finding for pack: `wwav pack F -o F/master.wav` (or -o a hard
+/// link to any of its WAVs) writes the .wwav over the master it is
+/// reading. It has to refuse, in swav_pack.py's words, and leave the
+/// folder as it was; so does unpack into a folder holding a hard link to
+/// the .wwav under a stem's name.
+#[test]
+fn pack_never_writes_over_its_input() {
+    let dir = tmp("review-over-pack");
+    let folder = song_folder(&dir, "01 Song", 600, &NAMED, "title = x\n");
+    let before = std::fs::read(folder.join("master.wav")).unwrap();
+    std::fs::hard_link(folder.join("bass.wav"), dir.join("bass-link.wwav")).unwrap();
+    for out in [folder.join("master.wav"), dir.join("bass-link.wwav")] {
+        let o = wwav(&["pack", s(&folder), "-o", s(&out)]);
+        assert_eq!(o.status.code(), Some(1), "pack -o {}", out.display());
+        let said = String::from_utf8_lossy(&o.stderr);
+        assert!(said.contains("would write over"), "{said}");
+    }
+    assert!(std::fs::read(folder.join("master.wav")).unwrap() == before);
+    assert!(std::fs::read(folder.join("bass.wav")).unwrap() == wav(600, 5));
+
+    let song = dir.join("song.wwav");
+    std::fs::copy(corpus().join("original.wwav"), &song).unwrap();
+    let back = dir.join("back");
+    std::fs::create_dir_all(&back).unwrap();
+    std::fs::hard_link(&song, back.join("drums.wav")).unwrap();
+    let whole = std::fs::read(&song).unwrap();
+    let o = wwav(&["unpack", s(&song), "-o", s(&back)]);
+    assert_eq!(o.status.code(), Some(1));
+    assert!(std::fs::read(&song).unwrap() == whole);
+    assert!(
+        !back.join("master.wav").exists(),
+        "unpack wrote before refusing"
+    );
 }

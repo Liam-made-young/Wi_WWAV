@@ -19,7 +19,7 @@ use crate::meta::{Kind, Lineage, SongMeta};
 use crate::text::{basename, join, key_values, py_float, title_of, today};
 use crate::writer::{wav_header, WwavWriter};
 use crate::wwav::{read_at, ChunkWalk, Fmt, Wwav, FRAME, STEMS, STEM_FRAME};
-use crate::{msg, Error};
+use crate::{msg, not_same, Error};
 
 const NAMED: [&str; 5] = [
     "master.wav",
@@ -108,6 +108,8 @@ impl Input {
 
 /// `wwav_pack.py pack folder -o out --splitter S --creator C`. A song.txt
 /// without a valid song_id gets a new one; without a created date, today's.
+/// Where the tool would write the .wwav over one of the WAVs it is reading,
+/// this refuses, as swav_pack.py does ("would write over").
 pub fn pack(folder: &str, out: &str, splitter: &str, creator: &str) -> Result<Packed, Error> {
     if !Path::new(folder).is_dir() {
         return Err(msg(format!("{folder}: not a folder")));
@@ -147,7 +149,7 @@ pub fn pack(folder: &str, out: &str, splitter: &str, creator: &str) -> Result<Pa
         )));
     }
 
-    let info = key_values(Path::new(&join(folder, "song.txt")));
+    let info = key_values(Path::new(&join(folder, "song.txt")))?;
     let text = |k: &str| info.get(k).cloned().unwrap_or_default();
     let song_id = Some(text("song_id"))
         .filter(|id| wwav_ids::is_work_id(id))
@@ -171,6 +173,10 @@ pub fn pack(folder: &str, out: &str, splitter: &str, creator: &str) -> Result<Pa
             .unwrap_or_else(today),
     };
     let lineage = Lineage::original(&song_id, creator);
+    // the tool would write over the WAV it is reading: refuse instead
+    for w in &wavs {
+        not_same(Path::new(&w.path), Path::new(out))?;
+    }
     let mut w = match WwavWriter::create(Path::new(out), frames, &meta, &lineage, None) {
         Err(Error::TooLong { .. }) => {
             return Err(msg(format!("{folder}: too long for one WAV file (4 GB)")))
@@ -231,13 +237,27 @@ pub(crate) fn object_or_empty(v: &Option<Value>) -> Result<&[(String, Value)], E
 }
 
 /// `wwav_pack.py unpack file -o outdir`: master.wav, the four stems when
-/// wstm holds them whole, and song.txt. Returns the names written.
+/// wstm holds them whole, and song.txt. Returns the names written. Where
+/// the tool would write one of them over the .wwav it is reading (a .wwav
+/// named master.wav unpacked into its own folder), this refuses first.
 pub fn unpack(path: &str, outdir: &str) -> Result<Vec<String>, Error> {
     let mut w = Wwav::open(Path::new(path))?;
     if w.first(b"data").is_none() || w.fmt != Some(Fmt::CD) {
         return Err(msg(format!(
             "{path}: the master isn't 44.1 kHz 16-bit stereo PCM"
         )));
+    }
+    let stems = w
+        .wstm
+        .filter(|s| s.fits && (s.version, s.stems, s.channels, s.bits) == (1, 4, 2, 16));
+    // the tool would write over the .wwav it is reading: refuse instead
+    let mut names = vec!["master.wav".to_string()];
+    if stems.is_some() {
+        names.extend(STEMS.iter().map(|n| format!("{n}.wav")));
+    }
+    names.push("song.txt".into());
+    for n in &names {
+        not_same(Path::new(path), Path::new(&join(outdir, n)))?;
     }
     std::fs::create_dir_all(outdir)?;
     let frames = w.master_frames();
@@ -254,12 +274,8 @@ pub fn unpack(path: &str, outdir: &str) -> Result<Vec<String>, Error> {
         )?;
     }
     out.flush()?;
-    let mut written = vec!["master.wav".to_string()];
 
-    if let Some(s) = w
-        .wstm
-        .filter(|s| s.fits && (s.version, s.stems, s.channels, s.bits) == (1, 4, 2, 16))
-    {
+    if let Some(s) = stems {
         let stem_frames = s.frames as u64;
         let mut outs = STEMS
             .iter()
@@ -288,7 +304,6 @@ pub fn unpack(path: &str, outdir: &str) -> Result<Vec<String>, Error> {
         for o in &mut outs {
             o.flush()?;
         }
-        written.extend(STEMS.iter().map(|n| format!("{n}.wav")));
     }
 
     let meta = object_or_empty(&w.wmet)?;
@@ -301,6 +316,5 @@ pub fn unpack(path: &str, outdir: &str) -> Result<Vec<String>, Error> {
         }
     }
     std::fs::write(join(outdir, "song.txt"), lines.join("\n") + "\n")?;
-    written.push("song.txt".into());
-    Ok(written)
+    Ok(names)
 }

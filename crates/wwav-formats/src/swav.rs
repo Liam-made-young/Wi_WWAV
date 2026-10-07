@@ -244,6 +244,16 @@ fn copy(f: &mut File, n: u64, o: &mut impl Write, shown: &Path) -> Result<(), Er
 /// reads it, and `swav_pack.py unpack` warns that film.txt can't keep its
 /// parent. The command line's pack ([`pack_original`]) stays an original.
 pub fn pack(film: &Path, out: &Path, meta: &FilmMeta, lineage: &Lineage) -> Result<u64, Error> {
+    pack_with(film, out, || Ok((meta.clone(), lineage.clone()))).map(|(_, total)| total)
+}
+
+/// pack, with wmet and wlin made by `identity` once the film has passed
+/// the tool's checks, as swav_pack.py reads film.txt only then.
+fn pack_with(
+    film: &Path,
+    out: &Path,
+    identity: impl FnOnce() -> Result<(FilmMeta, Lineage), Error>,
+) -> Result<(FilmMeta, u64), Error> {
     not_same(film, out)?;
     let mut s = Swav::open(film)?;
     if s.boxes.iter().any(|b| OWN.contains(&&b.kind)) {
@@ -252,7 +262,8 @@ pub fn pack(film: &Path, out: &Path, meta: &FilmMeta, lineage: &Lineage) -> Resu
             film.display()
         )));
     }
-    let tail = tail(meta, lineage);
+    let (meta, lineage) = identity()?;
+    let tail = tail(&meta, &lineage);
     // A last box of size 0 runs "to the end of the file", which would
     // swallow the new boxes: write its real size in first.
     let last = *s.boxes.last().ok_or_else(|| msg("no boxes"))?;
@@ -272,7 +283,7 @@ pub fn pack(film: &Path, out: &Path, meta: &FilmMeta, lineage: &Lineage) -> Resu
     }
     o.write_all(&tail)?;
     o.flush()?;
-    Ok(s.size + tail.len() as u64)
+    Ok((meta, s.size + tail.len() as u64))
 }
 
 /// film.txt beside a film: `film.mp4` -> `film.txt`.
@@ -323,15 +334,10 @@ pub fn pack_original(
     artist: &str,
     creator: &str,
 ) -> Result<(FilmMeta, u64), Error> {
-    let (meta, lineage) = original(
-        film,
-        &key_values(Path::new(&txt_path(film))),
-        title,
-        artist,
-        creator,
-    );
-    let total = pack(Path::new(film), Path::new(out), &meta, &lineage)?;
-    Ok((meta, total))
+    pack_with(Path::new(film), Path::new(out), || {
+        let info = key_values(Path::new(&txt_path(film)))?;
+        Ok(original(film, &info, title, artist, creator))
+    })
 }
 
 /// `{**a, **b}`: each key's value, b's where both have it, and the keys in
@@ -396,7 +402,7 @@ pub fn unpack(path: &str, out: &str) -> Result<Unpacked, Error> {
 
     // film.txt holds one trimmed line per value, and pack writes originals:
     // say when packing this again won't give back what was dropped, and why
-    let (again_meta, again_lin) = original(out, &key_values(Path::new(&txt)), "", "", "");
+    let (again_meta, again_lin) = original(out, &key_values(Path::new(&txt))?, "", "", "");
     let again = tail(&again_meta, &again_lin);
     let rest = read_at(&mut s.file, end, s.size - end)?;
     let mut warning = None;
