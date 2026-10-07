@@ -1,0 +1,308 @@
+/* The Console's frame (docs/SPEC.md 5.2): metal outside, Game Boy inside.
+   Sizes are the spec's: transport 56, browser 220, inspector 320, bottom
+   panel 240, track headers 196, lanes 56, all in pt (CSS px). */
+
+.console {
+  --console-browser: 220px;
+  --console-inspector: 320px;
+  --console-panel: 240px;
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--console-browser) minmax(0, 1fr) var(--console-inspector);
+  grid-template-rows: 56px minmax(0, 1fr) var(--console-panel);
+  grid-template-areas:
+    'transport transport transport'
+    'browser arrangement inspector'
+    'panel panel panel';
+  background: var(--desk-ground, #2b2f35);
+  color: var(--desk-deck-ink);
+  font: 13px/1.35 var(--font-desk, 'Lucida Grande', 'Lucida Sans Unicode', system-ui, sans-serif);
+  overflow: hidden;
+}
+
+.console[data-browser='false'] {
+  --console-browser: 0px;
+}
+.console[data-inspector='false'] {
+  --console-inspector: 0px;
+}
+.console[data-panel='none'] {
+  --console-panel: 0px;
+}
+
+/* Deck metal with a 1 px pinstripe every 4 px, which "reads as texture,
+   never as stripes". */
+.console .metal {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 3px, var(--desk-deck-pinstripe) 3px 4px),
+    linear-gradient(180deg, var(--desk-deck-metal));
+  border: 1px solid var(--desk-deck-edge);
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* A DMG screen: four greens and a glow, uppercase dot-matrix. */
+.console .dmg {
+  background: var(--screen-dmg-deep);
+  color: var(--screen-dmg-lit);
+  border: 1px solid var(--screen-dmg-dark);
+  border-radius: 3px;
+  font: 600 12px/1 Menlo, 'SF Mono', ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 0 4px rgb(198 226 74 / 0.45);
+}
+
+.console-transport {
+  grid-area: transport;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+}
+
+.transport-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.metal-button {
+  min-width: 44px;
+  height: 32px;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--desk-deck-metal));
+  color: var(--desk-deck-ink);
+  font-size: 15px;
+}
+.metal-button.record {
+  color: #e0453a;
+}
+.metal-button:disabled {
+  opacity: 0.55;
+}
+
+.transport-screen {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 9px 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.transport-chip,
+.transport-engine {
+  padding: 9px 10px;
+  white-space: nowrap;
+}
+.transport-engine[data-state='stopped'],
+.transport-engine[data-state='none'] {
+  color: var(--screen-dmg-mid);
+  text-shadow: none;
+}
+
+.console-browser {
+  grid-area: browser;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.console .segmented {
+  display: flex;
+  margin: 8px;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: 6px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.console .segmented button {
+  flex: 1 1 0;
+  min-height: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--desk-deck-ink);
+  font: inherit;
+  font-size: 12px;
+}
+.console .segmented button + button {
+  border-left: 1px solid var(--desk-deck-edge);
+}
+.console .segmented button.selected {
+  background: linear-gradient(180deg, #5f97e6, #3875d7);
+  color: #fff;
+}
+
+.browser-list {
+  overflow: auto;
+  flex: 1 1 auto;
+  padding: 0 8px 8px;
+}
+
+.console .empty {
+  color: var(--desk-deck-ink-soft);
+  margin: 8px;
+  font-size: 12px;
+}
+
+.clips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.clip {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 6px;
+  border-bottom: 1px solid rgb(0 0 0 / 0.08);
+  min-height: 24px;
+}
+.clip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clip-facts {
+  color: var(--desk-deck-ink-soft);
+  font-size: 11px;
+}
+
+.console-arrangement {
+  grid-area: arrangement;
+  display: grid;
+  grid-template-rows: 28px minmax(0, 1fr) 56px;
+  background: #f4f6f8;
+  color: #161d26;
+  min-width: 0;
+  min-height: 0;
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+.ruler {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  border-bottom: 1px solid var(--desk-deck-edge);
+  overflow: hidden;
+}
+.ruler-head {
+  border-right: 1px solid var(--desk-deck-edge);
+}
+.ruler-bars {
+  display: grid;
+  grid-template-columns: repeat(32, minmax(48px, 1fr));
+  overflow: hidden;
+}
+.ruler-bar {
+  font: 11px/28px Menlo, ui-monospace, monospace;
+  padding-left: 4px;
+  border-left: 1px solid rgb(0 0 0 / 0.12);
+  color: #4f5963;
+}
+
+.lanes {
+  overflow: auto;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  background: repeating-linear-gradient(180deg, transparent 0 55px, rgb(0 0 0 / 0.06) 55px 56px);
+}
+.lanes-empty {
+  max-width: 420px;
+  text-align: center;
+}
+
+.output-row {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  border-top: 1px solid var(--desk-deck-edge);
+}
+.track-head {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  border-right: 1px solid var(--desk-deck-edge);
+  background: linear-gradient(180deg, var(--desk-deck-metal));
+}
+.output-lane {
+  margin: 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.console-inspector {
+  grid-area: inspector;
+  padding: 10px 12px;
+  overflow: auto;
+}
+.inspector-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--desk-deck-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+}
+
+.console-panel {
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mixer {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.strip {
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: 4px;
+  padding: 6px;
+}
+.strip .meter {
+  flex: 1 1 auto;
+  width: 14px;
+}
+.strip-name {
+  font: 600 10px/1 Menlo, ui-monospace, monospace;
+  letter-spacing: 0.06em;
+}
+.strip.stem-vocals {
+  border-top: 3px solid var(--stem-vocals, #e85d75);
+}
+.strip.stem-drums {
+  border-top: 3px solid var(--stem-drums, #f0b90b);
+}
+.strip.stem-other {
+  border-top: 3px solid var(--stem-other, #5cc8a8);
+}
+.strip.stem-bass {
+  border-top: 3px solid var(--stem-bass, #6c7cf0);
+}
+.strip.master {
+  margin-left: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .console-arrangement {
+    background: #26282b;
+    color: #ececec;
+  }
+}

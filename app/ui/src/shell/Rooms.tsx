@@ -8,6 +8,8 @@
 // empty line.
 
 import type { ReactNode } from 'react';
+import { ConsoleView } from '../console/ConsoleView';
+import { SpaceView } from '../space/SpaceView';
 import { REGISTERS, ROOM_NAMES, ROOMS, type RoomId } from './rooms';
 
 interface Props {
@@ -46,16 +48,8 @@ const BODIES: Record<RoomId, ReactNode> = {
       <p>{EMPTY}</p>
     </div>
   ),
-  space: (
-    <div className="room-empty">
-      <p className="night-line">{EMPTY}</p>
-    </div>
-  ),
-  console: (
-    <div className="room-empty">
-      <p className="dmg-screen">{EMPTY.toUpperCase()}</p>
-    </div>
-  ),
+  space: <SpaceView />,
+  console: <ConsoleView />,
   unquantized: (
     <div className="room-empty">
       <p className="paper-tag">{EMPTY}</p>
