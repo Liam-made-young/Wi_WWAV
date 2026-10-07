@@ -103,7 +103,8 @@ DTSTAMP:20261006T091512Z
 DTSTART:20261010T035900Z
 DTEND:20261010T035900Z
 SUMMARY:Reading response 3 - Due
-DESCRIPTION:Non-Graded practice. Bring your notes to Thursday's class.
+DESCRIPTION:Graded\, 5 points. The non-graded practice set on the same chap
+ ter is optional.
 LOCATION:WRT 104 Sec 0010 - Fall 2026
 END:VEVENT
 BEGIN:VEVENT
@@ -131,8 +132,9 @@ UID:1291230-132440@brightspace.uri.edu
 DTSTAMP:20261006T091512Z
 DTSTART:20261008T035900Z
 DTEND:20261008T035900Z
-SUMMARY:CANCELLED - Listening journal 2 - Due
+SUMMARY:Listening journal 2 - Due
 LOCATION:MUS 110 Sec 0001 - Fall 2026
+STATUS:cancelled
 END:VEVENT
 BEGIN:VEVENT
 UID:1291231-132440@brightspace.uri.edu

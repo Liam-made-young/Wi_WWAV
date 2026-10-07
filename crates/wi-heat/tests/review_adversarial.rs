@@ -1,9 +1,9 @@
 //! An independent review's adversarial tests for S2.5, S2.7 and 2.11/3.12.
-//! A test marked #[ignore] fails against the code as reviewed; its comment
-//! names the finding it exposes. Run them with `cargo test -- --ignored`.
+//! Each test that begins "Finding" failed against the code as reviewed and
+//! passes since its fix; its comment names the finding it exposed.
 
 use jiff::tz::TimeZone;
-use jiff::Timestamp;
+use jiff::{SignedDuration, Timestamp};
 use serde_json::json;
 use wi_heat::assist::{check_review, read_mail_body};
 use wi_heat::brightspace::{
@@ -11,7 +11,7 @@ use wi_heat::brightspace::{
 };
 use wi_heat::ical::{self, Event, When};
 use wi_heat::mail::{self, MailState, Message};
-use wi_heat::sync::{Change, Page, Replica, Server};
+use wi_heat::sync::{Change, Page, Replica, Saved, Server};
 
 fn ny() -> TimeZone {
     TimeZone::get("America/New_York").unwrap()
@@ -46,7 +46,6 @@ fn due_event(summary: &str, description: &str) -> Event {
 /// a rule the spec doesn't have (3.11 skips cancelled items, which the feed
 /// marks with STATUS). A graded make-up for a cancelled class is a due item.
 #[test]
-#[ignore = "finding: the title-word cancellation rule drops graded due items"]
 fn a_make_up_for_a_cancelled_class_is_still_due() {
     let e = due_event("Make-up quiz for the cancelled lab - Due", "");
     assert!(is_kept(&e), "a graded make-up quiz was dropped");
@@ -55,7 +54,6 @@ fn a_make_up_for_a_cancelled_class_is_still_due() {
 /// Finding: /non-graded/i is also tested against the description, so a
 /// graded item that points at a non-graded practice run is dropped.
 #[test]
-#[ignore = "finding: /non-graded/i on the description drops graded due items"]
 fn a_graded_quiz_that_mentions_non_graded_practice_is_still_due() {
     let e = due_event(
         "Quiz 5 - Due",
@@ -68,7 +66,6 @@ fn a_graded_quiz_that_mentions_non_graded_practice_is_still_due() {
 /// VEVENT without its END swallows every VEVENT after it as a child, so
 /// they never reach the calendar's list.
 #[test]
-#[ignore = "finding: one missing END:VEVENT hides every later event"]
 fn one_missing_end_vevent_loses_no_later_event() {
     let ics = calendar(
         "BEGIN:VEVENT\r\nUID:a\r\nSUMMARY:Homework 5 - Due\r\nDTSTART:20261009T035900Z\r\n\
@@ -85,7 +82,6 @@ fn one_missing_end_vevent_loses_no_later_event() {
 /// feed that names its Eastern zone "EST" and defines it with DST gets every
 /// summer deadline an hour late.
 #[test]
-#[ignore = "finding: the database overrides the file's own VTIMEZONE"]
 fn the_files_vtimezone_defines_its_tzid() {
     let ics = calendar(
         "BEGIN:VTIMEZONE\r\nTZID:EST\r\n\
@@ -144,7 +140,6 @@ fn long_message(n: usize, text: &str) -> Message {
 /// sync sends the same eight oldest messages: mail reading stalls until they
 /// fall out of the 14-day window.
 #[test]
-#[ignore = "finding: eight long non-ASCII emails exceed the 100 KB body limit every sync"]
 fn eight_long_japanese_announcements_fit_the_body_limit() {
     let text = "来週の小テストは第九課です。".repeat(500); // 7000 characters
     let inbox: Vec<Message> = (0..11).map(|n| long_message(n, &text)).collect();
@@ -166,7 +161,6 @@ fn eight_long_japanese_announcements_fit_the_body_limit() {
 /// about a new grading scale becomes a pending grade and its deadline never
 /// reaches Claude.
 #[test]
-#[ignore = "finding: the grade-notice pattern takes announcements for grades"]
 fn an_announcement_about_a_new_grade_scale_is_not_a_grade() {
     let m = long_message(1, "The final project is due Friday, Oct 16.");
     let m = Message {
@@ -181,7 +175,6 @@ fn an_announcement_about_a_new_grade_scale_is_not_a_grade() {
 /// shifting under new mail) with another in between at the same instant
 /// makes two pending grades with one id.
 #[test]
-#[ignore = "finding: a repeated message id makes two pending grades"]
 fn a_message_listed_twice_makes_one_pending_grade() {
     let at = ts("2026-10-05T14:00:00Z");
     let grade = Message {
@@ -202,7 +195,6 @@ fn a_message_listed_twice_makes_one_pending_grade() {
 /// Finding: the "never invent metrics" check only looks at digits, so a
 /// number written as a word passes.
 #[test]
-#[ignore = "finding: the review check lets numbers written as words through"]
 fn a_review_draft_cannot_invent_a_number_in_words() {
     let facts = vec!["Tasks done: 14".to_string()];
     let draft = r#"{"draft":"What moved: 14 tasks, a twenty percent gain on last week."}"#;
@@ -218,16 +210,20 @@ fn a_review_draft_cannot_invent_a_number_in_words() {
 /// lands at 10:05 and replaces the 10:00 title with the 9:00 one: a slower
 /// older write overwrites a newer one, as the person sees it.
 #[test]
-#[ignore = "finding: across devices, a busier device's earlier edit beats a later one"]
 fn a_later_edit_on_a_quieter_device_is_not_overwritten_by_an_earlier_one() {
     let mut studio = Replica::new("studio");
     let mut air = Replica::new("air");
     let mut server = Server::default();
+    // The scenario's times, on clocks that agree (write_at since the fix).
+    let morning = ts("2026-10-06T12:00:00Z"); // 8:00 in Kingston
     for n in 0..10 {
-        studio.write("task", &format!("t{n}"), "notes", json!("morning"));
+        let t = morning + SignedDuration::from_mins(n);
+        studio.write_at("task", &format!("t{n}"), "notes", json!("morning"), t);
     }
-    studio.write("task", "title-me", "title", json!("9:00 title")); // 9:00, offline
-    air.write("task", "title-me", "title", json!("10:00 title")); // 10:00
+    let nine = ts("2026-10-06T13:00:00Z");
+    let ten = ts("2026-10-06T14:00:00Z");
+    studio.write_at("task", "title-me", "title", json!("9:00 title"), nine); // offline
+    air.write_at("task", "title-me", "title", json!("10:00 title"), ten);
     let a = air.push_batch();
     server.push(&a); // lands 10:01
     air.acked(&a);
@@ -245,7 +241,6 @@ fn a_later_edit_on_a_quieter_device_is_not_overwritten_by_an_earlier_one() {
 /// write overflow: a panic in debug builds, and a wrap to 0 in release, after
 /// which every local write loses. Remote input shouldn't be able to do that.
 #[test]
-#[ignore = "finding: a pulled u64::MAX seq overflows the next local write"]
 fn a_huge_pulled_number_does_not_break_local_writes() {
     let mut mac = Replica::new("mac");
     mac.pulled(Page {
@@ -273,18 +268,21 @@ fn a_huge_pulled_number_does_not_break_local_writes() {
 /// as its own older edit; the server keeps the older one and the device
 /// keeps the newer one, and they never converge.
 #[test]
-#[ignore = "finding: the counter can't survive a restart, so a newer edit loses"]
 fn a_newer_edit_after_a_restart_reaches_the_server() {
     let mut server = Server::default();
     let mut mac = Replica::new("mac");
-    mac.write("task", "t1", "title", json!("before the restart"));
+    // Both edits read the same clock, so only the saved counter can order
+    // them (write_at since the fix).
+    let now = ts("2026-10-06T12:40:00Z");
+    mac.write_at("task", "t1", "title", json!("before the restart"), now);
     let b = mac.push_batch();
     server.push(&b);
     mac.acked(&b);
 
-    // The app restarts offline; the crate offers no way to restore `mac`.
-    let mut mac = Replica::new("mac");
-    mac.write("task", "t1", "title", json!("after the restart"));
+    // The app restarts offline, from what it saved (Replica::save, as JSON).
+    let saved = serde_json::to_string(&mac.save()).unwrap();
+    let mut mac = Replica::restore(serde_json::from_str::<Saved>(&saved).unwrap());
+    mac.write_at("task", "t1", "title", json!("after the restart"), now);
     let b = mac.push_batch();
     server.push(&b);
     mac.acked(&b);

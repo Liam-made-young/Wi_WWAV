@@ -6,6 +6,7 @@
 
 use jiff::tz::TimeZone;
 use jiff::Timestamp;
+use proptest::prelude::*;
 use rand::rngs::mock::StepRng;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -204,9 +205,25 @@ fn other_answers_are_never_retried() {
         step(1, Outcome::Offline, &mut rng),
         Step::Done(Err(Failure::Offline))
     );
+    // A body the server refuses is refused again if sent again.
+    for status in [400, 413, 422] {
+        assert_eq!(
+            step(1, answered(status, "{}"), &mut rng),
+            Step::Done(Err(Failure::Refused)),
+            "{status}"
+        );
+    }
+    for status in [401, 403, 404] {
+        assert_eq!(
+            step(1, answered(status, "{}"), &mut rng),
+            Step::Done(Err(Failure::Unavailable)),
+            "{status}"
+        );
+    }
     assert_eq!(
-        step(1, answered(400, "{}"), &mut rng),
-        Step::Done(Err(Failure::Unavailable))
+        Failure::Refused.sentence(),
+        Failure::Unavailable.sentence(),
+        "the spec gives a refusal no words of its own"
     );
 }
 
@@ -283,6 +300,66 @@ fn reading_mail_sends_at_most_8_messages_and_80_titles() {
     );
 }
 
+proptest! {
+    /// Whatever the mail holds (long, non-ASCII, full of characters JSON
+    /// escapes), the body stays under the server's limit, and every message
+    /// keeps a share of it.
+    #[test]
+    fn a_read_mail_body_never_passes_its_byte_limit(
+        texts in prop::collection::vec(("[a-z \n\"\\\u{1}\t漢字🎵é]{0,40}", 0..400usize), 1..12),
+        line in "[a-z漢🎵\u{2}\"]{0,400}",
+        titles in prop::collection::vec("[a-zA-Z漢🎵\"\u{3} ]{0,500}", 0..100),
+    ) {
+        let messages: Vec<Message> = texts
+            .iter()
+            .enumerate()
+            .map(|(n, (piece, times))| Message {
+                subject: format!("{line} {n}"),
+                from: line.clone(),
+                text: piece.repeat(*times),
+                ..message(n)
+            })
+            .collect();
+        let body = read_mail_body(&messages, ts("2026-10-06T12:40:00Z"), &zone(), &titles);
+        let bytes = serde_json::to_vec(&body).unwrap().len();
+        prop_assert!(bytes <= assist::MAIL_BODY_BYTES, "{} bytes", bytes);
+        prop_assert!(body.titles.len() <= 80);
+        // What a string weighs inside the JSON body.
+        let weight = |s: &str| serde_json::to_string(s).unwrap().len() - 2;
+        for (sent, m) in body.messages.iter().zip(&messages) {
+            prop_assert!(m.text.starts_with(&sent.text));
+            prop_assert!(sent.text.chars().count() <= assist::MAIL_TEXT_CHARS);
+            let whole: String = m.text.chars().take(assist::MAIL_TEXT_CHARS).collect();
+            prop_assert!(
+                weight(&sent.text) >= weight(&whole).min(4 * 1024),
+                "a long email crowded out another"
+            );
+        }
+    }
+}
+
+#[test]
+fn ascii_mail_goes_whole_up_to_6000_characters() {
+    let mut m = message(1);
+    m.text = "Problem set 7 is due Friday at 5 PM. ".repeat(500);
+    let body = read_mail_body(
+        std::slice::from_ref(&m),
+        ts("2026-10-06T12:40:00Z"),
+        &zone(),
+        &[],
+    );
+    assert_eq!(body.messages[0].text.chars().count(), 6000);
+    assert!(m.text.starts_with(&body.messages[0].text));
+    let short = message(2);
+    let body = read_mail_body(
+        std::slice::from_ref(&short),
+        ts("2026-10-06T12:40:00Z"),
+        &zone(),
+        &[],
+    );
+    assert_eq!(body.messages[0].text, short.text);
+}
+
 #[test]
 fn mail_tasks_keep_only_future_deadlines() {
     let sent = [message(1)];
@@ -346,6 +423,34 @@ fn a_review_draft_may_only_restate_numbers_heat_passed_in() {
         check_review(invented, &facts).is_none(),
         "20 is not a number Heat passed in"
     );
+    // Numbers in words are held to the same rule, by value.
+    for (draft, honest) in [
+        ("Fourteen tasks done.", true),
+        (
+            "Homework ran fifty minutes over across four of them.",
+            false,
+        ),
+        ("Forty minutes of focus on top of six hours.", true),
+        ("Thirty-two minutes over on homework, across four.", true),
+        ("Thirty two minutes over.", true),
+        ("Thirty, two minutes over.", false),
+        ("Fourteen hundred minutes of focus.", false),
+        ("One thing to watch: homework.", true),
+        ("Twenty-one tasks.", false),
+        ("A dozen tasks.", false),
+        ("Zero tasks slipped.", false),
+    ] {
+        let body = serde_json::to_string(&json!({ "draft": draft })).unwrap();
+        assert_eq!(check_review(&body, &facts).is_some(), honest, "{draft}");
+    }
+    let big = vec!["Focus time: 1405 minutes, 2005 total".to_string()];
+    for draft in [
+        "One thousand four hundred and five minutes.",
+        "Two thousand and five in all.",
+    ] {
+        let body = serde_json::to_string(&json!({ "draft": draft })).unwrap();
+        assert!(check_review(&body, &big).is_some(), "{draft}");
+    }
 }
 
 #[test]

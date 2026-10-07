@@ -114,10 +114,14 @@ pub enum Failure {
     DailyLimit {
         limit: u32,
     },
-    /// A server error after the retry, a refusal, or an answer that can't be
-    /// read. The spec gives this case no words; this line holds the place
-    /// until the founder writes one.
+    /// A server error after the retry, or an answer that can't be read. The
+    /// spec gives this case no words; this line holds the place until the
+    /// founder writes one.
     Unavailable,
+    /// The server refused this request's body (400, 413 or 422): sending it
+    /// again won't help. It reads as [`Failure::Unavailable`] does; reading
+    /// mail counts it against the batch ([`crate::mail::MailState::refused`]).
+    Refused,
 }
 
 impl Failure {
@@ -129,7 +133,9 @@ impl Failure {
             Failure::DailyLimit { limit } => {
                 format!("Claude's {limit} calls for today are used. They come back at midnight.")
             }
-            Failure::Unavailable => "Claude couldn't answer. Try again later.".into(),
+            Failure::Unavailable | Failure::Refused => {
+                "Claude couldn't answer. Try again later.".into()
+            }
         }
     }
 }
@@ -193,6 +199,10 @@ pub fn step<R: Rng + ?Sized>(attempt: u32, outcome: Outcome, rng: &mut R) -> Ste
             status: 408 | 500..=599,
             ..
         } => retry(rng),
+        Outcome::Answered {
+            status: 400 | 413 | 422,
+            ..
+        } => Step::Done(Err(Failure::Refused)),
         Outcome::Answered { .. } => Step::Done(Err(Failure::Unavailable)),
         Outcome::Offline => Step::Done(Err(Failure::Offline)),
         Outcome::TimedOut => retry(rng),
@@ -242,9 +252,18 @@ pub struct ScoreBatchBody {
 }
 
 pub const MAIL_TITLES: usize = 80;
-/// Each message's text is cut here, so eight long emails stay inside the
-/// server's 100 KB body limit instead of failing every sync.
+/// The most a read-mail body may weigh as JSON: under the server's 100 KB
+/// `express.json()` limit, with room to spare. A body the server refuses
+/// would fail the same way every sync.
+pub const MAIL_BODY_BYTES: usize = 90 * 1024;
+/// Each message's text is cut at this many characters, and shorter still
+/// when the body would pass [`MAIL_BODY_BYTES`].
 pub const MAIL_TEXT_CHARS: usize = 6000;
+/// A sender, subject or title is one line; a longer one is cut here.
+pub const MAIL_LINE_CHARS: usize = 300;
+/// The titles together weigh at most this much as JSON; the rest are left
+/// out, so the messages always keep most of the body.
+pub const MAIL_TITLES_BYTES: usize = 16 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct MailMessage {
@@ -266,32 +285,98 @@ pub struct ReadMailBody {
     pub titles: Vec<String>,
 }
 
+/// What `c` weighs inside a JSON string, as serde_json writes it.
+fn json_len(c: char) -> usize {
+    match c {
+        '"' | '\\' | '\u{8}' | '\u{c}' | '\n' | '\r' | '\t' => 2,
+        c if c < ' ' => 6,
+        c => c.len_utf8(),
+    }
+}
+
+/// The longest start of `s` that weighs at most `bytes` as JSON and holds at
+/// most `chars` characters. It ends on a character boundary.
+fn cut(s: &str, chars: usize, bytes: usize) -> String {
+    let mut weight = 0;
+    s.chars()
+        .take(chars)
+        .take_while(|&c| {
+            weight += json_len(c);
+            weight <= bytes
+        })
+        .collect()
+}
+
+/// Shares `budget` among items wanting `wants`: each gets what it wants up
+/// to an equal share, and what a short one leaves over goes to the longer.
+fn share_out(wants: &[usize], budget: usize) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..wants.len()).collect();
+    order.sort_by_key(|&i| wants[i]);
+    let mut left = budget;
+    let mut got = vec![0; wants.len()];
+    for (k, &i) in order.iter().enumerate() {
+        got[i] = wants[i].min(left / (wants.len() - k));
+        left -= got[i];
+    }
+    got
+}
+
 /// The body for the first 8 `messages` and the first 80 `titles`; pass the
-/// titles that matter most first (open tasks, nearest due).
+/// titles that matter most first (open tasks, nearest due). It never weighs
+/// more than [`MAIL_BODY_BYTES`]: titles stop at [`MAIL_TITLES_BYTES`], and
+/// the texts share what is left, so one long email can't crowd out the rest.
 pub fn read_mail_body(
     messages: &[Message],
     now: Timestamp,
     zone: &TimeZone,
     titles: &[String],
 ) -> ReadMailBody {
-    ReadMailBody {
+    let line = |s: &str| cut(s.trim(), MAIL_LINE_CHARS, usize::MAX);
+    let mut weight = 0;
+    let titles = titles
+        .iter()
+        .take(MAIL_TITLES)
+        .map(|t| line(t))
+        .take_while(|t| {
+            weight += t.chars().map(json_len).sum::<usize>() + 3; // quotes and comma
+            weight <= MAIL_TITLES_BYTES
+        })
+        .collect();
+    let messages: Vec<&Message> = messages
+        .iter()
+        .take(crate::mail::FOR_CLAUDE_PER_SYNC)
+        .collect();
+    let mut body = ReadMailBody {
         messages: messages
             .iter()
-            .take(crate::mail::FOR_CLAUDE_PER_SYNC)
             .map(|m| MailMessage {
                 id: m.id.clone(),
-                from: m.from.clone(),
-                subject: m.subject.clone(),
+                from: line(&m.from),
+                subject: line(&m.subject),
                 date: m.received.to_string(),
-                text: m.text.chars().take(MAIL_TEXT_CHARS).collect(),
+                text: String::new(),
             })
             .collect(),
         today: zone.to_datetime(now).date().to_string(),
         zone: zone
             .iana_name()
             .map_or_else(|| zone.to_offset(now).to_string(), str::to_string),
-        titles: titles.iter().take(MAIL_TITLES).cloned().collect(),
+        titles,
+    };
+    let bare = serde_json::to_vec(&body).map_or(MAIL_BODY_BYTES, |v| v.len());
+    let texts: Vec<String> = messages
+        .iter()
+        .map(|m| cut(&m.text, MAIL_TEXT_CHARS, usize::MAX))
+        .collect();
+    let wants: Vec<usize> = texts
+        .iter()
+        .map(|t| t.chars().map(json_len).sum())
+        .collect();
+    let shares = share_out(&wants, MAIL_BODY_BYTES.saturating_sub(bare));
+    for ((m, text), share) in body.messages.iter_mut().zip(&texts).zip(shares) {
+        m.text = cut(text, usize::MAX, share);
     }
+    body
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -528,17 +613,141 @@ pub fn parse_syllabus(body: &str) -> Option<SyllabusDraft> {
     (!categories.is_empty()).then_some(SyllabusDraft { categories, scale })
 }
 
-fn numbers(s: &str) -> impl Iterator<Item = &str> {
-    s.split(|c: char| !c.is_ascii_digit())
-        .filter(|n| !n.is_empty())
+/// How a number word combines with the words before it.
+#[derive(Clone, Copy)]
+enum Joins {
+    /// "twenty-three": adds.
+    Adds,
+    /// "three hundred", "two dozen": multiplies what came before.
+    Times,
+    /// "four thousand five hundred": closes a group of three digits.
+    Group,
 }
 
-/// `{"draft": "..."}`, kept only if every number in it is one of the
-/// facts' ("NEVER invent metrics"); otherwise the facts stand alone.
+fn number_word(w: &str) -> Option<(u64, Joins)> {
+    const SMALL: [&str; 20] = [
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen",
+    ];
+    const TENS: [&str; 8] = [
+        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    ];
+    if let Some(n) = SMALL.iter().position(|s| *s == w) {
+        return Some((n as u64, Joins::Adds));
+    }
+    if let Some(n) = TENS.iter().position(|s| *s == w) {
+        return Some((n as u64 * 10 + 20, Joins::Adds));
+    }
+    match w {
+        "dozen" => Some((12, Joins::Times)),
+        "hundred" => Some((100, Joins::Times)),
+        "thousand" => Some((1_000, Joins::Group)),
+        "million" => Some((1_000_000, Joins::Group)),
+        "billion" => Some((1_000_000_000, Joins::Group)),
+        _ => None,
+    }
+}
+
+/// The value of a run of number words. "one" on its own has none: it is as
+/// often the article ("one thing", as in the review's own "Next week's one
+/// thing"), and "a task" says the same without being checked either.
+fn words_value(run: &[&str]) -> Option<u64> {
+    if run.is_empty() || run == ["one"] {
+        return None;
+    }
+    let (mut total, mut current) = (0u64, 0u64);
+    for (v, joins) in run.iter().filter_map(|w| number_word(w)) {
+        match joins {
+            Joins::Adds => current = current.saturating_add(v),
+            Joins::Times => current = current.max(1).saturating_mul(v),
+            Joins::Group => {
+                total = total.saturating_add(current.max(1).saturating_mul(v));
+                current = 0;
+            }
+        }
+    }
+    Some(total.saturating_add(current))
+}
+
+/// Every number `s` states, as digits: digit runs ("14", the "1" and "5" of
+/// "1.5") and number words ("twenty", "forty-two", "two hundred and five").
+/// Number words run together across spaces and hyphens; anything else ends
+/// the number.
+fn numbers(s: &str) -> Vec<String> {
+    let mut out: Vec<String> = s
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|n| !n.is_empty())
+        .map(|n| match n.trim_start_matches('0') {
+            "" => "0".to_string(),
+            n => n.to_string(),
+        })
+        .collect();
+
+    // Each word, and whether only spaces and hyphens part it from the last.
+    let lower = s.to_lowercase();
+    let mut words = Vec::new();
+    let mut rest = lower.as_str();
+    while let Some(start) = rest.find(char::is_alphabetic) {
+        let joined = rest[..start].chars().all(|c| c == ' ' || c == '-');
+        let tail = &rest[start..];
+        let end = tail
+            .find(|c: char| !c.is_alphabetic())
+            .unwrap_or(tail.len());
+        words.push((&tail[..end], joined));
+        rest = &tail[end..];
+    }
+
+    let mut run: Vec<&str> = Vec::new();
+    let mut and = false; // an "and" follows the run so far
+    let mut flush = |run: &mut Vec<&str>| {
+        out.extend(words_value(run).map(|v| v.to_string()));
+        run.clear();
+    };
+    for (word, joined) in words {
+        let continues = joined && !run.is_empty();
+        if number_word(word).is_some() {
+            if !continues {
+                flush(&mut run);
+            }
+            run.push(word);
+            and = false;
+        } else if word == "and" && continues && !and {
+            and = true;
+        } else {
+            flush(&mut run);
+            and = false;
+        }
+    }
+    flush(&mut run);
+    out
+}
+
+/// `{"draft": "..."}`, kept only if every number in it, in digits or in
+/// words, is one of the facts' ("NEVER invent metrics"); otherwise the facts
+/// stand alone. Ordinals and words such as "half" or "twice" aren't read;
+/// the server's prompt asks for numbers in digits.
 pub fn check_review(body: &str, facts: &[String]) -> Option<String> {
     let draft = text(&json_in(body)?["draft"])?;
-    let known: HashSet<&str> = facts.iter().flat_map(|f| numbers(f)).collect();
-    let honest = numbers(&draft).all(|n| known.contains(n));
+    let known: HashSet<String> = facts.iter().flat_map(|f| numbers(f)).collect();
+    let honest = numbers(&draft).iter().all(|n| known.contains(n));
     honest.then_some(draft)
 }
 
@@ -581,4 +790,26 @@ pub fn release_milestones(release: Date) -> [(&'static str, Date); 3] {
         ("Release day", release),
         ("Post-release", shift(28)),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_character_weighs_what_serde_json_writes() {
+        let odd = ['é', '漢', '🎵', '\u{7f}', '\u{2028}', '/'];
+        for c in (0..=0x7f).filter_map(char::from_u32).chain(odd) {
+            let written = serde_json::to_string(&c.to_string()).unwrap().len() - 2;
+            assert_eq!(json_len(c), written, "{c:?}");
+        }
+    }
+
+    #[test]
+    fn shares_go_to_whoever_needs_them() {
+        assert_eq!(share_out(&[10, 500, 40], 300), vec![10, 250, 40]);
+        assert_eq!(share_out(&[500, 500], 300), vec![150, 150]);
+        assert_eq!(share_out(&[], 300), Vec::<usize>::new());
+        assert_eq!(cut("漢字", 9, 5), "漢", "a cut never splits a character");
+    }
 }

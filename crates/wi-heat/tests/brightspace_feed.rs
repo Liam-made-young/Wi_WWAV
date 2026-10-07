@@ -41,7 +41,7 @@ fn items() -> Vec<FeedItem> {
 
 /// Every VEVENT in the fixture that is a graded " - Due" item, written out by
 /// hand from the file: (uid, title, course, type, due).
-const DUE_ITEMS: [(&str, &str, &str, &str, &str); 10] = [
+const DUE_ITEMS: [(&str, &str, &str, &str, &str); 11] = [
     (
         "1290877-128934@brightspace.uri.edu",
         "Grammar quiz 4",
@@ -69,6 +69,14 @@ const DUE_ITEMS: [(&str, &str, &str, &str, &str); 10] = [
         "PHY 203",
         "Lab",
         "2026-10-12T13:00:00Z",
+    ),
+    // Graded; its description only mentions a non-graded practice set.
+    (
+        "1291102-131002@brightspace.uri.edu",
+        "Reading response 3",
+        "WRT 104",
+        "Reading",
+        "2026-10-10T03:59:00Z",
     ),
     (
         "1291150-131002@brightspace.uri.edu",
@@ -115,14 +123,13 @@ const DUE_ITEMS: [(&str, &str, &str, &str, &str); 10] = [
 ];
 
 /// Every VEVENT the rules must drop: availability windows, a workshop, the
-/// non-graded pair and the two cancelled items.
-const DROPPED: [&str; 7] = [
+/// non-graded item and the two cancelled ones.
+const DROPPED: [&str; 6] = [
     "1290878-128934@brightspace.uri.edu", // "- Availability Ends"
     "1290801-128934@brightspace.uri.edu", // "- Availability Starts"
     "1291045-130587@brightspace.uri.edu", // "(non-graded)" in the title
-    "1291102-131002@brightspace.uri.edu", // "Non-Graded" in the description
     "1291200-130587@brightspace.uri.edu", // STATUS:CANCELLED
-    "1291230-132440@brightspace.uri.edu", // "CANCELLED - " in the title
+    "1291230-132440@brightspace.uri.edu", // STATUS:cancelled
     "1291400-131002@brightspace.uri.edu", // no " - Due"
 ];
 
@@ -326,7 +333,7 @@ fn a_task_from_google_calendar_takes_on_the_uid() {
         .new
         .iter()
         .all(|i| i.uid != "1290912-130211@brightspace.uri.edu"));
-    assert_eq!(report.new.len(), 7);
+    assert_eq!(report.new.len(), 8);
 }
 
 #[test]

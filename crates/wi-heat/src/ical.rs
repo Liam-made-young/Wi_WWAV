@@ -2,10 +2,12 @@
 //! what a calendar feed of due dates holds: folded lines, escaped text,
 //! VEVENTs and the VTIMEZONEs their times refer to.
 //!
-//! Times come out as instants. A TZID is looked up in the bundled time zone
-//! database first, because it knows a zone's whole history; a TZID it doesn't
-//! know (D2L can write Windows names such as "Eastern Standard Time") is read
-//! from the file's own VTIMEZONE. A time with no zone, or a zone neither
+//! Times come out as instants. A TZID means what the file's own VTIMEZONE
+//! says it means (RFC 5545 3.2.19), whatever its name: D2L can write Windows
+//! names such as "Eastern Standard Time", and a short name like "EST" may be
+//! defined with daylight saving the database's "EST" lacks. A TZID the file
+//! doesn't define (or defines in a way this reader can't follow) is looked up
+//! in the bundled time zone database. A time with no zone, or a zone neither
 //! defines, is the school's local time.
 //!
 //! The reader is lenient, as a feed reader has to be: a line it can't read is
@@ -181,8 +183,27 @@ impl Component {
     }
 }
 
+/// The component these always sit directly inside (RFC 5545 3.6, 3.6.5).
+fn parent_of(name: &str) -> Option<&'static str> {
+    match name {
+        "VEVENT" | "VTODO" | "VJOURNAL" | "VFREEBUSY" | "VTIMEZONE" => Some("VCALENDAR"),
+        "STANDARD" | "DAYLIGHT" => Some("VTIMEZONE"),
+        _ => None,
+    }
+}
+
+/// Closes every component above the innermost one named `name` into its
+/// parent; that one stays open.
+fn close_down_to(stack: &mut Vec<Component>, name: &str) {
+    while stack.len() > 1 && stack.last().is_some_and(|c| c.name != name) {
+        let done = stack.pop().expect("checked");
+        stack.last_mut().expect("root").children.push(done);
+    }
+}
+
 /// The BEGIN/END tree. A missing END closes at the next END that matches an
-/// outer component, or at the end of the file.
+/// outer component, at the next BEGIN of a component that can't sit inside it
+/// (a VEVENT never holds another VEVENT), or at the end of the file.
 fn components(text: &str) -> Vec<Component> {
     let mut stack = vec![Component::new("")];
     for raw in text.split('\n') {
@@ -190,18 +211,21 @@ fn components(text: &str) -> Vec<Component> {
             continue;
         };
         match line.name.as_str() {
-            "BEGIN" => stack.push(Component::new(line.value.trim())),
+            "BEGIN" => {
+                let part = Component::new(line.value.trim());
+                if let Some(parent) = parent_of(&part.name) {
+                    if stack.iter().any(|c| c.name == parent) {
+                        close_down_to(&mut stack, parent);
+                    }
+                }
+                stack.push(part);
+            }
             "END" => {
                 let name = line.value.trim().to_ascii_uppercase();
                 if stack.iter().skip(1).any(|c| c.name == name) {
-                    loop {
-                        let done = stack.pop().expect("the root is never popped here");
-                        let matched = done.name == name;
-                        stack.last_mut().expect("root").children.push(done);
-                        if matched {
-                            break;
-                        }
-                    }
+                    close_down_to(&mut stack, &name);
+                    let done = stack.pop().expect("the root is never popped here");
+                    stack.last_mut().expect("root").children.push(done);
                 }
             }
             _ => stack.last_mut().expect("root").lines.push(line),
@@ -271,7 +295,7 @@ fn when(line: &Line, zones: &HashMap<String, TimeZone>, zone: &TimeZone) -> Opti
     let dt = civil_datetime(v)?;
     let tz = line
         .param("TZID")
-        .and_then(|id| TimeZone::get(id).ok().or_else(|| zones.get(id).cloned()));
+        .and_then(|id| zones.get(id).cloned().or_else(|| TimeZone::get(id).ok()));
     // RFC 5545 3.3.5 reads a time in a gap with the offset before it, and a
     // repeated time as its first occurrence: jiff's "compatible".
     tz.as_ref()
@@ -325,7 +349,8 @@ fn civil_datetime(s: &str) -> Option<DateTime> {
 /// A VTIMEZONE as a jiff time zone. Its latest STANDARD and DAYLIGHT rules
 /// become a POSIX TZ string, which holds exactly what a yearly
 /// "Nth weekday of a month" rule says. A rule that doesn't fit (a one-off
-/// observance, BYMONTHDAY lists) leaves the TZID to the school's zone.
+/// observance, BYMONTHDAY lists, a rule that ends) leaves the TZID to the
+/// time zone database, and then to the school's zone.
 fn vtimezone(c: &Component) -> Option<(String, TimeZone)> {
     if c.name != "VTIMEZONE" {
         return None;
@@ -411,7 +436,12 @@ fn posix_rule(observance: &Component) -> Option<String> {
         .filter_map(|p| p.split_once('='))
         .map(|(k, v)| (k.trim().to_ascii_uppercase(), v.trim().to_ascii_uppercase()))
         .collect();
-    if parts.get("FREQ").map(String::as_str) != Some("YEARLY") {
+    // A rule with an UNTIL or COUNT is history, and the latest one may not
+    // be in force now (a zone that dropped daylight saving).
+    if parts.get("FREQ").map(String::as_str) != Some("YEARLY")
+        || parts.contains_key("UNTIL")
+        || parts.contains_key("COUNT")
+    {
         return None;
     }
     let month = digits(parts.get("BYMONTH")?)?;
@@ -618,6 +648,35 @@ mod tests {
         let uids: Vec<&str> = events.iter().map(|e| e.uid.as_deref().unwrap()).collect();
         assert_eq!(uids, ["g", "h"]);
         assert_eq!(events[0].summary, "Quiz 1 - Due");
+    }
+
+    #[test]
+    fn a_missing_end_inside_a_vtimezone_loses_no_rule() {
+        let ics = wrap(
+            "BEGIN:VTIMEZONE\r\nTZID:Eastern\r\n\
+             BEGIN:STANDARD\r\nDTSTART:16011104T020000\r\nRRULE:FREQ=YEARLY;BYDAY=1SU;BYMONTH=11\r\n\
+             TZOFFSETFROM:-0400\r\nTZOFFSETTO:-0500\r\n\
+             BEGIN:DAYLIGHT\r\nDTSTART:16010311T020000\r\nRRULE:FREQ=YEARLY;BYDAY=2SU;BYMONTH=3\r\n\
+             TZOFFSETFROM:-0500\r\nTZOFFSETTO:-0400\r\nEND:DAYLIGHT\r\nEND:VTIMEZONE\r\n\
+             BEGIN:VEVENT\r\nUID:j\r\nDTSTART;TZID=Eastern:20261012T090000\r\nEND:VEVENT\r\n",
+        );
+        let e = &parse(ics.as_bytes(), &TimeZone::UTC).unwrap()[0];
+        assert_eq!(e.start, at("2026-10-12T13:00:00Z"));
+    }
+
+    #[test]
+    fn a_rule_that_ended_leaves_the_tzid_to_the_database() {
+        // Sao Paulo dropped daylight saving in 2019; a VTIMEZONE that still
+        // carries its old yearly rule, ended by UNTIL, isn't followed.
+        let e = one(
+            "BEGIN:VTIMEZONE\r\nTZID:America/Sao_Paulo\r\n\
+             BEGIN:STANDARD\r\nDTSTART:20190216T000000\r\nRRULE:FREQ=YEARLY;BYMONTH=2;BYDAY=3SA;UNTIL=20190216T020000Z\r\n\
+             TZOFFSETFROM:-0200\r\nTZOFFSETTO:-0300\r\nEND:STANDARD\r\n\
+             BEGIN:DAYLIGHT\r\nDTSTART:20181104T000000\r\nRRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU;UNTIL=20181104T030000Z\r\n\
+             TZOFFSETFROM:-0300\r\nTZOFFSETTO:-0200\r\nEND:DAYLIGHT\r\nEND:VTIMEZONE\r\n\
+             BEGIN:VEVENT\r\nUID:k\r\nDTSTART;TZID=America/Sao_Paulo:20261210T090000\r\nEND:VEVENT\r\n",
+        );
+        assert_eq!(e.start, at("2026-12-10T12:00:00Z"));
     }
 
     #[test]

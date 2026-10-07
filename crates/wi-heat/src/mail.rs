@@ -2,7 +2,8 @@
 //! Gmail for `brightspace newer_than:Nd`, turns grade notices into pending
 //! grades, and hands up to 8 announcements per sync to Claude, which pulls
 //! out deadlines. The rest wait for the next sync, and the last 400 message
-//! ids are remembered so nothing is read twice.
+//! ids are remembered so nothing is read twice. A batch the server refuses
+//! three times is given up on, so it can't hold up the mail behind it.
 //!
 //! The grade-notice phrasings below were written without a stored notice
 //! from URI's Brightspace, the same Open item as the feed (11.2).
@@ -10,7 +11,7 @@
 use crate::brightspace::{course_code, School};
 use jiff::Timestamp;
 use regex::Regex;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::sync::OnceLock;
 
 /// Message ids remembered, as the artifact does.
@@ -18,6 +19,9 @@ pub const REMEMBERED: usize = 400;
 /// Announcements handed to Claude in one sync.
 pub const FOR_CLAUDE_PER_SYNC: usize = 8;
 pub const MORE_EMAILS_LEFT: &str = "More emails left, they'll come in on the next sync.";
+/// A batch the server refuses this many times running is given up on, so it
+/// can't hold up every message behind it.
+pub const REFUSALS_BEFORE_GIVING_UP: u8 = 3;
 
 const DAY_SECS: i64 = 86_400;
 
@@ -48,14 +52,15 @@ fn grade_notice() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
         Regex::new(
-            r"(?i)\b(new grades?|grades? (item )?(released|posted|updated|available)|grades? (has|have) been (released|posted|updated)|has been graded)\b",
+            r"(?i)\b(new grades?(:|\s+(posted|released|available|in|for)\b)|grades? (item )?(released|posted|updated|available)\b|grades? (has|have) been (released|posted|updated)\b|has been graded\b)",
         )
         .expect("valid")
     })
 }
 
 /// Brightspace's notice that a grade was released: "Grade released: Quiz 4",
-/// "New grade in MTH 142", "Homework 5 has been graded".
+/// "New grade in MTH 142", "Homework 5 has been graded". "New grade" alone
+/// isn't enough: "New grade scale for the final project" is an announcement.
 pub fn is_grade_notice(m: &Message) -> bool {
     grade_notice().is_match(&m.subject)
 }
@@ -139,6 +144,10 @@ pub struct MailState {
     /// Every message before this has been handled. It stays on the oldest
     /// message carried over, so the next search still reaches back to it.
     pub read_through: Option<Timestamp>,
+    /// Refusals counted against each message of the last refused batch
+    /// ([`MailState::refused`]). Save it with the rest, or the count starts
+    /// over at every launch.
+    pub refusals: BTreeMap<String, u8>,
 }
 
 impl MailState {
@@ -160,9 +169,13 @@ impl MailState {
     /// reading off, announcements are left alone: nothing is sent and
     /// nothing waits for Claude.
     pub fn plan(&self, messages: &[Message], school: &School, reading_on: bool) -> MailPlan {
-        let mut fresh: Vec<&Message> = messages.iter().filter(|m| !self.seen(&m.id)).collect();
+        // A message listed twice (Gmail's pages shift under new mail) counts once.
+        let mut ids = HashSet::new();
+        let mut fresh: Vec<&Message> = messages
+            .iter()
+            .filter(|m| !self.seen(&m.id) && ids.insert(m.id.as_str()))
+            .collect();
         fresh.sort_by_key(|m| m.received);
-        fresh.dedup_by(|a, b| a.id == b.id);
         let mut plan = MailPlan::default();
         for m in fresh {
             if is_grade_notice(m) {
@@ -193,13 +206,41 @@ impl MailState {
                 self.remember(&m.id);
             }
         }
-        let mut left: Vec<Timestamp> = plan.carried.iter().map(|m| m.received).collect();
-        if !claude_read {
-            left.extend(plan.for_claude.iter().map(|m| m.received));
+        let mut left: Vec<&Message> = plan.carried.iter().collect();
+        if claude_read {
+            self.refusals.clear();
+        } else {
+            left.extend(&plan.for_claude);
         }
-        let oldest_left = left.into_iter().min();
+        let oldest_left = left
+            .into_iter()
+            .filter(|m| !self.seen(&m.id))
+            .map(|m| m.received)
+            .min();
         self.read_through = Some(oldest_left.unwrap_or(searched_at));
         oldest_left.map(|_| MORE_EMAILS_LEFT)
+    }
+
+    /// Records a sync whose batch the server refused ([`Failure::Refused`])
+    /// or whose answer couldn't be read. Each message in the batch counts a
+    /// refusal; one refused 3 times running is given up: remembered as
+    /// handled, so the messages behind it come in. It stays in Mail, where
+    /// "Make a task" still reads it.
+    ///
+    /// [`Failure::Refused`]: crate::assist::Failure::Refused
+    pub fn refused(&mut self, plan: &MailPlan, searched_at: Timestamp) -> Option<&'static str> {
+        let batch: HashSet<&str> = plan.for_claude.iter().map(|m| m.id.as_str()).collect();
+        // A message no longer in the batch was read or has gone.
+        self.refusals.retain(|id, _| batch.contains(id.as_str()));
+        for m in &plan.for_claude {
+            let n = self.refusals.entry(m.id.clone()).or_insert(0);
+            *n += 1;
+            if *n >= REFUSALS_BEFORE_GIVING_UP {
+                self.refusals.remove(&m.id);
+                self.remember(&m.id);
+            }
+        }
+        self.finish(plan, false, searched_at)
     }
 }
 
@@ -268,6 +309,8 @@ mod tests {
             "New grade posted in MTH 142",
             "Homework 5 has been graded",
             "Grades have been released for PHY 203",
+            "New grade: Lab 5a",
+            "New grade in WRT 104",
         ];
         for subject in notices {
             assert!(
@@ -279,6 +322,8 @@ mod tests {
             "New announcement: office hours moved",
             "Grade expectations for the essay",
             "Upgrade your app",
+            "New grade scale for the final project, due Friday",
+            "New grading policy for late labs",
         ] {
             assert!(
                 !is_grade_notice(&msg("x", subject, "2026-10-05T14:00:00Z")),
@@ -354,6 +399,60 @@ mod tests {
         assert!(!state.seen("a1"));
         assert_eq!(state.read_through, Some(ts("2026-10-05T14:00:00Z")));
         assert_eq!(state.plan(&inbox, &s, true).for_claude.len(), 1);
+    }
+
+    #[test]
+    fn a_batch_refused_three_times_is_given_up_and_the_rest_come_in() {
+        let s = school();
+        let mut state = MailState::default();
+        let inbox: Vec<Message> = (0..10)
+            .map(|n| {
+                msg(
+                    &format!("a{n:02}"),
+                    &format!("Announcement {n}"),
+                    &format!("2026-10-01T{n:02}:00:00Z"),
+                )
+            })
+            .collect();
+        let at = ts("2026-10-06T12:40:00Z");
+
+        // Offline and limits aren't the batch's fault: they never count.
+        for _ in 0..5 {
+            let plan = state.plan(&inbox, &s, true);
+            assert_eq!(state.finish(&plan, false, at), Some(MORE_EMAILS_LEFT));
+        }
+        for n in 1..=REFUSALS_BEFORE_GIVING_UP {
+            let plan = state.plan(&inbox, &s, true);
+            assert_eq!(plan.for_claude[0].id, "a00", "refusal {n}: the same batch");
+            assert_eq!(state.refused(&plan, at), Some(MORE_EMAILS_LEFT));
+        }
+        assert!(state.seen("a07"), "given up after three refusals");
+        assert!(state.refusals.is_empty());
+        assert_eq!(state.read_through, Some(ts("2026-10-01T08:00:00Z")));
+        let next = state.plan(&inbox, &s, true);
+        let ids: Vec<&str> = next.for_claude.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, ["a08", "a09"], "the messages behind it come in");
+        assert_eq!(state.finish(&next, true, at), None);
+    }
+
+    #[test]
+    fn a_refusal_count_starts_over_when_the_batch_is_read() {
+        let s = school();
+        let mut state = MailState::default();
+        let inbox = vec![msg("a1", "Lab moved to Friday", "2026-10-05T14:00:00Z")];
+        let at = ts("2026-10-06T12:40:00Z");
+        let plan = state.plan(&inbox, &s, true);
+        state.refused(&plan, at);
+        state.refused(&plan, at);
+        assert_eq!(state.refusals.get("a1"), Some(&2));
+        let more = vec![
+            inbox[0].clone(),
+            msg("a2", "Quiz moved to Monday", "2026-10-05T15:00:00Z"),
+        ];
+        // a1 went in with the batch that Claude read.
+        let plan = state.plan(&more, &s, true);
+        assert_eq!(state.finish(&plan, true, at), None);
+        assert!(state.refusals.is_empty());
     }
 
     #[test]

@@ -1,7 +1,8 @@
 //! Brightspace in Heat (`docs/SPEC.md` 3.1, 3.11): the feed's items become
 //! tasks by Heat's rules, matched to what Heat already holds.
 //!
-//! - Keep titles ending " - Due"; skip /non-graded/i and cancelled items.
+//! - Keep titles ending " - Due"; skip titles matching /non-graded/i and
+//!   items whose STATUS is CANCELLED.
 //! - The course comes from the school's pattern, tried on the location and
 //!   then the title; the type comes from the space's keywords.
 //! - The VEVENT UID becomes the task id. A task that arrived through Google
@@ -152,16 +153,16 @@ pub struct FeedItem {
     pub url: Option<String>,
 }
 
-/// Heat's filters: a title ending " - Due", nothing non-graded, nothing
-/// cancelled (by STATUS, or by an instructor's "Cancelled" in the title).
+/// Heat's filters, which read the title: it ends " - Due" and doesn't match
+/// /non-graded/i. A cancelled item is one whose STATUS says so. Neither
+/// filter reads the description or looks for "cancelled" in the title,
+/// because a graded item can mention both ("Make-up quiz for the cancelled
+/// lab", "Try the non-graded practice quiz first"); a stored raw feed
+/// settles whether D2L marks either another way (docs/QUESTIONS.md).
 pub fn is_kept(e: &Event) -> bool {
-    let non_graded = |s: &str| s.to_lowercase().contains("non-graded");
-    let cancelled = e.status.as_deref() == Some("CANCELLED")
-        || words(&e.summary).any(|w| w == "cancelled" || w == "canceled");
     e.summary.trim_end().ends_with(DUE_SUFFIX)
-        && !non_graded(&e.summary)
-        && !non_graded(&e.description)
-        && !cancelled
+        && !e.summary.to_lowercase().contains("non-graded")
+        && e.status.as_deref() != Some("CANCELLED")
 }
 
 /// A whole-day deadline is due at 11:59 PM that day, as a task added on the
