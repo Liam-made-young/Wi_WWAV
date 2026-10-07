@@ -15,13 +15,15 @@
 //! - [`py_str`] is `str(v)`, as an f-string prints a value: None, True,
 //!   1.0, ['a'] and {'k': 1}.
 //!
-//! Where python holds what a Rust `String` can't: a lone surrogate from
-//! "\ud800" becomes U+FFFD here (python can't print one either: it raises
-//! UnicodeEncodeError), and nesting deeper than 500 isn't JSON here, where
-//! python raises RecursionError somewhere near 1,000. `str()` of a string
-//! inside a list escapes the characters python counts unprintable; for a
-//! character Unicode assigned after 15.1 (python 3.13's tables) this goes
-//! by Rust's tables.
+//! Where this parts from python, on texts no writer makes: a lone
+//! surrogate from "\ud800" becomes U+FFFD, since a Rust `String` can't
+//! hold one (python can't print one either: it raises UnicodeEncodeError);
+//! and nesting deeper than 500 isn't JSON here, so reading, printing and
+//! comparing a value never runs a thread out of stack, where python 3.13
+//! reads 9,998 levels and raises RecursionError past them. `str()` of a
+//! string inside a list escapes the characters python counts unprintable;
+//! for a character Unicode assigned after 15.1 (python 3.13's tables) this
+//! goes by Rust's tables.
 
 use std::fmt::Write;
 
