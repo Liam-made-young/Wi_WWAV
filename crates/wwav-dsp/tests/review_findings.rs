@@ -1,7 +1,6 @@
-//! Reviewer's tests (build/dsp review, 2026-10-07). Each one exposes a defect
-//! found in review and is `#[ignore]`d until it is fixed; the comment on each
-//! names the finding. Run them with `cargo test -p wwav-dsp --test
-//! review_findings -- --ignored`.
+//! Reviewer's tests (build/dsp review, 2026-10-07). Each one exposed a defect
+//! found in review and was `#[ignore]`d until it was fixed; the comment on
+//! each names the finding. All are fixed and run with the rest.
 
 use wwav_dsp::analysis::{analyze, estimate_tempo, Audio, Estimates, Key, Stems};
 use wwav_dsp::fold::stem_peaks;
@@ -25,20 +24,39 @@ fn stereo(samples: &[f32]) -> Audio<'_> {
 /// "written as silence" (6.6), so any drumless session or song gets an
 /// invented tempo, and the figure-eight then bends a drumless child by
 /// 184.6 ÷ the parent's tempo instead of leaving its rate alone.
+///
+/// Fixed: silence has no tempo, and a silent drum stem gives way to the
+/// whole song, as a missing one does in analysis.js ("the whole mix as
+/// fallback"). So a drumless song's tempo comes from what was played (5.4's
+/// hum over a guitar), and a child with nothing played keeps its own rate.
+/// The review's version put a steady 220 Hz sine over the silent drums and
+/// asked for no tempo; read through that fallback, the sine's 512-sample
+/// energy ripple reads as 139.6 BPM, so the part here is played at 90 BPM.
 #[test]
-#[ignore = "finding: silence is estimated at 184.6 BPM"]
 fn silence_has_no_tempo() {
     let silent = vec![0.0f32; 2 * 30 * RATE as usize];
     assert_eq!(estimate_tempo(&[stereo(&silent)]), None);
 
-    let pad: Vec<f32> = (0..30 * RATE as usize)
+    // A drumless song: a note plucked on every beat at 90 BPM.
+    let beat = (60.0 / 90.0 * RATE as f64) as usize;
+    let plucked: Vec<f32> = (0..30 * RATE as usize)
         .flat_map(|n| {
-            let s = 0.2 * (2.0 * std::f64::consts::PI * 220.0 * n as f64 / RATE as f64).sin();
+            let t = (n % beat) as f64 / RATE as f64;
+            let s = 0.3 * (-t / 0.15).exp() * (2.0 * std::f64::consts::PI * 196.0 * t).sin();
             [s as f32, s as f32]
         })
         .collect();
+    let song = analyze(&Stems {
+        vocals: Some(stereo(&plucked)),
+        drums: Some(stereo(&silent)),
+        other: None,
+        bass: None,
+    });
+    let bpm = song.bpm.expect("a tempo from what was played");
+    assert!((bpm - 90.0).abs() <= 1.0, "read as {bpm}");
+
     let child = analyze(&Stems {
-        vocals: Some(stereo(&pad)),
+        vocals: Some(stereo(&silent)),
         drums: Some(stereo(&silent)),
         other: None,
         bass: None,
@@ -53,6 +71,7 @@ fn silence_has_no_tempo() {
     // A child with no tempo keeps its own rate (matching.rs: "A missing tempo
     // or key leaves that part alone").
     assert_eq!(match_to_parent(&parent, &child).rel_rate, 1.0);
+    assert_eq!(match_to_parent(&parent, &song).rel_rate, 120.0 / bpm);
 }
 
 /// Finding (medium, 5.4): a clip of 87 × 512 samples (1.01 s) has 86 onset
@@ -60,7 +79,6 @@ fn silence_has_no_tempo() {
 /// parabolic refinement reads that NaN and the estimate is NaN, shown as
 /// "≈ NaN BPM (estimate)". analysis.js returns NaN here too.
 #[test]
-#[ignore = "finding: a 1.01 s clip is estimated at NaN BPM"]
 fn a_short_clip_never_reads_nan_bpm() {
     let mut x = vec![0.0f32; 87 * 512];
     for i in 0..512 {
@@ -88,7 +106,6 @@ fn a_short_clip_never_reads_nan_bpm() {
 /// is 81:09, so a session of 81:00–81:09 is accepted and reads "81:05 →
 /// about 4.3 GB.".
 #[test]
-#[ignore = "finding: sessions of 81:00 to 81:09 are not refused"]
 fn a_session_just_over_81_minutes_is_refused() {
     let frames = (81 * 60 + 5) * RATE as u64;
     let bytes = wwav_bytes(frames, 195, 115, None);
@@ -105,7 +122,6 @@ fn a_session_just_over_81_minutes_is_refused() {
 /// reads "+2.0 dBFS. Lower all four stems by 3 dB.". A non-finite peak reads
 /// "+inf dBFS. Lower all four stems by 4294967295 dB.".
 #[test]
-#[ignore = "finding: clipping lines can contradict their own cut"]
 fn the_shown_peak_agrees_with_the_cut() {
     let quiet = vec![0.1f32; 3];
     for db in [0.01f64, 0.04, 2.04] {
@@ -132,4 +148,38 @@ fn the_shown_peak_agrees_with_the_cut() {
         "{:?}",
         peaks.lines()
     );
+}
+
+/// Finding (low, 5.4 and `Estimates::bpm`'s "60–180 BPM"): the estimate can
+/// leave the range the spec gives it. The lags run from ⌊60 ÷ 180 × fps⌋ to
+/// ⌈fps⌉, so the extremes are 184.6 and 59.4 BPM at 44.1 kHz, and a clean
+/// 180 BPM click at 48 kHz reads 181.5, shown as "≈ 182 BPM (estimate)".
+/// analysis.js gives the same (the port is faithful).
+#[test]
+fn a_tempo_estimate_stays_within_60_to_180_bpm() {
+    let rate = 48_000u32;
+    let seconds = 70.0;
+    let frames = (seconds * rate as f64) as usize;
+    let mut x = vec![0.0f32; frames * 2];
+    let mut t0 = 0.5;
+    while t0 < seconds {
+        let start = (t0 * rate as f64).round() as usize;
+        for i in 0..(0.25 * rate as f64) as usize {
+            if start + i >= frames {
+                break;
+            }
+            let t = i as f64 / rate as f64;
+            let s = 0.8 * (-t / 0.03).exp() * (2.0 * std::f64::consts::PI * 80.0 * t).sin();
+            x[(start + i) * 2] = s as f32;
+            x[(start + i) * 2 + 1] = s as f32;
+        }
+        t0 += 60.0 / 180.0;
+    }
+    let bpm = estimate_tempo(&[Audio {
+        samples: &x,
+        channels: 2,
+        rate,
+    }])
+    .expect("a tempo");
+    assert!((60.0..=180.0).contains(&bpm), "estimated {bpm} BPM");
 }

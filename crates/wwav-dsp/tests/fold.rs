@@ -2,6 +2,7 @@
 //! −80 dBFS (`docs/PLAN.md`); S3.6 fails if a clipping stem isn't named. 6.6
 //! gives the sentences.
 
+use wwav_dsp::dither::to_16_bit;
 use wwav_dsp::fold::{fold_check, stem_peaks};
 
 fn tone(len: usize, freq: f64, amp: f64) -> Vec<f32> {
@@ -83,7 +84,10 @@ fn exactly_minus_80_dbfs_is_not_under_it() {
 #[test]
 fn a_stem_over_full_scale_is_named_with_the_cut_rounded_up_to_a_whole_db() {
     let (mut stems, _) = stems_and_sum();
-    stems[1] = tone(8_820, 55.0, 10f64.powf(1.8 / 20.0)); // drums at +1.8 dBFS
+    // A peak shows rounded up to a tenth, so each stem here sits just under
+    // its tenth: one built at +1.8 can peak a hair over it, from f32
+    // rounding, and read +1.9.
+    stems[1] = tone(8_820, 55.0, 10f64.powf(1.795 / 20.0)); // drums at +1.8 dBFS
     let peaks = stem_peaks(refs(&stems));
     assert!((peaks.dbfs()[1] - 1.8).abs() < 0.01);
     assert_eq!(peaks.cut_db(), 2);
@@ -100,9 +104,11 @@ fn a_stem_over_full_scale_is_named_with_the_cut_rounded_up_to_a_whole_db() {
 #[test]
 fn every_clipping_stem_is_named_in_file_order_and_the_loudest_sets_the_cut() {
     let (mut stems, _) = stems_and_sum();
-    stems[3] = tone(8_820, 41.0, 10f64.powf(0.4 / 20.0)); // bass +0.4
-    stems[0] = tone(8_820, 220.0, 10f64.powf(3.2 / 20.0)); // vocals +3.2
-    stems[1] = tone(8_820, 55.0, 10f64.powf(1.8 / 20.0)); // drums +1.8
+    // Just under each tenth, as above: built at +0.4 exactly, bass peaks at
+    // +0.40000008 dBFS and reads +0.5.
+    stems[3] = tone(8_820, 41.0, 10f64.powf(0.395 / 20.0)); // bass +0.4
+    stems[0] = tone(8_820, 220.0, 10f64.powf(3.195 / 20.0)); // vocals +3.2
+    stems[1] = tone(8_820, 55.0, 10f64.powf(1.795 / 20.0)); // drums +1.8
     let peaks = stem_peaks(refs(&stems));
     assert_eq!(peaks.cut_db(), 4);
     assert_eq!(
@@ -126,4 +132,78 @@ fn a_silent_stem_has_no_peak() {
     let (mut stems, _) = stems_and_sum();
     stems[2] = vec![0.0; 8_820];
     assert_eq!(stem_peaks(refs(&stems)).dbfs()[2], f64::NEG_INFINITY);
+}
+
+#[test]
+fn a_difference_that_isnt_a_number_is_said_plainly() {
+    // A plugin that fails can put NaN or infinity in the master.
+    for bad in [f32::NAN, f32::INFINITY] {
+        let (stems, mut master) = stems_and_sum();
+        master[10] = bad;
+        let check = fold_check(refs(&stems), &master);
+        assert!(!check.passes());
+        assert_eq!(
+            check.line("Tape Sat on the drums reverb return"),
+            "Stems don't sum to the master: some samples aren't numbers, \
+             from Tape Sat on the drums reverb return."
+        );
+    }
+}
+
+#[test]
+fn a_stem_with_samples_that_arent_numbers_is_named_without_a_cut() {
+    // No cut fixes these, so they're named instead, before any clipping.
+    let (mut stems, _) = stems_and_sum();
+    stems[1][100] = f32::NAN;
+    stems[0] = tone(8_820, 220.0, 10f64.powf(3.195 / 20.0)); // vocals +3.2
+    let peaks = stem_peaks(refs(&stems));
+    assert_eq!(peaks.dbfs()[1], f64::INFINITY);
+    assert_eq!(
+        peaks.cut_db(),
+        4,
+        "the cut still covers the stems that are numbers"
+    );
+    assert_eq!(
+        peaks.lines().unwrap(),
+        [
+            "drums has samples that aren't numbers.".to_string(),
+            "At 16 bits they would be written as silence or full scale.".to_string(),
+        ]
+    );
+    stems[3][7] = f32::NEG_INFINITY;
+    assert_eq!(
+        peaks_line(&stems),
+        "drums and bass have samples that aren't numbers."
+    );
+}
+
+fn peaks_line(stems: &[Vec<f32>; 4]) -> String {
+    stem_peaks(refs(stems)).lines().unwrap()[0].clone()
+}
+
+#[test]
+fn a_stem_at_full_scale_is_written_within_the_dithers_own_error() {
+    // 6.6 names stems over 0 dBFS. One at or just under it can have dither
+    // push a sample past 32,767, where to_16_bit clamps it, unnamed. The
+    // clamped sample is still within 1 LSB of its value, inside the 1.5 LSB
+    // any dithered sample moves, so the sheet stays quiet about it.
+    let quiet = vec![0.1f32; 4];
+    for x in [1.0f32, 0.99999, 32_767.0 / 32_768.0, -1.0, -0.99999] {
+        let stem = vec![x; 100_000];
+        assert!(stem_peaks([&quiet, &stem, &quiet, &quiet])
+            .lines()
+            .is_none());
+        let out = to_16_bit(&stem, 5);
+        let worst = out
+            .samples()
+            .iter()
+            .map(|&q| (q as f64 - x as f64 * 32_768.0).abs())
+            .fold(0.0, f64::max);
+        assert!(worst <= 1.0, "{x}: off by {worst} LSB");
+    }
+    // The reviewer's case, a constant 0.99999 (32,767.67 codes): dither
+    // would carry about two thirds of its samples past 32,767, so every
+    // sample is written as 32,767, 0.67 LSB under its value.
+    let stem = vec![0.99999f32; 10_000];
+    assert!(to_16_bit(&stem, 5).samples().iter().all(|&q| q == i16::MAX));
 }

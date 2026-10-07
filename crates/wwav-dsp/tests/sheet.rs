@@ -61,29 +61,36 @@ fn a_94_minute_session_is_refused_with_the_spec_sentence() {
 }
 
 #[test]
-fn the_limit_is_the_packers_4_gb() {
-    // `pack` refuses a file over 0xFFFFFFFF bytes. Find the longest song
-    // that fits and check one frame more is refused.
-    let fits = |f: u64| wwav_bytes(f, 195, 115, None) <= 0xFFFF_FFFF;
-    let (mut lo, mut hi) = (0u64, 1 << 30);
-    while hi - lo > 1 {
-        let mid = (lo + hi) / 2;
-        if fits(mid) {
-            lo = mid
-        } else {
-            hi = mid
-        }
-    }
-    let longest = lo;
-    assert!(longest / 44_100 / 60 == 81, "{longest} frames");
-    assert_eq!(refusal(longest, wwav_bytes(longest, 195, 115, None)), None);
-    assert_eq!(
-        refusal(longest + 1, wwav_bytes(longest + 1, 195, 115, None)).as_deref(),
-        Some("A .wwav holds about 81 minutes. This session is 82.")
-    );
-    // 81 minutes on the dot fits.
+fn files_under_a_megabyte_read_in_kilobytes() {
+    // In megabytes these would read "about 0 MB".
+    let line = |frames: u64| size_line(frames, wwav_bytes(frames, 195, 115, None));
+    assert_eq!(wwav_bytes(0, 195, 115, None), 636);
+    assert_eq!(line(0), "0:00 → about 1 kB.");
+    assert_eq!(line(22_050), "0:00 → about 442 kB.");
+    assert_eq!(line(44_100), "0:01 → about 883 kB.");
+    // 999,500 bytes and up round to a megabyte.
+    let mb = (0..)
+        .find(|&f| wwav_bytes(f, 195, 115, None) >= 999_500)
+        .unwrap();
+    assert!(line(mb - 1).ends_with(" kB."), "{}", line(mb - 1));
+    assert_eq!(line(mb), "0:01 → about 1 MB.");
+}
+
+#[test]
+fn the_limit_is_81_minutes() {
+    // 6.7: "a session over 81 minutes | refused". 81:00 on the dot fits and
+    // one frame more is refused, though the packer's 4 GB would take 81:09.
     let frames = 81 * 60 * 44_100;
     assert_eq!(refusal(frames, wwav_bytes(frames, 195, 115, None)), None);
+    assert_eq!(
+        refusal(frames + 1, wwav_bytes(frames + 1, 195, 115, None)).as_deref(),
+        Some("A .wwav holds about 81 minutes. This session is 82.")
+    );
+    // 81 minutes is the whole minutes under the packer's 4 GB, which also
+    // refuses on its own: a file over it can't be written at any length.
+    assert!(wwav_bytes(frames, 195, 115, None) <= 0xFFFF_FFFF);
+    assert!(wwav_bytes(frames + 60 * 44_100, 195, 115, None) > 0xFFFF_FFFF);
+    assert!(refusal(frames, 0xFFFF_FFFF + 1).is_some());
 }
 
 #[test]
