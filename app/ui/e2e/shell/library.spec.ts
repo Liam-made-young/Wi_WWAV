@@ -8,7 +8,7 @@ import { CMD, dropFiles, expect, openShell, packSong, plainWav, test } from './k
 // clip, a setting or an action, reading a filter as a search word, or
 // letting Return and ⌘Return do the same thing to a song; capture closing
 // on Enter or not reading "N in inbox · captured ✓"; the drawer anything
-// but 280 pt, or not over every room; an import that copies before it says
+// but 280 pt, or not over every view; an import that copies before it says
 // what it brings, or a plain WAV that comes in without "master only" being
 // said; a tag shown with a capital, a 13th tag or a fifth pin taken
 // silently; a delete that can't be undone; Get Info's verdict differing
@@ -106,9 +106,9 @@ test('⌘⇧N saves on Enter, stays open and counts the inbox', async ({ page, c
   await page.keyboard.press('Escape');
 });
 
-test('⌘L slides a 280 pt drawer over every room', async ({ page }) => {
+test('⌘L slides a 280 pt drawer over every view', async ({ page }) => {
   await openShell(page);
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 3; i++) {
     await page.keyboard.press(`${CMD}+${i}`);
     await page.keyboard.press(`${CMD}+l`);
     const drawer = page.getByRole('complementary', { name: 'Library' });
@@ -131,11 +131,10 @@ test('a drop says what it holds before anything comes in; plain audio says maste
   expect((await core.call<{ clips: unknown[] }>('library.search', { q: 'field recording' })).clips).toHaveLength(0);
   await note.getByRole('button', { name: 'Bring them in' }).click();
   await expect(page.locator('.drawer-said')).toHaveText('Brought in 2 files.');
-  // A plain WAV says it is master only (2.5). The library's sentence for it
-  // is its own, where wwav_pack.py says "the master only: no wmet and wlin,
-  // so a plain WAV"; a song's is the reader's, word for word.
-  const row = page.getByRole('option', { name: /field recording/ });
-  await expect(row).toContainText('Plain audio comes in as master only.');
+  // The drop said a plain WAV is master only (2.5) before it came in; once
+  // it is in, its row says what the reference tool says of it, word for word
+  // ("the master only: no wmet and wlin, so a plain WAV"), as a song's does.
+  await expect(page.getByRole('option', { name: /field recording/ })).toContainText(pranaVerdict(wav));
   await expect(page.getByRole('option', { name: /Dropped Song/ })).toContainText(pranaVerdict(song));
 });
 

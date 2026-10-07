@@ -2,7 +2,9 @@ import { test as base } from '@playwright/test';
 import { clearTasks, expect, plainWav } from './kit';
 import { connect } from '../support/core';
 
-// docs/SPEC.md 2.14. What a fail looks like: a step with no "Skip for now",
+// docs/SPEC.md 2.14: sign in, claim your galaxy, import your folder, add your
+// calendars (as iCal addresses: no Google sign-in) and connect Claude. What a
+// fail looks like: a step with no "Skip for now",
 // or with any other secondary action; a disabled control that doesn't say
 // why; the import step copying before it says what the folder holds, or
 // saying it in other words than 2.14's; the flow ending anywhere but Heat
@@ -20,13 +22,7 @@ base(
     await page.goto('/');
     const flow = page.getByRole('dialog', { name: 'Welcome to Wi_WWAV' });
     await expect(flow).toBeVisible();
-    const titles = [
-      'Sign in',
-      'Make your astronaut',
-      'Claim your galaxy',
-      'Import your folder',
-      'Connect your school calendar',
-    ];
+    const titles = ['Sign in', 'Claim your galaxy', 'Import your folder', 'Add your calendars', 'Connect Claude'];
     for (const [i, title] of titles.entries()) {
       await expect(flow.getByRole('heading')).toHaveText(title);
       await expect(flow.getByText(`Step ${i + 1} of 5`)).toBeVisible();
@@ -50,7 +46,7 @@ base(
     await expect(page.locator('.strip-task .strip-line1')).toHaveText('All clear');
     await expect(page.locator('.strip-track .strip-line1')).toHaveText('Nothing playing');
 
-    // Finished is finished: a reload goes straight to the rooms.
+    // Finished is finished: a reload goes straight to the views.
     await page.reload();
     await page.locator('.case-bar').waitFor();
     await expect(flow).toBeHidden();
@@ -61,11 +57,11 @@ base('the import step brings a folder in once you press, and the flow goes on', 
   const take = plainWav('first launch take.wav');
   await page.goto('/');
   const flow = page.getByRole('dialog', { name: 'Welcome to Wi_WWAV' });
-  for (let i = 0; i < 3; i++) await flow.getByRole('button', { name: 'Skip for now' }).click();
+  for (let i = 0; i < 2; i++) await flow.getByRole('button', { name: 'Skip for now' }).click();
   await flow.getByRole('textbox').fill(take.replace(/\/[^/]+$/, ''));
   await flow.getByRole('button', { name: 'Look inside' }).click();
   await flow.getByRole('button', { name: 'Bring them in' }).click();
-  await expect(flow.getByRole('heading')).toHaveText('Connect your school calendar');
+  await expect(flow.getByRole('heading')).toHaveText('Add your calendars');
   await expect(page.locator('.toast')).toHaveText('Brought in 1 file.');
   const core = await connect();
   const found = await core.call<{ clips: { title: string; verdict: string }[] }>('library.search', {

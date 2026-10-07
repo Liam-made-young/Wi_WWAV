@@ -17,7 +17,8 @@ import { createInterface } from 'node:readline';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const UI = resolve(import.meta.dirname, '../..');
-const VITE_PORT = 5173;
+// 5173 unless WI_E2E_PORT says otherwise, so two checkouts can run at once.
+const VITE_PORT = Number(process.env.WI_E2E_PORT ?? 5173);
 
 // Starts a child and resolves with the first stdout line matching `ready`.
 function start(cmd: string, args: string[], ready: RegExp, opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}) {

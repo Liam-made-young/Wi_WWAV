@@ -1,18 +1,18 @@
 import { CMD, expect, openShell, test } from './kit';
 
-// docs/PLAN.md S0.1, S1.1 and S1.2. What a fail looks like: ⌘1–⌘4 or a
-// click on a segment doesn't change the room; the title bar isn't 52 pt
-// with the switcher (76 pt segments), the Now strip, the search pill and
-// the astronaut chip; below 1180 pt the pill isn't a 28 pt magnifier and
-// the strip isn't 440 pt; anything overflows at 1024 × 680; switching away
-// and back loses a room's scroll, selection, open sheet or half-typed
-// text, or rebuilds the room; a room change isn't a 140 ms cross-fade, or
-// isn't a cut under Reduce Motion.
+// docs/PLAN.md S0.1, S1.1 and S1.2. What a fail looks like: ⌘1–⌘3 or a
+// click on a segment doesn't change the view, or there is a fourth segment
+// or a ⌘4; the title bar isn't 52 pt with the switcher (76 pt segments), the
+// Now strip, the search pill and the galaxy chip; below 1180 pt the pill
+// isn't a 28 pt magnifier and the strip isn't 440 pt; anything overflows at
+// 1024 × 680; switching away and back loses a view's scroll, selection,
+// open sheet or half-typed text, or rebuilds the view; a view change isn't a
+// 140 ms cross-fade, or isn't a cut under Reduce Motion.
 
-const ROOMS = ['heat', 'space', 'console', 'unquantized'] as const;
-const NAMES = ['Heat', 'Space', 'Console', 'Unquantized'];
+const ROOMS = ['heat', 'space', 'console'] as const;
+const NAMES = ['Heat', 'Space', 'Console'];
 
-test('⌘1–⌘4 and the segments switch between the four rooms', async ({ page }) => {
+test('⌘1–⌘3 and the segments switch between the three views, and there is no fourth', async ({ page }) => {
   await openShell(page);
   for (const [i, room] of ROOMS.entries()) {
     await page.keyboard.press(`${CMD}+${i + 1}`);
@@ -29,6 +29,12 @@ test('⌘1–⌘4 and the segments switch between the four rooms', async ({ page
   await page.getByRole('combobox').fill('half');
   await page.keyboard.press(`${CMD}+3`);
   await expect(page.locator('[data-room="console"]')).toHaveAttribute('data-current', 'true');
+  // The shop is gone: three tabs, three views, and ⌘4 does nothing.
+  await expect(page.getByRole('tab')).toHaveCount(3);
+  await expect(page.locator('[data-room]')).toHaveCount(3);
+  await page.keyboard.press(`${CMD}+1`);
+  await page.keyboard.press(`${CMD}+4`);
+  await expect(page.locator('[data-room="heat"]')).toHaveAttribute('data-current', 'true');
 });
 
 test('the title bar holds its four controls at 52 pt, and narrows below 1180 pt', async ({ page }) => {
@@ -51,8 +57,9 @@ test('the title bar holds its four controls at 52 pt, and narrows below 1180 pt'
     return { w: box.width - parseFloat(ring.left) - parseFloat(ring.right), target: box.width };
   });
   expect(glass).toEqual({ w: 28, target: 44 });
-  const portrait = await page.locator('.portrait').boundingBox();
-  expect(portrait!.width).toBe(28);
+  // The galaxy chip is a 28 pt miniature of your own galaxy.
+  const galaxy = await page.locator('.galaxy').boundingBox();
+  expect([galaxy!.width, galaxy!.height]).toEqual([28, 28]);
 });
 
 test('nothing overflows at 1024 × 680', async ({ page }) => {
@@ -74,10 +81,10 @@ test('nothing overflows at 1024 × 680', async ({ page }) => {
   expect((await page.locator('.case-status').boundingBox())!).toMatchObject({ y: 680 - 22, height: 22 });
 });
 
-test('a room keeps its scroll, selection, open sheet and half-typed text, and is never rebuilt', async ({ page }) => {
+test('a view keeps its scroll, selection, open sheet and half-typed text, and is never rebuilt', async ({ page }) => {
   await openShell(page);
-  // Put state into every room: a tall page scrolled down, a field with
-  // half a sentence in it, a selected row and an open sheet. If a room were
+  // Put state into every view: a tall page scrolled down, a field with
+  // half a sentence in it, a selected row and an open sheet. If a view were
   // unmounted, React would build it again without any of this.
   for (const [i, room] of ROOMS.entries()) {
     await page.keyboard.press(`${CMD}+${i + 1}`);
@@ -116,7 +123,7 @@ test('a room keeps its scroll, selection, open sheet and half-typed text, and is
   }
 });
 
-test('a room change is a 140 ms cross-fade, and a cut under Reduce Motion', async ({ page }) => {
+test('a view change is a 140 ms cross-fade, and a cut under Reduce Motion', async ({ page }) => {
   await openShell(page);
   const fade = () =>
     page.locator('[data-room="space"]').evaluate((el) => {
@@ -124,7 +131,7 @@ test('a room change is a 140 ms cross-fade, and a cut under Reduce Motion', asyn
       return { property: s.transitionProperty, duration: s.transitionDuration };
     });
   expect(await fade()).toEqual({ property: 'opacity, visibility', duration: '0.14s, 0s' });
-  // Midway through a switch both rooms are partly there: a cross-fade, not a cut.
+  // Midway through a switch both views are partly there: a cross-fade, not a cut.
   await page.keyboard.press(`${CMD}+2`);
   const midway = await page.evaluate(
     () =>
@@ -136,6 +143,7 @@ test('a room change is a 140 ms cross-fade, and a cut under Reduce Motion', asyn
   expect(midway).toBeLessThan(1);
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('html')).toHaveAttribute('data-reduce-motion', 'true');
   expect((await fade()).duration).toBe('0s');
   await page.keyboard.press(`${CMD}+1`);
   expect(await page.locator('[data-room="heat"]').evaluate((el) => getComputedStyle(el).opacity)).toBe('1');

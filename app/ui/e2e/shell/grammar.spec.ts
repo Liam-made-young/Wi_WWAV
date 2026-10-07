@@ -35,13 +35,13 @@ test('⌘Z is labelled before and after: in the status bar, then a 2.6 s toast',
   await expect(toast).toHaveText('Redone — capture');
 });
 
-test('⌘Z acts on the room you are in, and says so when there is nothing there', async ({ page }) => {
+test('⌘Z acts on the view you are in, and says so when there is nothing there', async ({ page }) => {
   await openShell(page);
   await page.keyboard.press(`${CMD}+Shift+n`);
   await page.getByRole('textbox', { name: 'Capture' }).fill('a thought in Heat');
   await page.keyboard.press('Enter');
   await page.keyboard.press('Escape');
-  await page.keyboard.press(`${CMD}+4`);
+  await page.keyboard.press(`${CMD}+3`);
   await page.keyboard.press(`${CMD}+z`);
   await expect(page.locator('.toast')).toHaveText('Nothing to undo.');
   await page.keyboard.press(`${CMD}+1`);
