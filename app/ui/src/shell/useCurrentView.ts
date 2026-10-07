@@ -1,4 +1,4 @@
-// Whether the view a component sits in is the one showing. Rooms.tsx keeps
+// Whether the view a component sits in is the one showing. RoomViews.tsx keeps
 // every view mounted and marks the current one with data-current, so a view
 // can hold its work (a sky, a timer) while hidden and wake when shown.
 
