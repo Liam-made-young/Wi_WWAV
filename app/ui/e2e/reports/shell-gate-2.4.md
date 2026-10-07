@@ -30,7 +30,7 @@ Run 2026-10-07.
 | Settings · Appearance · Keyboard | 1024 × 680 | light | 76 | 11.18 | 5 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
 | Export everything | 1024 × 680 | light | 13 | 11.18 | 5 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | Undo toast | 1024 × 680 | light | 12 | 8.86 | 5 | 11 | 6 | 76 × 44 (needs 44) | — | 0 |
-| First launch 1: Sign in | 1024 × 680 | light | 13 | 11.18 | 5 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
+| First launch 1: Sign in | 1024 × 680 | light | 12 | 11.18 | 5 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
 | First launch 2: Claim your galaxy | 1024 × 680 | light | 15 | 11.18 | 5 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
 | First launch 3: Import your folder | 1024 × 680 | light | 14 | 11.18 | 5 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 4: Add your calendars | 1024 × 680 | light | 16 | 11.18 | 5 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
@@ -102,7 +102,7 @@ Run 2026-10-07.
 | Settings · Appearance · Keyboard | 1280 × 800 | dark | 78 | 9.64 | 4.71 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
 | Export everything | 1280 × 800 | dark | 15 | 9.64 | 4.83 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | Undo toast | 1280 × 800 | dark | 14 | 8.3 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | — | 0 |
-| First launch 1: Sign in | 1280 × 800 | dark | 14 | 9.64 | 4.83 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
+| First launch 1: Sign in | 1280 × 800 | dark | 15 | 9.64 | 4.83 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
 | First launch 2: Claim your galaxy | 1280 × 800 | dark | 17 | 9.64 | 4.83 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
 | First launch 3: Import your folder | 1280 × 800 | dark | 16 | 9.64 | 4.83 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 4: Add your calendars | 1280 × 800 | dark | 18 | 9.64 | 4.83 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
