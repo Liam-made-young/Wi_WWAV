@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use wi_heat::model::records::{
     Capture, CalendarEvent, Course, FocusSession, Grade, Habit, Milestone, Project, Space, Task, TaskOccurrence, Term, TimeBlock,
 };
-use wi_heat::model::{estimate, grades, heat, plan, zone};
+use wi_heat::model::{estimate, grades, heat, plan, recurrence, zone};
 use wi_store::Store;
 
 use crate::{all, kind, num, refused, round, Clock, Result};
@@ -180,7 +180,9 @@ pub(crate) struct Plan {
     pub drafts: Vec<Value>,
     /// As `heatState.planDrafts` keeps them, for the time column.
     pub drafts_stored: Vec<Value>,
+    /// Open tasks that got no draft and have no block that day, in heat order.
     pub unplanned: Vec<Value>,
+    /// Minutes on the 15-minute grid still free between now and the day's end, after the drafts.
     pub minutes_left: f64,
 }
 
@@ -209,11 +211,24 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
         .filter(|b| b.date == date)
         .filter_map(|b| b.task_id.as_deref())
         .collect();
+    // A parent is planned through its subtasks, and a recurring series by its open occurrence.
+    let parents: Vec<&str> = world
+        .tasks
+        .iter()
+        .filter(|t| !t.done)
+        .filter_map(|t| t.parent_task_id.as_deref().filter(|p| !p.is_empty()))
+        .collect();
+    let open_tasks = recurrence::open_tasks(&world.tasks, &world.occurrences, now, &clock.zone);
+    let open: Vec<&str> = open_tasks.iter().map(|t| t.id.as_str()).collect();
     let unplanned = heat_order(world, clock)
         .into_iter()
         .map(|i| &world.tasks[i])
-        .filter(|t| !t.done && !drafted.contains(&t.id.as_str()) && !blocked.contains(&t.id.as_str()))
-        .take(20)
+        .filter(|t| {
+            open.contains(&t.id.as_str())
+                && !parents.contains(&t.id.as_str())
+                && !drafted.contains(&t.id.as_str())
+                && !blocked.contains(&t.id.as_str())
+        })
         .map(|t| {
             json!({
                 "task_id": t.id,
@@ -222,10 +237,7 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
             })
         })
         .collect();
-    let minutes_left = match drafts.last() {
-        Some(d) => d.left_min,
-        None => free_minutes(world, clock, date, now, day_ends),
-    };
+    let minutes_left = free_minutes(world, clock, date, now, day_ends, &drafts);
     Ok(Plan {
         drafts: drafts
             .iter()
@@ -245,18 +257,20 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
     })
 }
 
-/// Minutes between now and the day's end not already under a block.
-fn free_minutes(world: &World, clock: &Clock, date: &str, now: f64, day_ends: f64) -> f64 {
-    let from = zone::minute_of_day(now, &clock.zone).max(0.0);
-    let mut taken = 0.0;
-    for b in world.blocks.iter().filter(|b| b.date == date) {
-        let start = b.start.max(from);
-        let end = (b.start + b.minutes).min(day_ends);
-        if end > start {
-            taken += end - start;
+/// The 15-minute marks from now (never before 7 AM) to the day's end that no
+/// block, timed event or draft covers, in minutes.
+fn free_minutes(world: &World, clock: &Clock, date: &str, now: f64, day_ends: f64, drafts: &[plan::Draft]) -> f64 {
+    let mut spans = plan::busy_spans(&world.blocks, &world.events, date, &clock.zone);
+    spans.extend(drafts.iter().map(|d| (d.start, d.start + d.minutes)));
+    let mut mark = ((zone::minute_of_day(now, &clock.zone).max(DAY_STARTS_MIN)) / 15.0).ceil() * 15.0;
+    let mut free = 0.0;
+    while mark + 15.0 <= day_ends {
+        if spans.iter().all(|(a, b)| mark + 15.0 <= *a || mark >= *b) {
+            free += 15.0;
         }
+        mark += 15.0;
     }
-    (day_ends - from - taken).max(0.0)
+    free
 }
 
 /// One course as `get_grades` gives it (3.13).

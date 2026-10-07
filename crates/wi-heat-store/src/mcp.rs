@@ -214,7 +214,9 @@ pub fn plan_day(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
     let mut state = crate::state(store)?;
     state["planDrafts"] = Value::Array(plan.drafts_stored.clone());
     crate::set_state(store, &state)?;
-    Ok(json!({"drafts": plan.drafts, "unplanned": plan.unplanned, "minutes_left": num(plan.minutes_left)}))
+    // Claude reads the first twenty that didn't fit; the window's footer counts them all.
+    let unplanned: Vec<&Value> = plan.unplanned.iter().take(20).collect();
+    Ok(json!({"drafts": plan.drafts, "unplanned": unplanned, "minutes_left": num(plan.minutes_left)}))
 }
 
 /// `get_grades`: the term's courses with their items and Heat's own

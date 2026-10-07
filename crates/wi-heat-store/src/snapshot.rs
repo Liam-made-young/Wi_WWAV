@@ -70,6 +70,11 @@ fn day_bounds(clock: &Clock, from: &str, to: &str) -> (f64, f64) {
     (zone::start_of_day(from, &clock.zone), zone::start_of_day(&zone::add_days(to, 1.0), &clock.zone))
 }
 
+/// Whether a record's `date` falls in the days asked for.
+fn in_window(record: &Value, from: &str, to: &str) -> bool {
+    record["date"].as_str().is_some_and(|d| d >= from && d <= to)
+}
+
 /// A month around a day: from a week before the 1st to a week after the last.
 fn default_range(date: &str) -> (String, String) {
     let (year, month, _) = zone::key_parts(date);
@@ -92,15 +97,14 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
     let world = World::load(store)?;
     let (now, tz) = (clock.now_ms, &clock.zone);
 
-    // The records, as stored. Blocks and events are bounded to the stretch
-    // asked for; a Now making line past its time is no longer there (3.15).
+    // The records, as stored. Blocks, ticks and events are bounded to the
+    // stretch asked for; a Now making line past its time is no longer there (3.15).
     let mut records = Map::new();
     for k in SNAPSHOT_KINDS {
         let mut list = all(store, k)?;
         match k {
-            kind::BLOCK => list.retain(|b| {
-                b["date"].as_str().is_some_and(|d| d >= from.as_str() && d <= to.as_str())
-            }),
+            kind::BLOCK => list.retain(|b| in_window(b, &from, &to)),
+            kind::OCCURRENCE => list.retain(|o| in_window(o, &from, &to)),
             kind::SHARE => list.retain(|s| s.get("clearsAt").and_then(Value::as_f64).map_or(true, |t| t > now)),
             _ => {}
         }
@@ -191,6 +195,25 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
     };
     let lists = library_lists(&side, now, tz, None);
     let capture_ids = |v: &[Capture]| -> Vec<Value> { v.iter().map(|c| json!(c.id)).collect() };
+    // Done reads newest first.
+    let mut done_list = lists.done.clone();
+    done_list.sort_by(|a, b| b.done_at.unwrap_or(0.0).total_cmp(&a.done_at.unwrap_or(0.0)));
+
+    // Calendar's recurring pills: each open series' occurrences in the days
+    // asked for, and whether each is ticked.
+    let ticked: std::collections::HashSet<(&str, &str)> =
+        world.occurrences.iter().map(|o| (o.task_id.as_str(), o.date.as_str())).collect();
+    let occurrences: Vec<Value> = world
+        .tasks
+        .iter()
+        .filter(|t| !t.done && recurrence::recurs(t))
+        .flat_map(|t| {
+            recurrence::task_occurrences(t, tz, &from, &to)
+                .into_iter()
+                .map(|o| json!({"taskId": t.id, "date": o.date, "done": ticked.contains(&(t.id.as_str(), o.date.as_str()))}))
+                .collect::<Vec<_>>()
+        })
+        .collect();
 
     // "Your average time", by space and then by the space's own order of types.
     let mut averages = Vec::new();
@@ -267,8 +290,9 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
                 "dueThisWeek": task_ids(&lists.due_this_week),
                 "scheduled": task_ids(&lists.scheduled),
                 "someday": task_ids(&lists.someday),
-                "done": task_ids(&lists.done),
+                "done": task_ids(&done_list),
             },
+            "occurrences": occurrences,
             "averages": averages,
             "courses": courses,
             "habits": habit_lines,

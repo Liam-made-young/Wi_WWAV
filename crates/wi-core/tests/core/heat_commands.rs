@@ -70,7 +70,8 @@ fn s2_2_plan_my_day_is_the_written_rule_and_return_accepts_all() {
     assert_eq!(drafts[2]["reason"], "Due Tuesday 11:59 PM, Cool.");
     assert_eq!(drafts[1]["leftLine"], "15m left to plan");
     assert!(drafts[0]["leftLine"].is_null());
-    assert!(made["minutesLeft"].is_number() && made["unplanned"].is_array());
+    // Left: the 15-minute marks free from now to 11 PM after the drafts (14 hours less 165 minutes).
+    assert_eq!((made["minutesLeft"].as_f64(), made["unplanned"].clone()), (Some(675.0), json!([])));
     // A draft is not a change: nothing to undo, and the snapshot shows them waiting.
     assert_eq!(undo_label(&core), before);
     assert_eq!(snap(&core, "2026-10-07")["heatState"]["planDrafts"].as_array().unwrap().len(), 3);
@@ -115,6 +116,20 @@ fn s2_2_plan_my_day_is_the_written_rule_and_return_accepts_all() {
     let early = ok(&core, "heat.plan.make", json!({"date": "2026-10-07", "dayEnds": 10.0 * 60.0}));
     let ends: Vec<f64> = early["drafts"].as_array().unwrap().iter().map(|d| d["start"].as_f64().unwrap() + d["minutes"].as_f64().unwrap()).collect();
     assert!(ends.iter().all(|e| *e <= 600.0), "nothing runs past 'Day ends at': {ends:?}");
+    let unplanned: Vec<&str> = early["unplanned"].as_array().unwrap().iter().map(|u| u.as_str().unwrap()).collect();
+    assert_eq!(unplanned, [id(&t2), id(&t3)], "what didn't fit, in heat order");
+    assert_eq!(early["minutesLeft"], 15, "an hour, 45 minutes of it drafted");
+
+    // Blocks take their minutes too; a block's own task isn't unplanned; a parent is planned through its subtasks.
+    let parent = add_task(&core, &space, "Album", json!({"estMin": 600}));
+    add_task(&core, &space, "Mix verse", json!({"parentTaskId": parent["id"], "estMin": 30, "due": ny("2026-10-30 23:59")}));
+    ok(&core, "heat.block.put", json!({"taskId": id(&t3), "date": "2026-10-07", "start": 13 * 60, "minutes": 60}));
+    let around = ok(&core, "heat.plan.make", json!({"date": "2026-10-07", "dayEnds": 23.0 * 60.0}));
+    let spent: f64 = around["drafts"].as_array().unwrap().iter().map(|d| d["minutes"].as_f64().unwrap()).sum();
+    assert_eq!(around["minutesLeft"].as_f64(), Some(14.0 * 60.0 - spent - 60.0));
+    let ids: Vec<&str> = around["drafts"].as_array().unwrap().iter().map(|d| d["taskId"].as_str().unwrap()).collect();
+    assert!(!ids.contains(&id(&parent).as_str()) && !ids.contains(&id(&t3).as_str()));
+    assert_eq!(around["unplanned"], json!([]));
 }
 
 #[test]
@@ -148,10 +163,8 @@ fn s2_3_focus_starts_only_on_a_press_and_its_minutes_reach_the_task() {
     let id = task["id"].as_str().unwrap();
 
     // Making a task current starts nothing, and with no task, no press starts anything.
-    assert_eq!(
-        refused(&core, "heat.focus.start", json!({})).1,
-        "Nothing is current. Pick a task and press C, or drag one here."
-    );
+    assert_eq!(refused(&core, "heat.focus.start", json!({})).1, "Pick a task and press C first.");
+    assert_eq!(refused(&core, "heat.current.set", json!({"taskId": "no-such-task"})).1, "No task has that id.");
     assert_eq!(ok(&core, "heat.current.set", json!({"taskId": id})), json!({}));
     let idle = snap(&core, "2026-10-07");
     assert_eq!(idle["heatState"]["currentTaskId"], id);
@@ -162,6 +175,7 @@ fn s2_3_focus_starts_only_on_a_press_and_its_minutes_reach_the_task() {
     let started = ok(&core, "heat.focus.start", json!({}));
     let timer = &started["heatState"]["timer"];
     assert_eq!((timer["phase"].as_str(), timer["round"].as_f64(), timer["endsAt"].as_f64()), (Some("focus"), Some(1.0), Some(ny("2026-10-07 09:25"))));
+    assert_eq!(timer["taskId"], id, "the round says which task it is on");
     // Starting what runs doesn't pause it.
     assert_eq!(ok(&core, "heat.focus.start", json!({}))["heatState"]["timer"]["running"], true);
 
@@ -235,6 +249,134 @@ fn stopping_logs_the_minutes_so_far_and_less_than_a_minute_logs_nothing() {
     let took = ok(&core, "heat.tookTime", json!({"taskId": id, "minutes": 75}));
     assert_eq!(took["undo"], "Undo change time taken");
     assert_eq!(snap(&core, "2026-10-07")["derived"]["tasks"][id]["actualMin"], 75);
+}
+
+/// The window asks the core to finish a round once its time has passed,
+/// twice a second, until it sees the round has ended: so a call that comes
+/// early, late or twice must change nothing it shouldn't.
+#[test]
+fn finish_logs_the_round_once_at_its_own_end_and_leaves_the_break_waiting() {
+    let setup = Setup::new();
+    let core = heat_core(&setup, "2026-10-07 09:00");
+    let task = add_task(&core, &classes(&core), "Mix the second verse", json!({}));
+    let id = task["id"].as_str().unwrap();
+    let started = ok(&core, "heat.focus.start", json!({"taskId": id}));
+    // The timer carries what the LCD draws, beyond phase, round and endsAt.
+    let t = &started["heatState"]["timer"];
+    assert_eq!(
+        (t["running"].clone(), t["lengthMs"].as_f64(), t["focusMin"].as_f64(), t["taskId"].clone(), t["note"].clone()),
+        (json!(true), Some(25.0 * 60_000.0), Some(25.0), json!(id), Value::Null)
+    );
+    assert!(t["leftMs"].is_number());
+    let events = core.events();
+    drain(&events, "heat");
+
+    // A minute early: nothing moves, nothing is written and nobody is told.
+    pin(&core, "2026-10-07 09:24");
+    let early = ok(&core, "heat.focus.finish", json!({}));
+    assert!(early["logged"].is_null() && early["undo"].is_null(), "{early}");
+    assert_eq!(early["heatState"]["timer"]["running"], true);
+    assert!(drain(&events, "heat").is_empty());
+
+    // Time's up: the minutes are logged, the break waits, and the window is told once.
+    pin(&core, "2026-10-07 09:25");
+    let done = ok(&core, "heat.focus.finish", json!({}));
+    assert_eq!((done["logged"]["focusMin"].as_f64(), done["undo"].as_str()), (Some(25.0), Some("Undo focus session")));
+    let t = &done["heatState"]["timer"];
+    assert_eq!((t["phase"].as_str(), t["running"].clone(), t["endsAt"].clone()), (Some("break"), json!(false), Value::Null));
+    assert_eq!(t["note"], "Focus done. 25m logged to Mix the second verse.");
+    assert_eq!(drain(&events, "heat").len(), 1);
+
+    // Asked again, a minute on and hours on: one session, the break still waiting, no news.
+    for at in ["2026-10-07 09:25", "2026-10-07 09:26", "2026-10-07 14:00"] {
+        pin(&core, at);
+        let again = ok(&core, "heat.focus.finish", json!({}));
+        assert!(again["logged"].is_null() && again["undo"].is_null(), "{at}: {again}");
+        assert_eq!((again["heatState"]["timer"]["phase"].as_str(), again["heatState"]["timer"]["running"].clone()), (Some("break"), json!(false)));
+        assert_eq!(again["heatState"]["timer"]["note"], t["note"]);
+    }
+    assert!(drain(&events, "heat").is_empty());
+    assert_eq!(records(&snap(&core, "2026-10-07"), "focusSession").len(), 1);
+
+    // Nothing running: finishing is a no-op, not an error.
+    let quiet = Setup::new();
+    let idle = heat_core(&quiet, "2026-10-07 09:00");
+    assert_eq!(ok(&idle, "heat.focus.finish", json!({}))["heatState"]["timer"]["phase"], "idle");
+}
+
+/// The window may be away (the Mac asleep) past the end of a round.
+#[test]
+fn a_round_finished_late_still_ends_when_it_did() {
+    let setup = Setup::new();
+    let core = heat_core(&setup, "2026-10-07 09:00");
+    let task = add_task(&core, &classes(&core), "Mix the second verse", json!({}));
+    ok(&core, "heat.focus.start", json!({"taskId": task["id"]}));
+    pin(&core, "2026-10-07 09:50");
+    let done = ok(&core, "heat.focus.finish", json!({}));
+    assert_eq!(done["logged"]["focusMin"], 25, "not the 50 minutes the clock says");
+    assert_eq!(done["logged"]["endedAt"].as_f64(), Some(ny("2026-10-07 09:25")));
+    assert_eq!(done["logged"]["startedAt"].as_f64(), Some(ny("2026-10-07 09:00")));
+}
+
+#[test]
+fn done_reads_newest_first_and_a_task_marked_done_stops_being_current() {
+    let setup = Setup::new();
+    let core = heat_core(&setup, "2026-10-07 09:00");
+    let space = classes(&core);
+    let first = add_task(&core, &space, "Read chapter 4", json!({}));
+    let second = add_task(&core, &space, "Mix verse", json!({}));
+    let third = add_task(&core, &space, "Email Prof. Aoki", json!({}));
+    ok(&core, "heat.current.set", json!({"taskId": first["id"]}));
+    ok(&core, "heat.done", json!({"taskId": first["id"], "done": true}));
+    assert!(snap(&core, "2026-10-07")["heatState"]["currentTaskId"].is_null(), "a task that is done is not current");
+    // Another task being done leaves the current one alone.
+    ok(&core, "heat.current.set", json!({"taskId": third["id"]}));
+    pin(&core, "2026-10-07 10:00");
+    ok(&core, "heat.done", json!({"taskId": second["id"], "done": true}));
+    let shown = snap(&core, "2026-10-07");
+    assert_eq!(shown["heatState"]["currentTaskId"], third["id"]);
+    let order: Vec<&Value> = shown["derived"]["lists"]["done"].as_array().unwrap().iter().collect();
+    assert_eq!(order, [&second["id"], &first["id"]], "done, the one done last first");
+    // Current is any task there is; a task that isn't there can't be.
+    assert_eq!(ok(&core, "heat.current.set", json!({"taskId": first["id"]})), json!({}));
+    assert_eq!(refused(&core, "heat.current.set", json!({"taskId": "nope"})).1, "No task has that id.");
+    assert_eq!(ok(&core, "heat.current.set", json!({"taskId": null})), json!({}));
+    assert!(snap(&core, "2026-10-07")["heatState"]["currentTaskId"].is_null());
+}
+
+#[test]
+fn a_series_is_drawn_for_the_days_asked_and_its_ticks_are_bounded_with_them() {
+    let setup = Setup::new();
+    let core = heat_core(&setup, "2026-10-07 09:00");
+    let space = classes(&core);
+    let scales = add_task(&core, &space, "Practise scales", json!({"due": ny("2026-10-05 20:00"), "rrule": "FREQ=DAILY"}));
+    let sid = scales["id"].as_str().unwrap();
+    add_task(&core, &space, "Essay", json!({"due": ny("2026-10-08 23:59")}));
+    for day in ["2026-10-05", "2026-10-06", "2026-10-07"] {
+        ok(&core, "heat.done", json!({"taskId": sid, "done": true, "date": day}));
+    }
+    let pills = |s: &Value| -> Vec<(String, bool)> {
+        s["derived"]["occurrences"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| {
+                assert_eq!(o["taskId"], sid, "only a recurring task has pills");
+                (o["date"].as_str().unwrap().to_string(), o["done"].as_bool().unwrap())
+            })
+            .collect()
+    };
+    let days = |s: &Value| -> Vec<String> {
+        records(s, "taskOccurrence").iter().map(|o| o["date"].as_str().unwrap().to_string()).collect()
+    };
+    let narrow = ok(&core, "heat.snapshot", json!({"date": "2026-10-07", "from": "2026-10-06", "to": "2026-10-08"}));
+    assert_eq!(pills(&narrow), [("2026-10-06".to_string(), true), ("2026-10-07".to_string(), true), ("2026-10-08".to_string(), false)]);
+    assert_eq!(days(&narrow), ["2026-10-06", "2026-10-07"], "ticks outside the days asked for aren't sent");
+    assert_eq!(narrow["derived"]["tasks"][sid]["next"], "2026-10-08", "what the core works out still reads every tick");
+    let wide = ok(&core, "heat.snapshot", json!({"date": "2026-10-07", "from": "2026-10-01", "to": "2026-10-10"}));
+    assert_eq!(pills(&wide).len(), 6, "the series starts on its first day, the 5th");
+    assert_eq!(pills(&wide).iter().filter(|p| p.1).count(), 3);
+    assert_eq!(days(&wide).len(), 3);
 }
 
 #[test]
@@ -559,7 +701,7 @@ fn s2_10_capture_keeps_every_line_and_triage_empties_the_inbox() {
     want.sort();
     assert_eq!(kept, want, "no line was lost");
     assert_eq!(shown["derived"]["lists"]["inbox"].as_array().unwrap().len(), 60);
-    assert_eq!(refused(&core, "heat.capture.add", json!({"text": "   "})).1, "Write something to capture first.");
+    assert_eq!(refused(&core, "heat.capture.add", json!({"text": "   "})).1, "Type something to capture.");
 
     // Triage: a task, a note, a project, an upload.
     let caps = records(&shown, "capture");

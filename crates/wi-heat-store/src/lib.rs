@@ -288,8 +288,8 @@ pub fn set_tool(store: &mut Store, name: &str, on: bool) -> Result<()> {
     Ok(())
 }
 
-/// The one `heatState` record's key, the id the shell reads it under.
-pub const STATE_KEY: &str = "heat";
+/// The one `heatState` record's key (docs/HEAT.md).
+pub const STATE_KEY: &str = "state";
 
 /// Heat's state outside the journal: `{currentTaskId?, timer, planDrafts}`,
 /// and the focus timer's whole state under `focus` (docs/HEAT.md).

@@ -303,7 +303,17 @@ pub fn done(store: &mut Store, clock: &Clock, task_id: &str, make_done: bool, da
     if let Some(m) = took {
         result["took"] = json!(m);
     }
-    Ok(Outcome::new(result, c))
+    let mut out = Outcome::new(result, c);
+    // The current task, once done, is no longer current.
+    if make_done {
+        let mut st = crate::state(store)?;
+        if st["currentTaskId"] == task_id {
+            st["currentTaskId"] = Value::Null;
+            crate::set_state(store, &st)?;
+            out = out.also(&[kind::STATE]);
+        }
+    }
+    Ok(out)
 }
 
 /// `heat.estimate`: the person's difficulty or minutes, the same rules as
@@ -390,7 +400,7 @@ fn inbox_line(count: usize) -> String {
 pub fn capture_add(store: &mut Store, _clock: &Clock, text: &str, link: Option<&Value>) -> Result<Outcome> {
     let text = text.trim();
     if text.is_empty() {
-        return refused("Write something to capture first.");
+        return refused("Type something to capture.");
     }
     let mut record = json!({"id": ulid(), "text": text});
     if let Some(link) = link.filter(|l| !l.is_null()) {

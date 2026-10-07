@@ -200,7 +200,7 @@ pub(crate) fn finish(
         "grade" => grade(&mut candidate, world)?,
         "capture" => {
             if text(&candidate, "text").is_empty() {
-                return refused("Write something to capture first.");
+                return refused("Type something to capture.");
             }
         }
         "dailyNote" => {

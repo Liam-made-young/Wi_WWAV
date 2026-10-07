@@ -18,7 +18,9 @@ use crate::{commit, kind, num, one, put, refused, set_setting, set_state, settin
 
 /// The timer's state as the views read it: the summary 3.16 gives
 /// (`{phase, round, endsAt}`), and what a paused or waiting timer needs too.
+/// `taskId` is the task the round is on (a habit's round has none).
 fn timer_summary(f: &FocusState) -> Value {
+    let task = f.target.as_ref().filter(|t| t.kind == TargetKind::Task).map_or(Value::Null, |t| json!(t.id));
     json!({
         "phase": f.phase,
         "round": num(f.round),
@@ -27,7 +29,7 @@ fn timer_summary(f: &FocusState) -> Value {
         "leftMs": num(f.left_ms),
         "lengthMs": num(f.length_ms),
         "focusMin": num(f.focus_min),
-        "target": f.target,
+        "taskId": task,
         "note": f.note,
     })
 }
@@ -201,8 +203,8 @@ pub fn set_current(store: &mut Store, clock: &Clock, task_id: Option<&str>) -> R
     let world = World::load(store)?;
     let target = match task_id {
         Some(id) => {
-            if !world.tasks.iter().any(|t| t.id == id && !t.done) {
-                return refused("No open task has that id.");
+            if !world.tasks.iter().any(|t| t.id == id) {
+                return refused("No task has that id.");
             }
             Some(target_of(&world, id)?)
         }
@@ -232,7 +234,8 @@ pub fn set_current(store: &mut Store, clock: &Clock, task_id: Option<&str>) -> R
 pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>, length: Option<f64>) -> Result<Outcome> {
     let now = clock.now_ms;
     let world = World::load(store)?;
-    let mut st = state(store)?;
+    let was = state(store)?;
+    let mut st = was.clone();
     let mut fs = load_focus(&st);
     let mut events: Vec<FocusEvent> = Vec::new();
     match step {
@@ -245,7 +248,7 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
                 },
             };
             if target.is_none() && fs.phase == Phase::Idle {
-                return refused(wi_heat::model::copy::widgets::NOW_EMPTY);
+                return refused("Pick a task and press C first.");
             }
             if let Some(minutes) = length {
                 if fs.phase != Phase::Focus {
@@ -273,7 +276,9 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
         }
         "interrupt" => events.push(FocusEvent::PulledAway),
         "stop" => events.push(FocusEvent::Stop),
-        // Time is up: the round settles, logs its minutes and waits for a press.
+        // Time is up: the round settles at its own end, logs its minutes once
+        // and waits for a press. Called early, late or twice, it changes
+        // nothing more: the window asks until it sees the round has ended.
         "finish" => events.push(FocusEvent::Tick),
         other => return refused(format!("There is no focus step called {other}.")),
     }
@@ -286,17 +291,18 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
     keep_focus(&mut st, &fs);
     let carried = carry_out(store, clock, &effects)?;
     let committed = if carried.logged.is_some() || carried.habit.is_some() { Some(log_round(store, &carried)?) } else { None };
-    set_state(store, &st)?;
+    // A press that moves nothing (a second finish) writes nothing and tells no one.
+    let moved = st != was;
+    if moved {
+        set_state(store, &st)?;
+    }
     let mut result = json!({ "heatState": public_state(&st) });
     if let Some(s) = &carried.logged {
         result["logged"] = s.clone();
     }
-    Ok(match committed {
-        Some(c) => Outcome::new(result, c).also(&[kind::STATE]),
-        None => {
-            let mut out = Outcome::unchanged(result).also(&[kind::STATE]);
-            out.with_undo = true;
-            out
-        }
-    })
+    let out = match committed {
+        Some(c) => Outcome::new(result, c),
+        None => Outcome::unchanged(result),
+    };
+    Ok(if moved { out.also(&[kind::STATE]) } else { out })
 }
