@@ -9,6 +9,7 @@ import { useServer } from './setup.js';
 import { WORKS } from '../fixtures.js';
 import { call, putSigned } from '../helpers.js';
 import { writeWwav } from '../wwav.js';
+import { platformSongId } from '../hash.js';
 
 const songId = () => randomBytes(16).toString('hex');
 
@@ -210,5 +211,63 @@ describe('6.8: song ids on the server', () => {
     assert.equal(tree.body.root.withdrawn, true);
     const again = await ctx.call('POST', '/api/unpublish', { token: ctx.lmy, body: { trackId } });
     assert.deepEqual([again.status, again.body], [404, { error: 'Not published' }]);
+  });
+});
+
+describe('publishing again', () => {
+  const ctx = useServer();
+
+  test('a work published again after unpublish is back: not "Already up", and in the catalog', async () => {
+    const id = songId();
+    const trackId = await upload(ctx, ctx.lmy, writeWwav({ songId: id, title: 'Comes back' }));
+    await publish(ctx, ctx.lmy, { trackId });
+    await ctx.call('POST', '/api/unpublish', { token: ctx.lmy, body: { trackId } });
+    const back = await publish(ctx, ctx.lmy, { trackId });
+    assert.equal(back.status, 200);
+    assert.equal(back.body.message, undefined);
+    assert.equal(worksBy(ctx, id)[0].withdrawn, false);
+    const catalog = await ctx.call('GET', '/api/v2/catalog?search=comes');
+    assert.deepEqual(
+      catalog.body.data.items.map((i) => i.title),
+      ['Comes back'],
+    );
+  });
+
+  test('"Already up" adds no version but takes the new title; a refused publish takes nothing', async () => {
+    const id = songId();
+    const bytes = writeWwav({ songId: id, title: 'Draft name' });
+    const trackId = await upload(ctx, ctx.lmy, bytes);
+    await publish(ctx, ctx.lmy, { trackId });
+    const renamed = await publish(ctx, ctx.lmy, { trackId, title: 'Final name' });
+    assert.equal(renamed.body.message, 'Already up');
+    assert.equal(worksBy(ctx, id)[0].title, 'Final name');
+    const other = await upload(ctx, ctx.lmy, writeWwav({ songId: id, title: 'Draft name', bpm: 70 }));
+    const refused = await publish(ctx, ctx.lmy, { trackId: other, title: 'Refused name', tags: ['x'] });
+    assert.equal(refused.status, 409);
+    assert.deepEqual([worksBy(ctx, id)[0].title, worksBy(ctx, id)[0].tags], ['Final name', []]);
+  });
+
+  test("a version's bytes are kept under their sha256, out of reach of any upload URL", async () => {
+    const id = songId();
+    const bytes = writeWwav({ songId: id, title: 'Kept bytes' });
+    const trackId = await upload(ctx, ctx.lmy, bytes);
+    await publish(ctx, ctx.lmy, { trackId });
+    const version = worksBy(ctx, id)[0].versions[0];
+    assert.equal(version.s3Key, `files/${version.sha256}`);
+    assert.deepEqual(ctx.state.objects.get(version.s3Key).bytes, bytes);
+  });
+
+  test("another account's upload owns its trackId's platform id, even before it is published", async () => {
+    const theirs = await ctx.call('GET', '/api/upload/sign?fileType=audio/wav&size=10', { token: ctx.ana });
+    const squat = await upload(
+      ctx,
+      ctx.lmy,
+      writeWwav({ songId: platformSongId(theirs.body.trackId), title: 'Squat' }),
+    );
+    const res = await publish(ctx, ctx.lmy, { trackId: squat });
+    assert.deepEqual(
+      [res.status, res.body],
+      [409, { error: "This file's id belongs to another account's upload.", code: 'id_taken' }],
+    );
   });
 });

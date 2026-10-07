@@ -113,3 +113,42 @@ describe('heat changes', () => {
     assert.equal(anon.status, 400);
   });
 });
+
+describe('cursors', () => {
+  const ctx = useServer();
+
+  test("a push sent with the device's cursor answers one that skips only that device's own changes", async () => {
+    const { cursor } = await pullAll(ctx, ctx.lmy);
+    const mine = await ctx.call('POST', '/api/heat/changes', {
+      token: ctx.lmy,
+      body: { device: 'mac-a', cursor, changes: [{ kind: 'task', id: 'c1', field: 'title', value: 'A1', seq: 1 }] },
+    });
+    assert.equal(mine.body.cursor, cursor + 1, 'alone, the device moves past its own change');
+    await push(ctx, ctx.lmy, 'mac-b', [{ kind: 'task', id: 'c2', field: 'title', value: 'B1', seq: 2 }]);
+    const after = await ctx.call('POST', '/api/heat/changes', {
+      token: ctx.lmy,
+      body: {
+        device: 'mac-a',
+        cursor: mine.body.cursor,
+        changes: [{ kind: 'task', id: 'c3', field: 'title', value: 'A2', seq: 3 }],
+      },
+    });
+    assert.equal(after.body.cursor, mine.body.cursor, "B's change waits in front of it");
+    const { changes } = await pullAll(ctx, ctx.lmy, after.body.cursor);
+    assert.deepEqual(
+      changes.map((c) => c.value),
+      ['B1', 'A2'],
+    );
+  });
+
+  test('a cursor past the end of the log is refused, so the device pulls again from 0', async () => {
+    const { cursor } = await pullAll(ctx, ctx.lmy);
+    const ahead = await ctx.call('GET', `/api/heat/changes?cursor=${cursor + 1}`, { token: ctx.lmy });
+    assert.deepEqual([ahead.status, ahead.body.code], [409, 'cursor_ahead']);
+    const pushed = await ctx.call('POST', '/api/heat/changes', {
+      token: ctx.lmy,
+      body: { device: 'mac-a', cursor: cursor + 5, changes: [] },
+    });
+    assert.deepEqual([pushed.status, pushed.body.code], [409, 'cursor_ahead']);
+  });
+});

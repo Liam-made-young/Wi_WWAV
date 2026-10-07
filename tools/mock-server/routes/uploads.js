@@ -7,12 +7,12 @@
 // ownership row, so sign, PUT, publish answers 403), and /api/upload/parts
 // is new: multipart in 8 MiB parts, each part signed just before it goes up
 // (mismatch 5: only Wi's own host has 8 MiB parts, proxied, not presigned).
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, randomInt } from 'node:crypto';
 import { bytes, error, json, text } from '../http.js';
 import { requireUser } from '../auth.js';
 import { etagOf, sha256 } from '../hash.js';
 import { SECRET } from '../jwt.js';
-import { iso, limit, nextId } from '../state.js';
+import { iso, limit } from '../state.js';
 
 const MB = 1024 * 1024;
 export const PART_SIZE = 8 * MB;
@@ -129,10 +129,14 @@ function checkMime(raw, allowed, label) {
   return raw.toLowerCase();
 }
 
-// The server mints `track_<ms>_<9 base36>`; the mock counts instead of
-// drawing random letters, so runs repeat.
-function newTrackId(state) {
-  return `track_${state.now()}_${nextId(state, 'trackIds').toString(36).padStart(9, '0')}`;
+// The server mints `track_<ms>_<9 base36>` (and `fork_…` for a fork). The
+// letters are random, as there: a trackId names its platform song id
+// (6.1), so it mustn't be guessable before it is handed out.
+const BASE36 = '0123456789abcdefghijklmnopqrstuvwxyz';
+
+export function newTrackId(state, prefix = 'track') {
+  const letters = Array.from({ length: 9 }, () => BASE36[randomInt(36)]).join('');
+  return `${prefix}_${state.now()}_${letters}`;
 }
 
 function own(state, user, trackId, s3Key) {
@@ -228,9 +232,11 @@ function ownedUpload(ctx) {
   return { user, upload };
 }
 
+// Not counted against upload_sign: creating the upload was. A 4 GB file is
+// 512 parts, each signed just before it goes up (9.7), so counting parts
+// would stop a 2 GB file at part 240 for an hour.
 function signPart(ctx) {
-  const { user, upload } = ownedUpload(ctx);
-  limitSigning(ctx, user);
+  const { upload } = ownedUpload(ctx);
   const n = Number(ctx.params.n);
   if (!Number.isInteger(n) || n < 1 || n > upload.total) throw error(400, `There is no part ${ctx.params.n}`);
   if (upload.done) throw error(409, 'That upload is finished');

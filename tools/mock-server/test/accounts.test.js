@@ -332,3 +332,43 @@ describe('a desktop token from another client id', () => {
     assert.equal(res.body.error, 'invalid_client');
   });
 });
+
+describe('password guesses', () => {
+  const ctx = useServer();
+
+  test('five wrong passwords for one email, then 429 until 15 minutes pass; a right one clears the count', async () => {
+    const wrong = { email: 'ana@example.com', password: 'nope' };
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await ctx.call('POST', '/api/auth/login', { body: wrong })).status, 400);
+    }
+    const locked = await ctx.call('POST', '/api/auth/login', { body: ACCOUNTS.ana });
+    assert.deepEqual(
+      [locked.status, locked.body],
+      [429, { error: 'Too many login attempts. Try again in 15 minutes.' }],
+    );
+    await advanceClock(ctx.url, 15 * 60 * 1000 + 1);
+    assert.equal((await ctx.call('POST', '/api/auth/login', { body: wrong })).status, 400);
+    assert.equal((await ctx.call('POST', '/api/auth/login', { body: ACCOUNTS.ana })).status, 200);
+    for (let i = 0; i < 4; i++) await ctx.call('POST', '/api/auth/login', { body: wrong });
+    assert.equal((await ctx.call('POST', '/api/auth/login', { body: ACCOUNTS.ana })).status, 200);
+  });
+
+  test("the desktop sign-in page and PRANA's page share the count", async () => {
+    const page = await ctx.call('GET', `/oauth/desktop/authorize?${authorizeQuery()}`);
+    const request = hiddenField(page.body, 'request');
+    for (let i = 0; i < 5; i++) {
+      const res = await ctx.call('POST', '/oauth/desktop/login', {
+        form: { request, email: 'lmy@mi-wwav.com', password: `guess-${i}` },
+      });
+      assert.equal(res.status, 401);
+    }
+    const form = await ctx.call('POST', '/oauth/desktop/login', { form: { request, ...ACCOUNTS.lmy } });
+    assert.equal(form.status, 429);
+    assert.match(form.body, /Too many login attempts\. Try again in 15 minutes\./);
+    const device = (await ctx.call('POST', '/oauth/device/code', { form: { client_id: 'prana' } })).body;
+    const prana = await ctx.call('POST', '/device', { form: { user_code: device.user_code, ...ACCOUNTS.lmy } });
+    assert.equal(prana.status, 429);
+    const api = await ctx.call('POST', '/api/auth/login', { body: ACCOUNTS.lmy });
+    assert.equal(api.status, 429);
+  });
+});

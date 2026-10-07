@@ -17,13 +17,34 @@ const CODE_MS = 5 * 60 * 1000;
 const DEVICE_MS = 15 * 60 * 1000;
 const INTERVAL_S = 5;
 
-function findAccount(state, email, password) {
+const GUESSES = 5;
+const GUESS_MS = 15 * 60 * 1000;
+
+// The server's login lockout (routes/auth.js): five wrong passwords for an
+// email, then 429 until 15 minutes after the last one; a right one clears
+// the count. Every page that takes a password shares it, so the desktop
+// sign-in form and PRANA's /device page can't be used to keep guessing.
+// (Not reproduced: the per-IP 20 per 15 minutes, as every test comes from
+// one address, and the 30-minute lock after 10 failures in the database.)
+// Answers the account, or null for a wrong password; throws the 429.
+function signIn(state, email, password, refuse = (status, words) => error(status, words)) {
   const wanted = String(email || '').toLowerCase();
-  return state.users.find((u) => u.email === wanted && u.password === password) ?? null;
+  const now = state.now();
+  const tries = state.loginAttempts.get(wanted);
+  if (tries && now - tries.last > GUESS_MS) state.loginAttempts.delete(wanted);
+  const count = state.loginAttempts.get(wanted)?.count ?? 0;
+  if (count >= GUESSES) {
+    const minutes = Math.ceil((GUESS_MS - (now - tries.last)) / 60000);
+    throw refuse(429, `Too many login attempts. Try again in ${minutes} minutes.`);
+  }
+  const user = state.users.find((u) => u.email === wanted && u.password === password) ?? null;
+  if (user) state.loginAttempts.delete(wanted);
+  else state.loginAttempts.set(wanted, { count: count + 1, last: now });
+  return user;
 }
 
 function login(ctx) {
-  const user = findAccount(ctx.state, ctx.body.email, ctx.body.password);
+  const user = signIn(ctx.state, ctx.body.email, ctx.body.password);
   if (!user) return error(400, 'Invalid credentials');
   return json(200, { ...tokenPair(user, ctx.state.now()), user: userPayload(user) });
 }
@@ -119,7 +140,9 @@ function loginForm(ctx) {
     requests.delete(ctx.body.request);
     return answer(request.redirectUri, { error: 'access_denied', state: request.state });
   }
-  const user = findAccount(ctx.state, ctx.body.email, ctx.body.password);
+  const user = signIn(ctx.state, ctx.body.email, ctx.body.password, (status, words) =>
+    html(status, signInPage(ctx.body.request, words)),
+  );
   if (!user) return html(401, signInPage(ctx.body.request, "That email and password don't match."));
   requests.delete(ctx.body.request);
   const code = randomBytes(32).toString('base64url');
@@ -239,7 +262,9 @@ function deviceApprove(ctx) {
     (d) => d.userCode === code && d.status === 'pending' && d.expiresAt > ctx.state.now(),
   );
   if (!device) return html(400, devicePage(code, "That code isn't one we gave out, or it has expired."));
-  const user = findAccount(ctx.state, ctx.body.email, ctx.body.password);
+  const user = signIn(ctx.state, ctx.body.email, ctx.body.password, (status, words) =>
+    html(status, devicePage(code, words)),
+  );
   if (!user) return html(401, devicePage(code, "That email and password don't match."));
   if (ctx.body.action === 'cancel') {
     device.status = 'denied';

@@ -16,7 +16,9 @@ const FORBIDDEN = new Set(
     'like likes liked play plays played listen listens listened view views viewed viewer viewers ' +
     'follower followers following follows count counts seen sold sales saves popular popularity trending ' +
     'rank ranked ranking attendee attendees repost reposts comments fuel fans rating ratings reviews ' +
-    'visits visitors downloads buyers'
+    'visits visitors downloads buyers listener listeners streams streamed subscriber subscribers subscribed ' +
+    'favorite favorites favorited favourite favourites hearts hearted upvote upvotes downvotes impressions reach ' +
+    'engagement'
   ).split(' '),
 );
 
@@ -102,7 +104,13 @@ async function tour(base, c, state) {
   await c('POST', `/api/upload/parts/${parts.uploadId}/complete`, { token: lmy, body: { parts: [{ n: 1, etag }] } });
   await c('POST', '/api/publish', { token: lmy, body: { trackId: signed.trackId, s3Key: parts.s3Key } });
   await c('GET', `/api/tracks/${signed.trackId}/lineage`);
+  await c('GET', `/api/tracks/${signed.trackId}/is-published`, { token: lmy });
   await c('PUT', `/api/tracks/${signed.trackId}/set-price`, { token: lmy, body: { price: 3 } });
+  await c('POST', `/api/tracks/${WORKS.glassHours.trackId}/fork`, {
+    token: lmy,
+    body: { mix: { stems: { vocals: { level: 0.5 } } } },
+  });
+  await c('GET', '/api/lineage/global');
 
   // Space.
   const claim = await c('POST', '/api/v2/galaxies', { token: lmy, body: {} });
@@ -110,6 +118,7 @@ async function tour(base, c, state) {
   await c('GET', '/api/v2/galaxies/mine', { token: lmy });
   await c('GET', '/api/v2/galaxies/lmy', { token: ana });
   await c('GET', '/api/v2/galaxies/lmy/sun');
+  await c('GET', '/api/v2/galaxies/lmy/letters');
   const system = (await c('POST', `/api/v2/galaxies/${galaxyId}/systems`, { token: lmy, body: { title: 'Tour' } })).body
     .data.system;
   await c('PATCH', `/api/v2/systems/${system.id}`, { token: lmy, body: { status: 'published' } });

@@ -329,3 +329,47 @@ describe('Since you last looked', () => {
     assert.deepEqual(res.body.data.events, []);
   });
 });
+
+describe('letters on a bio sun', () => {
+  const ctx = useServer();
+
+  test("LMY's bio sun lists his letter; another galaxy's lists none", async () => {
+    const res = await ctx.call('GET', '/api/v2/galaxies/lmy/letters');
+    assert.equal(res.status, 200);
+    assert.deepEqual(
+      res.body.data.letters.map((l) => [l.greeting, l.signoff, l.sentAt]),
+      [['Dear Wi-WWAV,', 'Sincerely LMY', '2026-10-03']],
+    );
+    assert.equal(res.body.data.nextCursor, null);
+    const hers = await ctx.call('GET', '/api/v2/galaxies/ana/letters');
+    assert.deepEqual(hers.body.data, { letters: [], nextCursor: null });
+    const nobody = await ctx.call('GET', '/api/v2/galaxies/nobody/letters');
+    assert.equal(nobody.status, 404);
+  });
+
+  test('ten at a time, newest first, then "Show older" until the end', async () => {
+    for (let i = 1; i <= 12; i++) {
+      ctx.state.letters.push({
+        id: 100 + i,
+        userId: 1,
+        greeting: 'Dear Wi-WWAV,',
+        blocks: [{ type: 'text', style: 'body', text: `Letter ${i}` }],
+        signoff: 'Sincerely LMY',
+        sentAt: `2026-11-${String(i).padStart(2, '0')}`,
+        createdAt: `2026-11-${String(i).padStart(2, '0')}T12:00:00.000Z`,
+      });
+    }
+    const first = await ctx.call('GET', '/api/v2/galaxies/lmy/letters');
+    assert.equal(first.body.data.letters.length, 10);
+    assert.equal(first.body.data.letters[0].blocks[0].text, 'Letter 12');
+    const rest = await ctx.call(
+      'GET',
+      `/api/v2/galaxies/lmy/letters?cursor=${encodeURIComponent(first.body.data.nextCursor)}`,
+    );
+    assert.deepEqual(
+      rest.body.data.letters.map((l) => l.blocks[0].text),
+      ['Letter 2', 'Letter 1', 'Hardware is hard…'],
+    );
+    assert.equal(rest.body.data.nextCursor, null);
+  });
+});

@@ -279,3 +279,127 @@ describe('payouts, prices and the floor', () => {
     assert.equal(res.body.halls.length, 4);
   });
 });
+
+describe('the bag after things change', () => {
+  const ctx = useServer();
+
+  test('a withdrawn work stays in the bag, marked, and checkout charges only what can still be bought', async () => {
+    const buyer = await addAccount(ctx.state, { username: 'Fern' });
+    const low = trackOf(ctx, WORKS.lowTide);
+    const glass = trackOf(ctx, WORKS.glassHours);
+    for (const t of [low, glass]) {
+      await ctx.call('PUT', '/api/store/bag', { token: buyer.token, body: { type: 'track', id: t.id } });
+    }
+    await ctx.call('POST', '/api/unpublish', { token: ctx.ana, body: { trackId: glass.trackId } });
+    const bag = await ctx.call('GET', '/api/store/bag', { token: buyer.token });
+    assert.equal(bag.status, 200);
+    assert.deepEqual(
+      bag.body.items.map((i) => [i.title, i.available]),
+      [
+        ['Low Tide', true],
+        ['glass hours', false],
+      ],
+    );
+    assert.equal(bag.body.totalCents, 400);
+    assert.deepEqual(bag.body.payments[0].items, [{ type: 'track', id: low.id }]);
+    const paid = await ctx.call('POST', '/api/store/bag/checkout', { token: buyer.token });
+    assert.equal(paid.status, 200);
+    assert.equal(ctx.state.sessions.get(paid.body.payments[0].sessionId).amountTotal, 400);
+    const left = await ctx.call('GET', '/api/store/bag', { token: buyer.token });
+    assert.deepEqual(
+      left.body.items.map((i) => [i.id, i.available]),
+      [[glass.id, false]],
+    );
+    const again = await ctx.call('POST', '/api/store/bag/checkout', { token: buyer.token });
+    assert.deepEqual([again.status, again.body.code], [409, 'unavailable']);
+    const gone = await ctx.call('DELETE', `/api/store/bag/track/${glass.id}`, { token: buyer.token });
+    assert.deepEqual(gone.body.items, []);
+  });
+
+  test('the holder asking again for their held garment gets back the checkout that holds it', async () => {
+    const buyer = await addAccount(ctx.state, { username: 'Gus' });
+    const jacket = ctx.state.listings[0];
+    const first = await checkout(ctx, buyer.token, { type: 'fashion', id: jacket.id });
+    const again = await checkout(ctx, buyer.token, { type: 'fashion', id: jacket.id });
+    assert.equal(again.status, 200);
+    assert.equal(again.body.sessionId, first.body.sessionId);
+    const other = await checkout(ctx, ctx.lmy, { type: 'fashion', id: jacket.id });
+    assert.deepEqual([other.status, other.body], [409, { error: 'Just sold or being purchased' }]);
+    await advanceClock(ctx.url, 30 * MINUTE);
+  });
+
+  test('a bag checkout retried with its Idempotency-Key after a lost answer gets the same sessions', async () => {
+    const buyer = await addAccount(ctx.state, { username: 'Hal' });
+    const jacket = ctx.state.listings[0];
+    await ctx.call('PUT', '/api/store/bag', { token: buyer.token, body: { type: 'fashion', id: jacket.id } });
+    await call(ctx.url, 'POST', '/__mock/fail', {
+      body: { method: 'POST', path: '/api/store/bag/checkout', drop: 'after' },
+    });
+    const headers = { 'idempotency-key': 'bag-checkout-0001' };
+    await assert.rejects(ctx.call('POST', '/api/store/bag/checkout', { token: buyer.token, headers }));
+    const retry = await ctx.call('POST', '/api/store/bag/checkout', { token: buyer.token, headers });
+    assert.equal(retry.status, 200);
+    assert.equal(retry.headers.get('idempotent-replay'), 'true');
+    assert.equal(ctx.state.sessions.get(retry.body.payments[0].sessionId).status, 'open');
+    assert.equal([...ctx.state.sessions.values()].filter((s) => s.buyerId === buyer.user.id).length, 1);
+  });
+
+  test('a file paid for twice, once alone and once in a bag, is refunded the second time', async () => {
+    const buyer = await addAccount(ctx.state, { username: 'Ivy' });
+    const low = trackOf(ctx, WORKS.lowTide);
+    const world = trackOf(ctx, WORKS.worldEnding);
+    for (const t of [low, world]) {
+      await ctx.call('PUT', '/api/store/bag', { token: buyer.token, body: { type: 'track', id: t.id } });
+    }
+    const bag = await ctx.call('POST', '/api/store/bag/checkout', { token: buyer.token });
+    const alone = await checkout(ctx, buyer.token, { type: 'track', id: low.id });
+    assert.equal(alone.status, 200);
+    assert.notEqual(alone.body.sessionId, bag.body.payments[0].sessionId);
+    await completeCheckout(ctx.url, alone.body.sessionId);
+    assert.equal((await completeCheckout(ctx.url, bag.body.payments[0].sessionId)).status, 200);
+    const mine = ctx.state.purchases.filter((p) => p.userId === buyer.user.id);
+    assert.deepEqual(
+      mine.map((p) => [p.itemId, p.status]).sort(),
+      [
+        [world.id, 'completed'],
+        [low.id, 'completed'],
+        [low.id, 'refunded'],
+      ].sort(),
+    );
+    const session = ctx.state.sessions.get(bag.body.payments[0].sessionId);
+    assert.equal(session.refundedCents, 400);
+    const transfers = ctx.state.transfers.filter((t) => t.transferGroup === session.transferGroup);
+    assert.deepEqual(
+      transfers.map((t) => t.amountCents),
+      [world.priceCents - Math.round(world.priceCents * 0.1)],
+    );
+  });
+
+  test('asking twice for one file gives the same open checkout', async () => {
+    const buyer = await addAccount(ctx.state, { username: 'Jo' });
+    const low = trackOf(ctx, WORKS.lowTide);
+    const a = await checkout(ctx, buyer.token, { type: 'track', id: low.id });
+    const b = await checkout(ctx, buyer.token, { type: 'track', id: low.id });
+    assert.equal(b.body.sessionId, a.body.sessionId);
+  });
+});
+
+describe('prices and checks', () => {
+  const ctx = useServer();
+
+  test('a paid file costs at least $2 (Open #44)', async () => {
+    const trackId = await publishedTrack(ctx, ctx.lmy);
+    const low = await ctx.call('PUT', `/api/tracks/${trackId}/set-price`, { token: ctx.lmy, body: { price: 1.99 } });
+    assert.deepEqual([low.status, low.body], [400, { error: 'A paid file costs at least $2.', code: 'price_too_low' }]);
+    const two = await ctx.call('PUT', `/api/tracks/${trackId}/set-price`, { token: ctx.lmy, body: { price: 2 } });
+    assert.deepEqual(two.body, { success: true, isForSale: true, price: 2 });
+  });
+
+  test('purchase/check answers about the type asked: a film or an album is never a track', async () => {
+    const world = trackOf(ctx, WORKS.worldEnding);
+    const ask = (type) => ctx.call('GET', `/api/purchase/check?type=${type}&id=${world.id}`, { token: ctx.ana });
+    assert.deepEqual((await ask('track')).body, { purchased: true });
+    for (const type of ['film', 'album', 'event', 'sticker'])
+      assert.deepEqual((await ask(type)).body, { purchased: false });
+  });
+});

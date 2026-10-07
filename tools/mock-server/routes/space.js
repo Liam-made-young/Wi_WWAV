@@ -203,10 +203,41 @@ function galaxyScene(ctx) {
 }
 
 function galaxySun(ctx) {
+  optionalUser(ctx);
   const galaxy = bySlug(ctx.state, ctx.params.slug);
   const sun = ctx.state.suns.find((s) => s.galaxyId === galaxy.id);
   if (!sun) return fail(404, 'no_sun', 'This galaxy has no bio yet');
   return ok({ sun: sunDocument(sun), galaxy: galaxyBrief(galaxy), system: null });
+}
+
+// A bio sun's letters (4.8): newest first, ten at a time, then "Show
+// older" with nextCursor, until null ("That's everything."). New: the
+// server has no such route (mismatch 13: GET /api/devlog answers every
+// post at once, as DevlogPost blocks with no greeting or sign-off).
+const LETTERS_PAGE = 10;
+
+function letters(ctx) {
+  optionalUser(ctx);
+  const { state } = ctx;
+  const galaxy = bySlug(state, ctx.params.slug);
+  const cursor = parseCursor(ctx.query.cursor, 2);
+  const rows = state.letters
+    .filter((l) => l.userId === galaxy.userId)
+    .sort(newestFirst)
+    .filter(before(cursor));
+  const page = rows.slice(0, LETTERS_PAGE);
+  const last = page[page.length - 1];
+  return ok({
+    letters: page.map(({ id, greeting, blocks, signoff, sentAt, createdAt }) => ({
+      id,
+      greeting,
+      blocks,
+      signoff,
+      sentAt,
+      createdAt,
+    })),
+    nextCursor: rows.length > page.length ? `${last.createdAt}|${last.id}` : null,
+  });
 }
 
 function createSystem(ctx) {
@@ -256,6 +287,7 @@ function systemScene(ctx) {
 }
 
 function systemSun(ctx) {
+  optionalUser(ctx);
   const galaxy = bySlug(ctx.state, ctx.params.slug);
   const system = systemBySlug(ctx.state, galaxy, ctx.params.system);
   const sun = ctx.state.suns.find((s) => s.systemId === system.id);
@@ -454,6 +486,7 @@ function sunAnswer(state, sun) {
 }
 
 function getSun(ctx) {
+  optionalUser(ctx);
   const sun = byId(ctx.state.suns, ctx.params.id);
   if (!sun) return fail(404, 'not_found', 'No sun there');
   return sunAnswer(ctx.state, sun);
@@ -702,6 +735,7 @@ function pageSize(raw, fallback, max) {
 }
 
 function catalog(ctx) {
+  optionalUser(ctx);
   const { state } = ctx;
   const cursor = parseCursor(ctx.query.cursor, 2);
   const limitTo = pageSize(ctx.query.limit, 40, 100);
@@ -734,6 +768,23 @@ function catalog(ctx) {
   });
 }
 
+// Newest's medium filter takes the words the rest of the API uses: a
+// medium as the store's halls name it, its family (4.7), or a planet kind.
+// The mock's worlds are all songs.
+const MEDIA = {
+  music: 'music',
+  mi: 'music',
+  song: 'music',
+  film: 'film',
+  si: 'film',
+  writing: 'writing',
+  ri: 'writing',
+  page: 'writing',
+  fashion: 'fashion',
+  gi: 'fashion',
+  gallery: 'fashion',
+};
+
 // Newest (4.10): planets in published systems, newest first, filtered by
 // medium, "Galaxies I've added", key and BPM. A card says what a thing is
 // and nothing about how it did. The server's feed also mixes in suns; the
@@ -743,7 +794,11 @@ function feed(ctx) {
   const { state, query } = ctx;
   const cursor = parseCursor(query.cursor, 3);
   const limitTo = pageSize(query.limit, 12, 40);
-  const media = query.medium ? String(query.medium).split(',') : null;
+  const media = query.medium
+    ? String(query.medium)
+        .split(',')
+        .map((m) => MEDIA[m.trim().toLowerCase()])
+    : null;
   if (query.added && !viewer) return error(401, 'Unauthorized');
   const added = query.added ? addedUserIds(state, viewer) : null;
   const bpmMin = query.bpmMin === undefined ? -Infinity : Number(query.bpmMin);
@@ -756,7 +811,7 @@ function feed(ctx) {
       return { planet, system, galaxy, track, createdAt: planet.createdAt, id: planet.id };
     })
     .filter((c) => c.system.status === 'published' && !c.track.withdrawn)
-    .filter((c) => !media || media.includes('song'))
+    .filter((c) => !media || media.includes('music'))
     .filter((c) => !added || added.has(c.galaxy.userId))
     .filter((c) => !query.key || c.track.musicalKey === query.key)
     .filter(
@@ -771,7 +826,7 @@ function feed(ctx) {
     items: page.map(({ planet, system, galaxy, track }) => ({
       type: 'planet',
       kind: 'song',
-      medium: 'song',
+      medium: 'music',
       id: planet.id,
       createdAt: planet.createdAt,
       title: track.title,
@@ -913,6 +968,7 @@ export const routes = [
   ['GET', '/api/v2/galaxies/mine', mine],
   ['GET', '/api/v2/galaxies/:slug', galaxyScene],
   ['GET', '/api/v2/galaxies/:slug/sun', galaxySun],
+  ['GET', '/api/v2/galaxies/:slug/letters', letters],
   ['POST', '/api/v2/galaxies/:id/systems', createSystem],
   ['GET', '/api/v2/galaxies/:slug/systems/:system', systemScene],
   ['GET', '/api/v2/galaxies/:slug/systems/:system/sun', systemSun],

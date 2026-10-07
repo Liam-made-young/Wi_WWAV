@@ -7,6 +7,7 @@ import { tokenPair } from './jwt.js';
 import { etagOf, sha256, unitJitter } from './hash.js';
 import { nextId } from './state.js';
 import { writeWwav } from './wwav.js';
+import { versionKey } from './routes/publish.js';
 
 export const ACCOUNTS = {
   lmy: { email: 'lmy@mi-wwav.com', password: 'WeWave-lmy1' },
@@ -140,7 +141,9 @@ function song(state, user, work, { title, bpm, key, duration, priceCents, at, pa
     creator: parent ? user.username : '',
   });
   const s3Key = `uploads/${work.trackId}`;
-  state.objects.set(s3Key, { bytes, contentType: 'audio/wav', etag: etagOf(bytes), sha256: sha256(bytes) });
+  const object = { bytes, contentType: 'audio/wav', etag: etagOf(bytes), sha256: sha256(bytes) };
+  state.objects.set(s3Key, object);
+  state.objects.set(versionKey(object.sha256), object);
   state.uploads.push({ trackId: work.trackId, userId: user.id, s3Key, createdAt: at });
   const track = {
     id: nextId(state, 'tracks'),
@@ -161,12 +164,21 @@ function song(state, user, work, { title, bpm, key, duration, priceCents, at, pa
     secondaryParentTrackId: null,
     lineageRootTrackId: (root ?? work).trackId,
     remixDepth: generation,
+    inFeed: true,
+    remixSnapshot: null,
     priceCents,
     isForSale: priceCents !== null,
     withdrawn: false,
     createdAt: at,
     versions: [
-      { version: 1, sha256: sha256(bytes), bytes: bytes.length, s3Key, fileName: `${title}.wwav`, createdAt: at },
+      {
+        version: 1,
+        sha256: object.sha256,
+        bytes: bytes.length,
+        s3Key: versionKey(object.sha256),
+        fileName: `${title}.wwav`,
+        createdAt: at,
+      },
     ],
   };
   state.tracks.push(track);

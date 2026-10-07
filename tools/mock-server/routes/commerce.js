@@ -10,10 +10,14 @@
 //   a stale session can't sell a garment twice (today the session lives 24 h);
 // - a listing can't be priced until payouts are set up (mismatch 17);
 // - the bag: one charge for every file in it, transferred to each seller
-//   under one transfer_group, and one destination charge per seller of goods.
+//   under one transfer_group, and one destination charge per seller of goods;
+// - asking again for what you are already checking out answers that open
+//   checkout (mismatch 18: a pending purchase doesn't block a second one),
+//   and a file paid for twice anyway is refunded the second time;
+// - a paid file costs at least $2 (Open #44 at its recommendation).
 // The mock refuses with the server's status codes (400 for your own item
 // and for one you own, mismatch 18).
-import { escapeHtml, error, html, json, page, redirect } from '../http.js';
+import { Reply, escapeHtml, error, html, json, page, redirect } from '../http.js';
 import { onboarded, optionalUser, requireUser } from '../auth.js';
 import { idempotent, iso, limit, nextId } from '../state.js';
 import { presign } from './uploads.js';
@@ -23,17 +27,19 @@ import { unitJitter } from '../hash.js';
 const FEE = 0.1;
 const HOLD_MS = 30 * 60 * 1000;
 const MAX_DIGITAL_CENTS = 200000;
+const MIN_DIGITAL_CENTS = 200;
 const GETS = '.wwav, master and four stems';
 
 const byId = (rows, id) => rows.find((r) => r.id === Number(id));
 
 // --- items ---------------------------------------------------------------------
 
-// What a {type, id} names, in one shape for checkout and the bag.
-function itemOf(state, type, id) {
+// What a {type, id} names, in one shape for checkout and the bag, or
+// null. A withdrawn work is still found here, since a bag may hold one.
+function findItem(state, type, id) {
   if (type === 'fashion') {
     const listing = byId(state.listings, id);
-    if (!listing) throw error(404, 'Listing not found');
+    if (!listing) return null;
     return {
       type,
       id: listing.id,
@@ -45,7 +51,7 @@ function itemOf(state, type, id) {
     };
   }
   const track = byId(state.tracks, id);
-  if (!track || track.withdrawn) throw error(404, 'Track not found');
+  if (!track) return null;
   return {
     type: 'track',
     id: track.id,
@@ -55,6 +61,13 @@ function itemOf(state, type, id) {
     physical: false,
     track,
   };
+}
+
+function itemOf(state, type, id) {
+  const item = findItem(state, type, id);
+  if (!item && type === 'fashion') throw error(404, 'Listing not found');
+  if (!item || item.track?.withdrawn) throw error(404, 'Track not found');
+  return item;
 }
 
 // The refusals every way of buying shares.
@@ -99,10 +112,14 @@ export function sweep(state) {
   }
 }
 
+// Each item's fee is rounded on its own, and the session's fee is their
+// sum, so the transfers and the fee add up to the charge to the cent.
+const feeOf = (cents) => Math.round(cents * FEE);
+
 function openSession(state, buyer, items, { physical }) {
   const id = `cs_test_${String(nextId(state, 'sessions')).padStart(6, '0')}`;
   const amountTotal = items.reduce((n, i) => n + i.priceCents, 0);
-  const feeCents = Math.round(amountTotal * FEE);
+  const feeCents = items.reduce((n, i) => n + feeOf(i.priceCents), 0);
   const describe = physical ? 'Streetwear purchase on WWAV' : 'Purchase on WWAV';
   const session = {
     id,
@@ -116,6 +133,7 @@ function openSession(state, buyer, items, { physical }) {
     amountTotal,
     currency: 'usd',
     feeCents,
+    refundedCents: 0,
     expiresAt: state.now() + HOLD_MS,
     status: 'open',
     successUrl: `${state.base}/?purchase=success`,
@@ -141,7 +159,7 @@ function openSession(state, buyer, items, { physical }) {
       type: item.type,
       itemId: item.id,
       amountCents: item.priceCents,
-      feeCents: Math.round(item.priceCents * FEE),
+      feeCents: feeOf(item.priceCents),
       status: 'pending',
       sessionId: id,
       createdAt: iso(state.now()),
@@ -153,7 +171,9 @@ function openSession(state, buyer, items, { physical }) {
 
 // checkout.session.completed: the purchases complete, a garment is sold,
 // and each digital seller is sent 90% of their items under the session's
-// transfer group. False when the session can no longer be paid.
+// transfer group. A file the buyer already owns (bought through another
+// checkout while this one was open) is refunded, not owned twice (7.11).
+// False when the session can no longer be paid.
 export function completeSession(state, id) {
   sweep(state);
   const session = state.sessions.get(id);
@@ -162,6 +182,11 @@ export function completeSession(state, id) {
   const at = iso(state.now());
   const owed = new Map();
   for (const p of state.purchases.filter((x) => x.sessionId === id)) {
+    if (p.type === 'track' && ownsPurchase(state, { id: session.buyerId }, 'track', p.itemId)) {
+      p.status = 'refunded';
+      session.refundedCents += p.amountCents;
+      continue;
+    }
     p.status = 'completed';
     p.completedAt = at;
     if (p.type === 'fashion') {
@@ -229,6 +254,20 @@ function holdListing(state, me, item) {
   item.listing.hold = { userId: me.id, until: state.now() + HOLD_MS };
 }
 
+// Your open checkout for this item, if there is one to give back: the one
+// holding your garment (whatever else of that seller's it carries), or one
+// for exactly this file. So a lost answer never locks the holder out of
+// their own hold, and asking twice opens one charge.
+function openCheckoutFor(state, me, item) {
+  const holds = (s) =>
+    state.purchases.some((p) => p.sessionId === s.id && p.type === item.type && p.itemId === item.id);
+  return (
+    [...state.sessions.values()].find(
+      (s) => s.status === 'open' && s.buyerId === me.id && holds(s) && (item.physical || s.lineItems.length === 1),
+    ) ?? null
+  );
+}
+
 function createCheckout(ctx) {
   const me = requireUser(ctx);
   limitCheckouts(ctx.state, me);
@@ -236,15 +275,20 @@ function createCheckout(ctx) {
     const { state } = ctx;
     const item = itemOf(state, ctx.body.type, ctx.body.id);
     checkBuyable(state, me, item);
+    const open = openCheckoutFor(state, me, item);
+    if (open) return json(200, { url: open.url, sessionId: open.id });
     if (item.physical) holdListing(state, me, item);
     const session = openSession(state, me, [item], { physical: item.physical });
     return json(200, { url: session.url, sessionId: session.id });
   });
 }
 
+// The server's types are track (the default), album, film, fashion and
+// event. The mock sells only files and garments, so nothing else is owned.
 function check(ctx) {
   const me = requireUser(ctx);
-  const type = ctx.query.type === 'fashion' ? 'fashion' : 'track';
+  const type = ctx.query.type ?? 'track';
+  if (type !== 'track' && type !== 'fashion') return json(200, { purchased: false });
   return json(200, { purchased: ownsPurchase(ctx.state, me, type, ctx.query.id) });
 }
 
@@ -347,9 +391,16 @@ function setPrice(ctx) {
     track.priceCents = null;
     return json(200, { success: true, isForSale: false });
   }
-  if (Math.round(price * 100) > MAX_DIGITAL_CENTS) return error(400, 'Price cannot exceed $2000');
+  const cents = Math.round(price * 100);
+  if (cents > MAX_DIGITAL_CENTS) return error(400, 'Price cannot exceed $2000');
+  // Open #44 at its recommendation: at $1, Stripe's 30¢ is more than the 10% fee (7.11).
+  if (cents < MIN_DIGITAL_CENTS) return error(400, 'A paid file costs at least $2.', { code: 'price_too_low' });
+  // What's sold is the file (6.12), and a fork pushed in Space has none.
+  if (!track.versions.length) {
+    return error(400, 'This fork has no file of its own yet. Export it to sell it.', { code: 'no_file' });
+  }
   if (!onboarded(me)) return error(400, 'Selling needs a payout account. Set it up once.');
-  track.priceCents = Math.round(price * 100);
+  track.priceCents = cents;
   track.isForSale = true;
   return json(200, { success: true, isForSale: true, price });
 }
@@ -563,10 +614,35 @@ function bagOf(state, me) {
   return state.bags.get(me.id);
 }
 
+// Can `me` buy this now? A held garment still can (the hold may lapse);
+// checkout refuses it then.
+function buyable(state, me, item) {
+  if (item.physical ? item.listing.status === 'sold' : item.track.withdrawn) return false;
+  try {
+    checkBuyable(state, me, item);
+    return true;
+  } catch (refusal) {
+    if (refusal instanceof Reply) return false;
+    throw refusal;
+  }
+}
+
+// The bag as it stands now. A thing can leave the shop while it sits in a
+// bag (withdrawn, off sale, sold, bought another way): its row stays,
+// `available: false`, so the buyer sees which and takes it out, and only
+// what is available is charged.
+function bagRows(state, me) {
+  return bagOf(state, me).map((b) => {
+    const item = findItem(state, b.type, b.id);
+    return { item, available: buyable(state, me, item) };
+  });
+}
+
 function bagAnswer(state, me) {
-  const items = bagOf(state, me).map((b) => itemOf(state, b.type, b.id));
+  const rows = bagRows(state, me);
+  const items = rows.filter((r) => r.available).map((r) => r.item);
   return json(200, {
-    items: items.map((i) => itemPayload(state, me, i)),
+    items: rows.map((r) => ({ ...itemPayload(state, me, r.item), available: r.available })),
     payments: payments(state, items).map((p) => ({
       ...p,
       items: p.items.map((i) => ({ type: i.type, id: i.id })),
@@ -601,14 +677,20 @@ function removeFromBag(ctx) {
 }
 
 // Every hold is taken before any session opens; if one garment is gone,
-// the holds this checkout took are let go and nothing is charged.
+// the holds this checkout took are let go and nothing is charged. What
+// was charged leaves the bag; rows that can't be bought stay, marked. An
+// Idempotency-Key replays a lost answer, as on create-checkout.
 function checkoutBag(ctx) {
   const me = requireUser(ctx);
-  const { state } = ctx;
-  limitCheckouts(state, me);
-  const items = bagOf(state, me).map((b) => itemOf(state, b.type, b.id));
-  if (!items.length) return error(400, 'Your bag is empty');
-  for (const item of items) checkBuyable(state, me, item);
+  limitCheckouts(ctx.state, me);
+  return idempotent(ctx, me, 'checkout.bag', false, () => chargeBag(ctx.state, me));
+}
+
+function chargeBag(state, me) {
+  const rows = bagRows(state, me);
+  if (!rows.length) return error(400, 'Your bag is empty');
+  const items = rows.filter((r) => r.available).map((r) => r.item);
+  if (!items.length) return error(409, 'Nothing in your bag can be bought now.', { code: 'unavailable' });
   const held = [];
   try {
     for (const item of items.filter((i) => i.physical)) {
@@ -630,7 +712,10 @@ function checkoutBag(ctx) {
       url: session.url,
     };
   });
-  state.bags.set(me.id, []);
+  state.bags.set(
+    me.id,
+    bagOf(state, me).filter((b) => !items.some((i) => i.type === b.type && i.id === b.id)),
+  );
   return json(200, { payments: out });
 }
 

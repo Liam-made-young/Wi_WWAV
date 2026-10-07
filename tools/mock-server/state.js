@@ -40,6 +40,7 @@ export function reset(state) {
   state.heat = new Map();
   state.assist = new Map();
   state.oauth = { requests: new Map(), codes: new Map(), devices: new Map() };
+  state.loginAttempts = new Map(); // email -> { count, last }: wrong passwords
   state.limits = new Map();
   state.idempotency = new Map();
   state.faults = [];

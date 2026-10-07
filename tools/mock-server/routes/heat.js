@@ -40,9 +40,28 @@ function entryPayload(e) {
   return { kind: e.kind, id: e.id, field: e.field, value: e.value, seq: e.seq, device: e.device };
 }
 
-// POST {device, changes: [{kind, id, field, value, seq}]} → {cursor, kept}.
-// `kept` lists every pushed field where the server already held something
-// newer, with that newer value, so the device can take it.
+// A cursor is a place in the account's log. One past its end (from before
+// a reset or a restore) would hide the next changes, so it is refused and
+// the device pulls again from 0.
+function readCursor(log, raw) {
+  const cursor = Number(raw ?? 0);
+  if (!Number.isInteger(cursor) || cursor < 0) throw error(400, "That cursor isn't readable");
+  if (cursor > log.entries.length) {
+    throw error(409, "That cursor is past the end of this account's changes. Pull again from 0.", {
+      code: 'cursor_ahead',
+    });
+  }
+  return cursor;
+}
+
+const isCurrent = (log, e) => log.current.get(fieldKey(e)) === e;
+
+// POST {device, cursor?, changes: [{kind, id, field, value, seq}]} →
+// {cursor, kept}. `kept` lists every pushed field where the server already
+// held something newer, with that newer value, so the device can take it.
+// The answer's cursor is the one the device sent (0 if none), moved past
+// the device's own changes and any overwritten since, and no further: a
+// change another device made in between still waits in front of it.
 function push(ctx) {
   const me = requireUser(ctx);
   const { device, changes } = ctx.body;
@@ -51,6 +70,7 @@ function push(ctx) {
   if (changes.length > MAX_BATCH) return error(413, `Send at most ${MAX_BATCH} changes at a time`);
   const incoming = changes.map(readChange);
   const log = logOf(ctx.state, me);
+  let cursor = readCursor(log, ctx.body.cursor);
   const kept = [];
   for (const change of incoming) {
     const key = fieldKey(change);
@@ -63,7 +83,11 @@ function push(ctx) {
     log.entries.push(entry);
     log.current.set(key, entry);
   }
-  return json(200, { cursor: log.entries.length, kept });
+  for (const e of log.entries.slice(cursor)) {
+    if (e.device !== device && isCurrent(log, e)) break;
+    cursor = e.n;
+  }
+  return json(200, { cursor, kept });
 }
 
 // GET ?cursor=n&limit= → {changes, cursor, more}. Only each field's current
@@ -71,13 +95,12 @@ function push(ctx) {
 function pull(ctx) {
   const me = requireUser(ctx);
   const log = logOf(ctx.state, me);
-  const from = Number(ctx.query.cursor ?? 0);
-  if (!Number.isInteger(from) || from < 0) return error(400, "That cursor isn't readable");
+  const from = readCursor(log, ctx.query.cursor);
   const limitTo = Math.min(MAX_PULL, Math.max(1, Number(ctx.query.limit) || MAX_PULL));
   const out = [];
   let cursor = from;
   for (const entry of log.entries.slice(from)) {
-    if (log.current.get(fieldKey(entry)) !== entry) {
+    if (!isCurrent(log, entry)) {
       cursor = entry.n;
       continue;
     }
@@ -85,7 +108,7 @@ function pull(ctx) {
     out.push(entryPayload(entry));
     cursor = entry.n;
   }
-  const more = log.entries.slice(cursor).some((e) => log.current.get(fieldKey(e)) === e);
+  const more = log.entries.slice(cursor).some((e) => isCurrent(log, e));
   return json(200, { changes: out, cursor, more });
 }
 

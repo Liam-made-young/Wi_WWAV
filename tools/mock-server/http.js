@@ -70,7 +70,14 @@ export function router(table) {
       const segments = pathname.split('/');
       for (const route of routes) {
         if (route.method !== method) continue;
-        const params = matchParts(route.parts, segments);
+        let params;
+        try {
+          params = matchParts(route.parts, segments);
+        } catch (e) {
+          // A broken percent-escape, such as %E0%A4%A.
+          if (e instanceof URIError) throw error(400, "That path isn't readable");
+          throw e;
+        }
         if (params) return { route, params };
       }
       return null;
@@ -109,11 +116,16 @@ export function parseBody(req, raw) {
   const type = (req.headers['content-type'] || '').split(';')[0].trim();
   if (type === 'application/json') {
     if (raw.length === 0) return {};
+    let value;
     try {
-      return JSON.parse(raw.toString('utf8'));
+      value = JSON.parse(raw.toString('utf8'));
     } catch {
       throw error(400, "Request body isn't JSON");
     }
+    // Objects and arrays only, as express.json()'s strict mode takes them:
+    // a body of null, 3 or "x" would otherwise reach handlers as ctx.body.
+    if (value === null || typeof value !== 'object') throw error(400, 'Request body must be a JSON object');
+    return value;
   }
   if (type === 'application/x-www-form-urlencoded') {
     return Object.fromEntries(new URLSearchParams(raw.toString('utf8')));

@@ -9,6 +9,7 @@ import { seed } from './fixtures.js';
 import { routes as accounts } from './routes/accounts.js';
 import { routes as uploads } from './routes/uploads.js';
 import { routes as publish } from './routes/publish.js';
+import { routes as forks } from './routes/forks.js';
 import { routes as space } from './routes/space.js';
 import { routes as commerce, sweep } from './routes/commerce.js';
 import { routes as heat } from './routes/heat.js';
@@ -20,6 +21,7 @@ const table = router([
   ...accounts,
   ...uploads,
   ...publish,
+  ...forks,
   ...space,
   ...commerce,
   ...heat,
@@ -44,10 +46,11 @@ async function handle(state, req, res, onResponse) {
   const url = new URL(req.url, state.base);
   const fault = takeFault(state, req.method, url.pathname);
   if (fault?.drop === 'before') return req.socket.destroy();
-  const found = table.match(req.method, url.pathname);
-  const route = found ? `${found.route.method} ${found.route.path}` : null;
+  let route = null;
   let reply;
   try {
+    const found = table.match(req.method, url.pathname);
+    if (found) route = `${found.route.method} ${found.route.path}`;
     if (fault && !fault.drop) throw error(fault.status, 'Injected failure');
     if (!found) throw error(404, 'Not found');
     const raw = await readBody(req, url.pathname.startsWith('/r2/') ? Infinity : JSON_LIMIT);
