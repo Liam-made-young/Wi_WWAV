@@ -41,7 +41,45 @@ import {
   weeklyLoad,
   weeklyLoadLine,
 } from './estimate';
+import type { Task } from './records';
+import {
+  addHabit,
+  doneRecord,
+  habitLabel,
+  habitLine,
+  lastFourteen,
+  markHabitDone,
+  streak,
+  todayOrbs,
+  toggleHabit,
+  yearGrid,
+} from './habits';
+import {
+  basedOnLine,
+  categoryPct,
+  currentPct,
+  decidedPct,
+  gradesWidget,
+  guessCategory,
+  letterFor,
+  weightsLine,
+  whatItWouldTake,
+} from './grades';
 import { byHeat, DAY_MS, duePhrase, heatOf, heatThresholds, nextHeatChange, runway, tubeFill } from './heat';
+import {
+  checkOccurrence,
+  nextOpenOccurrence,
+  occurrencesBetween,
+  openTasks,
+  parseRule,
+  recurs,
+  reopenOccurrence,
+  seriesStart,
+  setRepeat,
+  taskOccurrences,
+  withEffectiveDue,
+} from './recurrence';
+import { defaultSpaces, groupCounts, groupName, inSpace, libraryLists, spaceCounts } from './spaces';
 
 const ENABLED = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
   ?.WRITE_HEAT_VECTORS === '1';
@@ -655,14 +693,14 @@ function estimateVectors(): void {
   add('estimate', 'formatMinutes', 600, (r) => ({ minutes: r.pick([0, 1, 44.5, 44.6, 45, 59, 59.5, 60, 61, 75, 119.5, 120, 190, 1440, -5, -60, -61, -0.4, 0.4, 0.5, r.int(0, 700), r.float(-100, 700)]) }), ({ minutes }) => formatMinutes(minutes));
   const world = (r: Rng) => {
     const now = instant(r);
-    const tasks = genTasks(r, r.int(0, 9), now, NY, 0);
-    return { now, tasks, sessions: genSessions(r, tasks, now) };
+    const tasks = genTasks(r, r.int(0, 6), now, NY, 0);
+    return { now, tasks, sessions: genSessions(r, tasks, now, 5) };
   };
   add('estimate', 'actualMin', 500, (r) => {
     const w = world(r);
     return { task: w.tasks.length > 0 ? r.pick(w.tasks) : genTask(r, 0, w.now, NY, []), sessions: w.sessions };
   }, ({ task, sessions }) => actualMin(task as never, sessions as never));
-  add('estimate', 'estimateContext', 500, (r) => world(r), ({ tasks, sessions }) => {
+  add('estimate', 'estimateContext', 300, (r) => world(r), ({ tasks, sessions }) => {
     const ctx = estimateContext(tasks as never, sessions as never);
     const sorted = <T>(m: Map<string, T>) => Object.fromEntries([...m.entries()].sort(([a], [b]) => (a < b ? -1 : 1)));
     return {
@@ -670,7 +708,7 @@ function estimateVectors(): void {
       children: Object.fromEntries([...ctx.children.entries()].map(([k, v]) => [k, v.map((t) => t.id)]).sort(([a], [b]) => ((a as string) < (b as string) ? -1 : 1))),
     };
   });
-  add('estimate', 'estimateMin', 800, (r) => {
+  add('estimate', 'estimateMin', 500, (r) => {
     const w = world(r);
     if (w.tasks.length === 0) return null;
     return { ...w, taskId: r.pick(w.tasks).id };
@@ -678,19 +716,302 @@ function estimateVectors(): void {
     const ctx = estimateContext(tasks as never, sessions as never);
     return estimateMin(tasks.find((t) => t.id === taskId) as never, ctx);
   });
-  add('estimate', 'averageLines', 400, (r) => {
+  add('estimate', 'averageLines', 300, (r) => {
     const w = world(r);
     // Done tasks with time, so the averages exist.
     const tasks = w.tasks.map((t) => (r.chance(0.5) ? { ...t, done: true, adjustMin: r.int(10, 120) } : t));
     return { space: genSpace(r, r.int(0, 2)), tasks, sessions: w.sessions };
   }, ({ space, tasks, sessions }) => averageLines(space as never, estimateContext(tasks as never, sessions as never)));
-  add('estimate', 'weeklyLoad', 700, (r) => world(r), ({ tasks, sessions, now }) =>
+  add('estimate', 'weeklyLoad', 500, (r) => world(r), ({ tasks, sessions, now }) =>
     weeklyLoad(tasks as never, estimateContext(tasks as never, sessions as never), now));
   add('estimate', 'weeklyLoadLine', 300, (r) => ({ load: { minutes: r.pick([0, 1, 45, 200, 190, r.int(0, 1000), 44.6], ), count: r.pick([0, 1, 2, 5, r.int(0, 20)]) } }), ({ load }) => weeklyLoadLine(load));
 }
 
+
+// --- recurrence ---------------------------------------------------------------------------
+
+/** A rule string put together from parts, some of them wrong. */
+function ruleText(r: Rng): string {
+  const parts: string[] = [];
+  const freq = r.pick(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'daily', 'Weekly', 'HOURLY', 'SECONDLY', '', 'DAILY ']);
+  if (r.chance(0.95)) parts.push(`FREQ=${freq}`);
+  if (r.chance(0.35)) parts.push(`INTERVAL=${r.pick(['1', '2', '3', '5', '12', '0', '-1', 'x', '', '007', '2.5', '99999', '1e2', '٣'])}`);
+  if (r.chance(0.3)) parts.push(`BYDAY=${r.pick(['MO', 'TU,TH', 'MO,TU,WE,TH,FR', 'SA,SU', 'su,mo', 'MO,MO,TU', '2TU', 'XX', '', 'TU,'])}`);
+  if (r.chance(0.25)) parts.push(`BYMONTHDAY=${r.pick(['1', '15', '31', '-1', '1,15', '1,-1', '0', '32', '-32', 'x', '', '5,', '07', '-0'])}`);
+  if (r.chance(0.2)) parts.push(`COUNT=${r.pick(['1', '3', '6', '10', '0', '-2', 'x', '2.5', '012'])}`);
+  if (r.chance(0.2)) {
+    parts.push(`UNTIL=${r.pick(['20261031', '20261008T035900Z', '20271231T235959Z', '20260101', '2026103', '20261031T0359Z', '20261031T035900', 'x', '', '20261331', '00500101', '20261031t035900z'])}`);
+  }
+  if (r.chance(0.08)) parts.push(r.pick(['WKST=SU', 'BYSETPOS=1', 'BYMONTH=3', 'X-FOO=1', '', 'FREQ']));
+  for (let i = parts.length - 1; i > 0; i--) {
+    const j = r.int(0, i);
+    [parts[i], parts[j]] = [parts[j], parts[i]];
+  }
+  let text = parts.join(r.chance(0.97) ? ';' : ';;');
+  if (r.chance(0.1)) text = `RRULE:${text}`;
+  if (r.chance(0.04)) text = `rrule:${text}`;
+  if (r.chance(0.05)) text = ` ${text} `;
+  if (r.chance(0.03)) text = `${text};`;
+  return text;
+}
+
+/** A rule that parses and can't search for ever: no huge interval. */
+function goodRule(r: Rng): string {
+  for (;;) {
+    const text = r.chance(0.5) ? r.pick(RULES) : ruleText(r);
+    const rule = parseRule(text);
+    if (rule && rule.interval <= 60) return text;
+  }
+}
+
+const seriesZone = (r: Rng) => r.weighted<string>([[6, NY], [1, 'Australia/Lord_Howe'], [1, 'Europe/London'], [1, 'Asia/Kolkata'], [1, 'UTC']]);
+
+function recurrenceVectors(): void {
+  add('recurrence', 'parseRule', 2500, (r) => ({ text: r.chance(0.35) ? r.pick(RULES) : ruleText(r) }), ({ text }) => parseRule(text));
+  add('recurrence', 'occurrencesBetween', 500, (r) => {
+    const tz = seriesZone(r);
+    const day = addDays(dayKey(instant(r, tz), tz), r.pick([0, 0, -400, -3000, 1, 17]));
+    const from = addDays(day, r.pick([-30, -1, 0, 0, 5, 40, 400, 3000]));
+    return {
+      rule: goodRule(r),
+      start: { day, minute: r.pick([0, 9 * 60, 23 * 60 + 59, 2 * 60 + 30, 1 * 60 + 30, r.int(0, 1439)]) },
+      tz,
+      from,
+      to: addDays(from, r.pick([0, 1, 7, 35, 90, 400])),
+    };
+  }, ({ rule, start, tz, from, to }) => occurrencesBetween(parseRule(rule)!, start, tz, from, to));
+  const withRule = (r: Rng, now: number, tz: string) => {
+    const t = genTask(r, 0, now, tz, [], 0.7);
+    if (t.rrule && r.chance(0.2)) t.due = null;
+    return t;
+  };
+  add('recurrence', 'seriesStart', 400, (r) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    return { task: withRule(r, now, tz), tz };
+  }, ({ task, tz }) => seriesStart(task as never, tz));
+  add('recurrence', 'taskOccurrences', 500, (r) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    const from = dayOffset(r, tz, now, -10, 10);
+    return { task: withRule(r, now, tz), tz, from, to: addDays(from, r.pick([0, 6, 30, 90])) };
+  }, ({ task, tz, from, to }) => taskOccurrences(task as never, tz, from, to));
+  const withTicks = (r: Rng) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    const task = withRule(r, now, tz);
+    const occurrences = r.chance(0.6)
+      ? Array.from({ length: r.int(1, 5) }, (_, i) => ({ id: `o${i}`, taskId: r.chance(0.9) ? task.id : 'other', date: dayOffset(r, tz, now, -3, 14), doneAt: now - r.int(0, 3 * 86_400_000) }))
+      : [];
+    return { task, occurrences, now, tz };
+  };
+  add('recurrence', 'nextOpenOccurrence', 700, withTicks, ({ task, occurrences, now, tz }) => nextOpenOccurrence(task as never, occurrences, now, tz));
+  add('recurrence', 'recurs', 400, (r) => ({ task: withRule(r, instant(r), NY) }), ({ task }) => recurs(task as never));
+  add('recurrence', 'setRepeat', 400, (r) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    return { task: withRule(r, now, tz), rule: r.chance(0.2) ? null : goodRule(r), now, tz };
+  }, ({ task, rule, now, tz }) => setRepeat(task as never, rule, now, tz));
+  add('recurrence', 'withEffectiveDue', 600, withTicks, ({ task, occurrences, now, tz }) => withEffectiveDue(task as never, occurrences, now, tz));
+  add('recurrence', 'checkOccurrence', 500, (r) => ({ ...withTicks(r), idPrefix: r.pick(['occ', 'id']) }), ({ task, occurrences, now, tz, idPrefix }) => {
+    let n = 0;
+    return checkOccurrence(task as never, occurrences, now, tz, () => `${idPrefix}-${++n}`);
+  });
+  add('recurrence', 'reopenOccurrence', 300, (r) => {
+    const w = withTicks(r);
+    const date = w.occurrences.length > 0 ? r.pick(w.occurrences).date : '2026-10-06';
+    return { occurrences: w.occurrences, taskId: r.chance(0.8) ? w.task.id : 'other', date };
+  }, ({ occurrences, taskId, date }) => reopenOccurrence(occurrences, taskId, date));
+  add('recurrence', 'openTasks', 400, (r) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    const tasks = genTasks(r, r.int(0, 6), now, tz, 0.4);
+    return { tasks, occurrences: genOccurrences(r, tasks, now, tz), now, tz };
+  }, ({ tasks, occurrences, now, tz }) => openTasks(tasks as never, occurrences, now, tz));
+}
+
+// --- spaces -------------------------------------------------------------------------------
+
+function genCapture(r: Rng, i: number, now: number) {
+  const c: Record<string, unknown> = { id: `c${i}`, text: r.pick(['fix the snare at 1:32', 'a thought', 'call the bank']) };
+  if (r.chance(0.1)) c.link = { kind: 'work', id: 'w1' };
+  if (r.chance(0.4)) c.triagedAt = now - r.int(0, 86_400_000);
+  if (r.chance(0.2)) c.resultType = r.pick(['task', 'note', 'project', 'upload']);
+  if (r.chance(0.2)) c.resultId = 'r1';
+  return c;
+}
+
+function genCourse(r: Rng, id: string, code: string) {
+  const c: Record<string, unknown> = {
+    id,
+    termId: 'fall26',
+    code,
+    name: r.pick(['Japanese', 'Calculus', 'History']),
+    categories: genCategories(r),
+  };
+  if (r.chance(0.3)) c.scale = r.pick([[{ letter: 'A', min: 90 }, { letter: 'B', min: 80 }, { letter: 'C', min: 70 }, { letter: 'F', min: 0 }], [{ letter: 'A', min: 90 }, { letter: 'B', min: 80 }, { letter: 'D', min: 60 }], [{ letter: 'P', min: 50 }, { letter: 'F', min: 0 }]]);
+  c.notes = '';
+  return c;
+}
+
+function genCategories(r: Rng) {
+  const n = r.int(0, 5);
+  const weights = r.pick([[25, 20, 20, 35], [40, 40, 20], [50, 50], [60, 40], [33.3, 33.3, 33.4], [10, 20, 30, 40, 10], [100], [20, 80], [34, 66]]);
+  return Array.from({ length: Math.min(n, weights.length) || r.int(0, 1) }, (_, i) => ({
+    id: `k${i}`,
+    name: r.pick(['Homework', 'Quizzes', 'Exit tickets', 'Labs', 'Final']) + i,
+    weight: r.chance(0.9) ? weights[i] : r.pick([0, 12.5, 7.7]),
+    keywords: r.sample(['quiz', 'Lab', 'lab 5a', 'exit ticket', 'kanji', 'homework', 'Edfinity', ' ', '', 'é'], r.int(0, 3)),
+  }));
+}
+
+function spacesVectors(): void {
+  add('spaces', 'defaultSpaces', 20, (r) => ({ idPrefix: r.pick(['space', 'id', 's']) }), ({ idPrefix }) => {
+    let n = 0;
+    return defaultSpaces(() => `${idPrefix}-${++n}`);
+  });
+  add('spaces', 'inSpace', 300, (r) => {
+    const now = instant(r);
+    return { spaceId: r.pick([null, '', 'classes', 'wwav', 'zzz']), tasks: genTasks(r, r.int(0, 6), now, NY, 0) };
+  }, ({ spaceId, tasks }) => (tasks as never as Task[]).filter(inSpace(spaceId)).map((t) => t.id));
+  const sidebar = (r: Rng, now: number, tz: string) => {
+    const tasks = genTasks(r, r.int(0, 6), now, tz, 0.25);
+    return {
+      tasks,
+      occurrences: genOccurrences(r, tasks, now, tz),
+      captures: Array.from({ length: r.int(0, 3) }, (_, i) => genCapture(r, i, now)),
+      projects: Array.from({ length: r.int(0, 3) }, (_, i) => ({ id: `p${i + 1}`, spaceId: r.pick(SPACE_IDS), title: `Project ${i}`, status: r.pick(['active', 'on_hold', 'someday', 'archived']) })),
+      milestones: Array.from({ length: r.int(0, 4) }, (_, i) => genMilestone(r, i + 1, dayKey(now, tz))),
+      courses: [genCourse(r, 'jpn201', 'JPN 201'), genCourse(r, 'mth142', 'MTH 142'), genCourse(r, 'his101', 'HIS 101'), genCourse(r, 'zzz999', 'jpn  101')].slice(0, r.int(0, 4)),
+    };
+  };
+  add('spaces', 'spaceCounts', 250, (r) => {
+    const now = instant(r);
+    const d = sidebar(r, now, NY);
+    return { spaces: [0, 1, 2].map((i) => genSpace(r, i)), tasks: d.tasks, occurrences: d.occurrences, now, tz: NY };
+  }, ({ spaces, tasks, occurrences, now, tz }) => spaceCounts(spaces as never, { tasks: tasks as never, occurrences }, now, tz));
+  add('spaces', 'libraryLists', 250, (r) => {
+    const now = instant(r);
+    return { data: sidebar(r, now, NY), now, tz: NY, spaceId: r.pick([null, null, 'classes', 'wwav', 'personal']) };
+  }, ({ data, now, tz, spaceId }) => libraryLists(data as never, now, tz, spaceId));
+  add('spaces', 'groupName', 400, (r) => {
+    const now = instant(r);
+    const d = sidebar(r, now, NY);
+    return { task: d.tasks.length > 0 ? r.pick(d.tasks) : genTask(r, 0, now, NY, []), courses: d.courses, milestones: d.milestones };
+  }, ({ task, courses, milestones }) => groupName(task as never, { courses: courses as never, milestones: milestones as never }));
+  add('spaces', 'groupCounts', 250, (r) => {
+    const now = instant(r);
+    const space = genSpace(r, r.int(0, 2));
+    return { space, data: sidebar(r, now, NY), now, tz: NY };
+  }, ({ space, data, now, tz }) => groupCounts(space as never, data as never, now, tz));
+}
+
+// --- grades -------------------------------------------------------------------------------------
+
+function genGrades(r: Rng, categories: { id: string }[], n: number, courseIds: string[] = ['jpn201']) {
+  return Array.from({ length: n }, (_, i) => {
+    const outOf = r.weighted<number>([[8, 100], [3, r.pick([10, 20, 25, 3, 7])], [1, 0]]);
+    const g: Record<string, unknown> = {
+      id: `g${i}`,
+      courseId: r.chance(0.9) ? courseIds[0] : r.pick(courseIds),
+      categoryId: categories.length > 0 && r.chance(0.92) ? r.pick(categories).id : null,
+      title: r.pick(['Exit Ticket 12', 'Kanji quiz 6', 'Lab 5a write-up', 'Midterm', 'Labor day essay', 'EDFINITY 4.2']),
+      score: r.chance(0.1) ? null : r.weighted<number>([[6, r.int(0, outOf || 10)], [3, Math.round(r.float(0, outOf || 10) * 10) / 10], [1, r.float(0, 100)]]),
+      outOf,
+      dropped: r.chance(0.08),
+      pending: r.chance(0.08),
+    };
+    if (r.chance(0.1)) g.link = 'https://brightspace.uri.edu/d2l/home';
+    g.source = r.pick(['you', 'mail', 'valence']);
+    return g;
+  });
+}
+
+function gradeWorld(r: Rng) {
+  const course = genCourse(r, 'jpn201', 'JPN 201') as { categories: { id: string }[] };
+  return { course, grades: genGrades(r, course.categories, r.int(0, 6)) };
+}
+
+function gradesVectors(): void {
+  add('grades', 'categoryPct', 500, (r) => {
+    const w = gradeWorld(r);
+    return { categoryId: w.course.categories.length > 0 && r.chance(0.9) ? r.pick(w.course.categories).id : 'zzz', grades: w.grades };
+  }, ({ categoryId, grades }) => categoryPct(categoryId, grades as never));
+  add('grades', 'currentPct', 500, gradeWorld, ({ course, grades }) => currentPct(course as never, grades as never));
+  add('grades', 'decidedPct', 400, gradeWorld, ({ course, grades }) => decidedPct(course as never, grades as never));
+  const thresholds = [93, 90, 87, 83, 80, 77, 73, 70, 67, 60, 0];
+  add('grades', 'letterFor', thresholds.length * 6 + 500, (r, i) => {
+    const scale = r.chance(0.35) ? r.pick([[{ letter: 'A', min: 90 }, { letter: 'B', min: 80 }, { letter: 'C', min: 70 }, { letter: 'F', min: 0 }], [{ letter: 'A', min: 90 }, { letter: 'D', min: 60 }], []]) : undefined;
+    if (i < thresholds.length * 6) {
+      const at = thresholds[Math.floor(i / 6)];
+      return { pct: at + [-1e-9, -0.01, 0, 0.01, 1e-9, 0.5][i % 6], ...(scale ? { scale } : {}) };
+    }
+    return { pct: r.pick([r.float(-10, 110), r.int(0, 100), r.int(0, 1000) / 10]), ...(scale ? { scale } : {}) };
+  }, ({ pct, scale }) => letterFor(pct, scale));
+  add('grades', 'basedOnLine', 300, gradeWorld, ({ course, grades }) => basedOnLine(course as never, grades as never));
+  add('grades', 'weightsLine', 500, (r) => ({ course: { ...(genCourse(r, 'jpn201', 'JPN 201') as object), categories: Array.from({ length: r.int(0, 5) }, (_, i) => ({ id: `k${i}`, name: `k${i}`, weight: r.pick([10, 20, 25, 33.3, 33.4, 12.5, 40, 65, 35, 0.1, r.float(0, 60)]), keywords: [] })) } }), ({ course }) => weightsLine(course as never));
+  const letters = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'P', 'Z', ''];
+  // Two-category courses over every weight and a spread of scores, as the findings test sweeps them.
+  const sweep: { w: number; score: number; outOf: number; letter: string }[] = [];
+  for (let w = 10; w < 100; w += 10) for (const [score, outOf] of [[0, 1], [2, 3], [5, 6], [50, 100], [93, 100], [67, 100]]) for (const letter of ['A', 'B-', 'C', 'D+', 'F']) sweep.push({ w, score, outOf, letter });
+  add('grades', 'whatItWouldTake', sweep.length + 450, (r, i) => {
+    if (i < sweep.length) {
+      const { w, score, outOf, letter } = sweep[i];
+      const course = { id: 'jpn201', termId: 't', code: 'JPN 201', name: 'x', categories: [{ id: 'done', name: 'done', weight: w, keywords: [] }, { id: 'left', name: 'left', weight: 100 - w, keywords: [] }], notes: '' };
+      return { course, grades: [{ id: 'g', courseId: 'jpn201', categoryId: 'done', title: 't', score, outOf, dropped: false, pending: false, source: 'you' }], letter };
+    }
+    const w = gradeWorld(r);
+    return { ...w, letter: r.pick(letters) };
+  }, ({ course, grades, letter }) => whatItWouldTake(course as never, grades as never, letter));
+  add('grades', 'guessCategory', 500, (r) => ({
+    title: r.pick(['Exit Ticket 12', 'EDFINITY 4.2', 'Kanji quiz 7', 'Lab 3: Titration', 'Lab 5a write-up', 'Labor history essay', 'Midterm', 'lab', 'Lab5a', 'my-lab!', 'écoute lab é', '😀 lab 😀', '']),
+    categories: genCategories(r),
+  }), ({ title, categories }) => guessCategory(title, categories));
+  add('grades', 'gradesWidget', 300, (r) => {
+    const courses = [genCourse(r, 'jpn201', 'JPN 201'), genCourse(r, 'mth142', 'MTH 142'), genCourse(r, 'his101', 'HIS 101')].slice(0, r.int(0, 3));
+    const cats = courses.flatMap((c) => (c as { categories: { id: string }[] }).categories);
+    const grades = genGrades(r, cats, r.int(0, 7), ['jpn201', 'mth142', 'his101']);
+    return { courses, grades };
+  }, ({ courses, grades }) => gradesWidget(courses as never, grades as never));
+}
+
+// --- habits --------------------------------------------------------------------------------------
+
+function habitsVectors(): void {
+  add('habits', 'addHabit', 400, (r) => {
+    const n = r.pick([0, 1, 3, 5, 6, 7]);
+    return {
+      habits: Array.from({ length: n }, (_, i) => ({ id: `h${i}`, title: `Habit ${i}`, log: {}, showCounter: false })),
+      title: r.pick(['Practise kanji', '  ', '', ' Stretch ', ' x ', '﻿', '\u0085', 'a']),
+      ...(r.chance(0.5) ? { minutes: r.pick([10, 20, 0, 7.5]) } : {}),
+      idPrefix: r.pick(['h', 'habit']),
+    };
+  }, ({ habits, title, minutes, idPrefix }) => {
+    let n = 0;
+    return addHabit(habits as never, minutes === undefined ? { title } : { title, minutes }, () => `${idPrefix}-${++n}`);
+  });
+  const habitWorld = (r: Rng) => {
+    const now = instant(r);
+    const today = dayKey(now, NY);
+    return { habit: genHabit(r, 0, today), today, now };
+  };
+  add('habits', 'habitLabel', 300, (r) => ({ habit: genHabit(r, 0, '2026-10-06') }), ({ habit }) => habitLabel(habit as never));
+  add('habits', 'markHabitDone', 400, (r) => { const w = habitWorld(r); return { habit: w.habit, day: r.chance(0.5) ? w.today : addDays(w.today, r.int(-30, 3)) }; }, ({ habit, day }) => markHabitDone(habit as never, day));
+  add('habits', 'toggleHabit', 400, (r) => { const w = habitWorld(r); return { habit: w.habit, day: r.chance(0.5) ? w.today : addDays(w.today, r.int(-30, 3)) }; }, ({ habit, day }) => toggleHabit(habit as never, day));
+  add('habits', 'todayOrbs', 250, (r) => {
+    const now = instant(r);
+    const today = dayKey(now, NY);
+    return { habits: Array.from({ length: r.int(0, 4) }, (_, i) => genHabit(r, i, today)), now, tz: NY };
+  }, ({ habits, now, tz }) => todayOrbs(habits as never, now, tz));
+  add('habits', 'lastFourteen', 300, (r) => { const w = habitWorld(r); return { habit: w.habit, today: w.today }; }, ({ habit, today }) => lastFourteen(habit as never, today));
+  add('habits', 'yearGrid', 60, (r) => { const w = habitWorld(r); return { habit: w.habit, today: w.today }; }, ({ habit, today }) => yearGrid(habit as never, today));
+  add('habits', 'doneRecord', 500, (r) => { const w = habitWorld(r); return { habit: w.habit, today: w.today }; }, ({ habit, today }) => doneRecord(habit as never, today));
+  add('habits', 'streak', 500, (r) => { const w = habitWorld(r); return { habit: w.habit, today: w.today }; }, ({ habit, today }) => streak(habit as never, today));
+  add('habits', 'habitLine', 500, (r) => { const w = habitWorld(r); return { habit: w.habit, today: w.today }; }, ({ habit, today }) => habitLine(habit as never, today));
+}
+
 // Generators for the modules still to come.
-void [genOccurrences, genHabit, genBlock, genEvent, genMilestone];
+void [genBlock, genEvent];
 
 // --- Entry -------------------------------------------------------------------------------
 
@@ -701,6 +1022,10 @@ describe.skipIf(!ENABLED)('writing the cross-check vectors', () => {
     formatVectors();
     heatVectors();
     estimateVectors();
+    recurrenceVectors();
+    spacesVectors();
+    gradesVectors();
+    habitsVectors();
     await write();
   }, 600_000);
 });

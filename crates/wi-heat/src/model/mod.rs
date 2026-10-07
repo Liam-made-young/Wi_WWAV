@@ -24,7 +24,11 @@
 pub mod copy;
 pub mod estimate;
 pub mod format;
+pub mod grades;
+pub mod habits;
 pub mod heat;
 pub mod js;
 pub mod records;
+pub mod recurrence;
+pub mod spaces;
 pub mod zone;

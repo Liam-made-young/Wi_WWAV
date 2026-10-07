@@ -13,8 +13,11 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use wi_heat::model::records::{FocusSession, Space, Task};
-use wi_heat::model::{estimate, format, heat, js, zone};
+use wi_heat::model::records::{
+    Course, FocusSession, Grade, GradeCategory, Habit, LetterStep, Space, Task, TaskOccurrence,
+};
+use wi_heat::model::spaces::SidebarData;
+use wi_heat::model::{estimate, format, grades, habits, heat, js, recurrence, spaces, zone};
 
 mod vectors {
     use super::*;
@@ -300,6 +303,236 @@ fn estimate_vectors() {
                 out(estimate::weekly_load(&tasks, &ctx, num(i, "now")))
             }
             "weeklyLoadLine" => out(estimate::weekly_load_line(&arg(i, "load"))),
+            _ => return None,
+        })
+    });
+}
+
+// --- recurrence ------------------------------------------------------------------------------------
+
+/// An id maker that counts from 1 under a prefix, as the generator's does.
+fn ids(i: &Value) -> impl FnMut() -> String {
+    let prefix = text(i, "idPrefix").to_string();
+    let mut n = 0;
+    move || {
+        n += 1;
+        format!("{prefix}-{n}")
+    }
+}
+
+#[test]
+fn recurrence_vectors() {
+    check_module("recurrence", |name, i| {
+        Some(match name {
+            "parseRule" => out(recurrence::parse_rule(text(i, "text"))),
+            "occurrencesBetween" => {
+                let rule = recurrence::parse_rule(text(i, "rule")).expect("a rule that reads");
+                out(recurrence::occurrences_between(
+                    &rule,
+                    &arg(i, "start"),
+                    &tz(i),
+                    text(i, "from"),
+                    text(i, "to"),
+                ))
+            }
+            "seriesStart" => out(recurrence::series_start(&arg::<Task>(i, "task"), &tz(i))),
+            "taskOccurrences" => out(recurrence::task_occurrences(
+                &arg::<Task>(i, "task"),
+                &tz(i),
+                text(i, "from"),
+                text(i, "to"),
+            )),
+            "nextOpenOccurrence" => out(recurrence::next_open_occurrence(
+                &arg::<Task>(i, "task"),
+                &arg::<Vec<TaskOccurrence>>(i, "occurrences"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "recurs" => out(recurrence::recurs(&arg::<Task>(i, "task"))),
+            "setRepeat" => {
+                let rule: Option<String> = arg(i, "rule");
+                out(recurrence::set_repeat(
+                    &arg::<Task>(i, "task"),
+                    rule.as_deref(),
+                    num(i, "now"),
+                    &tz(i),
+                ))
+            }
+            "withEffectiveDue" => out(recurrence::with_effective_due(
+                &arg::<Task>(i, "task"),
+                &arg::<Vec<TaskOccurrence>>(i, "occurrences"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "checkOccurrence" => out(recurrence::check_occurrence(
+                &arg::<Task>(i, "task"),
+                &arg::<Vec<TaskOccurrence>>(i, "occurrences"),
+                num(i, "now"),
+                &tz(i),
+                &mut ids(i),
+            )),
+            "reopenOccurrence" => out(recurrence::reopen_occurrence(
+                &arg::<Vec<TaskOccurrence>>(i, "occurrences"),
+                text(i, "taskId"),
+                text(i, "date"),
+            )),
+            "openTasks" => out(recurrence::open_tasks(
+                &arg::<Vec<Task>>(i, "tasks"),
+                &arg::<Vec<TaskOccurrence>>(i, "occurrences"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            _ => return None,
+        })
+    });
+}
+
+// --- spaces ---------------------------------------------------------------------------------------------
+
+fn space_id(i: &Value) -> Option<String> {
+    arg(i, "spaceId")
+}
+
+#[test]
+fn spaces_vectors() {
+    check_module("spaces", |name, i| {
+        Some(match name {
+            "defaultSpaces" => out(spaces::default_spaces(&mut ids(i))),
+            "inSpace" => {
+                let (tasks, id): (Vec<Task>, Option<String>) = (arg(i, "tasks"), space_id(i));
+                let keep = spaces::in_space(id.as_deref());
+                out(tasks
+                    .iter()
+                    .filter(|t| keep(t))
+                    .map(|t| t.id.clone())
+                    .collect::<Vec<_>>())
+            }
+            "spaceCounts" => out(spaces::space_counts(
+                &arg::<Vec<Space>>(i, "spaces"),
+                &arg::<Vec<Task>>(i, "tasks"),
+                &arg::<Vec<TaskOccurrence>>(i, "occurrences"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "libraryLists" => {
+                let id = space_id(i);
+                out(spaces::library_lists(
+                    &arg::<SidebarData>(i, "data"),
+                    num(i, "now"),
+                    &tz(i),
+                    id.as_deref(),
+                ))
+            }
+            "groupName" => out(spaces::group_name(
+                &arg::<Task>(i, "task"),
+                &arg::<Vec<Course>>(i, "courses"),
+                &arg::<Vec<wi_heat::model::records::Milestone>>(i, "milestones"),
+            )),
+            "groupCounts" => out(spaces::group_counts(
+                &arg::<Space>(i, "space"),
+                &arg::<SidebarData>(i, "data"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            _ => return None,
+        })
+    });
+}
+
+// --- grades -------------------------------------------------------------------------------------------------
+
+#[test]
+fn grades_vectors() {
+    check_module("grades", |name, i| {
+        Some(match name {
+            "categoryPct" => out(grades::category_pct(
+                text(i, "categoryId"),
+                &arg::<Vec<Grade>>(i, "grades"),
+            )),
+            "currentPct" => out(grades::current_pct(
+                &arg::<Course>(i, "course"),
+                &arg::<Vec<Grade>>(i, "grades"),
+            )),
+            "decidedPct" => out(grades::decided_pct(
+                &arg::<Course>(i, "course"),
+                &arg::<Vec<Grade>>(i, "grades"),
+            )),
+            "letterFor" => {
+                let scale: Option<Vec<LetterStep>> = arg(i, "scale");
+                out(match scale {
+                    Some(scale) => grades::letter_for(num(i, "pct"), &scale),
+                    None => grades::letter_for_default(num(i, "pct")),
+                })
+            }
+            "basedOnLine" => out(grades::based_on_line(
+                &arg::<Course>(i, "course"),
+                &arg::<Vec<Grade>>(i, "grades"),
+            )),
+            "weightsLine" => out(grades::weights_line(&arg::<Course>(i, "course"))),
+            "whatItWouldTake" => out(grades::what_it_would_take(
+                &arg::<Course>(i, "course"),
+                &arg::<Vec<Grade>>(i, "grades"),
+                text(i, "letter"),
+            )),
+            "guessCategory" => out(grades::guess_category(
+                text(i, "title"),
+                &arg::<Vec<GradeCategory>>(i, "categories"),
+            )),
+            "gradesWidget" => out(grades::grades_widget(
+                &arg::<Vec<Course>>(i, "courses"),
+                &arg::<Vec<Grade>>(i, "grades"),
+            )),
+            _ => return None,
+        })
+    });
+}
+
+// --- habits ------------------------------------------------------------------------------------------------------
+
+#[test]
+fn habits_vectors() {
+    check_module("habits", |name, i| {
+        Some(match name {
+            "addHabit" => {
+                let minutes: Option<f64> = arg(i, "minutes");
+                out(habits::add_habit(
+                    &arg::<Vec<Habit>>(i, "habits"),
+                    text(i, "title"),
+                    minutes,
+                    &mut ids(i),
+                ))
+            }
+            "habitLabel" => out(habits::habit_label(&arg::<Habit>(i, "habit"))),
+            "markHabitDone" => out(habits::mark_habit_done(
+                &arg::<Habit>(i, "habit"),
+                text(i, "day"),
+            )),
+            "toggleHabit" => out(habits::toggle_habit(
+                &arg::<Habit>(i, "habit"),
+                text(i, "day"),
+            )),
+            "todayOrbs" => out(habits::today_orbs(
+                &arg::<Vec<Habit>>(i, "habits"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "lastFourteen" => out(habits::last_fourteen(
+                &arg::<Habit>(i, "habit"),
+                text(i, "today"),
+            )),
+            "yearGrid" => out(habits::year_grid(
+                &arg::<Habit>(i, "habit"),
+                text(i, "today"),
+            )),
+            "doneRecord" => out(habits::done_record(
+                &arg::<Habit>(i, "habit"),
+                text(i, "today"),
+            )),
+            "streak" => out(habits::streak(&arg::<Habit>(i, "habit"), text(i, "today"))),
+            "habitLine" => out(habits::habit_line(
+                &arg::<Habit>(i, "habit"),
+                text(i, "today"),
+            )),
             _ => return None,
         })
     });
