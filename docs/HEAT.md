@@ -29,8 +29,9 @@ camelCase fields. `text` is what ⌘K searches (titles, notes, note text).
 |---|---|---|
 | `space`, `task`, `taskOccurrence`, `timeBlock`, `focusSession`, `project`, `milestone`, `habit`, `term`, `course`, `grade`, `mailThread`, `calendar`, `capture`, `note`, `profileShare` | the record's `id` (ULID for new records; imported ids kept) | journaled |
 | `dailyNote` | the date, `YYYY-MM-DD` | journaled |
-| `heatState` | `state` | the timer, the current task and `planDrafts`; **not** journaled (a draft is not a change, 8.8) |
-| `heatSetting` | `claude.tools`, `school`, `dayEnds` | `claude.tools` is `{tool: bool}`, all true by default |
+| `heatState` | `state` | the timer, the current task and `planDrafts`, and under `focus` the timer machine's whole state (never shown to a view); **not** journaled (a draft is not a change, 8.8) |
+| `heatSetting` | `claude.tools`, `school`, `dayEnds`, `feed.<calendarId>`, `feedDismissed`, `seeded`, `mailIds` | `claude.tools` is `{tool: bool}`, all true by default; `feed.*` holds a feed's missed-sync counts and `feedDismissed` the Brightspace items you deleted, so a sync doesn't make them again; `seeded` marks the three first spaces as made; **not** journaled |
+| `calendar` | the record's `id` | a calendar's name, kind, sync times and `keychainRef`; added and removed in Settings → Heat, so **not** journaled: ⌘Z never takes a calendar away |
 | `calendarEvent` | `<calendarId>/<UID>` | what other calendars' feeds hold; written by sync, outside the journal, replaced each sync |
 
 Two fields beyond 3.16's lists: a task Claude added keeps `claudeReason`,
@@ -44,6 +45,17 @@ course's pending grades. iCal addresses are never in the library: `calendar`
 holds a `keychainRef`, and the address is in the Keychain (Secret Service on
 Linux).
 
+**What syncs** (8.7). Only the app syncs, field by field, through
+`/api/heat/changes`. `calendar`, `calendarEvent`, `heatState` and
+`heatSetting` never go up. A private grade or course never goes up either: a
+grade or course switched public goes up as a copy of the fields 3.15 lists
+(a grade's `courseId`, `title`, `score`, `outOf`; a course's `code`, `name`),
+with `public`, and when it is switched back, or deleted, the copy is pushed as
+`deleted`. A private course whose grade is public goes up as its `code` and
+`name` alone while that grade is public, because the grade names it. A grade
+or course another device pushed is never written into this library. Everything
+else, public or private, syncs.
+
 ## The journal
 
 `txn` gains three columns: `actor` (`you` or `claude`, default `you`),
@@ -56,20 +68,21 @@ The person's labels:
 
 | Operation | Label |
 |---|---|
-| a new record of any kind | `add <kind>` ("add task", "add habit") |
+| a new record of any kind | `add <kind>`, the kind in words ("add task", "add habit", "add daily note") |
 | a task's title | `rename task` |
 | a task's difficulty or minutes | `estimate` |
 | any other field | `edit <kind>` |
+| a habit's day | `tick habit`, `untick habit` |
 | delete | `delete <kind>` |
 | done, and back | `mark done`, `mark not done` |
 | a block moved, resized, added, removed | `move block`, `resize block`, `add block`, `remove block` |
 | Plan my day accepted, one draft accepted | `plan my day`, `accept draft` |
 | a focus round logged; Get Info's "Took" | `focus session`; `change time taken` |
-| a habit's day | `tick habit`, `untick habit` |
 | the Public switch | `make public`, `make private` |
 | Show on a Now making line or a timeline, and hiding it | `show Now making`, `show timeline`, `hide Now making`, `hide timeline` |
 | a capture; triage | `capture`; `triage capture` |
-| a score typed into a pending grade | `enter score` |
+| a score typed into a grade | `enter score` |
+| the weekly review's note | `weekly review` |
 | moving in | `move in` |
 | a calendar sync that changed anything | `calendar sync` |
 
@@ -80,17 +93,25 @@ change first.", when a later done entry touched any of the same rows.
 ## The commands
 
 All go through `core(cmd, args)` (`docs/COMMANDS.md`). Errors are
-`{code, message}` with one plain sentence. Every write returns
-`{..., undo: "Undo add task"}` and emits the event `heat` `{kinds: [...]}`.
-Writes made by another process (`wi-mcp`) emit the same event: the core checks
-`PRAGMA data_version` every 500 ms and when the window comes forward, reads the
-journal rows newer than the last it saw, and names their kinds.
+`{code, message}` with one plain sentence (`refused` unless a row says
+otherwise). Every write returns `{..., undo: "Undo add task"}` (`undo` is null
+when nothing changed) and emits the event `heat` `{kinds: [...]}` and the
+`history` event the Edit menu listens to. Writes made by another process
+(`wi-mcp`) emit the same events: the core checks `PRAGMA data_version` every
+500 ms, reads the journal entries newer than the last it saw, skips its own,
+and names the kinds each one changed. A change made outside the journal (the
+timer, a setting, a calendar) emits `heat` with `heatState`, `heatSetting`,
+`calendar` or `calendarEvent`.
 
 ### Reading
 
-`heat.snapshot {date, from?, to?}` → everything the views draw for `date`
-(`from`/`to` bound events and blocks for Calendar; default: the month around
-`date`, a week either side):
+`heat.snapshot {date, from?, to?}` → everything the views draw for `date`.
+`from` and `to` are the days shown plus today (the views widen the window to
+take in today); `timeBlock`, `taskOccurrence` and `events` are bounded by them,
+and `derived.occurrences` is drawn for them. Every other record comes whole.
+Without them: the month around `date`, from a week before its 1st to a week
+after its last day. What the core works out (`next`, heat, the lists) reads
+every record, not only those in the window:
 
 ```jsonc
 {
@@ -100,7 +121,10 @@ journal rows newer than the last it saw, and names their kinds.
                "term": [...], "course": [...], "grade": [...], "mailThread": [...],
                "calendar": [...], "capture": [...], "dailyNote": [...], "note": [...],
                "profileShare": [...] },
-  "heatState": { "currentTaskId": null, "timer": { "phase": "idle", "round": 1, "endsAt": null }, "planDrafts": [] },
+  "heatState": { "currentTaskId": null,
+                 "timer": { "phase": "idle", "round": 1, "endsAt": null, "running": false, "leftMs": 1500000,
+                            "lengthMs": 1500000, "focusMin": 25, "taskId": null, "note": null },
+                 "planDrafts": [] },
   "events": [ { "id": "...", "calendarId": "...", "title": "...", "start": 0, "end": 0, "allDay": false } ],
   "derived": {
     "tasks":   { "<taskId>": { "heat": { "v": 0.0, "level": "..." }, "actualMin": 0,
@@ -111,15 +135,26 @@ journal rows newer than the last it saw, and names their kinds.
                  "recurringToday": [{ "kind": "task|habit", "id": "..." }], "hotUnplanned": ["<taskId>"] },
     "hotTasks": ["<taskId>"],
     "lists":   { "inbox": [], "allOpen": [], "hot": [], "dueThisWeek": [], "scheduled": [], "someday": [], "done": [] },
-    "averages": [ { "type": "Homework", "minutes": 75, "count": 4 } ],
-    "courses": { "<courseId>": { "currentPct": 0.0, "decidedPct": 0.0, "letter": "B", "weights": "Weights add to 95%. The other 5% is unassigned." } },
+    "averages": [ { "space": "<spaceId>", "type": "Homework", "minutes": 75, "count": 4, "line": "Homework 1h 15m (4)" } ],
+    "courses": { "<courseId>": { "currentPct": 0.0, "decidedPct": 0.0, "letter": "B", "weights": "Weights add to 95%. The other 5% is unassigned.", "basedOn": "Based on 62.5% of the course so far" } },
     "habits":  { "<habitId>": { "today": true, "record": "Done 41 days since August 26" } },
+    "occurrences": [ { "taskId": "<taskId>", "date": "2026-10-08", "done": false } ],
+    "timer":   { "digits": "25:00", "line": "...", "note": null, "meter": 0, "paused": false, "strip": "..." },
     "status":  "Saved on this Mac · Synced 3:41 PM"
   }
 }
 ```
 
-Lists are ids in display order, so the views never sort. `heat.whatItWouldTake
+Lists are ids in display order, so the views never sort (`done` reads newest
+first). `heatState.timer` is the summary 3.16 gives (`phase`, `round`,
+`endsAt`) and what the LCD needs to draw a paused round or a break that waits
+for a press: `running`, `leftMs` (time left while paused or waiting),
+`lengthMs`, `focusMin`, `taskId` (what the round is on, null for a habit's)
+and `note` ("Focus done. 25m logged to Mix the second verse.", until the next
+press). `derived.occurrences` holds each recurring, open series' dates inside
+the window, with whether each is ticked, for Calendar's pills; without it only
+`next` shows. `derived.timer` is the LCD's words at `now`, for a view that
+doesn't run the model. `heat.whatItWouldTake
 {courseId, letter}` → `{text}` ("To finish with a B (83%), you need 78.4% on
 the remaining 35%."). `heat.review.week {weekStart}` → step 2's facts and step
 5's headings (3.14). `heat.publicView {}` → exactly what someone opening your
@@ -130,33 +165,34 @@ sun would see (3.15), from the local records: the same shape the server's
 
 | cmd | args | result |
 |---|---|---|
-| `heat.put` | `{kind, record}` | `{record, undo}`. New when `record.id` is absent (a ULID is made). Checked against the kind's fields and rules: a 7th habit is refused ("Habit limit reached"), minutes are clamped 5–600, unknown fields are refused |
+| `heat.put` | `{kind, record}` | `{record, undo}`. New when `record.id` is absent (a ULID is made). Checked against the kind's fields and rules: a 7th habit is refused ("Habit limit reached"), minutes are clamped 5–600, unknown fields are refused ("A task has no field called 'colour'."). `mailThread`, `calendar` and `profileShare` are refused: Mail lists only what Claude recorded, calendars are added in Settings → Heat, and Show and Hide make the shares |
 | `heat.patch` | `{kind, id, set}` | `{record, undo}`. Fields not in `set` are untouched. `public` is refused here: it has its own command |
-| `heat.delete` | `{kind, id}` | `{undo}`. Takes the record's dependents with it, in the same entry |
-| `heat.done` | `{taskId, done, date?}` | `{task, took?, undo}`. A recurring task gets or loses a `taskOccurrence` for `date`. With logged time, `took` is "Done. Took 1h 15m across 3 focus sessions." |
+| `heat.delete` | `{kind, id}` | `{undo}`. Takes the record's dependents with it, in the same entry; a space that still holds tasks, projects or milestones, and a term that still holds courses, are refused with a sentence. Deleting the current task, or one in a draft, clears it there |
+| `heat.done` | `{taskId, done, date?}` | `{task, took?, undo}`. A recurring task gets or loses a `taskOccurrence` for `date` (the views always send it); a series never flips to done. With logged time, `took` is "Done. Took 1h 15m across 3 focus sessions." Marking the current task done makes nothing current, and clears a Now making line that shows it |
 | `heat.estimate` | `{taskId, difficulty?, estMin?}` | `{task, clamped, undo}`. The same store function as `update_task`, with `actor = you` |
 | `heat.tookTime` | `{taskId, minutes}` | `{task, undo}`. Sets `adjustMin` so the total reads `minutes` |
-| `heat.plan.make` | `{date, dayEnds?}` | `{drafts, unplanned, minutesLeft}`. Writes `heatState.planDrafts` only |
-| `heat.plan.accept` | `{date, taskIds?}` | `{blocks, undo}`. All drafts, or the ones named |
+| `heat.plan.make` | `{date, dayEnds?}` | `{drafts, unplanned, minutesLeft}`. Writes `heatState.planDrafts` only. `drafts` are as `planDrafts` keeps them (`{taskId, date, start, minutes, leftMin, reason, leftLine}`); `unplanned` is the ids of open tasks that got no draft and have no block that day, in heat order (a parent is planned through its subtasks, so it isn't listed); `minutesLeft` is the 15-minute marks between now (a day ahead: 7 AM) and the day's end that no block, timed event or draft covers. `dayEnds` (minutes after midnight) is remembered |
+| `heat.plan.accept` | `{date, taskIds?}` | `{blocks, undo}`. All drafts of `date` ("plan my day"), or the ones named ("accept draft"); the rest wait |
 | `heat.plan.clear` | `{}` | `{}` |
-| `heat.block.put` | `{id?, taskId?, habitId?, date, start, minutes}` | `{block, undo}`. 15-minute snap; label from what changed |
-| `heat.current.set` | `{taskId}` (or null) | `{}`. Not journaled |
-| `heat.focus.start` / `.pause` / `.resume` / `.interrupt` / `.stop` / `.finish` | `{taskId?, length?}` on start | `{heatState, logged?, undo?}`. `stop` and `finish` log a `focusSession` (journaled) and add its minutes; `interrupt` counts one and pauses. Nothing starts without a call (3.5) |
-| `heat.capture.add` | `{text, link?}` | `{capture, inbox, undo}` (`inbox` is the count line "4 in inbox · captured ✓") |
-| `heat.capture.triage` | `{id, to: "task"\|"note"\|"project"\|"upload", record?}` | `{result, undo}` |
-| `heat.score` | `{gradeId, score}` | `{grade, undo}` (a pending grade gets its score) |
-| `heat.public.set` | `{kind, id, public}` | `{record, undo}`. A grade's answer carries the sentence from 3.15 for the switch to show |
+| `heat.block.put` | `{id?, taskId?, habitId?, date, start, minutes}` | `{block, undo}`. 15-minute snap, kept inside 7 AM to midnight; other fields of a block (`origin`) are left as they are; label from what changed |
+| `heat.current.set` | `{taskId}` (or null) | `{}`. Not journaled. Any task there is; else "No task has that id." Changing it while a round runs closes that task's part of the round, logs it, and runs on for the new one |
+| `heat.focus.start` / `.pause` / `.resume` / `.interrupt` / `.stop` / `.finish` | `{taskId?, length?}` on start | `{heatState, logged?, undo}`. `start` takes the task named, else the current one ("Pick a task and press C first." with none) and makes it current; it starts a waiting break too, and never pauses a round that runs. `length` is 25, 50 or a whole 10–90. `stop` logs the minutes so far, `finish` is the window saying time is up, and each logs a `focusSession` (journaled, "focus session") only if it comes to a minute; `interrupt` counts one and pauses. **`finish` is idempotent:** the round ends at its own `endsAt`, whenever the call comes, logs once, and leaves the break waiting; asked early, late or twice, it changes nothing more, writes nothing and tells no one. The views ask every 500 ms, up to 8 times, once `endsAt` has passed. Nothing starts on its own (3.5) |
+| `heat.capture.add` | `{text, link?}` | `{capture, inbox, undo}` (`inbox` is the count line "4 in inbox · captured ✓"). Empty text: "Type something to capture." |
+| `heat.capture.triage` | `{id, to: "task"\|"note"\|"project"\|"upload", record?}` | `{result: {type, id, kind?, record?}, undo}`. With no `record` the core builds it from the capture's text: a task titled by the first line with the rest as notes, in the first space; a note holding the text; a project titled by the first line. `upload` only marks the capture dealt with (`id` null). A capture triaged already is refused |
+| `heat.score` | `{gradeId, score, outOf?}` | `{grade, undo}` (a pending grade gets its score) |
+| `heat.public.set` | `{kind, id, public}` | `{record, undo, sentence?}`. A grade's answer carries the sentence from 3.15 for the switch to show. Mail is never public ("Mail is never public."); kinds with no switch are refused |
 | `heat.share.now` | `{taskId, text}` | `{share, undo}`. `clearsAt` is 7 days on; done clears it |
 | `heat.share.timeline` | `{projectId, targetId}` | `{share, undo}` |
 | `heat.share.hide` | `{id}` | `{undo}` |
 | `heat.review.complete` | `{weekStart, note}` | `{note, undo}` |
 | `heat.import` | `{json}` | `{counts, undo}`. Moving in: every id kept (3.16) |
-| `heat.calendars.add` | `{name, kind, url}` | `{calendar}`. The address goes to the Keychain |
-| `heat.calendars.remove` | `{id}` | `{}` |
-| `heat.calendars.sync` | `{id?}` | `{line}` ("Synced 3:41 PM: 2 new tasks, 1 date change", or the failure sentence of 3.11) |
-| `heat.school.set` | `{name, host, icalUrl?, codePattern, termStart, termEnd}` | `{}` |
-| `heat.claude.get` | `{}` | `{helper, desktop, code, tools: [{name, on}], recent: [{txnId, label, reason, at, undone}]}` (the lines of Settings → Claude) |
-| `heat.claude.setTool` | `{name, on}` | `{}` |
+| `heat.calendars.add` | `{name, kind, url}` | `{calendar}`. The address goes to the Keychain (`webcal://` is read as `https://`; error `bad_address` for one that isn't an address) and is never logged, stored, exported or put in an error. The new calendar is read a few seconds later |
+| `heat.calendars.remove` | `{id}` | `{}`. Its events go; the tasks it made stay |
+| `heat.calendars.sync` | `{id?}` | `{line}` ("Synced 3:41 PM: 2 new tasks, 1 date change", or the failure sentence of 3.11 naming the calendar). Calendars are also read on open if the last read was over 15 minutes ago, then hourly; Brightspace items become tasks with the UID as the id, and one missing from two syncs in a row is tagged "No longer in Brightspace", never deleted; one sync is one entry, "calendar sync" |
+| `heat.school.set` | `{name, host, icalUrl?, codePattern, termStart, termEnd}` | `{}`. `icalUrl` goes to the Keychain |
+| `heat.claude.get` | `{}` | `{helper, desktop, code, tools: [{name, on}], recent: [{txnId, label, reason, at, undone}], note?}` (the lines of Settings → Claude). `helper` is `WI_WWAV_MCP`, else `Contents/Helpers/wi-mcp` inside the app bundle, else `wi-mcp` beside the app's binary; when that file isn't there `note` is "Build the helper first: cargo build -p wi-mcp". `recent` is Claude's latest 50 entries, newest first, an undone one marked `undone` |
+| `heat.claude.setTool` | `{name, on}` | `{}`. Not journaled; the helper reads it on every list and call |
+| `history.undoEntry` | `{txnId}` | `{label}`, or `cant_undo` ("This changed again since. Undo the later change first."). Also emits `heat` and `history` |
 
 ## The MCP server
 

@@ -48,6 +48,7 @@ calls travel two ways:
 | `history.get` | `{room}` | `{undo: "Undo move clip" \| null, redo: "Redo move clip" \| null, cant: "Can't undo a purchase." \| null}` |
 | `history.undo` | `{room}` | `{label: "move clip"}` or error `nothing_to_undo` ("Nothing to undo.") |
 | `history.redo` | `{room}` | `{label}` or error `nothing_to_redo` |
+| `history.undoEntry` | `{txnId}` | `{label}` or error `cant_undo` ("This changed again since. Undo the later change first."). One entry out of order: Settings → Claude's list |
 
 `room` is `heat`, `space`, `console`, `unquantized` or `library`. After any
 change the core sends `history` with the new labels for that room.
@@ -131,6 +132,17 @@ Events: `status` `{area: "upload", sentence: "Uploading World Ending · part 14 
 ⌘Z clears `published_at` while the upload is queued; after the server has it
 `history.get` returns `cant: "Can't undo a publish. Unpublish 'World Ending'…"`.
 
+### heat (3, 8.8)
+
+Heat's reads and writes, its calendars and its Claude pane: `heat.snapshot`,
+`heat.put`, `heat.patch`, `heat.delete`, `heat.done`, `heat.plan.*`,
+`heat.focus.*`, `heat.capture.*`, `heat.public.set`, `heat.calendars.*`,
+`heat.claude.*` and the rest. `docs/HEAT.md` lists each one's arguments,
+result and refusals, and what the snapshot carries. Every write answers
+`{..., undo}` with the Edit menu's text, and the core sends `heat`
+`{kinds: [...]}` after any Heat change, the app's own, Claude's (`wi-mcp`)
+or a sync's, so views refetch.
+
 ### export (2.9)
 
 | cmd | args | result |
@@ -139,7 +151,7 @@ Events: `status` `{area: "upload", sentence: "Uploading World Ending · part 14 
 
 ### status
 
-Event `status` `{area: "sync" \| "save" \| "upload" \| "room", sentence}` drives
+Event `status` `{area: "sync" \| "save" \| "upload" \| "room" \| "calendar", sentence}` drives
 the status bar: "Saved on this Mac", "Synced 3:41 PM", "Offline. 2 works wait
 to go up; they leave when you're back."
 
