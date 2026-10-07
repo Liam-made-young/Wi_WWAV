@@ -3,11 +3,13 @@
 //! these, so Claude and the window never disagree.
 
 use serde_json::{json, Value};
-use wi_heat::model::records::{CalendarEvent, Course, FocusSession, Grade, Habit, Space, Task, TaskOccurrence, Term, TimeBlock};
+use wi_heat::model::records::{
+    Capture, CalendarEvent, Course, FocusSession, Grade, Habit, Milestone, Project, Space, Task, TaskOccurrence, Term, TimeBlock,
+};
 use wi_heat::model::{estimate, grades, heat, plan, zone};
 use wi_store::Store;
 
-use crate::{all, kind, num, refused, round, Clock, Error, Result};
+use crate::{all, kind, num, refused, round, Clock, Result};
 
 /// "Day ends at", 11 PM by default (3.5).
 pub const DAY_ENDS_MIN: f64 = 23.0 * 60.0;
@@ -26,6 +28,9 @@ pub(crate) struct World {
     pub blocks: Vec<TimeBlock>,
     pub sessions: Vec<FocusSession>,
     pub habits: Vec<Habit>,
+    pub projects: Vec<Project>,
+    pub milestones: Vec<Milestone>,
+    pub captures: Vec<Capture>,
     pub terms: Vec<Term>,
     pub courses: Vec<Course>,
     pub raw_grades: Vec<Value>,
@@ -34,35 +39,49 @@ pub(crate) struct World {
     pub events: Vec<CalendarEvent>,
 }
 
-fn typed<T: serde::de::DeserializeOwned>(kind: &str, raw: &[Value]) -> Result<Vec<T>> {
-    raw.iter()
-        .map(|v| {
-            serde_json::from_value(v.clone()).map_err(|e| {
+/// The records of one kind that read as their type, beside their raw JSON.
+/// A record that doesn't read (one from a newer app, one half-written by
+/// another view) is left out of the maths, and said so on stderr, rather than
+/// stopping every command that reads Heat.
+fn typed<T: serde::de::DeserializeOwned>(kind: &str, raw: Vec<Value>) -> (Vec<T>, Vec<Value>) {
+    let mut out = Vec::with_capacity(raw.len());
+    let mut kept = Vec::with_capacity(raw.len());
+    for v in raw {
+        match serde_json::from_value(v.clone()) {
+            Ok(t) => {
+                out.push(t);
+                kept.push(v);
+            }
+            Err(e) => {
                 let id = v.get("id").and_then(Value::as_str).unwrap_or("?");
-                Error::Refused(format!("Heat's {kind} record {id} doesn't read: {e}."))
-            })
-        })
-        .collect()
+                eprintln!("wi-heat-store: Heat's {kind} record {id} doesn't read, so it is left out: {e}");
+            }
+        }
+    }
+    (out, kept)
 }
 
 impl World {
     pub fn load(store: &Store) -> Result<World> {
-        let raw_tasks = all(store, kind::TASK)?;
-        let raw_grades = all(store, kind::GRADE)?;
+        let (tasks, raw_tasks) = typed(kind::TASK, all(store, kind::TASK)?);
+        let (grades, raw_grades) = typed(kind::GRADE, all(store, kind::GRADE)?);
         Ok(World {
-            spaces: typed(kind::SPACE, &all(store, kind::SPACE)?)?,
-            tasks: typed(kind::TASK, &raw_tasks)?,
+            spaces: typed(kind::SPACE, all(store, kind::SPACE)?).0,
+            tasks,
             raw_tasks,
-            occurrences: typed(kind::OCCURRENCE, &all(store, kind::OCCURRENCE)?)?,
-            blocks: typed(kind::BLOCK, &all(store, kind::BLOCK)?)?,
-            sessions: typed(kind::FOCUS, &all(store, kind::FOCUS)?)?,
-            habits: typed(kind::HABIT, &all(store, kind::HABIT)?)?,
-            terms: typed(kind::TERM, &all(store, kind::TERM)?)?,
-            courses: typed(kind::COURSE, &all(store, kind::COURSE)?)?,
-            grades: typed(kind::GRADE, &raw_grades)?,
+            occurrences: typed(kind::OCCURRENCE, all(store, kind::OCCURRENCE)?).0,
+            blocks: typed(kind::BLOCK, all(store, kind::BLOCK)?).0,
+            sessions: typed(kind::FOCUS, all(store, kind::FOCUS)?).0,
+            habits: typed(kind::HABIT, all(store, kind::HABIT)?).0,
+            projects: typed(kind::PROJECT, all(store, kind::PROJECT)?).0,
+            milestones: typed(kind::MILESTONE, all(store, kind::MILESTONE)?).0,
+            captures: typed(kind::CAPTURE, all(store, kind::CAPTURE)?).0,
+            terms: typed(kind::TERM, all(store, kind::TERM)?).0,
+            courses: typed(kind::COURSE, all(store, kind::COURSE)?).0,
+            grades,
             raw_grades,
             mail: all(store, kind::MAIL)?,
-            events: typed(kind::EVENT, &all(store, kind::EVENT)?)?,
+            events: typed(kind::EVENT, all(store, kind::EVENT)?).0,
         })
     }
 

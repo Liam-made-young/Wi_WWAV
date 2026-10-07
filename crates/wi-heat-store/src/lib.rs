@@ -7,9 +7,21 @@
 //! `wi-store`'s journal, labelled, with who made it. The maths is
 //! `wi_heat::model`'s; this crate never reads the clock (a [`Clock`] comes
 //! in) and never touches the network or the Keychain.
+//!
+//! - [`mcp`]: the eight tools' store functions, by Claude.
+//! - [`ops`]: what the views write (put, patch, done, blocks, capture, scores,
+//!   the Public switch, shares, the weekly review, moving in), by the person.
+//! - [`timer`]: Plan my day's drafts, the current task and the focus timer.
+//! - [`snapshot`]: what the views read, and the public view.
+//! - [`feed`]: calendars and Brightspace, from a feed the core fetched.
 
 mod derive;
+pub mod feed;
 pub mod mcp;
+pub mod ops;
+mod schema;
+pub mod snapshot;
+pub mod timer;
 
 use std::collections::BTreeMap;
 
@@ -133,9 +145,9 @@ pub(crate) fn round(x: f64, places: i32) -> f64 {
     (x * f).round() / f
 }
 
-/// Every record of `kind`, as stored.
+/// Every record of `kind`, as stored, in the order they were made.
 pub fn all(store: &Store, kind: &str) -> Result<Vec<Value>> {
-    Ok(store.docs(kind)?.into_iter().map(|d| d.json).collect())
+    Ok(store.docs_oldest_first(kind)?.into_iter().map(|d| d.json).collect())
 }
 
 /// One record of `kind`, as stored.
@@ -160,6 +172,11 @@ pub(crate) fn search_text(kind: &str, r: &Value) -> String {
     parts.into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ")
 }
 
+/// A new record's id.
+pub(crate) fn ulid() -> String {
+    wwav_ids::ulid()
+}
+
 /// Puts one record inside an open change.
 pub(crate) fn put(txn: &mut Txn<'_>, kind: &str, record: &Value) -> Result<()> {
     let id = record
@@ -170,6 +187,26 @@ pub(crate) fn put(txn: &mut Txn<'_>, kind: &str, record: &Value) -> Result<()> {
     Ok(())
 }
 
+/// One journal entry just made: its id, and the Edit menu's text for it.
+pub(crate) struct Committed {
+    pub undo: Option<String>,
+    pub txn: Option<String>,
+}
+
+/// Runs `f` as one labelled change by `actor`. Nothing changed (nothing to
+/// undo) comes back as None, and no entry is made.
+pub(crate) fn commit(
+    store: &mut Store,
+    label: &str,
+    actor: Actor,
+    f: impl FnOnce(&mut Txn<'_>) -> Result<()>,
+) -> Result<Committed> {
+    let mut txn = store.begin_by(ROOM, label, actor)?;
+    f(&mut txn)?;
+    let id = txn.commit()?;
+    Ok(Committed { undo: id.as_ref().map(|_| format!("Undo {label}")), txn: id })
+}
+
 /// Runs `f` as one labelled change by `actor`, and returns the Edit menu's
 /// text for it ("Undo Claude's task"), or None when nothing changed.
 pub(crate) fn change(
@@ -178,9 +215,55 @@ pub(crate) fn change(
     actor: Actor,
     f: impl FnOnce(&mut Txn<'_>) -> Result<()>,
 ) -> Result<Option<String>> {
-    let mut txn = store.begin_by(ROOM, label, actor)?;
-    f(&mut txn)?;
-    Ok(txn.commit()?.map(|_| format!("Undo {label}")))
+    Ok(commit(store, label, actor, f)?.undo)
+}
+
+/// What a view's write gives back: the answer, the Edit menu's text for the
+/// change, and where the change is, so the core can tell the views and sync.
+pub struct Outcome {
+    /// The command's answer, without `undo`.
+    pub result: Value,
+    /// "Undo add task"; None when nothing changed.
+    pub undo: Option<String>,
+    /// The journal entry the write made, if it made one.
+    pub txn: Option<String>,
+    /// Kinds written outside the journal (the timer, a setting), for the
+    /// `heat` event.
+    pub outside: Vec<&'static str>,
+    /// Whether the answer carries `undo` (the commands that answer `{}` don't).
+    pub with_undo: bool,
+}
+
+impl Outcome {
+    pub(crate) fn new(result: Value, c: Committed) -> Outcome {
+        Outcome { result, undo: c.undo, txn: c.txn, outside: Vec::new(), with_undo: true }
+    }
+
+    /// A write that changed nothing the journal keeps.
+    pub(crate) fn unchanged(result: Value) -> Outcome {
+        Outcome { result, undo: None, txn: None, outside: Vec::new(), with_undo: true }
+    }
+
+    /// A write outside the journal, answered with `result` alone.
+    pub(crate) fn outside(result: Value, kinds: &[&'static str]) -> Outcome {
+        Outcome { result, undo: None, txn: None, outside: kinds.to_vec(), with_undo: false }
+    }
+
+    pub(crate) fn also(mut self, kinds: &[&'static str]) -> Outcome {
+        self.outside.extend_from_slice(kinds);
+        self
+    }
+
+    /// The answer as the command sends it: `{..., undo}` or the bare result.
+    pub fn value(self) -> Value {
+        let mut v = self.result;
+        if self.with_undo {
+            if let Some(m) = v.as_object_mut() {
+                m.insert("undo".into(), self.undo.map_or(Value::Null, Value::String));
+            }
+        }
+        v
+    }
 }
 
 /// The eight tools, every one on until switched off in Settings → Claude.
@@ -205,14 +288,29 @@ pub fn set_tool(store: &mut Store, name: &str, on: bool) -> Result<()> {
     Ok(())
 }
 
-/// Heat's state outside the journal: `{currentTaskId?, timer, planDrafts}`.
+/// The one `heatState` record's key, the id the shell reads it under.
+pub const STATE_KEY: &str = "heat";
+
+/// Heat's state outside the journal: `{currentTaskId?, timer, planDrafts}`,
+/// and the focus timer's whole state under `focus` (docs/HEAT.md).
 pub fn state(store: &Store) -> Result<Value> {
-    Ok(one(store, kind::STATE, "state")?.unwrap_or_else(|| {
+    Ok(one(store, kind::STATE, STATE_KEY)?.unwrap_or_else(|| {
         json!({"timer": {"phase": "idle", "round": 1, "endsAt": null}, "planDrafts": []})
     }))
 }
 
 pub(crate) fn set_state(store: &mut Store, state: &Value) -> Result<()> {
-    store.set_doc(kind::STATE, "state", state, "")?;
+    store.set_doc(kind::STATE, STATE_KEY, state, "")?;
+    Ok(())
+}
+
+/// A setting outside the journal, or None. Settings are `heatSetting`
+/// records: `claude.tools`, `school`, `dayEnds` and the feeds' bookkeeping.
+pub fn setting(store: &Store, key: &str) -> Result<Option<Value>> {
+    one(store, kind::SETTING, key)
+}
+
+pub fn set_setting(store: &mut Store, key: &str, value: &Value) -> Result<()> {
+    store.set_doc(kind::SETTING, key, value, "")?;
     Ok(())
 }
