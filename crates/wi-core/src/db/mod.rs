@@ -199,3 +199,90 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Json, CoreError> 
         )),
     }
 }
+
+pub(crate) use write::{preview_edits, row_labels, EditLine};
+
+/// Every table with its columns, in a few lines each: what Claude is told
+/// of the data before it asks for any.
+pub(crate) fn describe(i: &Inner) -> Result<String, CoreError> {
+    open_heat(i)?;
+    let clock = i.clock();
+    let store = i.store();
+    let sheets = Sheets::new(&store, &clock);
+    let mut out = String::new();
+    for (id, name, origin) in sheets.list() {
+        let table = sheets.table(&id)?;
+        let cols: Vec<String> = table
+            .columns
+            .iter()
+            .filter(|c| c.ty != catalog::ColType::Json)
+            .map(|c| {
+                let mut s = format!("{} ({}", c.name, c.ty.as_str());
+                if let Some(t) = &c.relation {
+                    s.push_str(&format!(" to {}", catalog::table_name(t)));
+                }
+                if c.locked.is_some() {
+                    s.push_str(", read-only");
+                }
+                s.push(')');
+                s
+            })
+            .collect();
+        let note = match (origin, &table.locked) {
+            (_, Some(_)) => ", read-only",
+            (Origin::User, _) => ", the person's own table",
+            _ => "",
+        };
+        out.push_str(&format!(
+            "- {name} [{} rows{note}]: {}\n",
+            table.rows.len(),
+            cols.join("; ")
+        ));
+    }
+    Ok(out)
+}
+
+/// A query's rows as objects keyed by column name, for Claude to read:
+/// `{id, Title: …, Due: …}`. Empty cells are left out, and a relation reads
+/// as what it shows. With `columns`, only those; else every column that
+/// isn't a list.
+pub(crate) fn rows_as_objects(q: &Json, columns: Option<&[String]>) -> Vec<Json> {
+    let cols: Vec<(usize, String)> = q["columns"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .filter(|(_, c)| match columns {
+            Some(want) => want.iter().any(|w| {
+                c["name"]
+                    .as_str()
+                    .is_some_and(|n| n.eq_ignore_ascii_case(w))
+                    || c["id"].as_str().is_some_and(|n| n.eq_ignore_ascii_case(w))
+            }),
+            None => c["type"] != "json" && c["id"] != "id",
+        })
+        .map(|(n, c)| (n, c["name"].as_str().unwrap_or("").to_string()))
+        .collect();
+    q["rows"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|r| {
+            let mut m = Map::new();
+            m.insert("id".into(), r["id"].clone());
+            for (n, name) in &cols {
+                let cell = &r["cells"][*n];
+                let v = match cell {
+                    Json::Null => continue,
+                    Json::String(s) if s.is_empty() => continue,
+                    Json::Bool(false) => continue,
+                    Json::Object(o) if o.contains_key("label") => o["label"].clone(),
+                    Json::Object(o) if o.contains_key("error") => o["error"].clone(),
+                    other => other.clone(),
+                };
+                m.insert(name.clone(), v);
+            }
+            Json::Object(m)
+        })
+        .collect()
+}

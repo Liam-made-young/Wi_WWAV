@@ -20,6 +20,10 @@
 
 mod account;
 mod args;
+mod ask;
+mod ask_index;
+mod ask_mcp;
+mod ask_tools;
 mod batch;
 mod bus;
 mod calendars;
@@ -216,6 +220,8 @@ pub(crate) struct Inner {
     claude: Option<PathBuf>,
     /// The Wiki tab's reader and its cache (wiki.rs).
     wiki: wiki::Wiki,
+    /// The prompt box's runs and the port its tools answer on (ask.rs).
+    ask: ask::State,
     /// The journal entries this process made, so the watcher tells the views
     /// only about other processes' (the MCP helper's).
     own: Mutex<BTreeSet<String>>,
@@ -339,6 +345,7 @@ impl Core {
             helper: config.helper.clone(),
             claude: config.claude.clone(),
             wiki,
+            ask: ask::State::default(),
             own: Mutex::new(BTreeSet::new()),
             fixed_now: Mutex::new(config.now),
             uploads: Mutex::new(upload::Status::default()),
@@ -377,6 +384,7 @@ impl Core {
             "records.mutate" => history::records_mutate(i, &a),
 
             heat if heat.starts_with("heat.") => heat_cmd::invoke(i, heat, &a),
+            ask if ask.starts_with("ask.") => ask::invoke(i, ask, &a),
             db if db.starts_with("db.") => db::invoke(i, db, &a),
             wiki if wiki.starts_with("wiki.") => wiki::invoke(i, wiki, &a),
 

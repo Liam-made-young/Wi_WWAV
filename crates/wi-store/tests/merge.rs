@@ -94,7 +94,9 @@ fn one_entry_is_only_relabelled_and_none_is_nothing() {
     let id = put(&mut store, Room::Heat, "edit task", "a", json!({"due": 1}));
     assert_eq!(store.merge_entries(&[], "x").unwrap(), None);
     assert_eq!(
-        store.merge_entries(&[id.clone()], "fill down").unwrap(),
+        store
+            .merge_entries(std::slice::from_ref(&id), "fill down")
+            .unwrap(),
         Some(id)
     );
     assert_eq!(

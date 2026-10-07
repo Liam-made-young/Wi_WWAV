@@ -1183,3 +1183,141 @@ pub(crate) fn csv_export(i: &Inner, a: &Args) -> Result<Json, CoreError> {
         None => Ok(json!({"csv": text, "name": format!("{name}.csv"), "rows": count})),
     }
 }
+
+/// One edit as a preview shows it: which row, which column, from what to what.
+pub(crate) struct EditLine {
+    pub label: String,
+    pub column_id: String,
+    pub column: String,
+    pub before: String,
+    pub after: String,
+}
+
+/// What a row is called: its title, its code, or its first cell.
+fn row_label(table: &Table, grid_row: &[super::sheet::Cell]) -> String {
+    let field = match table.origin {
+        Origin::User => table
+            .columns
+            .first()
+            .map(|c| c.id.clone())
+            .unwrap_or_default(),
+        _ => super::catalog::label_field(&table.id).to_string(),
+    };
+    let idx = table
+        .col_index(&field)
+        .or_else(|| table.col_index("title"))
+        .or_else(|| table.col_index("name"))
+        .unwrap_or(0);
+    let text = grid_row
+        .get(idx)
+        .map(|c| cell_text(&c.v))
+        .unwrap_or_default();
+    let text = text.lines().next().unwrap_or("").trim().to_string();
+    if text.is_empty() {
+        "(untitled)".to_string()
+    } else {
+        text.chars().take(80).collect()
+    }
+}
+
+/// Checks edits without making them, and says what each would do. The first
+/// one that can't be made is the error, in a sentence that names the row and
+/// the column, so whoever asked can put it right. A row whose id starts
+/// `new:` is one a staged change will make: only its column is checked.
+pub(crate) fn preview_edits(
+    i: &Inner,
+    table_name: &str,
+    edits: &[(String, String, Json)],
+) -> Result<(String, String, Vec<EditLine>), CoreError> {
+    let clock = i.clock();
+    let store = i.store();
+    let sheets = Sheets::new(&store, &clock);
+    let id = sheets
+        .resolve(table_name)
+        .ok_or_else(|| refused(format!("There is no table called '{table_name}'.")))?;
+    let table = sheets.table(&id)?;
+    if let Some(why) = &table.locked {
+        return Err(refused(format!(
+            "{} can't be changed here. {why}",
+            table.name
+        )));
+    }
+    let grid = sheets.grid(&table);
+    let mut out = Vec::new();
+    for (row, column, value) in edits {
+        let col = table.col_index(column).ok_or_else(|| {
+            let names: Vec<&str> = table
+                .columns
+                .iter()
+                .filter(|c| c.locked.is_none())
+                .map(|c| c.name.as_str())
+                .collect();
+            refused(format!(
+                "{} has no column called '{column}'. The ones that can be changed are: {}.",
+                table.name,
+                names.join(", ")
+            ))
+        })?;
+        let c = &table.columns[col];
+        if let Some(why) = &c.locked {
+            return Err(refused(format!("'{}' can't be changed. {why}", c.name)));
+        }
+        let (label, before) = if row.starts_with("new:") {
+            (row.clone(), String::new())
+        } else {
+            let r = table.row_index(row).ok_or_else(|| {
+                refused(format!("{} has no row with the id '{row}'.", table.name))
+            })?;
+            (row_label(&table, &grid[r]), cell_text(&grid[r][col].v))
+        };
+        let stored = parse_input(&sheets, &table, c, value)
+            .map_err(|why| refused(format!("{label}, {}: {why}", c.name)))?;
+        // What the cell will read once the value is kept.
+        let after = match (&c.relation, &stored) {
+            (Some(target), Json::String(target_id)) => sheets
+                .labels(target)
+                .get(target_id)
+                .cloned()
+                .unwrap_or_else(|| target_id.clone()),
+            _ => cell_text(&super::sheet::cell_of(Some(&stored), c.ty, &clock.zone)),
+        };
+        out.push(EditLine {
+            label,
+            column_id: c.id.clone(),
+            column: c.name.clone(),
+            before,
+            after,
+        });
+    }
+    Ok((table.id.clone(), table.name.clone(), out))
+}
+
+/// What rows are called, by their ids: for a preview of rows to be deleted.
+pub(crate) fn row_labels(
+    i: &Inner,
+    table_name: &str,
+    rows: &[String],
+) -> Result<(String, String, Vec<String>), CoreError> {
+    let clock = i.clock();
+    let store = i.store();
+    let sheets = Sheets::new(&store, &clock);
+    let id = sheets
+        .resolve(table_name)
+        .ok_or_else(|| refused(format!("There is no table called '{table_name}'.")))?;
+    let table = sheets.table(&id)?;
+    if let Some(why) = &table.locked {
+        return Err(refused(format!(
+            "{} can't be changed here. {why}",
+            table.name
+        )));
+    }
+    let grid = sheets.grid(&table);
+    let mut out = Vec::new();
+    for row in rows {
+        let r = table
+            .row_index(row)
+            .ok_or_else(|| refused(format!("{} has no row with the id '{row}'.", table.name)))?;
+        out.push(row_label(&table, &grid[r]));
+    }
+    Ok((table.id.clone(), table.name.clone(), out))
+}

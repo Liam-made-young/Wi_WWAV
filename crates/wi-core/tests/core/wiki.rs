@@ -30,15 +30,15 @@ struct Request {
 
 /// Wikipedia, for a test: answers by path, remembers what it was asked, and
 /// can go away or ask for a pause.
-struct Wikipedia {
-    url: String,
+pub struct Wikipedia {
+    pub url: String,
     seen: Arc<Mutex<Vec<Request>>>,
     down: Arc<AtomicBool>,
     slow: Arc<AtomicBool>,
 }
 
 impl Wikipedia {
-    fn start() -> Wikipedia {
+    pub fn start() -> Wikipedia {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
         let seen = Arc::new(Mutex::new(Vec::new()));
