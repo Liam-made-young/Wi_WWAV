@@ -76,7 +76,7 @@ Zi_WWAV (furniture) stays out, because the sketch names four media and nothing i
 Heat ── connected profiles ── Space ── connected uploads ── Console
 ```
 
-**Connected profiles (Heat and Space).** Heat is a private PKM by default. A simple public version of it, your **public Heat view**, is what anyone sees when they open the sun in the middle of your galaxy (**Decided**). By default it holds two things: a "Now making" line and the milestone timelines of projects you link to a solar system. Anything else, a task, a habit, a note or a grade, stays private until you switch that one item public. Counts and comparisons between people never cross (3.15).
+**Connected profiles (Heat and Space).** Heat is a private PKM by default. A simple public version of it, your **public Heat view**, is what anyone sees when they open the sun in the middle of your galaxy (**Decided**). By default it has room for two things, each shown once you press Show: a "Now making" line and the milestone timelines of projects you link to a solar system. Anything else, a task, a habit, a note or a grade, stays private until you switch that one item public. Counts and comparisons between people never cross (3.15).
 
 **Connected uploads (Console and Space).** Dropping an export on a solar system publishes it. The server keeps the exact bytes and reads the work's family from the file's `wlin` chunk. Going back, **Open in Console** (⌘E) on any song or film in Space opens it as a session with four stem lanes, ready to tear apart and fork (4.12, 5.14).
 
@@ -225,9 +225,9 @@ You have one WWAV account: the existing `Users` row at mi-wwav.com. Its 7-day JW
 | Bio sun | your page, in the middle of your galaxy | blocks v1 `{v:1, blocks:[…]}` | everyone | Exists today (`wwav/src/sun/blocks.js`) |
 | Public Heat view | the simple public version of Heat, shown under your bio when someone opens your sun | the items you've made public, synced to your account | everyone | Decided |
 | Stem player | your instrument's skin, wrapped from a photo or painted | `/api/user/stem-player-customization` | you | Exists today (v3) |
-| Heat | your time, as a private PKM | local SQLite, synced privately | only you, except what you switch public | Proposed |
+| Heat | your time, as a private PKM | local SQLite, synced privately, except private grades and courses, which stay on the Mac | only you, except what you switch public | Proposed |
 
-**Two profile views** (**Decided**). Your private Heat (⌘1) is the whole profile, and only you see it. Your public Heat view is what anyone sees when they open your sun in Space. By default it shows a "Now making" line and the milestone timelines of linked projects. Every other record (task, project, milestone, habit, note, course, grade, focus record) is private until you switch that item public, grades included (3.15).
+**Two profile views** (**Decided**). Your private Heat (⌘1) is the whole profile, and only you see it. Your public Heat view is what anyone sees when they open your sun in Space. By default it has room for two things, each shown once you press Show: a "Now making" line and the milestone timelines of linked projects. Every other record (task, project, milestone, habit, note, course, grade, focus record) is private until you switch that item public, grades included (3.15).
 
 **The stem player.** v3's tutorial says "the user's stem player IS their account". In Wi_WWAV your galaxy is who you are and the stem player is what you hold: your skin wraps the strip's planet when nothing is loaded. A loaded song always wears its own key colour.
 
@@ -269,7 +269,7 @@ A plain WAV comes in as master only and says so. Nothing is converted without a 
 
 | Connection | Views | What crosses | What never crosses |
 |---|---|---|---|
-| Connected profiles | Heat ↔ Space | your public Heat view: by default a "Now making" line and the milestone timelines of linked projects; any other item you switch public, one at a time (3.15) | anything still private; counts and totals worked out across your records; any comparison between people |
+| Connected profiles | Heat ↔ Space | your public Heat view: room for a "Now making" line and the milestone timelines of linked projects, each shown once you press **Show**; any other item you switch public, one at a time (3.15) | anything still private; counts and totals worked out across your records; any comparison between people |
 | Connected uploads | Console ↔ Space | exported `.wwav`/`.swav` as exact bytes, with lineage read from `wlin`; any song or film back into the Console with **Open in Console** | unexported takes, unpublished sessions |
 
 Heat also links tasks and projects to Console sessions, so focus follows you into the Console (3.15). That link is private and never reaches Space.
@@ -352,7 +352,7 @@ The status bar says only real stages:
 2. "Uploading World Ending · part 14 of 27"
 3. "Up. World Ending is in your galaxy."
 
-**Heat records sync privately** to your account, with a monotonic sequence number per field, so a slow older write never overwrites a newer one (**Exists today:** the PKM's `useAutosave.js`; see 8). Items you switch public sync the same way and show on your public Heat view once the server has them.
+**Heat records sync privately** to your account, except private grades and courses, which stay on the Mac unless encrypted sync is on (8.7, **Open**). Each field has a monotonic sequence number, so a slow older write never overwrites a newer one (**Exists today:** the PKM's `useAutosave.js`; see 8). Items you switch public sync the same way and show on your public Heat view once the server has them.
 
 ### 2.9 You can leave with everything
 
@@ -418,7 +418,7 @@ Claude estimates and drafts, and never decides. Each change it makes carries a o
 
 These are gate 2.4's bars, written down before testing. A desktop rule is added because the gate's posture rule covers phones only.
 
-- **Contrast and text.** Body text 7:1 and secondary 4.5:1, in light and dark, in both registers. Body text is at least 13 pt; ⌘+ scales it to 20.
+- **Contrast and text.** Body text 7:1 and secondary 4.5:1, in light and dark, in both registers. Running text (the reading room, letters, Mail) is at least 17 pt (7.9, **Open**); rows and labels are at least 13 pt; ⌘+ scales both, up to 20.
 - **Targets and keys.** Hit areas are at least 44 × 44 pt, and every gesture has a key. Newest and ⌘K mean Space never requires flying.
 - **Motion and state.** Nothing moves while nothing plays, and state is never colour alone. VoiceOver reads a moon as "Vocals, 70 percent, audible".
 
@@ -431,12 +431,12 @@ Settings is a classic Mac preferences window with an Aqua icon toolbar.
 | Pane | Contents |
 |---|---|
 | Account | galaxy address, stem player skin, sign out, delete account (type DELETE) |
-| Library | location, watched folders, copy or leave in place, Empty trash |
-| Heat | spaces, school and time zone, Brightspace calendar link, other calendars' iCal links |
+| Library | location, copy or leave in place, Empty trash |
+| Heat | spaces, school, Brightspace calendar link, other calendars' iCal links |
 | Audio & MIDI · Video | devices, buffer 64–1024 samples, plugin folders; hardware encode, proxy media |
 | Claude | the MCP connection: how to add Wi_WWAV to Claude Desktop and Claude Code, the tools offered with a switch on each, and Claude's recent changes, each with Undo |
 | Privacy | one table of everything public, with a switch on each; your public Heat view as others see it |
-| Appearance · Keyboard | Light, Dark or Match system (Space is always night), text size; every shortcut |
+| Appearance · Keyboard | Light, Dark or Match system (Space is always night), text size (⌘+ / ⌘−); every shortcut |
 
 ### 2.14 First launch
 
@@ -444,8 +444,8 @@ There are five steps. Each has exactly one secondary action, "Skip for now", and
 
 1. **Sign in.** The button **Sign in or create an account** opens mi-wwav.com in your browser (8.7). The form there asks for email, username, password, a birthdate for the 13+ gate, and an invite key when one is required (**Exists today:** v4 registration). The browser hands the sign-in back to the app.
 
-   **Open:** should "Not now" let you in without an account? Recommendation: yes. Heat, the library and the Console are fully local. Space can be looked at but not published to or pushed from, which is how the signed-out universe already works.
-2. **Claim your galaxy.** The copy is v4's: "You have no galaxy yet. A galaxy is yours. Projects orbit it as solar systems, and each song or film is a world inside one. The sun at the centre is where you say who you are." The button reads **Make my galaxy**. An optional first line on your sun has the placeholder "Say it plainly". Below it: "Behind your sun, people see a simple version of Heat. Everything else in Heat stays private until you choose."
+   **Open:** should "Skip for now" let you in without an account? Recommendation: yes. Heat, the library and the Console are fully local. Space can be looked at but not published to or pushed from, which is how the signed-out universe already works.
+2. **Claim your galaxy.** The copy is v4's: "You have no galaxy yet. A galaxy is yours. Projects orbit it as solar systems, and each song or film is a world inside one. The sun at the centre is where you say who you are." The button reads **Make my galaxy**. An optional first line on your sun has the placeholder "Say it plainly". Below it: "Behind your sun, people can see a simple version of Heat, once you choose what goes there. Everything in Heat stays private until then."
 3. **Import your folder.** Before anything is copied, you see what the folder holds: "214 files: 38 .wwav, 12 .swav, 160 plain audio, 4 other. Plain audio comes in as master only." The button reads **Bring them in**. It runs in the background, and pressing again picks up after an interruption.
 4. **Add your calendars.** Each comes in as a private iCal address, so the app needs no Google sign-in:
    - "Paste your Brightspace calendar link": the per-student iCal feed, which works now with no approval.
@@ -464,7 +464,7 @@ The app then opens on Heat → Today. The strip reads "All clear" on the left an
 | A fourth segment, Selling settings, the purchases folder and receipts | Commerce comes later, inside Space. |
 | Claude calls made by the app (`/api/assist/:task`, a daily limit per account, in-app consent sheets) | Wi_WWAV is an MCP server instead. Claude's own permission prompts ask before each tool call. |
 | Google sign-in for Gmail and Calendar | Claude reads mail through its own Gmail connector, and calendars come in as iCal addresses, so the app needs no Google account. |
-| Feedback on your work through Ripple, and the clerk | Cut on 7 Oct 2026 to narrow v1. |
+| Feedback on your work through Ripple | Cut on 7 Oct 2026 to narrow v1. |
 | OS notifications and Dock badges about other people | Anything that reaches out fails gate 1.1; "Since you last looked" is pulled, never pushed. |
 
 ## 3. Heat: the profile view
@@ -556,7 +556,7 @@ The heat algorithm, the estimate chain, the grade maths, the LCD, the sheets and
 
 ### 3.3 The view's window
 
-Heat fills the view area of the one main window (see 2; **Decided**: one desktop app, Mac first): 1280 × 726 pt at the default window, 1024 × 606 at the smallest. Heat's LCD moves up into the title bar as the Now strip's task half (see 2.2), so from left to right Heat's toolbar holds "+", the six tabs as one segmented control, Sync and search. Below sit the 190 px sidebar, the main view, and a 290 px right column. Below 1240 pt of window width, the right column folds into a 44 px strip of widget icons that open as popovers.
+Heat fills the view area of the one main window (see 2; **Decided**: one desktop app, Mac first): 1280 × 726 pt at the default window, 1024 × 606 at the smallest. Heat's LCD moves up into the title bar as the Now strip's task half (see 2.2), so from left to right Heat's toolbar holds "+", the six tabs as one segmented control and Sync. Search is the title bar's ⌘K pill (see 2.1). Below sit the 190 px sidebar, the main view, and a 290 px right column. Below 1240 pt of window width, the right column folds into a 44 px strip of widget icons that open as popovers.
 
 Each tab has one primary action ("+" or N) and exactly one secondary action:
 
@@ -752,7 +752,7 @@ Never invent metrics: only restate numbers this app returned.
 
 Because `add_task`, `add_pending_grade` and `record_mail_thread` don't repeat themselves on the same source, Claude can read the same mail twice and leave nothing doubled. That replaces Heat's old list of the last 400 processed message ids.
 
-**Remote, later.** A server through mi-wwav.com serves claude.ai with the same eight tools, arguments and labels. It needs Heat sync first (8.7). Sign-in works as the devlog's `/mcp/write` does (**Exists today:** `server/mcp/auth.js`).
+**Remote, later.** A server through mi-wwav.com serves claude.ai with the same eight tools, arguments and labels. It needs Heat sync first (8.7). Sign-in works as the devlog's `/mcp/write` does (**Exists today:** `server/mcp/auth.js`). Its `get_grades` returns only the grades you made public, because private grades are not on the server (8.8).
 
 ### 3.14 Capture, notes and the weekly review
 
@@ -829,7 +829,7 @@ The Public switch decides what other people see. It does not limit what Claude r
 
 Heat's records live in the app's local database and sync to the person's account on mi-wwav.com (see 8). Grade rows are the exception: private grades stay on the Mac unless you turn on encrypted sync (Open, 8.9). A grade you switch public is copied to the server in the clear, because other people have to read it, and the copy is removed when you switch it back. The server tables are new, because the PKM's tables have no `userId`. Writes stay optimistic, and the status bar says where things stand: "Saved on this Mac · Synced 3:41 PM".
 
-Every record below has a `public` flag, `false` unless noted. The app stores no Google token of any kind, because it has no Google sign-in.
+Every record below has a `public` flag, `false` by default. `ProfileShare` rows are the two default public items themselves, and exist only once you press **Show**. The app stores no Google token of any kind, because it has no Google sign-in.
 
 ```ts
 Space        { id, name, hue, groupKind: "course"|"milestone"|"free", groupLabel, types[], persona }
@@ -851,6 +851,7 @@ MailThread   { id, gmailThreadId, subject, from, receivedAt, course?,
 Calendar     { id, name, kind: "brightspace"|"ical", keychainRef, lastSyncedAt }          // the address itself is in the Keychain
 Capture      { id, text, link?, triagedAt?, resultType?, resultId? }
 DailyNote    { date, markdown, public }
+Note         { id, title?, markdown, projectId?, link?, public }   // Proposed: the note that can go public (3.15's table); a daily note stays a DailyNote
 ProfileShare { id, kind: "now"|"timeline", sourceId, text?, targetId, clearsAt? }   // the two default public items
 ```
 
@@ -870,7 +871,7 @@ The undo journal, in `library.sqlite`, records who made each change (`you` or `c
 | ⇧Return | The tab's secondary action (3.3): Plan my day, Triage inbox, Today, Add course, Show the year, Open in Gmail |
 | F, ⇧F, I | Focus start or pause; stop and log; pulled away |
 | M W D T ← → | Calendar views, today, page |
-| T (in Mail), ⌘R, ⌘F | Make a task; sync calendars; search |
+| T (in Mail), ⌥⌘R, ⌘F | Make a task; sync calendars; filter the current list |
 | ⌘Z, ⇧⌘Z, Esc | Labelled undo and redo; close without losing saved work |
 
 ### 3.18 Left out, and why
@@ -893,16 +894,16 @@ The undo journal, in `library.sqlite`, records who made each change (`you` or `c
 
 ### 3.19 The look, and open decisions
 
-Heat keeps its Aqua and brushed-metal skin (see 7). Its LCD stays iTunes olive while the Console's screens are DMG green, so the screen's colour says which view you're in. A check against gate 2.4 (body text 7:1, secondary 4.5:1) finds four pairs to fix: the LCD's dim text, the sidebar headings, the third ink, and white on the `#3875d7` selection (4.47:1). The fixes are in 7.2: selected rows fill `#1B4C8C` with white text (8.5:1) and keep a 3 px `#3875D7` bar at the leading edge.
+Heat keeps its Aqua and brushed-metal skin (see 7). Its LCD stays iTunes olive while the Console's screens are DMG green, so the screen's colour says which view you're in. A check against gate 2.4 (body text 7:1, secondary 4.5:1) finds five pairs to fix: the LCD's dim text, the sidebar headings, the third ink, white on the `#3875d7` selection (4.47:1), and the label on the blue gel buttons. The fixes are in 7.2: selected rows fill `#1B4C8C` with white text (8.5:1) and keep a 3 px `#3875D7` bar at the leading edge.
 
 | Open decision | Recommendation |
 |---|---|
 | **Streak counter** (gate 1.1) | The grids and a growing record by default; the counter is a per-habit setting, off by default |
 | **Deadline alerts** (gate 1.1) | None by default. Allow one hand-set alert per task ("Remind me at 9 PM") that fires once |
 | **Valence / LTI with URI** | Ship on iCal and Claude's Gmail connector. Ask URI's Brightspace admins to register the app after the small-group stage (9.5), with the group's weekly reviews as evidence, because real scores end the pending-grade guesswork |
-| **Control size** (gate 2.4 fails any control under 44×44 px; 26 px rows and 13 px habit squares fail it) | Keep 44 px for buttons, tabs and orbs. Before testing, write a separate rule for dense rows and grids: 24×24 px hit areas (the WCAG 2.2 minimum) and every action on the keyboard |
+| **Control size** (gate 2.4 fails any control under 44×44 pt; 26 px rows and 13 px habit squares fail it) | Keep 44 pt for buttons, tabs and orbs. Before testing, write a separate rule for dense rows and grids: 24×24 pt hit areas (the WCAG 2.2 minimum) and every action on the keyboard |
 | **Now making line** | Build it, shown only once you've written one. Drop it if it starts to feel like a status that has to be kept up |
-| **Remote MCP server** | Build it after Heat sync. Same eight tools and labels. A remote call writes to the synced copy, and the Mac journals it when it arrives, with the same "Undo Claude's…" label |
+| **Remote MCP server** | Build it after Heat sync. Same eight tools and labels. A remote call writes to the synced copy, and the Mac journals it when it arrives, with the same "Undo Claude's…" label. Its `get_grades` returns only the grades you made public, because private grades are not on the server (8.8). |
 | **Who Heat is for** | One account first, with nothing hard-coded to a school, so a classmate could use it next. That is also the clearest route to gate 4 |
 
 ## 4. Space: the social view
@@ -946,7 +947,7 @@ Space wears the night: `#070A18`, ink `#F4EFE6`, amber suns, and royal blue `#29
 | Input | Does |
 |---|---|
 | Two-finger scroll, or drag on empty sky | pan; at the system tier, turn the system about its sun (as on iOS) |
-| Pinch, ⌘-scroll, ⌘+ / ⌘− | zoom about the pointer; buttons step ×1.55 |
+| Pinch, ⌘-scroll, ⌥⌘+ / ⌥⌘− | zoom about the pointer; buttons step ×1.55. ⌘+ and ⌘− stay text size (2.13) |
 | ⌥-drag from empty sky | orbit the camera: pitch 0.35–1.15 rad (default 0.62), 0.006 rad per pt across, 0.004 down (the hub's numbers) |
 | Click · Return or double-click | select and show the info card · dive in (fit to 80%) or, on a work, open its player |
 | Hold 400 ms on a galaxy | peek: its bio sun inline, without leaving the sky |
@@ -1026,7 +1027,7 @@ All four are worlds you look at, listen to or read. Space makes none of them (**
 | Writing | Ri_WWAV | a page planet | paper | a link, which waits for consent (4.9) | **Open** |
 | Fashion | Gi_WWAV | a gallery planet, ×1.35 | from the cover photo | a link, which waits for consent (4.9) | photos |
 
-**Colour.** A work's colour is its key colour: hue = ((pc · 7) mod 12) · 30 with A = 0, major hsl(h, 72%, 58%), minor hsl(h, 58%, 42%) (**Exists today:** `keyColor.js`). Works with no key take a resonant colour from their image (saturation at least 0.55, lightness 0.42–0.62; **Exists today:** `posterColor.js`). Night indigo, hue 232, "still condensing", stays reserved for music whose key isn't known yet; the Console analyses key and BPM on export (see 5), so new songs arrive coloured.
+**Colour.** A work's colour is its key colour: hue = ((pc · 7) mod 12) · 30 with A = 0, major hsl(h, 72%, 58%), minor hsl(h, 58%, 42%) (**Exists today:** `keyColor.js`). Works with no key take a resonant colour from their image (saturation at least 0.55, lightness 0.42–0.62; **Exists today:** `posterColor.js`). Night indigo, hue 232, "still condensing", stays reserved for music whose key isn't known yet; the Console estimates key and BPM on import and after recording, and a song exported with a key arrives coloured (5.4, 5.13).
 
 #### Film
 
@@ -1067,6 +1068,8 @@ Writing has no world today. Suns are already block documents, so a written work 
 
 **Open: where pages and galleries are made.** Space only shows them. Pages can be written in the suns' block editor (4.8), but nothing in the app makes a gallery. Recommendation: v1 shows galleries that already exist and makes none, and a gallery maker waits until fashion has a format of its own (see 6).
 
+Writing and gallery works have no Open in Console; the Console is for sound and picture.
+
 ### 4.8 Suns and letters
 
 **Exists today (v4):** a sun is a blocks v1 document of text (heading, body, quote), photos (an R2 key) and details (label/value pairs). It opens as a sheet over the scene, so the camera keeps its place; an empty one reads "Nothing written here yet." The editor offers "Add words", "Add a picture", "Add details" and "Add a line", with the placeholder "Say it plainly", and saves the whole document at once, because "its ORDER is most of its meaning." The blocks are plain and stacked, one after another.
@@ -1074,7 +1077,7 @@ Writing has no world today. Suns are already block documents, so a written work 
 **On desktop:**
 
 - **Editing.** Your own sun opens straight into the editor; other people's open to read. There is no layout to drag, size or rotate. The blocks flow in order.
-- **The bio sun** is in the middle of your galaxy. It opens your **public Heat view** under your bio blocks (**Decided**; see 2.4 and 3.15). The view is a "Now making" line, then the milestone timelines of the projects you linked, then any other record you switched public, each kind under its own heading. Anyone who opens your sun sees it, read-only, and you see the same page through the galaxy chip's "Your public Heat view". It never shows a count or a comparison (see 3.15).
+- **The bio sun** is in the middle of your galaxy. It opens your **public Heat view** under your bio blocks (**Decided**; see 2.4 and 3.15). The view holds what you have shown: a "Now making" line, then the milestone timelines of the projects you linked, then any other record you switched public, each kind under its own heading. Anyone who opens your sun sees it, read-only, and you see the same page through the galaxy chip's "Your public Heat view". It never shows a count or a comparison (see 3.15).
 - **A project sun** shows the milestone timelines linked to its solar system, as beads with titles, dates, and reached or not. On your own project sun, the secondary act (⇧Return) is **Plan in Heat**, which makes a linked milestone (see 2.6).
 - **Heat reaches a sun only when you show it.** Making a Now making line or a timeline public is one press on **Show** in Heat (see 3.15). Nothing else in Heat is on a sun.
 
@@ -1102,7 +1105,7 @@ Writing has no world today. Suns are already block documents, so a written work 
 
 **Seeing a family.** The "tree" chip lays the family out as its own system: the root at the centre, forks on generation rings at 90 + (g − 1) · 70, each subtree's arc proportional to its leaves, "so families stay together" (**Exists today:** v3 `CosmosLayout.swift`). Your branch wears the accent. Return on a node opens its player, and ⌘E opens it in the Console, which is how you fork from there. There is no view of two galaxies or of everyone; the only graph is the family.
 
-**Across media.** Songs and films already share one id space ("a film made from a song is its child"); page and gallery planets join it, so a book can descend from an album. Whether a sold fork pays its ancestors waits for commerce (4.13; see 9).
+**Across media.** Songs and films already share one id space ("a film made from a song is its child"); page and gallery planets join it, so a book can descend from an album. Whether a sold fork pays its ancestors waits for commerce (4.13).
 
 ### 4.10 Finding work: the sky and Newest
 
@@ -1130,7 +1133,7 @@ WWAV's earlier apps had likes, follower counts, comments, push notifications and
 
 ### 4.12 Arriving and leaving
 
-**Connected uploads** (flows in 2.6). Drag an export from the library drawer (⌘L) onto a solar system, or onto an empty seat. The planet "condenses in" from 0.82 to full scale while a ring traces the upload (**Exists today:** `Planet.jsx`, where the ring traces the stems' download; here it traces the upload); the server keeps the exact bytes and reads lineage from `wlin`. A `.swav` also gets a streaming copy (H.264 up to 1080p, CRF 23) for phones and the sky; download returns the original (see 6). Uploads wait for a connection and finish on their own (see 2.8). Going back, press ⌘E or drag any planet onto "Console" (4.6).
+**Connected uploads** (flows in 2.6). Drag an export from the library drawer (⌘L) onto a solar system, or onto an empty seat. The planet "condenses in" from 0.82 to full scale while a ring traces the upload (**Exists today:** `Planet.jsx`, where the ring traces the stems' download; here it traces the upload); the server keeps the exact bytes and reads lineage from `wlin`. A `.swav` also gets a streaming copy (H.264 up to 1080p, CRF 23) for phones and the sky; download returns the original (6.2, 8.7). Uploads wait for a connection and finish on their own (see 2.8). Going back, press ⌘E or drag any planet onto "Console" (4.6). A work's **Copy link** (**Proposed**) opens its share page on www.wi-wwav.com with **Play**, so the paperclip row in 7.5 stays true (8.7).
 
 **Open: unpublishing a work others have forked.** Recommendation: the planet leaves the sky, forks made before then keep playing its stems, and their trees show "withdrawn by its maker".
 
@@ -1312,10 +1315,12 @@ The buttons are **Keep it off** and **Try it again**. The engine reports plugin 
 | Delay | one | a dotted eighth at the session tempo, ping-pong and damped, with fixed feedback | the delay return, fed by sends |
 | Distortion | one | a soft clip; its tone darkens from 12 kHz to 5 kHz as the amount rises | an insert |
 | Tremolo | one | depth, with one swell per eighth note, locked to the grid | an insert |
-| Filter | low-pass and high-pass, one amount each | the low-pass sweeps 20 kHz → 200 Hz, the high-pass 20 Hz → 2 kHz, Q 1.0 | an insert |
+| Filter | low-pass and high-pass, one amount each | the low-pass sweeps 20 kHz → 200 Hz, the high-pass 20 Hz → 2 kHz, Q 1.0 | an insert on a track or on the master chain |
 | Limiter | none | PRANA's master limiter, fixed | master only |
 
 Amounts glide over about 30 ms, so a move never zippers. There is no built-in EQ, no built-in compressor and no extra knobs on these six. If a stem needs an EQ or a compressor, put a plugin on it. The Chain tab shows each built-in as a card with its amount on a DMG screen.
+
+Only a Filter on the master fits `wrmx`'s `lpf` and `hpf`. A Filter on any track, or Distortion or Tremolo on any track other than a lone stem lane, makes the remix Baked (5.13, 6.8).
 
 ### 5.10 Split anything into four
 
@@ -1369,7 +1374,7 @@ Sequence {
 - **Undo is journalled.** Every change is a transaction that snapshots its rows; deleting a clip removes rows, never media.
 - **Exports know their session.** An export is a new clip with `from_sequence` set, and opening it offers **Open the session it came from**: "the edit stays editable forever."
 - **What you hear is what you render.** Export runs the engine's own graph faster than real time. A plugin that asks to render in real time gets it, and the export sheet names it.
-- **Old projects come in.** A v2 8-track fork imports as two groups of four lanes, A and B, with its clips and levels kept. Pitch and rate have no place in the Console, so the sheet lists them and leaves them out: "Not brought in: pitch on 3 clips."
+- **Old projects come in** (**Proposed**). A v4 8-track fork imports as two groups of four lanes, A and B, with its clips and levels kept. Pitch and rate have no place in the Console, so the sheet lists them and leaves them out: "Not brought in: pitch on 3 clips."
 
 ### 5.13 Export
 
@@ -1379,11 +1384,11 @@ Export is not a button. The last row of the arrangement is OUTPUT, as on MI-WWAV
 |---|---|---|
 | `.wwav` | master and four stems by role, metadata, lineage | 44.1 kHz, 16-bit, PRANA's layout (see 6) |
 | `.swav` | the picture with the mix as soundtrack | H.264 or HEVC through VideoToolbox, then `wmet` and `wlin` appended |
-| Plain | WAV 24-bit at session rate, MP3 320, MP4 | for tools that know nothing of WWAV |
+| Plain | WAV 24-bit at session rate | for tools that know nothing of WWAV |
 
 **A remix from a session** is written one of two ways, and the sheet's one secondary action switches between them (6.8):
 
-- **As settings**, when the four stem lanes are the parent's stems untouched (plus takes) and every change is one PRANA's `wrmx` can hold: a level, a mute or a built-in effect's amount. `wstm` holds the stems and `wrmx` the settings.
+- **As settings**, when the four stem lanes are the parent's stems untouched (plus takes) and every change is one PRANA's `wrmx` can hold: a level, a mute, or a reverb, delay, distortion or tremolo amount on a stem, or a Filter on the master. `wstm` holds the stems and `wrmx` the settings.
 - **Baked**, for anything else (new tracks, plugins, edits, automation). `wstm` holds the four rendered stem buses, with no `wrmx`: "This remix has 2 new tracks and a plugin, so its stems are rendered. It sounds the same everywhere."
 
 The sheet says out loud everything that changes on the way out:
@@ -1395,7 +1400,11 @@ The sheet says out loud everything that changes on the way out:
 
 **Lineage is set for you.** `type` is `original` for a new session, `remix` for one that came from someone's planet, `split` for a split song; `parent_id`, `root_id` and `generation` follow PRANA's rules. When one export makes both files, the film's `parent_id` is the song's `song_id`: "A film made from a song is its child" (`formats/swav/SPEC.md`). Progress shows real stages only: "Rendering master · 1:12 of 3:58", "Rendering stems", "Encoding · frame 2,410 of 5,712", "Packing".
 
+**Key and tempo.** Export writes the session's key and tempo into `wmet` when the session has them (typed by you, or an estimate you confirmed, 5.4).
+
 **Open:** sessions run at 48 kHz for video while `.wwav` 0.1 is fixed at 44.1 kHz, 16-bit. *Recommendation:* keep 0.1 fixed and convert on export, saying so, and weigh a 48 kHz `.wwav` in 6, since PRANA reads 44.1 kHz only (6.7).
+
+**Open:** MP3 320 and a plain MP4. *Recommendation:* not in v1; a `.swav` already plays as an MP4.
 
 ### 5.14 Playback: every file comes apart
 
@@ -1742,7 +1751,7 @@ A `.wwav` holds four stems; a session holds any number of tracks. The rule that 
 
 **A remix from the Console** is any export from a session with a `from`. It is written with `type` `remix`, a new `song_id`, `parent_id` = the source's `song_id`, `root_id` = the source's root, generation + 1, and `creator` = your account name at export. `device_id` stays "": the desktop app isn't a device, and a per-install id would be a tracking number with no use. The export sheet's one secondary action switches between two ways of writing it (see 5.13):
 
-- **As settings**, when the four stem lanes are the parent's stems untouched (plus takes) and every change is a level, a mute or a built-in effect's amount that PRANA's `wrmx` can hold. `wrmx` has a level and a mute for each stem, four effect amounts for each stem (reverb, delay, distortion, tremolo), and the two filter amounts on the master. `wstm` holds the stems and `wrmx` the settings, as PRANA writes them, so the remix reopens with every control where you left it, on the device too.
+- **As settings**, when the four stem lanes are the parent's stems untouched (plus takes) and every change is one that PRANA's `wrmx` can hold: a level, a mute, or a reverb, delay, distortion or tremolo amount on a stem, or a Filter on the master. `wrmx` has a level and a mute for each stem, four effect amounts for each stem (reverb, delay, distortion, tremolo), and the two filter amounts on the master. `wstm` holds the stems and `wrmx` the settings, as PRANA writes them, so the remix reopens with every control where you left it, on the device too.
 - **Baked**, for anything else (new tracks, plugins, edits, automation). `wstm` holds the four rendered stem buses, with no `wrmx`: "This remix has 2 new tracks and a plugin, so its stems are rendered. It sounds the same everywhere."
 
 **The master keeps the stems' length.** Readers use the stems only when `data`, `wstm` and `wmet` agree on the frame count, and speed and time change the length. The Console doesn't stretch audio or shift its pitch (5.4), so every `wrmx` it writes has `pitch` 0, `speed` 1.000 and `time` 1.000, and the master carries levels, mutes, effects and filters at the stems' length. PRANA's master leaves speed out for the same reason. A remix made on PRANA with speed, time or pitch set opens in the Console without them: "Not applied: speed 1.25×. The Console doesn't stretch audio." (see 5.14).
@@ -1930,7 +1939,7 @@ Toasts hold for 2600 ms. Every idle motion the app inherits gets a decision:
 | A planet pulsing for new work | portfolio | a still dot in "Since you last looked" |
 | An LED blinking while selected | PRANA | a still notch |
 
-Meters, playheads and waveforms move whenever audio moves, because they are information. Under Reduce Motion (Mac) or with animation effects off (Windows), every move becomes a 140 ms cross-fade, cameras lose their inertia, and breathing stops. A ceremony after a press is allowed if it ends within 900 ms: v2's Game Boy cartridge returns as a `.wwav` dropped on the Console's transport screen, sliding into its slot in 420 ms.
+Meters, playheads and waveforms move whenever audio moves, because they are information. Under Reduce Motion (Mac) or with animation effects off (Windows), every move becomes a 140 ms cross-fade, cameras lose their inertia, and breathing stops. A ceremony after a press is allowed if it ends within 900 ms, such as a planet condensing in as it lands.
 
 ### 7.7 Sound
 
@@ -1988,7 +1997,7 @@ Never: "Oops", "Awesome", "AI-powered", "Trending", "Don't break your streak", "
 
 ### 7.11 Tokens
 
-Every token lives in one file, `design/tokens.json`. The build compiles it into CSS custom properties for the web UI, a Rust module for the wgpu compositor, and a C++ header for the engine's 22 pt strip above third-party plugin windows, so no token can drift between processes.
+Every token lives in one file, `design/tokens.json`. The build compiles it into CSS custom properties for the web UI, a Rust module for the wgpu compositor, and a C++ header for the engine, so no token can drift between processes.
 
 ```json
 { "night": { "ground": "#070A18", "ink": "#F4EFE6",
@@ -2194,7 +2203,7 @@ The library is the folder `~/Music/Wi_WWAV/` (2.5).
 - **`media/`** holds every imported, recorded and rendered file under a ULID, written once and never edited (**Exists today:** `MI-WWAV-OS/engine/src/ids.rs`).
 - **`sessions/`** holds `.wwavsession` packages (6.5).
 
-**Heat's records** are the tables of 3.16. Each record has a `public` flag, `false` unless the record is one of the two default public items. The flag is part of the row, so switching it is one journalled change, "Undo make public", like any other.
+**Heat's records** are the tables of 3.16. Each record has a `public` flag, `false` by default. The two default public items are `ProfileShare` rows (3.16); each appears on your public Heat view once you press Show (3.15). The flag is part of the row, so switching it is one journalled change, "Undo make public", like any other.
 
 **The undo journal** follows MI-WWAV-OS's design (**Exists today:** `MI-WWAV-OS/engine/src/store.rs`), reimplemented in the app's Rust core. MI-WWAV-OS contributes the idea, not the code (**Decided**). Every mutation runs in a transaction that snapshots the affected rows before and after.
 
@@ -2255,6 +2264,8 @@ A public copy is written by the same push as any other change, and removed by th
 | `/api/lineage/global`, `/api/tracks/:id/lineage`, `/api/tracks/:id/fork` | family trees; ↑ Push (mix states) |
 | `/api/v2/*` (galaxies, systems, planets, suns, lineage-links, saved, catalog, universe) | Space, as the iPhone uses it (4) |
 | `/api/auth/refresh`, `/api/auth/me` | the 7-day JWT, refreshed after a 401 (2.4) |
+| the devlog's read route, `server/routes/devlog.js` | letters on a sun (4.8) |
+| `/api/messages` | the message door (4.11) |
 
 **New** (**Proposed**):
 
@@ -2265,6 +2276,8 @@ A public copy is written by the same push as any other change, and removed by th
 | `/api/heat/changes` | Heat sync, pulled with a cursor, pushed in batches; it carries public copies and their removal |
 | `/api/heat/public/:userId` | reading a person's public Heat items, for the public Heat view on their sun (4.8) |
 | `/desktop/latest.json` | the update manifest (8.10) |
+| Stripe webhook sets `tier` | `server/routes/subscription.js` sets `isPro`/`proExpiresAt` today and must set `tier` as well, so a plan bought in the browser is the plan the app reads (9.4) |
+| the web face (share pages) | share pages and public read routes on www.wi-wwav.com, because `WiPosts` serves one account today (below) |
 
 `/api/heat/public/:userId` returns the person's public copies and nothing else, in the order 3.15 gives: the Now making line, the project timelines (each with its `targetId`, so a project sun picks out its own), then the other public records by kind. It is open to anyone who can open the sun, as `/api/v2` reads are. It returns records, never a total, a count or a comparison (3.15).
 
@@ -2350,7 +2363,7 @@ A direct download, not the Mac App Store, whose sandbox blocks plugin hosting (*
 | JUCE 8 | AGPLv3 or commercial | Wi_WWAV is closed and takes money for Pro (9), so commercial; a free Starter tier applies under a revenue cap (check the cap at the version pinned). WWAV Push already uses JUCE 8.0.4 (**Exists today**) |
 | VST3 SDK | MIT from 3.8 (October 2025); confirm at the version pinned | the logo needs Steinberg's separate agreement, so the UI writes "VST3" in plain text |
 | Audio Units | Apple's SDK | no fee |
-| FFmpeg | LGPL 2.1 or later | built `--disable-gpl --disable-nonfree --enable-shared`, dylibs in `Contents/Frameworks`, no libx264, libx265 or fdk-aac, source and build script published. A user may swap the libraries if they re-sign them; the notes say how. LAME (the MP3 export in 5.13) is LGPL too |
+| FFmpeg | LGPL 2.1 or later | built `--disable-gpl --disable-nonfree --enable-shared`, dylibs in `Contents/Frameworks`, no libx264, libx265 or fdk-aac, source and build script published. A user may swap the libraries if they re-sign them; the notes say how. |
 | Tauri, wgpu, three.js, Rust crates | MIT or Apache-2.0 | credited in About |
 | Surge XT | GPLv3 | tests only, never shipped |
 
@@ -2427,7 +2440,7 @@ CI measures what it can. The rest is measured by hand at each release and writte
 | Left out | Why |
 |---|---|
 | The 3D shop's engineering: the hall budget (1,000 shops), the screen quad that seated a film in its room, `/api/store/*`, and store receipts in `library.sqlite` | The walkable shop is cut. "Eventually the space will hold commerce instead of having that be a 4th place." Cut on 7 Oct 2026 to narrow v1. |
-| Purchases, entitlements, Stripe Checkout and its web view, Connect payouts, fashion listings, orders and tickets (`/api/purchase/*`, `/api/purchases/*`, `/api/entitlements`, `/api/connect/*`, `/api/fashion-listings`, `/api/orders`, `/api/events`) | Commerce is later, inside Space (4.13), and nothing of it is designed now. Cut on 7 Oct 2026 to narrow v1. |
+| Purchases of works, Stripe Checkout for works and its web view in the app, Connect payouts, fashion listings, orders and tickets (`/api/purchase/*`, `/api/purchases/*`, `/api/connect/*`, `/api/fashion-listings`, `/api/orders`, `/api/events`) | Commerce is later, inside Space (4.13), and nothing of it is designed now. Cut on 7 Oct 2026 to narrow v1. Plans are still bought in the browser (9.4). |
 | `/api/assist/:task`, its prompts and per-account limit, and the founder's Anthropic key on the server | Wi_WWAV is an MCP server instead (3.13). The app calls no model, and Claude's own permission prompts ask before each tool call. |
 | A Google OAuth client, the `gmail.readonly` scope, Google verification and 7-day testing sign-ins, and Google tokens in the Keychain | Claude reads mail through its own Gmail connector, and calendars come in as iCal addresses, so the app needs no Google account. |
 | A local network listener for MCP | Claude Desktop and Claude Code start the helper over stdio, so there is no port to defend. |
@@ -2485,7 +2498,7 @@ Zi_WWAV (furniture) is left out, because the sketch names four media and nothing
 
 The fourth clause, **makes discs**, waits: "PRANA disc not ready yet, so definitely not writing software yet" (see 1.7). Shipping the software first gives Mi_pro_WWAV users before it has a case.
 
-**The app does not sell the hardware,** and nothing in it is an advertisement. Two ways it would have are out: the disc round trip, because writing a PRANA's disc waits for the disc, and the plinth, because commerce is later (4.13). One stays: **founding members first.** A Founding seat (9.4) carries a reserved place in line for the device. It is not a discount on it.
+**The app does not sell the hardware,** and nothing in it is an advertisement. Two ways it would have are out: the disc round trip, because writing a PRANA's disc waits for the disc, and a drop page, because commerce is later (4.13). One stays: **founding members first.** A Founding seat (9.4) carries a reserved place in line for the device. It is not a discount on it.
 
 **Post 34's roadmap.** Each step is quoted from the post, beside the app's part in it:
 
@@ -2510,7 +2523,7 @@ Kickstarter adds a 5% platform fee on top of payment processing. The old questio
 
 ### 9.4 Money
 
-#### Revenue lines
+#### Revenue lines now, and the one that waits
 
 | Line | What is sold | Price | WWAV keeps | Status |
 |---|---|---|---|---|
@@ -2675,7 +2688,7 @@ Six rows left with the features they were about. "Walk around infinitely", the s
 | Rights to your masters | WWAV hosts and delivers your work; taking your masters is what labels do, and WWAV exists against that. |
 | A device that needs the app | Mi-WWAV plays its discs (USB flash sticks in an acrylic case) without an account. The app is not a key to the device. |
 | Accounts under 13 | The birthdate gate keeps them out (2.14). Younger students with a teacher belong to class systems, which are later. |
-| Selling inside the app now: a walkable shop, the store fee as a revenue line, drops and preorders through a plinth, commissions through the store, and the clerk | "Eventually the space will hold commerce instead of having that be a 4th place." Commerce is later, inside Space (4.13). Cut on 7 Oct 2026 to narrow v1. |
+| Selling inside the app now: a walkable shop, the store fee as a revenue line, drops and preorders, and commissions through the store | "Eventually the space will hold commerce instead of having that be a 4th place." Commerce is later, inside Space (4.13). Cut on 7 Oct 2026 to narrow v1. |
 | Selling the hardware, or writing PRANA discs, from the app | "PRANA disc not ready yet, so definitely not writing software yet." |
 | Claude as a metered or sold feature | The app calls no model. Claude runs in the person's own Claude, through MCP, so there is nothing to meter or sell (2.11). |
 | Google verification and a Gmail stage in the school plan | Claude reads mail through its own Gmail connector, so the app never asks Google for it (3.10). |
@@ -2694,15 +2707,15 @@ The order follows the file. Every view reads and writes `.wwav` and `.swav`, so 
 | Stage | What exists at the end | Estimate |
 |---|---|---|
 | 0. Thin slice | the seven items in 10.3, end to end, passing on a second Mac | 1–2 weeks (**Decided**) |
-| 1. Shell and library | the window, view switcher and Now strip; `~/Music/Wi_WWAV/` with import, reader verdicts, tags and pins; ⌘K, ⌘⇧N and labelled ⌘Z; sign-in through the browser; the upload queue; Export everything with its offline `index.html` (see 2) | grows out of the slice, alongside stage 2; not estimated on its own |
-| 2. Heat, with the MCP server | Today with the time column, Plan my day and the Pomodoro timer; Tasks, Calendar, Grades, Habits and Mail; spaces; the Brightspace and other iCal feeds; the artifact's records imported with every id kept (see 3.16); `wi-mcp` with its eight tools and the journal's Claude labels (see 3.13 and 8.8) | about 1 week for Heat (**Decided**); about 1 week more for the MCP server (**Proposed**) |
-| 3. Console, audio | audio, instrument and stem-group tracks; VST3 and AU effects and instruments; MIDI and the piano roll; takes, one per pass; the four stem buses and the six built-in effects; `.wwav` export; Push to Space (see 5) | 2–4 months to finishing a song (**Decided**; the cut leaves less in this stage: no sampler, no comping, no Make a disc, and splitting has moved to stage 6) |
+| 1. Shell and library | the window, view switcher and Now strip; `~/Music/Wi_WWAV/` with import, reader verdicts, tags and pins; ⌘K, ⌘⇧N and labelled ⌘Z; sign-in through the browser; the upload queue; Export everything with its offline `index.html` (see 2); the Tauri updater with `/desktop/latest.json` (8.10; **Proposed**) | grows out of the slice, alongside stage 2; not estimated on its own |
+| 2. Heat, with the MCP server | Today with the time column, Plan my day and the Pomodoro timer; Tasks, Calendar, Grades, Habits and Mail; spaces; the Brightspace and other iCal feeds; the artifact's records imported with every id kept (see 3.16); quick capture, notes and the weekly review (see 3.14); `wi-mcp` with its eight tools and the journal's Claude labels (see 3.13 and 8.8). Heat records are kept on the Mac, and sync arrives with stage 5 (see 8.7) | about 1 week for Heat (**Decided**); about 1 week more for the MCP server (**Proposed**) |
+| 3. Console, audio | audio, instrument and stem-group tracks; VST3 and AU effects and instruments; MIDI and the piano roll; takes, one per pass; the four stem buses and the six built-in effects (see 5); the `.wwavsession` package with autosave and recovery (see 6.5); `.wwav` export; the upload queue sends exports to your library on mi-wwav.com | 2–4 months to finishing a song (**Decided**; the cut leaves less in this stage: no sampler, no comping, no Make a disc, and splitting has moved to stage 6) |
 | 4. Console, video | basic cutting on video tracks, proxies for 4K, the viewer on the engine's clock, `.swav` export (see 5.11) | about 1 month, overlapping stage 3 (**Proposed**; the founder's 1–2 months was set when video held grade, titles and generators too) |
-| 5. Space | the sky in three.js, the same on every machine; the planet player with level, mute and solo on the four moons, and ↑ Push; the four media to view; suns and letters, with the public Heat view and Heat sync; lineage and the family tree; Newest; "Since you last looked"; Open in Console (see 4) | 2–4 weeks (**Decided**; the cut removes the game layer, the remix deck and the astronaut, and adds the public Heat view) |
+| 5. Space | the sky in three.js, the same on every machine; the planet player with level, mute and solo on the four moons, and ↑ Push; the four media to view; suns and letters, with the public Heat view and Heat sync; lineage and the family tree; Add, Add galaxy and the Saved shelf; the message door; Newest; "Since you last looked"; Open in Console (see 4); Push to Space (see 5.16); the web face and its share pages (8.7; **Proposed**); buying Pro or a Founding seat in the browser, with the Stripe webhook setting `tier` (9.4; **Proposed**) | 2–4 weeks (**Proposed**; the founder's estimate was set before real 3D, Heat sync and the public Heat view were added) |
 | 6. Demucs splitting | Split into stems (⌃⌘S) in a background worker: the htdemucs model, the stem group made in place, the CPU fallback and its warning (see 5.10) | about 1–2 weeks (**Proposed**) |
 | 7. Windows | the same app on WebView2, ASIO or WASAPI, VST3, DX12 and Authenticode (see 8.10) | 3–6 weeks after the Mac (**Decided**) |
 
-Worked most days, that is roughly 3–6 months to a v1 of three views (**Proposed**). It is the founder's **Decided** 4–8 months for four rooms, less the shop's 1–2 months. Two stages are new, the MCP server and splitting as its own stage; the cut took more out of the Console than they add, so the range stays.
+Worked most days, that is roughly 3–6 months to a v1 of three views (**Proposed**). It is the founder's **Decided** 4–8 months for four rooms, less the shop's 1–2 months. Stage 5 grows with real 3D, Heat sync and the public Heat view, so the top of the range is the likelier end. Two stages are new, the MCP server and splitting as its own stage; the cut took more out of the Console than they add, so the range stays.
 
 **Why this order.**
 
@@ -2831,29 +2844,30 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | 23 | One process per plugin | 5.7, 8.3 | Not in v1. Log a month of engine crashes per plugin, then decide. |
 | 24 | What a local split costs | 5.10, 9.4 | Free and unmetered. The paid cloud split stays for phones and the web. |
 | 25 | A 48 kHz or 24-bit `.wwav` | 5.13, 6.7 | Keep 44.1 kHz, 16-bit for all of 0.x and convert on export, saying so. Decide both changes together for 1.0, once PRANA's hardware is measured. |
-| 26 | Versions and identity | 5.16, 6.8 | Keep versions on the server under one `song_id`. Add an optional `version` to `wmet` and a `parent_version` to `wlin` in 0.2. |
-| 27 | Thin remixes | 6.9 | Thick files wherever a file leaves. Thin storage inside the library and R2, keyed by sha256. |
-| 28 | Film stems for Si_WWAV | 6.10 | Build them after one film has been cut in the Console and someone has asked to take a film apart. |
+| 26 | MP3 320 and a plain MP4 export | 5.13 | Not in v1. A `.swav` already plays as an MP4. |
+| 27 | Versions and identity | 5.16, 6.8 | Keep versions on the server under one `song_id`. Add an optional `version` to `wmet` and a `parent_version` to `wlin` in 0.2. |
+| 28 | Thin remixes | 6.9 | Thick files wherever a file leaves. Thin storage inside the library and R2, keyed by sha256. |
+| 29 | Film stems for Si_WWAV | 6.10 | Build them after one film has been cut in the Console and someone has asked to take a film apart. |
 
 #### Engineering and shipping
 
 | # | Decision | From | Recommendation |
 |---|---|---|---|
-| 29 | `allow-unsigned-executable-memory` for copy-protected plugins | 8.10 | Add it only if a plugin in the test set fails without it. |
-| 30 | Intel-only plugins | 8.10 | Offer "Open the engine under Rosetta" per session, as a bridge. |
-| 31 | Minimum macOS | 8.10 | macOS 13. |
-| 32 | A self-hosted Mac mini CI runner | 8.12 | Add one once macOS runner minutes pass about $50 a month. |
-| 33 | The `formats/` submodule | 8.13 | A sparse checkout of Mi-WWAV now. Split the four folders out only if clone times start to hurt. |
+| 30 | `allow-unsigned-executable-memory` for copy-protected plugins | 8.10 | Add it only if a plugin in the test set fails without it. |
+| 31 | Intel-only plugins | 8.10 | Offer "Open the engine under Rosetta" per session, as a bridge. |
+| 32 | Minimum macOS | 8.10 | macOS 13. |
+| 33 | A self-hosted Mac mini CI runner | 8.12 | Add one once macOS runner minutes pass about $50 a month. |
+| 34 | The `formats/` submodule | 8.13 | A sparse checkout of Mi-WWAV now. Split the four folders out only if clone times start to hurt. |
 
 #### Business and school
 
 | # | Decision | From | Recommendation |
 |---|---|---|---|
-| 34 | One desktop price list | 9.4 | A free plan (all local features, 10 GB hosted, 10 cloud splits); Pro at $7.99 a month or $69.99 a year; Founding at $199.99 once, seats 1–500; a split pack at $9.99 for 50; one `tier` entitlement everywhere. |
-| 35 | Expiring split packs | 9.4 | Packs keep until used. |
-| 36 | The device's price | 9.4 | Write a price ceiling into the campaign plan before step 4, and announce it in a letter to Wi-WWAV. |
-| 37 | Money from the school | 9.5 | No-equity grants and competitions, leading with gate 4. Read the university's IP policy for student work first. |
-| 38 | A fail criterion for gate 1.4 | 9.6 | Adopt it: the gate fails if, 12 months after Space's first payment for a work, the sales fee, Pro, Founding and packs don't cover server running costs, or if any line depends on a count of attention. It has no route until commerce returns. |
+| 35 | One desktop price list | 9.4 | A free plan (all local features, 10 GB hosted, 10 cloud splits); Pro at $7.99 a month or $69.99 a year; Founding at $199.99 once, seats 1–500; a split pack at $9.99 for 50; one `tier` entitlement everywhere. |
+| 36 | Expiring split packs | 9.4 | Packs keep until used. |
+| 37 | The device's price | 9.4 | Write a price ceiling into the campaign plan before step 4, and announce it in a letter to Wi-WWAV. |
+| 38 | Money from the school | 9.5 | No-equity grants and competitions, leading with gate 4. Read the university's IP policy for student work first. |
+| 39 | A fail criterion for gate 1.4 | 9.6 | Adopt it: the gate fails if, 12 months after Space's first payment for a work, the sales fee, Pro, Founding and packs don't cover server running costs, or if any line depends on a count of attention. It has no route until commerce returns. |
 
 ### 10.5 Glossary
 
@@ -2871,7 +2885,6 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Aqua | The classic Mac OS X look Heat wears: brushed metal, gel buttons, striped rows; its highlight `#3875D7` is the desk's one accent | 7.2 |
 | AU, VST3 | The plugin formats the engine hosts: AU on the Mac, VST3 on both; CLAP and AAX are left out | 8.4 |
 | Bio sun | The sun at the centre of your galaxy: your page, with your public Heat view under your bio blocks | 4.8 |
-| Block | A span of time in Today's time column, given to a task or a habit | 3.5 |
 | Brightspace | D2L's learning system, used at URI; Heat reads its iCal feed now and Valence or LTI later | 3.11 |
 | Built-in effects | PRANA's reverb, delay, distortion, tremolo, filter and master limiter, with one amount each; there is no built-in EQ, compressor or instrument | 5.9 |
 | Case metal, deck metal | Heat's brushed metal (title bar, sheets) and MI-WWAV-OS's paler pinstriped metal (mixer strips, device cards) | 7.2 |
@@ -2887,7 +2900,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Delay compensation | Automatic alignment of signal paths through plugins that report latency | 5.7, 8.4 |
 | Demucs | The stem-splitting model (htdemucs, four stems); it runs locally in the Console and on Replicate for phones | 5.10 |
 | Desk, night | The two visual registers: Heat and the Console's chrome, and Space | 7.2 |
-| DISCMAN | The codename of WWAV v2 (web) and v3 (iOS), spring 2026 | 1.5, 4.1 |
+| DISCMAN | The codename of the spring 2026 iPhone app (v3) | 1.5, 4.1 |
 | DMG screen | A Game Boy-green readout behind glass in the Console | 5.2, 7.2 |
 | Drop | How publishing works: drag a work onto a system or a view segment | 2.7 |
 | Engine | `wwav-engine`, the separate JUCE process that owns audio, MIDI and plugins, and is the master clock | 8.1 |
@@ -2906,7 +2919,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Get Info | Heat's inspector drawer for one record; it holds the Public switch | 3.1, 3.15 |
 | Gi_WWAV | The garments family (fashion) | 1.2, 9.2 |
 | Heat | The profile view (⌘1), for planning time, grown from the founder's claude.ai artifact of the same name | 3 |
-| Heat score | v = 1 − days left ÷ runway, clamped to 0–1; 1.1 when overdue, 0.05 with no due date | 3.1 |
+| Heat algorithm | The rule that ranks tasks: v = 1 − days left ÷ runway, clamped to 0–1; 1.1 when overdue, 0.05 with no due date | 3.1 |
 | JUCE | The C++ audio framework (version 8) the engine and the scanner are built on | 8.1 |
 | Key colour | A work's colour: hue = ((pc · 7) mod 12) · 30 with A = 0; major hsl(h, 72%, 58%), minor hsl(h, 58%, 42%); night indigo, hue 232, when the key is unknown | 4.7, 7.3 |
 | Kepler motion | Worlds move on real ellipses; in Space only while something plays | 4.4 |
@@ -2915,7 +2928,9 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Lineage | The family tree of works, carried in each file's `wlin`: "the only social graph" | 4.9 |
 | Lineage link | A claim between works (influence, sample, collab, cover, custom) that waits for the other owner's **Agree** | 4.9 |
 | LMY | Liam, the founder; how the letters are signed | 9.3 |
+| Mail thread | A row in Mail made by Claude's `record_mail_thread`: subject, sender, time, state and a reason, never the body | 3.10 |
 | MCP server | A server that speaks the Model Context Protocol so Claude can call its tools. Wi_WWAV is one, with eight tools | 2.11, 3.13, 8.8 |
+| Message door | A message to one person. It opens once two people have added each other, with no read receipts and no unread badge | 4.11 |
 | mi-wwav.com | The existing server, which stays: Heroku, Express, Postgres and Cloudflare R2 | 8.7 |
 | Mi_cro_WWAV, Mi_pro_WWAV | Mi's pocket tier and its desktop-studio tier | 9.2 |
 | Mi_WWAV | The sound family; PRANA is its first beta | 9.2 |
@@ -2941,7 +2956,6 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Public Heat view | What anyone sees when they open your bio sun: your Now making line, the timelines of linked projects, and any record you switched public. It never shows a count or a comparison | 2.4, 3.15 |
 | Public switch | The switch in Get Info on every record, off by default and available on grades too; no Claude tool can set it | 3.15 |
 | Quantize | An act on selected MIDI notes (Q); each note keeps its played time, and ⌥Q returns to it. Audio is never quantized | 5.4 |
-| Recorded thread | A row in Mail made by Claude's `record_mail_thread`: subject, sender, time, state and a reason, never the body | 3.10 |
 | Ri_WWAV | The words family (writing) | 9.2 |
 | Ripple Creator | The server's release-plan writer (`rippleCreator.js`); Heat imports its plans as projects, and its rule "never invent metrics" is written into the MCP tool descriptions | 3.15 |
 | Rule 2 | "Write down what a fail looks like before testing" | 9.6 |
@@ -2949,6 +2963,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Screening room | Where a film plays in Space: it fills the stage, and it is for viewing only | 4.7 |
 | Secondary act | The one extra action each screen has, on ⇧Return | 2.7 |
 | Sequence | An edit list, never media; a Console session is one | 2.5, 5.12 |
+| Show / Keep private | The two buttons on the sheet that links a project or sets a Now making line: **Show** puts it on your public Heat view, and **Keep private** links it and shows nothing | 2.6, 3.15 |
 | Si_WWAV | The sight family (film) | 9.2 |
 | Since you last looked | The pull-only list at the top of Space: forks, links waiting on you, and new work and letters from galaxies you've added | 2.10 |
 | SOLAR SYSTEM | The codename of WWAV v4 (web, summer 2026, `/summer_26`) and v5 (iOS): the galaxy model | 4.1 |
@@ -2961,6 +2976,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Stem bus | One of the mixer's four buses; its output is that stem in the export | 6.6 |
 | Stem colours | PRANA's vocals `#D23C2A`, drums `#F0B90B`, other `#2E9A55`, bass `#1F4E9E`, the same everywhere | 7.3 |
 | Stem group | A Console track of four stem lanes, from a `.wwav` or a split | 5.3 |
+| Stem lights | The four 8 pt lights in the Now strip and on a stem group's header, in PRANA's order and colours: filled is audible, a hollow ring is muted, a 2 pt outer ring is soloed | 2.2 |
 | Stem player | WWAV's instrument; in Wi_WWAV, your skin for it wraps the Now strip's planet when nothing is loaded | 2.4 |
 | Stem role | The stem a Console track folds into | 5.3 |
 | Stripe | Takes the payment for Pro, Founding seats and split packs, in the browser | 9.4 |
@@ -2970,6 +2986,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | "That's everything." | How every list ends | 2.10, 4.10 |
 | Thin remix | A remix stored without its own copy of the stems: "thick files, thin storage" | 6.9 |
 | Tier | The one entitlement field the desktop app reads | 9.4 |
+| Time block | A span of time in Today's time column, given to a task or a habit | 3.5 |
 | ULID | The time-sortable id that names every media file and session | 2.5 |
 | Undo journal | Every change as a labelled transaction, behind ⌘Z; a change Claude makes is labelled as Claude's | 2.7, 8.6 |
 | Universe | Every galaxy on one spiral ("Everyone") | 4.2 |

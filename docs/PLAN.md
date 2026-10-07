@@ -18,7 +18,7 @@ Where each check runs:
 
 Rules for this work, from the founder (7 Oct 2026): the main agent plus at most one Sonnet subagent at a time while the spec is rewritten; at most two Sonnet subagents at once while coding.
 
-**The scope cut of `docs/SPEC.md`.** The decisions are in `docs/SCOPE_CUT.md` (the brief). Chapters are rewritten one at a time into `docs/spec2/` (one file per chapter group), then assembled into `docs/SPEC.md`.
+**The scope cut of `docs/SPEC.md`.** The decisions are in `docs/SCOPE_CUT.md` (the brief). The rewrite is done and assembled into `docs/SPEC.md`; edit it directly from now on.
 
 - [x] Brief written (`docs/SCOPE_CUT.md`)
 - [x] 1–2: The idea; One app, three views (`docs/spec2/ch01-02.md`)
@@ -29,8 +29,8 @@ Rules for this work, from the founder (7 Oct 2026): the main agent plus at most 
 - [x] 8: Under the hood (`ch08.md`)
 - [x] 9–10: Business and gates; Roadmap, open decisions, glossary (`ch09-10.md`)
 - [x] Assemble: front matter, join, resolve `{{old:X.Y}}` references, contents table
-- [ ] Review: every brief decision present, nothing cut left, references resolve
-- [ ] Commit and push to `claude/relaxed-cori-x2igz9`
+- [x] Review: every brief decision present, nothing cut left, references resolve
+- [x] Commit and push to `claude/relaxed-cori-x2igz9`
 - [ ] Re-scope the milestones below to the new spec (drop Unquantized rows, add MCP and public-view rows)
 
 **Then coding**, in this order: shell and library → Heat with the MCP server → Console audio, VST effects, MIDI → Space in three.js → Console video and `.swav` → Demucs. Partial work for the shell stage sits on branches `build/core`, `build/tauri` and `build/shell` (not merged; check against the new spec first).
