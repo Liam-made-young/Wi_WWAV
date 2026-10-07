@@ -104,7 +104,6 @@ fn a_session_just_over_81_minutes_is_refused() {
 /// reads "+2.0 dBFS. Lower all four stems by 3 dB.". A non-finite peak reads
 /// "+inf dBFS. Lower all four stems by 4294967295 dB.".
 #[test]
-#[ignore = "finding: clipping lines can contradict their own cut"]
 fn the_shown_peak_agrees_with_the_cut() {
     let quiet = vec![0.1f32; 3];
     for db in [0.01f64, 0.04, 2.04] {
