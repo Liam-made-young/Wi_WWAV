@@ -2,8 +2,10 @@
 //! lines the corpus and the fuzz don't make, read and written by this
 //! crate against what the reference tools do with them.
 //!
-//! Each test here failed when it was written, on a real defect, and is
-//! marked #[ignore] with the finding it shows. Run them with
+//! Each test here failed when it was written, on a real defect. The two
+//! still marked #[ignore] fail in wwav_pack.py itself, which this crate
+//! matches byte for byte on purpose: they wait on a decision about the
+//! reference (F1 stays failed until then). Run them with
 //! `cargo test -p wwav-formats --test review_findings -- --ignored`.
 
 mod common;
@@ -218,7 +220,7 @@ fn rust_round_trip(dir: &Path, folder: &Path) -> (Vec<u8>, Vec<u8>) {
 /// criterion can't pass for these files until that is decided. 20.001
 /// loses its bpm altogether ("20.00", then "20", which pack drops).
 #[test]
-#[ignore = "review finding: unpack then pack changes \"bpm\": 128.00 to 128 (num() in wwav_pack.py, mirrored)"]
+#[ignore = "open question on the reference: wwav_pack.py's num() writes 128.00, which unpack and pack give back as 128 (mirrored on purpose)"]
 fn unpack_then_pack_keeps_a_bpm_that_rounds_to_whole() {
     for bpm in ["127.9988", "120.001", "20.001"] {
         let dir = tmp("review-bpm");
@@ -240,7 +242,7 @@ fn unpack_then_pack_keeps_a_bpm_that_rounds_to_whole() {
 /// "title = Song " and pack reads song.txt's values trimmed, so the second
 /// pack's title is "Song". wwav_pack.py does the same.
 #[test]
-#[ignore = "review finding: unpack then pack trims a folder title's trailing space (song.txt is trimmed)"]
+#[ignore = "open question on the reference: wwav_pack.py's song.txt is read trimmed, so a folder title's trailing space is lost (mirrored on purpose)"]
 fn unpack_then_pack_keeps_a_title_from_the_folder() {
     let dir = tmp("review-title");
     let folder = song_folder(

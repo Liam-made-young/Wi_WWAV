@@ -243,6 +243,11 @@ fn copy(f: &mut File, n: u64, o: &mut impl Write, shown: &Path) -> Result<(), Er
 /// same export ("a film made from a song is its child"); every 0.x reader
 /// reads it, and `swav_pack.py unpack` warns that film.txt can't keep its
 /// parent. The command line's pack ([`pack_original`]) stays an original.
+///
+/// A film whose last box has size 0 gets its real size written in, so
+/// unpacking gives back that patched film, not the one handed in: an
+/// encoder whose film must come back byte for byte (S0.6) writes real box
+/// sizes, as ffmpeg's MP4 muxer does unless it is streaming.
 pub fn pack(film: &Path, out: &Path, meta: &FilmMeta, lineage: &Lineage) -> Result<u64, Error> {
     pack_with(film, out, || Ok((meta.clone(), lineage.clone()))).map(|(_, total)| total)
 }
