@@ -51,7 +51,7 @@ export function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (ch) => ENTITIES[ch]);
 }
 
-// A page of the mock's own HTML: the sign-in forms and the fake Stripe.
+// A page of the mock's own HTML: the sign-in forms.
 export function page(title, inner) {
   return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(title)}</title>
 <body style="font: 17px/1.6 system-ui; max-width: 30em; margin: 3em auto">

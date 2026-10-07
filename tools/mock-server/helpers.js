@@ -1,6 +1,6 @@
 // Helpers for tests that drive the mock server over HTTP: a small fetch
 // wrapper, the PKCE pair, the browser's half of desktop sign-in, and the
-// test-only controls under /__mock (clock, Stripe webhook).
+// test-only controls under /__mock (clock, faults).
 import { createHash, randomBytes } from 'node:crypto';
 
 // One request. `body` goes as JSON, `form` as a urlencoded form; the reply's
@@ -75,11 +75,6 @@ export function hiddenField(html, name) {
   const match = html.match(new RegExp(`name="${name}" value="([^"]*)"`));
   if (!match) throw new Error(`no hidden field ${name}`);
   return match[1];
-}
-
-// Stripe's checkout.session.completed webhook, as if the buyer had paid.
-export function completeCheckout(base, sessionId) {
-  return call(base, 'POST', '/__mock/stripe/complete', { body: { sessionId } });
 }
 
 export function advanceClock(base, ms) {

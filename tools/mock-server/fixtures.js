@@ -1,8 +1,8 @@
 // The seed: the same small world every time the mock starts or resets.
 // LMY and Ana; LMY's galaxy with "World Ending" and "Covers"; three songs in
-// one family (World Ending → Low Tide → glass hours); Ana's one-of-one
-// jacket; Ana's claim on World Ending waiting for LMY; one sale, one payout
-// and one letter, so "Since you last looked" has something to say.
+// one family (World Ending → Low Tide → glass hours); Ana's claim on World
+// Ending waiting for LMY; and one letter, so "Since you last looked" has
+// something to say.
 import { tokenPair } from './jwt.js';
 import { etagOf, sha256, unitJitter } from './hash.js';
 import { nextId } from './state.js';
@@ -32,7 +32,7 @@ function astronaut(hull) {
   };
 }
 
-export function addUser(state, { username, email, password, account, tier = 'free', founding = null, createdAt }) {
+export function addUser(state, { username, email, password, createdAt }) {
   const user = {
     id: nextId(state, 'users'),
     email,
@@ -40,15 +40,6 @@ export function addUser(state, { username, email, password, account, tier = 'fre
     username,
     bio: '',
     profilePicture: null,
-    isPro: tier !== 'free',
-    proExpiresAt: null,
-    tier,
-    tierExpiresAt: null,
-    foundingMemberNumber: founding,
-    connect: account
-      ? { account, detailsSubmitted: true, chargesEnabled: true, payoutsEnabled: true }
-      : { account: null, detailsSubmitted: false, chargesEnabled: false, payoutsEnabled: false },
-    shipFrom: { city: 'Providence', state: 'RI', zip: '02903', country: 'US' },
     astronaut: astronaut('#f4efe6'),
     stemPlayerCustomization: null,
     createdAt,
@@ -57,14 +48,12 @@ export function addUser(state, { username, email, password, account, tier = 'fre
   return user;
 }
 
-// A third (or fourth) account for a test, signed in. `onboarded: false`
-// leaves it without a payout account.
-export function addAccount(state, { username, onboarded = true }) {
+// A third (or fourth) account for a test, signed in.
+export function addAccount(state, { username }) {
   const user = addUser(state, {
     username,
     email: `${username.toLowerCase()}@example.com`,
     password: 'WeWave-test1',
-    account: onboarded ? `acct_${username.toLowerCase()}` : null,
     createdAt: new Date(state.now()).toISOString(),
   });
   return { user, token: tokenPair(user, state.now()).token };
@@ -126,7 +115,7 @@ function system(state, g, { title, slug, at }) {
   return s;
 }
 
-function song(state, user, work, { title, bpm, key, duration, priceCents, at, parent = null, root, generation }) {
+function song(state, user, work, { title, bpm, key, duration, at, parent = null, root, generation }) {
   const bytes = writeWwav({
     songId: work.songId,
     title,
@@ -166,8 +155,6 @@ function song(state, user, work, { title, bpm, key, duration, priceCents, at, pa
     remixDepth: generation,
     inFeed: true,
     remixSnapshot: null,
-    priceCents,
-    isForSale: priceCents !== null,
     withdrawn: false,
     createdAt: at,
     versions: [
@@ -206,16 +193,12 @@ export function seed(state) {
   const lmy = addUser(state, {
     username: 'LMY',
     ...ACCOUNTS.lmy,
-    account: 'acct_lmy',
-    tier: 'founding',
-    founding: 1,
     createdAt: '2026-08-17T12:00:00.000Z',
   });
   lmy.bio = 'Making a handheld and an album.';
   const ana = addUser(state, {
     username: 'Ana',
     ...ACCOUNTS.ana,
-    account: 'acct_ana',
     createdAt: '2026-08-20T12:00:00.000Z',
   });
   ana.bio = 'Bass on borrowed instruments.';
@@ -258,7 +241,6 @@ export function seed(state) {
     bpm: 92,
     key: 'E minor',
     duration: 238,
-    priceCents: 900,
     at: '2026-09-12T18:00:00.000Z',
     generation: 0,
   });
@@ -267,7 +249,6 @@ export function seed(state) {
     bpm: 86,
     key: 'A minor',
     duration: 201,
-    priceCents: 400,
     at: '2026-09-20T18:00:00.000Z',
     parent: WORKS.worldEnding,
     root: WORKS.worldEnding,
@@ -278,7 +259,6 @@ export function seed(state) {
     bpm: 128,
     key: 'A minor',
     duration: 176,
-    priceCents: 400,
     at: '2026-10-04T15:30:00.000Z',
     parent: WORKS.lowTide,
     root: WORKS.worldEnding,
@@ -310,43 +290,5 @@ export function seed(state) {
     signoff: 'Sincerely LMY',
     sentAt: '2026-10-03',
     createdAt: '2026-10-03T14:00:00.000Z',
-  });
-
-  state.listings.push({
-    id: nextId(state, 'listings'),
-    sellerId: ana.id,
-    title: 'Waxed chore jacket',
-    priceCents: 12000,
-    size: 'M',
-    condition: 'like_new',
-    category: 'outerwear',
-    brand: '',
-    color: 'olive',
-    material: 'waxed cotton',
-    measurements: { chest: '21 in', length: '28 in' },
-    photos: ['fashion/1/front.jpg', 'fashion/1/back.jpg', 'fashion/1/label.jpg'],
-    status: 'active',
-    hold: null,
-    createdAt: '2026-10-06T10:00:00.000Z',
-  });
-
-  state.purchases.push({
-    id: nextId(state, 'purchases'),
-    userId: ana.id,
-    sellerId: lmy.id,
-    type: 'track',
-    itemId: world.id,
-    amountCents: 900,
-    feeCents: 90,
-    status: 'completed',
-    sessionId: null,
-    createdAt: '2026-10-05T12:00:00.000Z',
-    completedAt: '2026-10-05T12:00:00.000Z',
-  });
-  state.payouts.push({
-    id: nextId(state, 'payouts'),
-    userId: lmy.id,
-    amountCents: 810,
-    at: '2026-10-06T09:00:00.000Z',
   });
 }

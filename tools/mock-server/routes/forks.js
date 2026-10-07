@@ -258,8 +258,6 @@ function fork(ctx) {
       // Off Newest by default, as on the server: a fork lives in its tree.
       inFeed: body.inFeed === true,
       remixSnapshot: project ? snapshotV2(project, at) : snapshotV1(mix, at),
-      priceCents: null,
-      isForSale: false,
       withdrawn: false,
       createdAt: at,
       versions: [],

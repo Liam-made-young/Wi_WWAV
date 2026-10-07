@@ -44,12 +44,6 @@ function uniqueSlug(base, taken) {
   return slug;
 }
 
-export function ownsPurchase(state, user, type, itemId) {
-  return state.purchases.some(
-    (p) => p.userId === user.id && p.type === type && p.itemId === Number(itemId) && p.status === 'completed',
-  );
-}
-
 // --- payloads ------------------------------------------------------------------
 
 function sunSummary(sun) {
@@ -64,9 +58,9 @@ function sunDocument(sun) {
 
 const galaxyBrief = (g) => ({ id: g.id, slug: g.slug, displayName: g.displayName });
 
-// A world as the scene draws it. priceCents is for the "$4 · on the shelf"
-// tag and `yours` for a work the viewer bought (4.13).
-function planetPayload(state, planet, viewer) {
+// A world as the scene draws it: what it is, never what it costs (commerce
+// is later, inside Space).
+function planetPayload(state, planet) {
   const track = trackOfPlanet(state, planet);
   return {
     id: planet.id,
@@ -83,8 +77,6 @@ function planetPayload(state, planet, viewer) {
     duration: track.duration,
     bpm: track.bpm,
     key: track.musicalKey,
-    priceCents: track.isForSale ? track.priceCents : null,
-    yours: Boolean(viewer && ownsPurchase(state, viewer, 'track', track.id)),
   };
 }
 
@@ -282,7 +274,7 @@ function systemScene(ctx) {
     galaxy: galaxyBrief(galaxy),
     system: { id, slug, title, orbitIndex, colorSeed, posX, posY, status },
     sun: sunSummary(state.suns.find((s) => s.systemId === system.id)),
-    planets: planets.map((p) => planetPayload(state, p, viewer)),
+    planets: planets.map((p) => planetPayload(state, p)),
   });
 }
 
@@ -769,8 +761,8 @@ function catalog(ctx) {
 }
 
 // Newest's medium filter takes the words the rest of the API uses: a
-// medium as the store's halls name it, its family (4.7), or a planet kind.
-// The mock's worlds are all songs.
+// medium, its family (Mi, Si, Ri, Gi; 4.7), or a planet kind. The mock's
+// worlds are all songs.
 const MEDIA = {
   music: 'music',
   mi: 'music',
@@ -837,7 +829,6 @@ function feed(ctx) {
       duration: track.duration,
       trackId: track.trackId,
       publishedId: track.id,
-      priceCents: track.isForSale ? track.priceCents : null,
       galaxyId: galaxy.id,
       galaxy: { slug: galaxy.slug, displayName: galaxy.displayName },
       system: { slug: system.slug, title: system.title },
@@ -901,8 +892,8 @@ function travel(ctx) {
 // --- Since you last looked (2.10) --------------------------------------------
 
 // What happened to you and the galaxies you added since `after`: forks of
-// your works, sales, payouts, new works and letters; plus every link still
-// waiting on you, however old. Each event is one line; nothing is summed.
+// your works, new works and letters; plus every link still waiting on you,
+// however old. Each event is one line; nothing is summed.
 function since(ctx) {
   const me = requireUser(ctx);
   const { state } = ctx;
@@ -928,14 +919,6 @@ function since(ctx) {
       });
     }
   }
-  for (const p of state.purchases) {
-    if (p.sellerId === me.id && p.status === 'completed' && p.completedAt > cut) {
-      events.push({ kind: 'sale', at: p.completedAt, work: itemTitle(state, p), priceCents: p.amountCents });
-    }
-  }
-  for (const p of state.payouts) {
-    if (p.userId === me.id && p.at > cut) events.push({ kind: 'payout', at: p.at, amountCents: p.amountCents });
-  }
   const added = addedUserIds(state, me);
   for (const t of state.tracks) {
     if (added.has(t.uploaderId) && t.isMaster && !t.withdrawn && t.createdAt > cut) {
@@ -956,11 +939,6 @@ function since(ctx) {
   }
   events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   return ok({ events });
-}
-
-export function itemTitle(state, purchase) {
-  const rows = purchase.type === 'track' ? state.tracks : state.listings;
-  return byId(rows, purchase.itemId).title;
 }
 
 export const routes = [

@@ -31,14 +31,7 @@ export function reset(state) {
   state.links = [];
   state.saved = [];
   state.letters = [];
-  state.listings = [];
-  state.purchases = [];
-  state.sessions = new Map(); // fake Stripe Checkout sessions
-  state.transfers = [];
-  state.payouts = [];
-  state.bags = new Map();
   state.heat = new Map();
-  state.assist = new Map();
   state.oauth = { requests: new Map(), codes: new Map(), devices: new Map() };
   state.loginAttempts = new Map(); // email -> { count, last }: wrong passwords
   state.limits = new Map();

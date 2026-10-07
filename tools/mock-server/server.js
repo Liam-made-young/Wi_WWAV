@@ -11,9 +11,7 @@ import { routes as uploads } from './routes/uploads.js';
 import { routes as publish } from './routes/publish.js';
 import { routes as forks } from './routes/forks.js';
 import { routes as space } from './routes/space.js';
-import { routes as commerce, sweep } from './routes/commerce.js';
 import { routes as heat } from './routes/heat.js';
-import { routes as assist } from './routes/assist.js';
 import { routes as updates } from './routes/updates.js';
 import { routes as mock } from './routes/mock.js';
 
@@ -23,9 +21,7 @@ const table = router([
   ...publish,
   ...forks,
   ...space,
-  ...commerce,
   ...heat,
-  ...assist,
   ...updates,
   ...mock,
 ]);
@@ -54,7 +50,6 @@ async function handle(state, req, res, onResponse) {
     if (fault && !fault.drop) throw error(fault.status, 'Injected failure');
     if (!found) throw error(404, 'Not found');
     const raw = await readBody(req, url.pathname.startsWith('/r2/') ? Infinity : JSON_LIMIT);
-    sweep(state);
     const ctx = {
       state,
       req,
