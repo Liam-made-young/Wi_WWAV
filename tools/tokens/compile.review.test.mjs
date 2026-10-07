@@ -50,6 +50,12 @@ test(
   },
 );
 
+// A note that names a glob path ("app/ui/src/heat/*/") is enough. The
+// compiler writes it into a CSS comment unescaped, the comment closes early,
+// and a CSS parser drops the next declaration (lightningcss loses
+// --heat-cool), while --check and crates/wwav-tokens' parity test both stay
+// green, because the parity test reads tokens.css line by line and ignores
+// comments. The CSS then lacks a token that the Rust and C++ outputs have.
 test(
   "a note in the token file can't break the CSS",
   { skip: "finding: a $doc holding '*/' closes the CSS comment early, and the next declaration is lost" },
@@ -66,5 +72,20 @@ test(
     const opened = css.split('/*').length - 1;
     const closed = css.split('*/').length - 1;
     assert.equal(closed, opened, 'a comment closes twice, so its tail is read as CSS');
+  },
+);
+
+test(
+  'an anchor or an id in the UI is not a colour',
+  { skip: 'finding: the stray check reads #feed, #add or #bad (an href or a selector) as a hex colour and fails --check' },
+  (t) => {
+    const root = scratch(t);
+    run(root);
+    const ui = join(root, 'app/ui/src/shell');
+    mkdirSync(ui, { recursive: true });
+    writeFileSync(join(ui, 'nav.html'), '<a href="#feed">Since you last looked</a>\n');
+    writeFileSync(join(ui, 'shell.css'), '#add {\n  color: var(--desk-ink);\n}\n');
+    const r = run(root, '--check');
+    assert.equal(r.status, 0, r.stderr);
   },
 );
