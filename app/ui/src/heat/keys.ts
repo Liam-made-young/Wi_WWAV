@@ -4,6 +4,7 @@
 // shell's); nothing here listens to the keyboard.
 //
 //   1-6        Today, Tasks, Calendar, Grades, Habits, Mail (no field focused)
+//   7 8        Database, Wiki
 //   N          New item          C  make current       P  plan into the next free gap
 //   ↑ ↓        move              F  focus start or pause
 //   Return     edit the row under the cursor   ⇧F stop and log   I  pulled away
@@ -82,7 +83,7 @@ export function heatRoute(e: HeatKey, ctx: HeatKeyContext): HeatCommand | null {
   }
   const k = key.length === 1 ? key.toLowerCase() : key;
   if (e.shift) return k === 'f' ? { type: 'stopFocus' } : null;
-  if (/^[1-6]$/.test(k)) return { type: 'tab', tab: TAB_IDS[Number(k) - 1] };
+  if (/^[1-9]$/.test(k) && Number(k) <= TAB_IDS.length) return { type: 'tab', tab: TAB_IDS[Number(k) - 1] };
   switch (k) {
     case 'n':
       return { type: 'new' };

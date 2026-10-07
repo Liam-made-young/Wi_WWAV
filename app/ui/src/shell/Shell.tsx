@@ -18,7 +18,8 @@ import { type UndoRoom, useAppearance, useCoreEvent, useHistory, useNarrow, useS
 import { type Command, type KeyContext, type Overlay, route } from './keys';
 import { type Clip, type DrawerHandle, LibraryDrawer } from './LibraryDrawer';
 import { NowStrip } from './NowStrip';
-import { type Item, Palette, type PaletteHandle } from './CommandPalette';
+import { AskBox, type AskHandle, type Item } from '../ask/AskBox';
+import { navigate, onNavigate, type Target } from '../ask/nav';
 import { IS_MAC, keys } from './platform';
 import { PlayerSheet } from './PlayerSheet';
 import { ROOM_NAMES, ROOMS, type RoomId } from './rooms';
@@ -76,7 +77,7 @@ export function Shell() {
   const player = usePlayer();
   const { half, tasks } = useTaskHalf();
 
-  const palette = useRef<PaletteHandle>(null);
+  const palette = useRef<AskHandle>(null);
   const capture = useRef<CaptureHandle>(null);
   const drawer = useRef<DrawerHandle>(null);
   const heat = useRef<HeatHandle>(null);
@@ -148,6 +149,25 @@ export function Shell() {
     setHeatTask(id);
     if (id) setHeatOpen((was) => ({ id, n: (was?.n ?? 0) + 1 }));
   };
+
+  // A link in an answer, a search result, or a link in the Wiki tab: Learn's
+  // own tabs show what is theirs (ask/nav.ts), a task opens as it always
+  // has, and a web address goes to the system browser.
+  const openTarget = (target: Target) => {
+    if (target.what === 'web') return void call('wiki.open', { url: target.url }).catch(failed);
+    setRoom('heat');
+    if (target.what === 'row' && target.table === 'task') return showTask(target.id);
+    navigate(target);
+  };
+  // A web link clicked inside a tab comes here too.
+  useEffect(
+    () =>
+      onNavigate((t) => {
+        if (t.what === 'web') void call('wiki.open', { url: t.url }).catch(failed);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const isSong = (c: Clip) => c.kind === 'wwav' || c.kind === 'audio';
   const notInConsole = (c: Clip | null) =>
@@ -386,7 +406,7 @@ export function Shell() {
         />
         <GetInfo id={infoId} shown={shown('info')} />
         <PlayerSheet player={player} shown={shown('player')} />
-        <Palette
+        <AskBox
           ref={palette}
           shown={shown('palette')}
           actions={actions}
@@ -402,6 +422,8 @@ export function Shell() {
               open('info');
             }
           }}
+          onOpen={(target) => openTarget(target)}
+          onSaid={say}
           onClose={() => close('palette')}
         />
         <Capture ref={capture} shown={shown('capture')} onError={say} />

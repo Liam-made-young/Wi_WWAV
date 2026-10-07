@@ -1175,6 +1175,34 @@ pub(crate) fn csv_export(i: &Inner, a: &Args) -> Result<Json, CoreError> {
         (table.name.clone(), csv::write(&out), r.order.len())
     };
     match a.opt_str("to") {
+        // The Downloads folder, under a name that takes nothing's place.
+        Some("downloads") => {
+            let folder = std::env::var_os("HOME")
+                .map(std::path::PathBuf::from)
+                .map(|h| h.join("Downloads"))
+                .filter(|d| d.is_dir())
+                .ok_or_else(|| refused("There is no Downloads folder to save to."))?;
+            let safe: String = name
+                .chars()
+                .map(|c| {
+                    if c == '/' || c == ':' || c == '\\' {
+                        '-'
+                    } else {
+                        c
+                    }
+                })
+                .collect();
+            let mut path = folder.join(format!("{safe}.csv"));
+            let mut n = 2;
+            while path.exists() {
+                path = folder.join(format!("{safe} {n}.csv"));
+                n += 1;
+            }
+            std::fs::write(&path, text.as_bytes())
+                .map_err(|e| refused(format!("That file couldn't be written: {e}")))?;
+            let file = path.file_name().map(|f| f.to_string_lossy().into_owned());
+            Ok(json!({"path": path, "file": file, "rows": count}))
+        }
         Some(path) => {
             std::fs::write(path, text.as_bytes())
                 .map_err(|e| refused(format!("That file couldn't be written: {e}")))?;

@@ -8,12 +8,14 @@
 
 import type { ComponentType } from 'react';
 import { Calendar } from './calendar/Calendar';
+import { Database } from './database/Database';
 import type { TabId } from './frame';
 import { Grades } from './grades/Grades';
 import { Habits } from './habits/Habits';
 import { Mail } from './mail/Mail';
 import { Tasks } from './tasks/Tasks';
 import { Today } from './today/Today';
+import { Wiki } from './wiki/Wiki';
 
 export const HEAT_TABS: Record<TabId, ComponentType> = {
   today: Today,
@@ -22,4 +24,6 @@ export const HEAT_TABS: Record<TabId, ComponentType> = {
   grades: Grades,
   habits: Habits,
   mail: Mail,
+  database: Database,
+  wiki: Wiki,
 };

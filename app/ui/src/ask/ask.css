@@ -1,0 +1,264 @@
+/* The prompt box (docs/ASK.md): the ⌘K sheet, anchored under the pill at the
+   top right, with Claude's answers under the field. Every colour and size is
+   a token; this file only arranges them. */
+
+.palette.ask {
+  left: auto;
+  right: var(--space-s3);
+  translate: none;
+  width: min(620px, calc(100% - var(--space-s5)));
+  max-height: calc(100% - var(--space-s5));
+}
+
+.ask-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  margin: 0 var(--space-s2) var(--space-s2) var(--space-s3);
+}
+
+.ask-spark {
+  flex: none;
+  color: var(--desk-select);
+}
+
+.ask-input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.palette-row.ask-send {
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.ask-thread {
+  flex: 1;
+  overflow: auto;
+  padding: 0 var(--space-s3) var(--space-s2);
+  user-select: text;
+}
+
+.ask-turn {
+  padding: var(--space-s3) 0;
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+.ask-turn:first-child {
+  border-top: 0;
+}
+
+.ask-prompt {
+  margin: 0 0 var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.ask-prompt::before {
+  content: 'You asked: ';
+}
+
+.ask-doing,
+.ask-note,
+.ask-error {
+  margin: 0 0 var(--space-s2);
+  font-size: var(--type-desk-small);
+}
+
+.ask-doing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  color: var(--desk-ink2);
+}
+
+.ask-dots {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--desk-select);
+  animation: ask-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes ask-pulse {
+  from {
+    opacity: 0.25;
+  }
+}
+
+:root[data-reduce-motion='true'] .ask-dots {
+  animation: none;
+}
+
+.ask-error {
+  color: var(--heat-overdue);
+}
+
+.ask-markdown {
+  font-size: var(--type-desk-body);
+  line-height: var(--type-desk-line-height);
+  color: var(--desk-ink);
+}
+
+.ask-markdown p,
+.ask-markdown ul,
+.ask-markdown ol,
+.ask-markdown table,
+.ask-markdown pre,
+.ask-markdown blockquote {
+  margin: 0 0 var(--space-s2);
+}
+
+.ask-list {
+  padding-inline-start: var(--space-s5);
+}
+
+.ask-heading {
+  font-weight: 600;
+}
+
+.ask-markdown code,
+.ask-pre {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-desk-small);
+}
+
+.ask-pre {
+  padding: var(--space-s2);
+  overflow: auto;
+  background: var(--desk-stripe);
+  border-radius: var(--radius-chip);
+}
+
+.ask-quote {
+  padding-inline-start: var(--space-s3);
+  border-inline-start: 3px solid var(--desk-deck-edge);
+  color: var(--desk-ink2);
+}
+
+.ask-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-desk-small);
+}
+
+.ask-table th,
+.ask-table td {
+  padding: var(--space-s1) var(--space-s2);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.ask-table th {
+  color: var(--desk-ink2);
+  font-weight: 600;
+}
+
+/* A link is the accent colour and underlined, because colour is never alone. */
+.ask-link,
+.ask-chip {
+  color: var(--desk-select);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ask-wiki {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s2);
+  margin: var(--space-s2) 0;
+  font-size: var(--type-desk-small);
+}
+
+.ask-chip {
+  padding: 2px var(--space-s2);
+  text-decoration: none;
+  border: 1px solid var(--desk-select);
+  border-radius: var(--radius-pill);
+}
+
+.ask-chip:hover {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+}
+
+.ask-change {
+  margin: var(--space-s2) 0;
+  padding: var(--space-s2) var(--space-s3);
+  background: var(--desk-stripe);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-card);
+}
+
+.ask-change[data-state='applied'] {
+  border-color: var(--label-green);
+}
+
+.ask-outward {
+  border-color: var(--label-orange);
+}
+
+.ask-change-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  font-size: var(--type-desk-body);
+}
+
+.ask-change-head span {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.ask-lines {
+  margin: var(--space-s2) 0 0;
+  padding-inline-start: var(--space-s4);
+  max-height: 180px;
+  overflow: auto;
+  font-size: var(--type-desk-small);
+}
+
+.ask-failed {
+  color: var(--heat-overdue);
+}
+
+.ask-outward-line {
+  margin: var(--space-s2) 0 0;
+}
+
+.ask-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  margin-top: var(--space-s1);
+}
+
+/* The default button wears the blue gel, as the selected segment does. */
+.gel.ask-apply {
+  color: var(--desk-select-ink);
+}
+
+.gel.ask-apply::before {
+  background: linear-gradient(var(--desk-gel-selected));
+  border-color: var(--desk-select);
+}
+
+.ask-hint {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.ask-stop {
+  margin-inline-start: auto;
+  padding: 0 var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-select);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -91,7 +91,10 @@ fn step(i: &Inner, a: &Args, back: bool) -> Result<Value, CoreError> {
     // whichever view changed it (Space plans a milestone in Heat from your
     // sun), so an undo or redo anywhere may have changed what syncs.
     i.bus.emit("library", json!({"ids": []}));
-    records_changed(i, all_kinds(i));
+    let kinds = all_kinds(i);
+    // Learn's views refetch on `heat`: an undo or a redo changes what they show.
+    i.bus.emit("heat", json!({"kinds": kinds}));
+    records_changed(i, kinds);
     heat::journal_moved(i)?;
     i.poke();
     Ok(json!({"label": label}))
