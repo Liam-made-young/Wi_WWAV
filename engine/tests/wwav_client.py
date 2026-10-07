@@ -273,7 +273,15 @@ class Engine:
             args.append("--test")
         self.clients = []
         self.proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.listening_line = self._listening_line()
+        try:
+            self.listening_line = self._listening_line()
+        except Exception:
+            self.kill()
+            self.proc.stdin.close()
+            self.proc.stdout.close()
+            if sock_dir is None:
+                shutil.rmtree(self.dir, ignore_errors=True)
+            raise
 
     def _listening_line(self, timeout=10.0):
         deadline = time.monotonic() + timeout

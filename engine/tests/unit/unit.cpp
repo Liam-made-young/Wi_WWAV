@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <string>
 #include <thread>
 #include <vector>
@@ -36,10 +37,14 @@ static int failures = 0;
     }                                                                    \
   } while (0)
 
+// Folders the tests write files into; main removes them at the end.
+static std::vector<std::string> tempDirs;
+
 static std::string tempDir() {
   char tmpl[] = "/tmp/wwav-unit-XXXXXX";
   const char* d = mkdtemp(tmpl);
   if (!d) abort();
+  tempDirs.push_back(d);
   return d;
 }
 
@@ -685,5 +690,6 @@ int main() {
     t.run();
     printf("%s %s\n", failures == before ? "ok  " : "FAIL", t.name);
   }
+  for (const std::string& d : tempDirs) std::filesystem::remove_all(d);
   return failures ? 1 : 0;
 }
