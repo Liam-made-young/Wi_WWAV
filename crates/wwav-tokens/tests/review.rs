@@ -1,9 +1,10 @@
 //! An adversarial review of design/tokens.json against docs/SPEC.md 8 (F7).
 //!
 //! Each test here failed when it was written, because of a finding in the
-//! review of build/tokens. They are #[ignore]d so the suite stays green until
-//! the finding is settled; run them with `cargo test -p wwav-tokens --test
-//! review -- --ignored`. Each says which finding it shows.
+//! review of build/tokens. Those whose finding is fixed run with the suite.
+//! The rest are #[ignore]d with their finding or question until the founder
+//! settles it; run them with `cargo test -p wwav-tokens --test review --
+//! --ignored`. Each says which finding it shows.
 
 mod common;
 
@@ -22,7 +23,6 @@ const NIGHT_INK_50: f32 = 0.5;
 /// half, where the soft ink #5D6975 falls to 3.6:1. The dark LCD's dim ink
 /// is 4.3:1 on its top stop.
 #[test]
-#[ignore = "finding: `over` hides deck soft ink at 3.6:1 and dark LCD dim at 4.3:1"]
 fn every_text_pair_holds_on_every_stop_of_its_ground() {
     let tokens = tokens();
     let mut misses = Vec::new();
@@ -96,7 +96,6 @@ fn night_secondary_ink_holds_on_clay() {
 /// an ink label … the darkest stop under it is 4.6:1" has no pair, so neither
 /// can be checked from the file alone.
 #[test]
-#[ignore = "finding: the dark gel's #5e6165 and the blue gel's 4.6:1 ink label are missing"]
 fn every_fix_in_8_2_is_in_the_file() {
     let text = std::fs::read_to_string(common::repo().join("design/tokens.json"))
         .unwrap()
@@ -158,7 +157,6 @@ fn the_glow_tone_holds_four_to_one_on_the_key_tinted_sky() {
 /// in a debug build and a wrong hue in release, where keyColor.ts gives the
 /// pitch class mod 12 (pc 40 is 120°, as pc 4 is).
 #[test]
-#[ignore = "finding: key_hue overflows u8 for pc >= 37 (panic in debug, wrong hue in release)"]
 fn key_hue_takes_any_pitch_class_mod_twelve() {
     use wwav_tokens::{key_hue, Key};
     for pc in [37u8, 40, 255] {

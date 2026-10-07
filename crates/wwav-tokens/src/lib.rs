@@ -141,10 +141,11 @@ pub fn parse_key(name: &str) -> Option<Key> {
 
 /// The hue in degrees: ((pc · 7) mod 12) · 30, which walks the circle of
 /// fifths, so a key a fifth away is the neighbouring shade. An unknown key
-/// takes night indigo, the sky's own hue: "still condensing".
+/// takes night indigo, the sky's own hue: "still condensing". Any `pc` is
+/// read mod 12, as keyColor.ts reads it.
 pub fn key_hue(key: Option<Key>) -> f32 {
     match key {
-        Some(k) => f32::from((k.pc * 7) % 12) * 30.0,
+        Some(k) => f32::from((k.pc % 12) * 7 % 12) * 30.0,
         None => key::UNKNOWN_HUE,
     }
 }
