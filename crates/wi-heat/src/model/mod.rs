@@ -21,14 +21,19 @@
 //! the tab bar, the rest of `copy.ts`, the level colours and tube, the letter
 //! pill's colour, and the titles and headers that name a view.
 
+pub mod calendar;
 pub mod copy;
 pub mod estimate;
+pub mod focus;
 pub mod format;
 pub mod grades;
 pub mod habits;
 pub mod heat;
 pub mod js;
+pub mod lcd;
+pub mod plan;
 pub mod records;
 pub mod recurrence;
+pub mod review;
 pub mod spaces;
 pub mod zone;

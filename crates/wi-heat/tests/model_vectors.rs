@@ -13,11 +13,20 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
+use wi_heat::model::calendar::{CalendarData, CalendarMode};
+use wi_heat::model::focus::{FocusEvent, FocusSettings, FocusState};
+use wi_heat::model::lcd::LcdData;
+use wi_heat::model::plan::{BlockTarget, Draft, PlanData, PlanOptions};
 use wi_heat::model::records::{
     Course, FocusSession, Grade, GradeCategory, Habit, LetterStep, Space, Task, TaskOccurrence,
+    TimeBlock,
 };
+use wi_heat::model::review::{ReviewData, WeekFacts};
 use wi_heat::model::spaces::SidebarData;
-use wi_heat::model::{estimate, format, grades, habits, heat, js, recurrence, spaces, zone};
+use wi_heat::model::{
+    calendar, estimate, focus, format, grades, habits, heat, js, lcd, plan, recurrence, review,
+    spaces, zone,
+};
 
 mod vectors {
     use super::*;
@@ -533,6 +542,207 @@ fn habits_vectors() {
                 &arg::<Habit>(i, "habit"),
                 text(i, "today"),
             )),
+            _ => return None,
+        })
+    });
+}
+
+// --- plan ---------------------------------------------------------------------------------------------------
+
+fn space_arg(i: &Value) -> Option<String> {
+    arg(i, "spaceId")
+}
+
+#[test]
+fn plan_vectors() {
+    check_module("plan", |name, i| {
+        Some(match name {
+            "minutesToY" => out(plan::minutes_to_y(num(i, "min"))),
+            "yToMinutes" => out(plan::y_to_minutes(num(i, "y"))),
+            "snap" => out(plan::snap(num(i, "min"))),
+            "initialScrollTop" => out(plan::initial_scroll_top(
+                num(i, "nowMin"),
+                num(i, "viewportPx"),
+            )),
+            "nowLineY" => out(plan::now_line_y(num(i, "nowMin"))),
+            "blockLength" => out(plan::block_length(num(i, "estimate"))),
+            "planNext" => out(plan::plan_next(
+                &arg::<BlockTarget>(i, "target"),
+                &arg::<PlanData>(i, "data"),
+                num(i, "now"),
+                &tz(i),
+                &mut ids(i),
+            )),
+            "dragOntoColumn" => out(plan::drag_onto_column(
+                &arg::<BlockTarget>(i, "target"),
+                num(i, "y"),
+                text(i, "date"),
+                &arg::<PlanData>(i, "data"),
+                &mut ids(i),
+            )),
+            "resizeBlock" => out(plan::resize_block(
+                &arg::<TimeBlock>(i, "block"),
+                num(i, "bottomY"),
+            )),
+            "moveBlock" => out(plan::move_block(
+                &arg::<TimeBlock>(i, "block"),
+                num(i, "topY"),
+            )),
+            "planReason" => out(plan::plan_reason(
+                &arg::<Task>(i, "task"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "planMyDay" => out(plan::plan_my_day(
+                &arg::<PlanData>(i, "data"),
+                num(i, "now"),
+                &tz(i),
+                &arg::<PlanOptions>(i, "options"),
+            )),
+            "acceptDraft" => out(plan::accept_draft(&arg::<Draft>(i, "draft"), &mut ids(i))),
+            "draftKey" => out(plan::draft_key(
+                &arg::<Vec<Draft>>(i, "drafts"),
+                text(i, "key"),
+                &mut ids(i),
+            )),
+            "planSections" => {
+                let id = space_arg(i);
+                out(plan::plan_sections(
+                    &arg::<PlanData>(i, "data"),
+                    num(i, "now"),
+                    &tz(i),
+                    id.as_deref(),
+                ))
+            }
+            "planSubtitle" => {
+                let id = space_arg(i);
+                out(plan::plan_subtitle(
+                    &arg::<PlanData>(i, "data"),
+                    num(i, "now"),
+                    &tz(i),
+                    id.as_deref(),
+                ))
+            }
+            _ => return None,
+        })
+    });
+}
+
+// --- focus ----------------------------------------------------------------------------------------------------------
+
+#[test]
+fn focus_vectors() {
+    check_module("focus", |name, i| {
+        Some(match name {
+            "isFocusLength" => out(focus::is_focus_length(num(i, "minutes"))),
+            "initialFocus" => out(focus::initial_focus()),
+            "focusStep" => out(focus::focus_step(
+                &arg::<FocusState>(i, "state"),
+                &arg::<FocusEvent>(i, "event"),
+                num(i, "now"),
+                arg::<FocusSettings>(i, "settings"),
+            )),
+            "focusLcd" => out(focus::focus_lcd(
+                &arg::<FocusState>(i, "state"),
+                num(i, "now"),
+            )),
+            "focusStrip" => out(focus::focus_strip(
+                &arg::<FocusState>(i, "state"),
+                num(i, "now"),
+            )),
+            "checkOff" => out(focus::check_off(
+                &arg::<Task>(i, "task"),
+                &arg::<Vec<FocusSession>>(i, "sessions"),
+                &arg::<Vec<TaskOccurrence>>(i, "occurrences"),
+                num(i, "now"),
+                &tz(i),
+                &mut ids(i),
+            )),
+            "finishWithTime" => out(focus::finish_with_time(
+                &arg::<Task>(i, "task"),
+                num(i, "minutes"),
+                num(i, "now"),
+            )),
+            "setTook" => out(focus::set_took(
+                &arg::<Task>(i, "task"),
+                &arg::<Vec<FocusSession>>(i, "sessions"),
+                num(i, "minutes"),
+            )),
+            _ => return None,
+        })
+    });
+}
+
+// --- lcd -------------------------------------------------------------------------------------------------------------------
+
+#[test]
+fn lcd_vectors() {
+    check_module("lcd", |name, i| {
+        Some(match name {
+            "taskHalf" => {
+                let (current, strip): (Option<String>, Option<String>) =
+                    (arg(i, "currentTaskId"), arg(i, "focus"));
+                out(lcd::task_half(
+                    &arg::<LcdData>(i, "data"),
+                    num(i, "now"),
+                    &tz(i),
+                    current.as_deref(),
+                    strip.as_deref(),
+                ))
+            }
+            _ => return None,
+        })
+    });
+}
+
+// --- calendar ------------------------------------------------------------------------------------------------------------------
+
+#[test]
+fn calendar_vectors() {
+    check_module("calendar", |name, i| {
+        Some(match name {
+            "monthGrid" => out(calendar::month_grid(
+                text(i, "anchor"),
+                &arg::<CalendarData>(i, "data"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "weekDays" => out(calendar::week_days(text(i, "anchor"))),
+            "dayLayout" => out(calendar::day_layout(
+                text(i, "day"),
+                &arg::<CalendarData>(i, "data"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "unscheduledTray" => out(calendar::unscheduled_tray(
+                text(i, "anchor"),
+                &arg::<CalendarData>(i, "data"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "page" => out(calendar::page(
+                arg::<CalendarMode>(i, "mode"),
+                text(i, "anchor"),
+                num(i, "dir"),
+            )),
+            "dueAtEndOfDay" => out(calendar::due_at_end_of_day(text(i, "day"), &tz(i))),
+            _ => return None,
+        })
+    });
+}
+
+// --- review -----------------------------------------------------------------------------------------------------------------------
+
+#[test]
+fn review_vectors() {
+    check_module("review", |name, i| {
+        Some(match name {
+            "lastWeekFacts" => out(review::last_week_facts(
+                &arg::<ReviewData>(i, "data"),
+                num(i, "now"),
+                &tz(i),
+            )),
+            "factLines" => out(review::fact_lines(&arg::<WeekFacts>(i, "facts"))),
             _ => return None,
         })
     });

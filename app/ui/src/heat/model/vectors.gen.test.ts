@@ -42,6 +42,11 @@ import {
   weeklyLoadLine,
 } from './estimate';
 import type { Task } from './records';
+import { draftKey, acceptDraft, blockLength, dragOntoColumn, initialScrollTop, minutesToY, moveBlock, nowLineY, planMyDay, planNext, planReason, planSections, planSubtitle, resizeBlock, snap, yToMinutes, type PlanData } from './plan';
+import { checkOff, finishWithTime, focusLcd, focusStep, focusStrip, initialFocus, isFocusLength, setTook, type FocusEvent, type FocusSettings, type FocusState, type FocusTarget } from './focus';
+import { taskHalf, type LcdData } from './lcd';
+import { dayLayout, dueAtEndOfDay, monthGrid, page, unscheduledTray, weekDays, type CalendarData } from './calendar';
+import { factLines, lastWeekFacts, type ReviewData } from './review';
 import {
   addHabit,
   doneRecord,
@@ -393,7 +398,7 @@ function genHabit(r: Rng, i: number, today: string) {
   return h;
 }
 
-function genBlock(r: Rng, i: number, tasks: { id: string }[], habits: { id: string }[], today: string, tz: string, now: number) {
+function genBlock(r: Rng, i: number, tasks: { id: string }[], habits: { id?: unknown }[], today: string, tz: string, now: number) {
   const b: Record<string, unknown> = { id: `b${i}` };
   if (r.chance(0.8) && tasks.length > 0) b.taskId = r.pick(tasks).id;
   else if (habits.length > 0) b.habitId = r.pick(habits).id;
@@ -1010,8 +1015,260 @@ function habitsVectors(): void {
   add('habits', 'habitLine', 500, (r) => { const w = habitWorld(r); return { habit: w.habit, today: w.today }; }, ({ habit, today }) => habitLine(habit as never, today));
 }
 
-// Generators for the modules still to come.
-void [genBlock, genEvent];
+
+// --- plan -----------------------------------------------------------------------------------
+
+function planWorld(r: Rng, tz = seriesZone(r)) {
+  const now = instant(r, tz);
+  const today = dayKey(now, tz);
+  // Often a fuller day: more tasks, most of them open.
+  const full = r.chance(0.6);
+  const tasks = genTasks(r, full ? r.int(2, 7) : r.int(0, 3), now, tz, 0.15).map((t) =>
+    full && r.chance(0.7) ? { ...t, done: false, doneAt: null } : t,
+  );
+  const habits = Array.from({ length: r.int(0, 3) }, (_, i) => genHabit(r, i, today));
+  const blocks = Array.from({ length: r.int(0, 4) }, (_, i) => {
+    const b = genBlock(r, i, tasks, habits, today, tz, now);
+    if (r.chance(0.1)) {
+      delete b.taskId;
+      delete b.habitId;
+    }
+    return b;
+  });
+  const events = Array.from({ length: r.int(0, 3) }, (_, i) => genEvent(r, i, tz, now));
+  const data = {
+    tasks,
+    occurrences: genOccurrences(r, tasks, now, tz),
+    blocks,
+    events,
+    sessions: genSessions(r, tasks, now, 4, habits.map((h) => h.id as string)),
+    habits,
+  };
+  return { now, tz, data };
+}
+
+function blockTarget(r: Rng, w: ReturnType<typeof planWorld>) {
+  const h = w.data.habits;
+  if (h.length > 0 && r.chance(0.3)) return { habitId: r.chance(0.9) ? (r.pick(h).id as string) : 'nope' };
+  return { taskId: w.data.tasks.length > 0 && r.chance(0.9) ? r.pick(w.data.tasks).id : 'nope' };
+}
+
+function planVectors(): void {
+  add('plan', 'minutesToY', 300, (r) => ({ min: r.pick([420, 480, 1440, 0, -10, 9 * 60 + 30, r.float(0, 1500), r.int(0, 1500)]) }), ({ min }) => minutesToY(min));
+  add('plan', 'yToMinutes', 300, (r) => ({ y: r.pick([0, 44, 66, 748, -50, r.float(-50, 800), r.int(0, 800)]) }), ({ y }) => yToMinutes(y));
+  add('plan', 'snap', 500, (r) => ({ min: r.pick([487, 488, 480, 7.5, 7.4999, 22.5, -7.5, r.float(0, 1500), r.int(0, 1500), r.int(0, 3000) / 2]) }), ({ min }) => snap(min));
+  add('plan', 'initialScrollTop', 300, (r) => ({ nowMin: r.int(0, 1440), viewportPx: r.pick([300, 600, 800, 1000, 748, r.int(100, 900)]) }), ({ nowMin, viewportPx }) => initialScrollTop(nowMin, viewportPx));
+  add('plan', 'nowLineY', 300, (r) => ({ nowMin: r.pick([419, 420, 421, 1439, 1440, 0, 570, r.int(0, 1500)]) }), ({ nowMin }) => nowLineY(nowMin));
+  add('plan', 'blockLength', 400, (r) => ({ estimate: r.pick([0, 1, 14, 15, 16, 29.5, 30, 45, 46, 90, 130, 135, -5, r.int(0, 300), r.float(0, 300)]) }), ({ estimate }) => blockLength(estimate));
+  add('plan', 'planNext', 400, (r) => {
+    const w = planWorld(r);
+    return { target: blockTarget(r, w), data: w.data, now: w.now, tz: w.tz, idPrefix: 'blk' };
+  }, ({ target, data, now, tz, idPrefix }) => {
+    let n = 0;
+    return planNext(target, data as unknown as PlanData, now, tz, () => `${idPrefix}-${++n}`);
+  });
+  add('plan', 'dragOntoColumn', 300, (r) => {
+    const w = planWorld(r);
+    return { target: blockTarget(r, w), y: r.pick([minutesToY(9 * 60 + 7), minutesToY(23 * 60 + 30), -20, 800, r.float(-30, 800)]), date: dayKey(w.now, w.tz), data: w.data, idPrefix: 'blk' };
+  }, ({ target, y, date, data, idPrefix }) => {
+    let n = 0;
+    return dragOntoColumn(target, y, date, data as unknown as PlanData, () => `${idPrefix}-${++n}`);
+  });
+  add('plan', 'resizeBlock', 400, (r) => {
+    const w = planWorld(r);
+    const b = genBlock(r, 0, w.data.tasks, w.data.habits, dayKey(w.now, w.tz), w.tz, w.now);
+    return { block: b, bottomY: r.pick([minutesToY(10 * 60 + 10), minutesToY(9 * 60 + 2), minutesToY(24 * 60) + 200, -50, r.float(-50, 900)]) };
+  }, ({ block, bottomY }) => resizeBlock(block as never, bottomY));
+  add('plan', 'moveBlock', 400, (r) => {
+    const w = planWorld(r);
+    const b = genBlock(r, 0, w.data.tasks, w.data.habits, dayKey(w.now, w.tz), w.tz, w.now);
+    return { block: b, topY: r.pick([minutesToY(13 * 60 + 5), -50, 748, r.float(-50, 900)]) };
+  }, ({ block, topY }) => moveBlock(block as never, topY));
+  add('plan', 'planReason', 600, (r) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    return { task: genTask(r, 0, now, tz, [], 0), now, tz };
+  }, ({ task, now, tz }) => planReason(task as never, now, tz));
+  add('plan', 'planMyDay', 500, (r) => {
+    const w = planWorld(r);
+    const options: Record<string, unknown> = {};
+    if (r.chance(0.3)) options.dayEndsAt = r.pick([9 * 60 + 30, 17 * 60, 23 * 60, 24 * 60, 22 * 60 + 20, 8 * 60]);
+    if (r.chance(0.3)) options.spaceId = r.pick(['classes', 'wwav', 'personal', '']);
+    return { data: w.data, now: w.now, tz: w.tz, options };
+  }, ({ data, now, tz, options }) => planMyDay(data as unknown as PlanData, now, tz, options));
+  add('plan', 'acceptDraft', 200, (r) => {
+    const w = planWorld(r);
+    const drafts = planMyDay(w.data as unknown as PlanData, w.now, w.tz);
+    if (drafts.length === 0) return null;
+    return { draft: r.pick(drafts), idPrefix: 'blk' };
+  }, ({ draft, idPrefix }) => {
+    let n = 0;
+    return acceptDraft(draft, () => `${idPrefix}-${++n}`);
+  });
+  add('plan', 'draftKey', 300, (r) => {
+    const w = planWorld(r);
+    const drafts = r.chance(0.9) ? planMyDay(w.data as unknown as PlanData, w.now, w.tz) : [];
+    return { drafts, key: r.pick(['Enter', 'Escape', 'p', '', 'Tab', 'enter']), idPrefix: 'blk' };
+  }, ({ drafts, key, idPrefix }) => {
+    let n = 0;
+    return draftKey(drafts, key, () => `${idPrefix}-${++n}`);
+  });
+  add('plan', 'planSections', 300, (r) => {
+    const w = planWorld(r);
+    return { data: w.data, now: w.now, tz: w.tz, spaceId: r.pick([undefined, undefined, 'classes', 'wwav', 'personal']) };
+  }, ({ data, now, tz, spaceId }) => planSections(data as unknown as PlanData, now, tz, spaceId));
+  add('plan', 'planSubtitle', 300, (r) => {
+    const w = planWorld(r);
+    return { data: w.data, now: w.now, tz: w.tz, spaceId: r.pick([undefined, undefined, 'classes', 'wwav', 'personal']) };
+  }, ({ data, now, tz, spaceId }) => planSubtitle(data as unknown as PlanData, now, tz, spaceId));
+}
+
+// --- focus ----------------------------------------------------------------------------------
+
+function genTarget(r: Rng): FocusTarget {
+  return r.weighted<() => FocusTarget>([
+    [3, () => ({ kind: 'task', id: r.pick(['mix', 'quiz', 'a', 'b']), title: r.pick(['Mix the second verse', 'Grammar quiz 4', 'a', 'Écrire 😀']) })],
+    [2, () => ({ kind: 'habit', id: 'kanji', title: 'Practise kanji', minutes: r.pick([2, 5, 10, 20, 25]) })],
+    [1, () => ({ kind: 'habit', id: 'stretch', title: 'Stretch' })],
+  ])();
+}
+
+function genFocusEvent(r: Rng): FocusEvent {
+  return r.weighted<() => FocusEvent>([
+    [4, () => ({ type: 'press', ...(r.chance(0.6) ? { target: genTarget(r) } : {}), ...(r.chance(0.3) ? { room: r.pick(['heat', 'space', 'console'] as const) } : {}) })],
+    [4, () => ({ type: 'tick' })],
+    [2, () => ({ type: 'stop' })],
+    [2, () => ({ type: 'pulledAway' })],
+    [2, () => ({ type: 'setTarget', target: r.chance(0.8) ? genTarget(r) : null })],
+    [1, () => ({ type: 'setLength', minutes: r.pick([10, 25, 50, 90, 9, 91, 12.5, 45, 0]) })],
+  ])();
+}
+
+/** States a timer really reaches: random events from the start, at times that move on. */
+function focusWalks(r: Rng, walks: number, steps: number) {
+  const out: { state: FocusState; event: FocusEvent; now: number; settings: FocusSettings }[] = [];
+  for (let w = 0; w < walks; w++) {
+    let state = initialFocus();
+    let now = Date.UTC(2026, 9, 6, 13) + r.int(0, 3 * 86_400_000);
+    const settings = { chime: r.chance(0.4) };
+    for (let i = 0; i < steps; i++) {
+      now += r.pick([0, 1000, 20_000, 60_000, 5 * 60_000, 12 * 60_000, 25 * 60_000, r.int(0, 40 * 60_000)]);
+      const event = genFocusEvent(r);
+      out.push({ state, event, now, settings });
+      state = focusStep(state, event, now, settings).state;
+    }
+  }
+  return out;
+}
+
+function focusVectors(): void {
+  add('focus', 'isFocusLength', 200, (r) => ({ minutes: r.pick([9, 10, 11, 45, 89, 90, 91, 12.5, 0, -10, 25, r.int(0, 100), r.float(0, 100)]) }), ({ minutes }) => isFocusLength(minutes));
+  add('focus', 'initialFocus', 1, () => ({}), () => initialFocus());
+  const walks = focusWalks(new Rng(SEED ^ 0x70c5), 30, 25);
+  add('focus', 'focusStep', walks.length, (_, i) => walks[i], ({ state, event, now, settings }) => focusStep(state, event, now, settings));
+  add('focus', 'focusLcd', walks.length, (r, i) => ({ state: walks[i].state, now: walks[i].now + r.pick([0, 1000, 59_000, 600_000]) }), ({ state, now }) => focusLcd(state, now));
+  add('focus', 'focusStrip', walks.length, (r, i) => ({ state: walks[i].state, now: walks[i].now + r.pick([0, 1000, 59_000, 600_000]) }), ({ state, now }) => focusStrip(state, now));
+  const checkWorld = (r: Rng) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    const tasks = genTasks(r, 1, now, tz, 0.4);
+    const task = { ...tasks[0], id: 't0' };
+    const sessions = Array.from({ length: r.int(0, 4) }, (_, i) => ({ ...genSession(r, i, now, ['t0', 'other']) }));
+    const occurrences = r.chance(0.5) ? Array.from({ length: r.int(1, 3) }, (_, i) => ({ id: `o${i}`, taskId: 't0', date: dayOffset(r, tz, now, -4, 6), doneAt: now - r.int(0, 4 * 86_400_000) })) : [];
+    return { task, sessions, occurrences, now, tz, idPrefix: 'id' };
+  };
+  add('focus', 'checkOff', 700, checkWorld, ({ task, sessions, occurrences, now, tz, idPrefix }) => {
+    let n = 0;
+    return checkOff(task as never, { sessions: sessions as never, occurrences }, now, tz, () => `${idPrefix}-${++n}`);
+  });
+  add('focus', 'finishWithTime', 200, (r) => { const w = checkWorld(r); return { task: w.task, minutes: r.pick([0, 40, 75, 12.5]), now: w.now }; }, ({ task, minutes, now }) => finishWithTime(task as never, minutes, now));
+  add('focus', 'setTook', 300, (r) => { const w = checkWorld(r); return { task: w.task, sessions: w.sessions, minutes: r.pick([0, 40, 75, 12.5, 200]) }; }, ({ task, sessions, minutes }) => setTook(task as never, sessions as never, minutes));
+}
+
+// --- lcd ---------------------------------------------------------------------------------------
+
+function lcdVectors(): void {
+  add('lcd', 'taskHalf', 400, (r) => {
+    const tz = seriesZone(r);
+    const now = instant(r, tz);
+    const tasks = genTasks(r, r.int(0, 6), now, tz, 0.2);
+    const data = {
+      tasks,
+      occurrences: genOccurrences(r, tasks, now, tz),
+      sessions: genSessions(r, tasks, now, 4),
+      courses: [genCourse(r, 'jpn201', 'JPN 201'), genCourse(r, 'mth142', 'MTH 142')],
+      milestones: Array.from({ length: r.int(0, 2) }, (_, i) => genMilestone(r, i + 1, dayKey(now, tz))),
+    };
+    return {
+      data,
+      now,
+      tz,
+      currentTaskId: r.chance(0.5) && tasks.length > 0 ? r.pick(tasks).id : r.pick([null, 'nope']),
+      focus: r.pick([null, null, 'focus 18:40 left', 'break 4:00 left', '']),
+    };
+  }, ({ data, now, tz, currentTaskId, focus }) => taskHalf(data as unknown as LcdData, now, tz, currentTaskId, focus));
+}
+
+// --- calendar -----------------------------------------------------------------------------------
+
+function calendarWorld(r: Rng) {
+  const w = planWorld(r);
+  const today = dayKey(w.now, w.tz);
+  const data: Record<string, unknown> = { ...w.data, milestones: Array.from({ length: r.int(0, 3) }, (_, i) => genMilestone(r, i + 1, today)) };
+  delete data.sessions;
+  if (r.chance(0.2)) delete data.habits;
+  return { ...w, data, today };
+}
+
+function calendarVectors(): void {
+  add('calendar', 'monthGrid', 120, (r) => {
+    const w = calendarWorld(r);
+    return { anchor: addDays(w.today, r.pick([0, 0, 15, -20, 40, 400])), data: w.data, now: w.now, tz: w.tz };
+  }, ({ anchor, data, now, tz }) => monthGrid(anchor, data as unknown as CalendarData, now, tz));
+  add('calendar', 'weekDays', 200, (r) => ({ anchor: addDays('2026-10-06', r.int(-800, 800)) }), ({ anchor }) => weekDays(anchor));
+  add('calendar', 'dayLayout', 400, (r) => {
+    const w = calendarWorld(r);
+    return { day: addDays(w.today, r.pick([0, 0, 1, -1, 2, 3])), data: w.data, now: w.now, tz: w.tz };
+  }, ({ day, data, now, tz }) => dayLayout(day, data as unknown as CalendarData, now, tz));
+  add('calendar', 'unscheduledTray', 300, (r) => {
+    const w = calendarWorld(r);
+    return { anchor: addDays(w.today, r.pick([0, 0, 7, -7, 3])), data: w.data, now: w.now, tz: w.tz };
+  }, ({ anchor, data, now, tz }) => unscheduledTray(anchor, data as unknown as CalendarData, now, tz));
+  add('calendar', 'page', 600, (r) => ({ mode: r.pick(['month', 'week', 'day'] as const), anchor: addDays('2026-10-06', r.int(-900, 900)), dir: r.pick([1, -1] as const) }), ({ mode, anchor, dir }) => page(mode, anchor, dir));
+  add('calendar', 'dueAtEndOfDay', 300, (r) => {
+    const tz = r.pick(ZONES);
+    return { day: dayKey(instant(r, tz), tz), tz };
+  }, ({ day, tz }) => dueAtEndOfDay(day, tz));
+}
+
+// --- review ---------------------------------------------------------------------------------------
+
+function reviewWorld(r: Rng) {
+  const tz = seriesZone(r);
+  const now = atMinute(addDays(dayKey(instant(r, tz), tz), r.int(0, 6)), r.pick([0, 600, 1439]), tz);
+  const tasks = genTasks(r, r.int(0, 7), now, tz, 0.15).map((t) => {
+    // Most done tasks were done last week, and some of those took time.
+    if (t.done) return { ...t, doneAt: now - r.int(0, 10 * 86_400_000), adjustMin: r.chance(0.6) ? r.int(5, 120) : t.adjustMin };
+    return t;
+  });
+  const habitIds = ['kanji', 'stretch'];
+  const data = {
+    spaces: [0, 1, 2].slice(0, r.int(1, 3)).map((i) => genSpace(r, i)),
+    tasks,
+    occurrences: Array.from({ length: r.int(0, 3) }, (_, i) => ({ id: `o${i}`, taskId: tasks.length > 0 ? r.pick(tasks).id : 'x', date: dayOffset(r, tz, now, -8, 0), doneAt: now - r.int(0, 9 * 86_400_000) })),
+    sessions: Array.from({ length: r.int(0, 6) }, (_, i) => genSession(r, i, now, tasks.map((t) => t.id), habitIds)),
+    milestones: Array.from({ length: r.int(0, 3) }, (_, i) => genMilestone(r, i + 1, dayKey(now, tz))),
+  };
+  return { data, now, tz };
+}
+
+function reviewVectors(): void {
+  add('review', 'lastWeekFacts', 400, reviewWorld, ({ data, now, tz }) => lastWeekFacts(data as unknown as ReviewData, now, tz));
+  add('review', 'factLines', 400, (r) => {
+    const w = reviewWorld(r);
+    return { facts: lastWeekFacts(w.data as unknown as ReviewData, w.now, w.tz) };
+  }, ({ facts }) => factLines(facts));
+}
 
 // --- Entry -------------------------------------------------------------------------------
 
@@ -1026,6 +1283,11 @@ describe.skipIf(!ENABLED)('writing the cross-check vectors', () => {
     spacesVectors();
     gradesVectors();
     habitsVectors();
+    planVectors();
+    focusVectors();
+    lcdVectors();
+    calendarVectors();
+    reviewVectors();
     await write();
   }, 600_000);
 });
