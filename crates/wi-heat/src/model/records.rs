@@ -1,7 +1,8 @@
-//! Heat's records: a port of `app/ui/src/heat/model/records.ts`, the shapes
-//! `docs/SPEC.md` 3.16 gives. Instants are epoch ms. Days are `"YYYY-MM-DD"`
-//! in the person's time zone. A block's `start` is minutes after that day's
-//! local midnight, as the time column reads it.
+//! Heat's records, as `docs/SPEC.md` 3.16 gives them: a port of
+//! `app/ui/src/heat/model/records.ts`, which predates 3.16, brought up to it.
+//! Instants are epoch ms. Days are `"YYYY-MM-DD"` in the person's time zone. A
+//! block's `start` is minutes after that day's local midnight, as the time
+//! column reads it.
 //!
 //! The serde names are the TypeScript JSON field names, so a record read from
 //! the store or written for the app round-trips as it is. A number is an `f64`
@@ -10,11 +11,25 @@
 //! `JSON.stringify` writes it. An optional field that is absent in TypeScript
 //! is `None` here and left out of the JSON; a field that is `null` there is an
 //! `Option` that is written as `null`.
+//!
+//! What 3.16 added to the TypeScript's records is read when it is absent and
+//! left out of the JSON when it is at its default (`false`, `None`, the plain
+//! timer's source), so a record the TypeScript wrote reads and writes back as
+//! it was, byte for byte. The values the TypeScript had and 3.16 dropped
+//! (`TaskSource::Calendar`, `CalendarEvent`, `SyncState`) stay, marked Legacy
+//! with what replaces each, because moving in from the artifact still makes
+//! them.
 
+use super::focus::Phase;
+use super::plan::Draft;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub use super::zone::DayKey;
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
 
 pub type Id = String;
 
@@ -91,13 +106,27 @@ pub struct Link {
 pub enum TaskSource {
     #[default]
     You,
+    /// Legacy: the artifact's Google Calendar path. 3.16 reads Brightspace and other calendars as iCal feeds, so a new task says `Ical`.
     Calendar,
     Ical,
+    /// Legacy: the artifact's Gmail path. In 3.16 Claude reads the mail and adds the task, so it says `Claude`, with the message id as its `sourceId`.
     Mail,
+    /// Legacy: an inbox capture made into a task. 3.16 has no source for it; the task is `You`'s.
     Capture,
+    Claude,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Who made a task's estimate: you typed it, Claude scored it, or it is the
+/// estimate chain's default (the type's average, else difficulty × 20).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EstBy {
+    You,
+    Claude,
+    Default,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: Id,
@@ -126,6 +155,12 @@ pub struct Task {
     pub difficulty: f64,
     #[serde(default, serialize_with = "ser::opt_num")]
     pub est_min: Option<f64>,
+    /// Who made `est_min`. None for a task from before 3.16, whose estimate says nothing of its maker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub est_by: Option<EstBy>,
+    /// Claude's one-sentence reason for its estimate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub est_reason: Option<String>,
     #[serde(serialize_with = "ser::num")]
     pub adjust_min: f64,
     pub notes: String,
@@ -135,6 +170,12 @@ pub struct Task {
     #[serde(default, serialize_with = "ser::opt_num")]
     pub done_at: Option<f64>,
     pub source: TaskSource,
+    /// What the source calls the task: a Gmail message id, a feed's VEVENT UID, the artifact's `em-` and `gp-` hashes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_id: Option<String>,
+    /// Whether the person has switched this task onto their public Heat view (3.15).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
 
 /// A finished occurrence of a recurring task. Its presence is the tick.
@@ -171,7 +212,22 @@ pub struct TimeBlock {
     pub origin: Origin,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Who logged a focus record: the timer, or Claude through `log_focus` (3.13).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FocusSource {
+    #[default]
+    Timer,
+    Claude,
+}
+
+impl FocusSource {
+    fn is_timer(&self) -> bool {
+        *self == FocusSource::Timer
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusSession {
     pub id: Id,
@@ -187,19 +243,28 @@ pub struct FocusSession {
     pub focus_min: f64,
     #[serde(serialize_with = "ser::num")]
     pub interruptions: f64,
-    pub room: Room,
+    /// The view the timer ran in. 3.16 calls it `view`; the TypeScript, which
+    /// this has to agree with until the app is rewired, writes `room`. Either
+    /// name is read, and `room` is written.
+    #[serde(rename = "room", alias = "view")]
+    pub view: Room,
+    #[serde(default, skip_serializing_if = "FocusSource::is_timer")]
+    pub source: FocusSource,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProjectStatus {
+    #[default]
     Active,
     OnHold,
     Someday,
     Archived,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: Id,
@@ -210,9 +275,11 @@ pub struct Project {
     pub target_date: Option<DayKey>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<Link>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Milestone {
     pub id: Id,
@@ -226,9 +293,11 @@ pub struct Milestone {
     pub order: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<Link>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Habit {
     pub id: Id,
@@ -242,6 +311,8 @@ pub struct Habit {
     /// The days it was done. Never pruned.
     pub log: BTreeMap<DayKey, bool>,
     pub show_counter: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -266,7 +337,7 @@ pub struct LetterStep {
     pub min: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Course {
     pub id: Id,
@@ -278,17 +349,23 @@ pub struct Course {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scale: Option<Vec<LetterStep>>,
     pub notes: String,
+    /// Shows only the course's code and name on the public Heat view, never its grades or percentage (3.15).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GradeSource {
+    #[default]
     You,
+    /// Legacy: a grade notice from the artifact's mail path. In 3.16 Claude adds the pending grade, so it says `Claude`.
     Mail,
     Valence,
+    Claude,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Grade {
     pub id: Id,
@@ -305,6 +382,9 @@ pub struct Grade {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<String>,
     pub source: GradeSource,
+    /// Each grade has its own switch, off by default; it shows the course, the item, the score and what it was out of (3.15).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -335,7 +415,7 @@ pub struct Capture {
     pub result_id: Option<Id>,
 }
 
-/// A Google Calendar event: read-only, drawn grey behind blocks (3.5).
+/// Legacy, TypeScript only: a Google Calendar event, read-only and drawn grey behind blocks (3.5). 3.16 stores no events; the time column reads them from each `Calendar`'s iCal feed (3.11).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarEvent {
@@ -348,11 +428,162 @@ pub struct CalendarEvent {
     pub all_day: bool,
 }
 
-/// What the syncs remember between runs. 3.15 has no record for it; the artifact keeps it.
+/// Legacy, TypeScript only: what the artifact's syncs remember between runs. 3.16 has no such record.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncState {
+    /// Legacy: the last 400 processed Gmail ids. In 3.16 `Task.sourceId` and `MailThread` replace them, so Claude can read the same mail twice and leave nothing doubled (3.13).
     pub processed_mail_ids: Vec<String>,
+    /// Legacy: the last sync's time. In 3.16 each `Calendar` keeps its own `lastSyncedAt`.
     #[serde(default, serialize_with = "ser::opt_num")]
     pub last_sync_at: Option<f64>,
+}
+
+/// What Claude decided about a mail thread, kept by `record_mail_thread` (3.13).
+/// It holds no body, and it is never public.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MailState {
+    Grade,
+    Task,
+    Nothing,
+}
+
+/// Who made a mail thread's row. Only Claude does.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RecordedBy {
+    #[default]
+    Claude,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailThread {
+    pub id: Id,
+    /// Gmail's id for the thread: the same one again updates the row rather than adding one.
+    pub gmail_thread_id: String,
+    pub subject: String,
+    pub from: String,
+    #[serde(serialize_with = "ser::num")]
+    pub received_at: f64,
+    /// The course code the mail is about, such as `JPN 201`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub course: Option<String>,
+    pub state: MailState,
+    /// Claude's one-sentence reason.
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<Id>,
+    #[serde(default)]
+    pub recorded_by: RecordedBy,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CalendarKind {
+    Brightspace,
+    Ical,
+}
+
+/// A calendar Heat reads (3.11). The address itself is in the Keychain, under `keychain_ref`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Calendar {
+    pub id: Id,
+    pub name: String,
+    pub kind: CalendarKind,
+    pub keychain_ref: String,
+    /// None until the first sync; written as `null`, as the spec's `lastSyncedAt` has no `?`.
+    #[serde(default, serialize_with = "ser::opt_num")]
+    pub last_synced_at: Option<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DailyNote {
+    pub date: DayKey,
+    pub markdown: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
+}
+
+/// The note that can go public (3.15's table); a daily note stays a `DailyNote`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Note {
+    pub id: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    pub markdown: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<Link>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ShareKind {
+    Now,
+    Timeline,
+}
+
+/// The two default public items themselves: the Now making line and a project's
+/// timeline. A row exists only once the person presses Show (3.15).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileShare {
+    pub id: Id,
+    pub kind: ShareKind,
+    /// The task a Now making line came from, or the project a timeline shows.
+    pub source_id: Id,
+    /// The line the person approved, for a Now making share.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// What it hangs on: your sun, or the project's solar system.
+    pub target_id: Id,
+    /// When a Now making line clears by itself: 7 days after it was set, or when its task is done.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "ser::opt_num"
+    )]
+    pub clears_at: Option<f64>,
+}
+
+/// The timer as it is kept between launches: its phase, round and when it ends.
+/// 3.16's shape, which holds no paused round's time left (docs/QUESTIONS.md #88).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeatTimer {
+    pub phase: Phase,
+    #[serde(serialize_with = "ser::num")]
+    pub round: f64,
+    #[serde(default, serialize_with = "ser::opt_num")]
+    pub ends_at: Option<f64>,
+}
+
+impl Default for HeatTimer {
+    fn default() -> Self {
+        HeatTimer {
+            phase: Phase::Idle,
+            round: 1.0,
+            ends_at: None,
+        }
+    }
+}
+
+/// What Heat holds between launches that is not a record: the current task, the
+/// timer, and the drafts Plan my day has made and nobody has accepted yet.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeatState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_task_id: Option<Id>,
+    #[serde(default)]
+    pub timer: HeatTimer,
+    #[serde(default)]
+    pub plan_drafts: Vec<Draft>,
 }

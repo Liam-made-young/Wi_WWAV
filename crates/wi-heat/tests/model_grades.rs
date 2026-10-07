@@ -29,6 +29,7 @@ fn grade_with(
         pending: false,
         link: None,
         source: GradeSource::You,
+        ..Default::default()
     };
     over(&mut g);
     g
@@ -69,6 +70,7 @@ fn course_with(categories: Vec<GradeCategory>, over: impl FnOnce(&mut Course)) -
         categories,
         scale: None,
         notes: String::new(),
+        ..Default::default()
     };
     over(&mut c);
     c

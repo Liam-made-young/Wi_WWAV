@@ -66,6 +66,7 @@ pub fn task(over: impl FnOnce(&mut Task)) -> Task {
         done: false,
         done_at: None,
         source: TaskSource::You,
+        ..Default::default()
     };
     over(&mut t);
     t
@@ -81,7 +82,8 @@ pub fn session(over: impl FnOnce(&mut FocusSession)) -> FocusSession {
         ended_at: 0.0,
         focus_min: 25.0,
         interruptions: 0.0,
-        room: Room::Heat,
+        view: Room::Heat,
+        ..Default::default()
     };
     over(&mut s);
     s
@@ -110,6 +112,7 @@ pub fn habit(over: impl FnOnce(&mut Habit)) -> Habit {
         minutes: None,
         log: Default::default(),
         show_counter: false,
+        ..Default::default()
     };
     over(&mut h);
     h

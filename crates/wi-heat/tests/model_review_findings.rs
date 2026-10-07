@@ -44,6 +44,7 @@ fn course(categories: Vec<GradeCategory>) -> Course {
         categories,
         scale: None,
         notes: String::new(),
+        ..Default::default()
     }
 }
 
@@ -59,6 +60,7 @@ fn grade(category_id: &str, score: f64, out_of: f64) -> Grade {
         pending: false,
         link: None,
         source: GradeSource::You,
+        ..Default::default()
     }
 }
 

@@ -209,6 +209,7 @@ fn lays_out_events_behind_blocks_and_a_heat_coloured_due_flag_at_its_time() {
         done: false,
         order: 1.0,
         link: None,
+        public: false,
     };
     let b = block(|b| {
         b.task_id = Some(quiz.id.clone());

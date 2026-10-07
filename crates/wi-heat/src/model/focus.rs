@@ -9,7 +9,7 @@
 //! view, so switching views doesn't touch it (2.3). A port of `focus.ts`.
 
 use super::estimate::{actual_min, format_minutes};
-use super::records::{ser, FocusSession, Id, Room, Task, TaskOccurrence};
+use super::records::{ser, FocusSession, FocusSource, Id, Room, Task, TaskOccurrence};
 use super::recurrence::{check_occurrence, recurs};
 use super::{copy, format, js};
 use jiff::tz::TimeZone;
@@ -159,7 +159,9 @@ impl NewFocusSession {
             ended_at: self.ended_at,
             focus_min: self.focus_min,
             interruptions: self.interruptions,
-            room: self.room,
+            view: self.room,
+            source: FocusSource::Timer,
+            public: false,
         }
     }
 }

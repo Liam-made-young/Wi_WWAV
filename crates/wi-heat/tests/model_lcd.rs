@@ -18,6 +18,7 @@ fn course(id: &str, code: &str) -> Course {
         categories: vec![],
         scale: None,
         notes: String::new(),
+        ..Default::default()
     }
 }
 

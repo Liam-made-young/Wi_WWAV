@@ -57,7 +57,8 @@ fn makes_a_habit_with_the_counter_off_and_an_empty_log() {
                 title: "Practise kanji".into(),
                 minutes: Some(20.0),
                 log: BTreeMap::new(),
-                show_counter: false
+                show_counter: false,
+                public: false
             }
         }
     );

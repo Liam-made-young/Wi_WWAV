@@ -12,6 +12,11 @@
 //! `localeCompare`, a stable sort). `tests/model_vectors.rs` replays inputs
 //! and outputs the TypeScript wrote and checks them bit for bit.
 //!
+//! [`records`] is the one file ahead of the TypeScript: it follows 3.16's data
+//! model, which `records.ts` predates. What 3.16 added reads when it is absent
+//! and is left out of the JSON at its default, so the TypeScript's records
+//! still match.
+//!
 //! One file per TypeScript module: [`records`], [`heat`], [`estimate`],
 //! [`grades`], [`plan`], [`focus`], [`habits`], [`recurrence`], [`calendar`],
 //! [`review`], [`spaces`], [`import_artifact`], and [`lcd`] for the Now

@@ -176,6 +176,7 @@ fn lists_inbox_all_open_hot_due_this_week_scheduled_someday_and_done() {
         status: ProjectStatus::Someday,
         target_date: None,
         link: None,
+        ..Default::default()
     };
     let active = Project {
         id: "p2".into(),
@@ -184,6 +185,7 @@ fn lists_inbox_all_open_hot_due_this_week_scheduled_someday_and_done() {
         status: ProjectStatus::Active,
         target_date: None,
         link: None,
+        ..Default::default()
     };
     let titled = |title: &str, over: &dyn Fn(&mut Task)| {
         task(|t| {
@@ -280,6 +282,7 @@ fn lists_courses_milestones_or_areas_under_each_space_with_open_counts() {
         categories: vec![],
         scale: None,
         notes: String::new(),
+        ..Default::default()
     };
     let (jpn, mth) = (
         course("jpn201", "JPN 201", "Japanese"),
@@ -294,6 +297,7 @@ fn lists_courses_milestones_or_areas_under_each_space_with_open_counts() {
         done: false,
         order,
         link: None,
+        ..Default::default()
     };
     let beads = vec![
         bead("m2", "Firmware 1.0", "2026-11-01", 2.0),
@@ -379,6 +383,7 @@ fn names_a_tasks_group_as_the_lcd_shows_it_the_course_code_the_milestone_or_the_
         categories: vec![],
         scale: None,
         notes: String::new(),
+        ..Default::default()
     };
     let bead = Milestone {
         id: "m2".into(),
@@ -389,6 +394,7 @@ fn names_a_tasks_group_as_the_lcd_shows_it_the_course_code_the_milestone_or_the_
         done: false,
         order: 2.0,
         link: None,
+        ..Default::default()
     };
     let courses = [jpn.clone()];
     let beads = [bead];

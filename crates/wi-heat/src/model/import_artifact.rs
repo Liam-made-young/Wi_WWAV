@@ -491,6 +491,7 @@ pub fn import_artifact(
             categories,
             scale: c.scale.clone(),
             notes: c.sticky.clone().unwrap_or_default(),
+            public: false,
         });
     }
     // A course only a task names is made here, once.
@@ -506,6 +507,7 @@ pub fn import_artifact(
             categories: vec![],
             scale: None,
             notes: String::new(),
+            public: false,
         };
         courses.push(c.clone());
         c
@@ -526,6 +528,7 @@ pub fn import_artifact(
             done: m.done,
             order: m.order,
             link: None,
+            public: false,
         })
         .collect();
 
@@ -563,6 +566,8 @@ pub fn import_artifact(
             rrule: None,
             difficulty: t.difficulty,
             est_min: t.est_min,
+            est_by: None,
+            est_reason: None,
             // The artifact has no focus sessions, so its typed time is all hand adjustment.
             adjust_min: t.actual_min.unwrap_or(0.0),
             notes: t.notes.clone(),
@@ -570,6 +575,9 @@ pub fn import_artifact(
             done: t.done,
             done_at: parse_time(&t.done_at),
             source: t.source.task_source(),
+            // The artifact's `em-` and `gp-` ids stay in `Task.id` here, as the TypeScript import leaves them.
+            source_id: None,
+            public: false,
         });
     }
 
@@ -596,6 +604,7 @@ pub fn import_artifact(
             } else {
                 GradeSource::You
             },
+            public: false,
         });
     }
 
@@ -612,6 +621,7 @@ pub fn import_artifact(
                 minutes: None,
                 log: h.log.clone(),
                 show_counter: false,
+                public: false,
             })
             .collect(),
         terms,

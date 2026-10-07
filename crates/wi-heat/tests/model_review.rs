@@ -63,6 +63,7 @@ fn bead(id: &str, title: &str, date: &str, done: bool, order: f64) -> Milestone 
         done,
         order,
         link: None,
+        ..Default::default()
     }
 }
 

@@ -47,6 +47,7 @@ pub fn add_habit(
             minutes,
             log: Default::default(),
             show_counter: false,
+            public: false,
         },
     }
 }
