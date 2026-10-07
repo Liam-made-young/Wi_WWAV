@@ -2,6 +2,7 @@
 // the actions every stem surface sends: the Now strip's lights, the planet
 // player's moons, the Console's Planet and a record in your hands.
 
+import tokens from '../../../../../design/tokens.json' with { type: 'json' };
 import { STEMS, STEM_LABELS, type Stem } from './stems';
 
 export type Effect = 'reverb' | 'delay' | 'distortion' | 'tremolo';
@@ -129,7 +130,7 @@ export function stemShape(mix: Mix, stem: Stem, selected: boolean, register: Reg
 }
 
 function soloRing(register: Register): string {
-  return register === 'night' ? '#2946FF' : 'ink';
+  return register === 'night' ? tokens.night.accent : 'ink';
 }
 
 // "Vocals, 70 percent, audible", "Drums, muted", "Bass, soloed".

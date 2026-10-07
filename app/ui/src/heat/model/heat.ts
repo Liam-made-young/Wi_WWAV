@@ -11,6 +11,7 @@
 // A recurring task's heat comes from its next occurrence: pass it through
 // recurrence.ts's withEffectiveDue first.
 
+import tokens from '../../../../../design/tokens.json' with { type: 'json' };
 import { clockAt, shortMonthDay, WEEKDAYS } from '../../shared/time/format';
 import { dayKey, daysBetween, wallTime, weekdayOf } from '../../shared/time/zone';
 import * as copy from './copy';
@@ -34,11 +35,12 @@ export interface HeatInput {
   difficulty: number;
 }
 
+// The colours live in the token file, like every other (docs/SPEC.md 8.11).
 export const LEVEL_COLOUR: Record<Exclude<HeatLevel, 'Done'>, string> = {
-  Overdue: '#8f1d16',
-  Hot: '#e0402c',
-  Warm: '#efa431',
-  Cool: '#4f9be6',
+  Overdue: tokens.heat.overdue,
+  Hot: tokens.heat.hot,
+  Warm: tokens.heat.warm,
+  Cool: tokens.heat.cool,
 };
 
 /** The badge: a glossy tube filled to v. */
