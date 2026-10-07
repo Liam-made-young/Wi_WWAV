@@ -6,6 +6,7 @@
 //! what their arguments may hold, and how an answer is worded. A [`Backend`]
 //! does the work, one store transaction per call.
 
+pub mod library;
 pub mod tools;
 
 use std::io::{BufRead, Write};

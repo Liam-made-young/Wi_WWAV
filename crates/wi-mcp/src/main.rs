@@ -2,33 +2,26 @@
 //! stdin and stdout until stdin ends (docs/SPEC.md 8.8).
 //!
 //! `wi-mcp [--library <dir>]`. Without `--library` it opens the library the
-//! app uses, as the app's settings name it.
+//! app uses: `WI_WWAV_LIBRARY`, or `~/Music/Wi_WWAV`.
 
 use std::io::{self, BufReader};
+use std::path::PathBuf;
 
-use serde_json::{Map, Value};
-use wi_mcp::{serve, Backend, ToolError};
-
-/// Answers while there is no library to open: every tool is listed, and
-/// every call says what to do.
-struct NoLibrary;
-
-impl Backend for NoLibrary {
-    fn enabled(&mut self, _tool: &str) -> bool {
-        true
-    }
-    fn call(&mut self, _tool: &str, _args: &Map<String, Value>) -> Result<Value, ToolError> {
-        Err(ToolError::new("No Wi_WWAV library yet. Open the app once."))
-    }
-}
+use wi_mcp::library::{default_root, Library};
+use wi_mcp::serve;
 
 fn main() {
+    let mut root: Option<PathBuf> = None;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
-            "--library" => {
-                args.next();
-            }
+            "--library" => match args.next() {
+                Some(dir) => root = Some(dir.into()),
+                None => {
+                    eprintln!("wi-mcp: --library needs a folder");
+                    std::process::exit(2);
+                }
+            },
             "--version" => {
                 println!("wi-mcp {}", env!("CARGO_PKG_VERSION"));
                 return;
@@ -41,7 +34,8 @@ fn main() {
     }
     let stdin = BufReader::new(io::stdin().lock());
     let stdout = io::stdout().lock();
-    if let Err(e) = serve(stdin, stdout, &mut NoLibrary) {
+    let mut library = Library::open(&root.unwrap_or_else(default_root));
+    if let Err(e) = serve(stdin, stdout, &mut library) {
         eprintln!("wi-mcp: {e}");
         std::process::exit(1);
     }
