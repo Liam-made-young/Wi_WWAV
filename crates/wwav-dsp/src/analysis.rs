@@ -7,6 +7,13 @@
 //! here and its sums stay `f64`, its `Math.round` rounds halves up, and
 //! `libm` stands in for `Math`. The results are estimates, and the app labels
 //! them as such: "≈ 86 BPM (estimate)" (5.4, "never invent metrics").
+//!
+//! It departs from the original only where that would invent a tempo or
+//! leave the range it gives: silence, a level that never moves and clips
+//! under two slow beats have no tempo; a silent drum stem gives way to the
+//! whole song, as a missing one does; a refinement can't leave the three
+//! lags it is fitted to; and the estimate stays within 60–180 BPM.
+//! Everywhere else it gives what the original gives, to the bit.
 
 use std::f64::consts::PI;
 use std::fmt;
@@ -83,7 +90,11 @@ impl fmt::Display for Key {
 /// What `analyze` estimated. Every field is an estimate.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Estimates {
-    /// 60–180 BPM, to a tenth.
+    /// 60–180 BPM, to a tenth. Like analysis.js, it can read an octave
+    /// away, toward 120: under 71 BPM a click track often reads double and
+    /// over 145 half (60 → 120.2, 150 → 74.9). The figure-eight folds tempo
+    /// ratios by octaves for this. None when nothing in the audio has
+    /// onsets to read, or none at a tempo in the range.
     pub bpm: Option<f64>,
     pub key: Option<Key>,
     /// Where the drums begin, in seconds; 0 when nothing could be found.
@@ -116,10 +127,14 @@ pub fn analyze(stems: &Stems) -> Estimates {
         .into_iter()
         .flatten()
         .collect();
-    let bpm = match stems.drums {
-        Some(drums) => estimate_tempo(&[drums]),
-        None => estimate_tempo(&all),
-    };
+    // The whole song stands in for drums that give no tempo, as it does for
+    // the first onset below. analysis.js falls back only for a missing drum
+    // stem, but a stem bus with no tracks is written as silence (6.6), and a
+    // drumless song still has the tempo of what was played (5.4).
+    let bpm = stems
+        .drums
+        .and_then(|drums| estimate_tempo(&[drums]))
+        .or_else(|| estimate_tempo(&all));
     let key = estimate_key(if harmonic.is_empty() { &all } else { &harmonic });
     let drum_onset = stems
         .drums
@@ -136,15 +151,32 @@ pub fn analyze(stems: &Stems) -> Estimates {
 const BPM_MIN: f64 = 60.0;
 const BPM_MAX: f64 = 180.0;
 
-/// `detectBpm`: the tempo of a minute from the middle of the audio, or None
-/// for under a second of it.
+/// `detectBpm`: the tempo of a minute from the middle of the audio. None
+/// when there's nothing to read: under two beats at 60 BPM (about 2 s); no
+/// onsets at all, such as silence, the dither on a silent bus or a level
+/// that never moves; or onsets that never repeat within the range, such as
+/// clicks at 55 BPM. analysis.js reads most of those as 184.6 BPM, and a
+/// clip of a second or so as NaN or as a value resting on a product or two.
 pub fn estimate_tempo(buffers: &[Audio]) -> Option<f64> {
     let (samples, rate) = mono_window(buffers, 60)?;
+    let mono = Audio {
+        samples: &samples,
+        channels: 1,
+        rate,
+    };
+    if blank(&mono) {
+        return None;
+    }
 
     // Onset envelope: half-wave-rectified energy flux over 512-sample hops.
     let hop = 512;
+    let fps = rate as f64 / hop as f64; // onset frames per second
+    let lag_min = ((60.0 / BPM_MAX) * fps).floor() as usize;
+    let lag_max = ((60.0 / BPM_MIN) * fps).ceil() as usize;
+    // Every lag is averaged over at least one slowest beat, so none rests on
+    // a product or two, or on none (0 ÷ 0).
     let frames = (samples.len() / hop) as i64 - 1;
-    if frames < 64 {
+    if frames < 64.max(2 * lag_max as i64) {
         return None;
     }
     let frames = frames as usize;
@@ -159,9 +191,6 @@ pub fn estimate_tempo(buffers: &[Audio]) -> Option<f64> {
         prev = e;
     }
 
-    let fps = rate as f64 / hop as f64; // onset frames per second
-    let lag_min = ((60.0 / BPM_MAX) * fps).floor() as usize;
-    let lag_max = ((60.0 / BPM_MIN) * fps).ceil() as usize;
     let mut corr = vec![0.0f32; lag_max + 1];
     for (lag, c) in corr.iter_mut().enumerate().skip(lag_min) {
         let mut sum = 0.0f64;
@@ -193,8 +222,16 @@ pub fn estimate_tempo(buffers: &[Audio]) -> Option<f64> {
             best = lag;
         }
     }
+    // Nothing correlated (every lag scored 0, and the first would win), or
+    // the audio held samples that aren't numbers.
+    if !(best_score > 0.0 && best_score.is_finite()) {
+        return None;
+    }
 
-    // Parabolic refinement around the winning lag.
+    // Parabolic refinement around the winning lag: the vertex of the
+    // parabola through it and its neighbours. When the winner isn't a peak
+    // of the autocorrelation itself, the vertex can fall outside those three
+    // lags, which is extrapolation, so the winner stands.
     let mut lag = best as f64;
     if best > lag_min && best < lag_max {
         let (a, b, c) = (
@@ -204,11 +241,16 @@ pub fn estimate_tempo(buffers: &[Audio]) -> Option<f64> {
         );
         let denom = a - 2.0 * b + c;
         if denom != 0.0 {
-            lag = best as f64 + (0.5 * (a - c)) / denom;
+            let vertex = best as f64 + (0.5 * (a - c)) / denom;
+            if (vertex - lag).abs() <= 1.0 {
+                lag = vertex;
+            }
         }
     }
+    // The lags reach a little past the range (59.4 to 184.6 BPM at
+    // 44.1 kHz), and the estimate is promised within it.
     let bpm = (60.0 * fps) / lag;
-    Some(js_round(bpm * 10.0) / 10.0)
+    Some((js_round(bpm * 10.0) / 10.0).clamp(BPM_MIN, BPM_MAX))
 }
 
 /// Krumhansl-Kessler probe-tone profiles, by semitones above the tonic.
@@ -305,29 +347,14 @@ pub fn estimate_key(buffers: &[Audio]) -> Option<Key> {
 /// it (one is a click, not a beat), then the time walks back down the rise
 /// to the transient's foot.
 pub fn first_onset(buffer: &Audio) -> Option<f64> {
-    let win = 1.max(js_round(buffer.rate as f64 * 0.02) as usize);
-    let frames = buffer.frames() / win;
+    let energy = rms_windows(buffer);
+    let frames = energy.len();
     if frames < 4 {
         return None;
     }
 
-    let mut energy = vec![0.0f32; frames];
-    for ch in 0..buffer.channels {
-        for (f, en) in energy.iter_mut().enumerate() {
-            let e: f64 = (f * win..f * win + win)
-                .map(|i| {
-                    let s = buffer.at(i, ch) as f64;
-                    s * s
-                })
-                .sum();
-            *en = (*en as f64 + (e / win as f64).sqrt() / buffer.channels as f64) as f32;
-        }
-    }
-
-    let peak = energy
-        .iter()
-        .fold(0.0f32, |p, &e| if e > p { e } else { p });
-    if (peak as f64) < 1e-4 {
+    let peak = loudest(&energy);
+    if (peak as f64) < SILENCE_RMS {
         return None; // silence, such as a blank stem
     }
 
@@ -346,6 +373,40 @@ pub fn first_onset(buffer: &Audio) -> Option<f64> {
         }
     }
     None
+}
+
+/// Under this RMS in every 20 ms window (−80 dBFS) a stem is silent. The
+/// dither on a silent bus, about −96 dBFS, is under it.
+const SILENCE_RMS: f64 = 1e-4;
+
+/// Nothing in it reaches −80 dBFS over 20 ms: `first_onset`'s test for a
+/// blank stem.
+fn blank(buffer: &Audio) -> bool {
+    (loudest(&rms_windows(buffer)) as f64) < SILENCE_RMS
+}
+
+/// The RMS of each whole 20 ms window, averaged over the channels.
+fn rms_windows(buffer: &Audio) -> Vec<f32> {
+    let win = 1.max(js_round(buffer.rate as f64 * 0.02) as usize);
+    let mut energy = vec![0.0f32; buffer.frames() / win];
+    for ch in 0..buffer.channels {
+        for (f, en) in energy.iter_mut().enumerate() {
+            let e: f64 = (f * win..f * win + win)
+                .map(|i| {
+                    let s = buffer.at(i, ch) as f64;
+                    s * s
+                })
+                .sum();
+            *en = (*en as f64 + (e / win as f64).sqrt() / buffer.channels as f64) as f32;
+        }
+    }
+    energy
+}
+
+fn loudest(energy: &[f32]) -> f32 {
+    energy
+        .iter()
+        .fold(0.0f32, |p, &e| if e > p { e } else { p })
 }
 
 /// `monoWindow`: `seconds` from the middle of the buffers, summed to mono.

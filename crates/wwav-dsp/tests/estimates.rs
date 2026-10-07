@@ -4,25 +4,34 @@
 //! "estimate".
 
 use wwav_dsp::analysis::{analyze, estimate_key, estimate_tempo, first_onset, Audio, Key, Stems};
+use wwav_dsp::dither::to_16_bit;
 
 const RATE: u32 = 44_100;
 
 /// Stereo kick-like hits (a decaying 80 Hz sine) on every beat.
 fn drums(bpm: f64, seconds: f64, first: f64) -> Vec<f32> {
-    let frames = (seconds * RATE as f64) as usize;
+    drums_at(RATE, bpm, seconds, first)
+}
+
+fn drums_at(rate: u32, bpm: f64, seconds: f64, first: f64) -> Vec<f32> {
+    let kick: Vec<f32> = (0..(0.25 * rate as f64) as usize)
+        .map(|i| {
+            let t = i as f64 / rate as f64;
+            (0.8 * (-t / 0.03).exp() * (2.0 * std::f64::consts::PI * 80.0 * t).sin()) as f32
+        })
+        .collect();
+    let frames = (seconds * rate as f64) as usize;
     let mut out = vec![0.0f32; frames * 2];
     let beat = 60.0 / bpm;
     let mut t0 = first;
     while t0 < seconds {
-        let start = (t0 * RATE as f64).round() as usize;
-        for i in 0..(0.25 * RATE as f64) as usize {
+        let start = (t0 * rate as f64).round() as usize;
+        for (i, &s) in kick.iter().enumerate() {
             if start + i >= frames {
                 break;
             }
-            let t = i as f64 / RATE as f64;
-            let s = 0.8 * (-t / 0.03).exp() * (2.0 * std::f64::consts::PI * 80.0 * t).sin();
-            out[(start + i) * 2] = s as f32;
-            out[(start + i) * 2 + 1] = s as f32;
+            out[(start + i) * 2] = s;
+            out[(start + i) * 2 + 1] = s;
         }
         t0 += beat;
     }
@@ -57,36 +66,99 @@ fn stereo(samples: &[f32]) -> Audio<'_> {
     }
 }
 
-#[test]
-fn tempo_of_click_tracks_to_within_a_bpm() {
-    // The 512-sample hop limits the estimate to about a beat a minute.
-    for bpm in (76..=160).step_by(4).chain([86]) {
-        let d = drums(bpm as f64, 70.0, 0.5);
-        let got = estimate_tempo(&[stereo(&d)]).expect("a tempo");
-        assert!((got - bpm as f64).abs() <= 1.0, "{bpm} BPM read as {got}");
+/// Every half BPM in `half_bpms` ÷ 2, as 30 s of clicks at `rate`. From 71
+/// to 145 BPM each reads within 1 BPM (the 512-sample hop limits it to about
+/// that). Outside, the prior around 120 can pull a reading an octave toward
+/// it, as analysis.js does: 60 reads 120.2 and 150 reads 74.9. The
+/// figure-eight folds tempo ratios by octaves for exactly this. Every
+/// reading stays within 60-180 and within 1 BPM of the tempo, its half or
+/// its double.
+fn sweep(rate: u32, half_bpms: std::ops::RangeInclusive<u32>) {
+    for half_bpm in half_bpms {
+        let bpm = half_bpm as f64 / 2.0;
+        let d = drums_at(rate, bpm, 30.0, 0.5);
+        let got = estimate_tempo(&[Audio {
+            samples: &d,
+            channels: 2,
+            rate,
+        }])
+        .expect("a tempo");
+        assert!((60.0..=180.0).contains(&got), "{bpm} BPM read as {got}");
+        if (71.0..=145.0).contains(&bpm) {
+            assert!(
+                (got - bpm).abs() <= 1.0,
+                "{bpm} BPM at {rate} read as {got}"
+            );
+        } else {
+            let near = [0.5, 1.0, 2.0].iter().any(|k| (got * k - bpm).abs() <= 1.0);
+            assert!(near, "{bpm} BPM at {rate} read as {got}");
+        }
     }
 }
 
 #[test]
-fn tempo_at_the_ends_of_the_range_may_read_an_octave_away() {
-    // The prior around 120 pulls 60 up to 120.2 and 176 down to 87.8, as
-    // analysis.js does; the figure-eight folds tempo ratios by octaves for
-    // exactly this.
-    for bpm in [60, 64, 68, 72, 164, 168, 172, 176, 180] {
-        let d = drums(bpm as f64, 70.0, 0.5);
-        let got = estimate_tempo(&[stereo(&d)]).expect("a tempo");
-        let near = [0.5, 1.0, 2.0]
-            .iter()
-            .any(|k| (got * k - bpm as f64).abs() <= 1.0);
-        assert!(near, "{bpm} BPM read as {got}");
-    }
+fn click_tracks_from_60_to_120_bpm_at_44_1_khz() {
+    sweep(44_100, 120..=240);
 }
 
 #[test]
-fn tempo_needs_enough_audio() {
+fn click_tracks_from_120_to_180_bpm_at_44_1_khz() {
+    sweep(44_100, 241..=360);
+}
+
+#[test]
+fn click_tracks_from_60_to_120_bpm_at_48_khz() {
+    sweep(48_000, 120..=240);
+}
+
+#[test]
+fn click_tracks_from_120_to_180_bpm_at_48_khz() {
+    sweep(48_000, 241..=360);
+}
+
+#[test]
+fn tempo_needs_two_of_the_slowest_beats() {
+    // Under two beats at 60 BPM, the longest lags would rest on a product
+    // or two, or on none: 175 hops of 512 samples, just over 2 s.
     let d = drums(120.0, 0.9, 0.0);
     assert_eq!(estimate_tempo(&[stereo(&d)]), None);
     assert_eq!(estimate_tempo(&[]), None);
+    let d = drums(120.0, 3.0, 0.0);
+    assert_eq!(estimate_tempo(&[stereo(&d[..2 * (175 * 512 - 1)])]), None);
+    assert!(estimate_tempo(&[stereo(&d[..2 * 175 * 512])]).is_some());
+}
+
+#[test]
+fn nothing_played_has_no_tempo() {
+    // Silence, the dither on a silent bus (what a stem bus with no tracks
+    // becomes at 16 bits), and a level that never moves have no onsets to
+    // read; analysis.js reads all three as 184.6 BPM.
+    let silence = vec![0.0f32; 2 * 30 * RATE as usize];
+    let dithered: Vec<f32> = to_16_bit(&silence, 3)
+        .samples()
+        .iter()
+        .map(|&q| q as f32 / 32_768.0)
+        .collect();
+    assert!(dithered.iter().any(|&x| x != 0.0));
+    let level = vec![0.5f32; 2 * 30 * RATE as usize];
+    for x in [&silence, &dithered, &level] {
+        assert_eq!(estimate_tempo(&[stereo(x)]), None);
+    }
+}
+
+#[test]
+fn clicks_slower_than_the_range_have_no_tempo() {
+    // At 55 BPM no two onsets are within a 60-180 BPM lag of each other, so
+    // nothing correlates; analysis.js reads the first lag, 184.6 BPM.
+    for rate in [44_100, 48_000] {
+        let d = drums_at(rate, 55.0, 30.0, 0.5);
+        let audio = Audio {
+            samples: &d,
+            channels: 2,
+            rate,
+        };
+        assert_eq!(estimate_tempo(&[audio]), None);
+    }
 }
 
 #[test]
