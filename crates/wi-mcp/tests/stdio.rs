@@ -442,7 +442,12 @@ fn rules_that_need_the_library_answer_in_one_sentence() {
     let clamped = h.call("update_task", json!({"id": "t-essay", "estimate_min": 9000, "reason": "Long."})).unwrap();
     assert_eq!(clamped["clamped"], true);
     assert_eq!(clamped["task"]["estimate_min"], 600);
-    assert_eq!(h.call("add_task", json!({"title": "x", "course": "BIO 100", "reason": "r"})).unwrap_err(), "No course has the code BIO 100.");
+    // What isn't a course code names no course; a code Learn doesn't hold yet makes one, a stub that needs its syllabus.
+    assert_eq!(h.call("add_task", json!({"title": "x", "course": "Biology", "reason": "r"})).unwrap_err(), "No course has the code Biology.");
+    let made = h.call("add_task", json!({"title": "Lab report 2", "course": "bio100", "reason": "r"})).unwrap();
+    assert_eq!((made["task"]["course"].as_str(), made["task"]["type"].as_str(), made["task"]["estimate_min"].as_i64()), (Some("BIO 100"), Some("Lab"), Some(120)));
+    let stub = wi_heat_store::all(&Store::open(&root).unwrap(), "course").unwrap().into_iter().find(|c| c["code"] == "BIO 100").unwrap();
+    assert_eq!((stub["status"].as_str(), stub["name"].as_str()), (Some("stub"), Some("BIO 100")));
     assert_eq!(h.call("add_task", json!({"title": "x", "space": "Gym", "reason": "r"})).unwrap_err(), "No space is called Gym.");
     assert_eq!(h.call("log_focus", json!({"task_id": "nope", "minutes": 5, "reason": "r"})).unwrap_err(), "No task has that id.");
 }

@@ -52,6 +52,7 @@ pub(crate) const SPECS: &[Spec] = &[
             "groupKind",
             "groupLabel",
             "types",
+            "typeDefs",
             "persona",
         ],
         &[],
@@ -65,6 +66,7 @@ pub(crate) const SPECS: &[Spec] = &[
             "spaceId",
             "title",
             "type",
+            "typeBy",
             "courseId",
             "projectId",
             "milestoneId",
@@ -74,6 +76,7 @@ pub(crate) const SPECS: &[Spec] = &[
             "scheduledDate",
             "rrule",
             "difficulty",
+            "difficultyBy",
             "estMin",
             "estBy",
             "estReason",
@@ -135,6 +138,7 @@ pub(crate) const SPECS: &[Spec] = &[
             "title",
             "status",
             "targetDate",
+            "types",
             "link",
             "source",
             "claudeReason",
@@ -181,6 +185,9 @@ pub(crate) const SPECS: &[Spec] = &[
             "categories",
             "scale",
             "notes",
+            "status",
+            "types",
+            "syllabusSource",
             "public",
         ],
         &[],
@@ -376,7 +383,13 @@ pub(crate) fn finish(
                 return refused("Give the term a name first.");
             }
         }
-        "course" => course(&mut candidate, world, new_id)?,
+        "course" => {
+            // A course a person makes is theirs; a stub is one a sync found.
+            if existing.is_none() {
+                needs(&mut candidate, "status", json!("confirmed"));
+            }
+            course(&mut candidate, world, new_id)?
+        }
         "grade" => grade(&mut candidate, world)?,
         "capture" => {
             if text(&candidate, "text").is_empty() {
@@ -421,6 +434,73 @@ fn space(m: &mut Map<String, Value>) -> Result<()> {
     {
         return refused("A space's types are a list of words.");
     }
+    type_defs(m, "typeDefs")
+}
+
+/// A home's or a space's task types, checked and tidied: each has a name;
+/// its patterns are words; its minutes are 5 to 600 and its difficulty 1 to
+/// 5, or left out for the level below to give.
+fn type_defs(m: &mut Map<String, Value>, field: &str) -> Result<()> {
+    let Some(list) = m.get_mut(field) else {
+        return Ok(());
+    };
+    let Some(list) = list.as_array_mut() else {
+        return refused("Task types are a list.");
+    };
+    for d in list.iter_mut() {
+        let Some(d) = d.as_object_mut() else {
+            return refused("Each task type has a name.");
+        };
+        let name = text(d, "name").to_string();
+        if name.is_empty() {
+            return refused("Give each task type a name.");
+        }
+        for k in d.keys() {
+            if !["name", "patterns", "estMin", "difficulty", "category"].contains(&k.as_str()) {
+                return refused(format!("A task type has no field called '{k}'."));
+            }
+        }
+        d.insert("name".into(), json!(name));
+        let patterns: Vec<Value> = match d.get("patterns") {
+            None | Some(Value::Null) => Vec::new(),
+            Some(Value::Array(a)) if a.iter().all(Value::is_string) => a
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|p| p.trim().to_lowercase())
+                .filter(|p| !p.is_empty())
+                .map(Value::String)
+                .collect(),
+            _ => return refused("A task type's patterns are a list of words."),
+        };
+        d.insert("patterns".into(), Value::Array(patterns));
+        match d.get("estMin").cloned().unwrap_or(Value::Null) {
+            Value::Null => d.insert("estMin".into(), Value::Null),
+            v => match v.as_f64().filter(|n| n.is_finite()) {
+                Some(n) => d.insert(
+                    "estMin".into(),
+                    num(n.round().clamp(crate::mcp::MINUTES.0, crate::mcp::MINUTES.1)),
+                ),
+                None => return refused("A task type's minutes are a number."),
+            },
+        };
+        match d.get("difficulty").cloned().unwrap_or(Value::Null) {
+            Value::Null => d.insert("difficulty".into(), Value::Null),
+            v => match v.as_f64().filter(|n| n.is_finite()) {
+                Some(n) => d.insert("difficulty".into(), num(n.round().clamp(1.0, 5.0))),
+                None => return refused("A task type's difficulty is 1 to 5."),
+            },
+        };
+        match d.get("category").cloned() {
+            Some(Value::String(c)) if !c.trim().is_empty() => {
+                d.insert("category".into(), json!(c.trim()));
+            }
+            Some(Value::String(_)) | Some(Value::Null) => {
+                d.remove("category");
+            }
+            None => {}
+            Some(_) => return refused("A task type's category is a category's name."),
+        }
+    }
     Ok(())
 }
 
@@ -442,18 +522,36 @@ fn task(
     else {
         return refused("Pick a space for the task.");
     };
-    let first_type = space
-        .types
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "Other".into());
-    needs(m, "type", json!(first_type));
-    needs(m, "difficulty", json!(3));
-    let d = finite(m, "difficulty")
-        .unwrap_or(3.0)
-        .round()
-        .clamp(1.0, 5.0);
-    m.insert("difficulty".into(), num(d));
+    let _ = space;
+    // A type or a difficulty that comes with the write is the writer's own
+    // choice; one that is left out is the type's to give (homes.rs).
+    let was = |k: &str| existing.and_then(|e| e.get(k)).cloned();
+    let moved = |m: &Map<String, Value>, k: &str| existing.is_some() && m.get(k).cloned() != was(k);
+    let chosen = |m: &Map<String, Value>, k: &str, by: &str| match existing {
+        None => !m.contains_key(by),
+        Some(_) => moved(m, k) && !moved(m, by),
+    };
+    match m.get("type").and_then(Value::as_str).map(str::trim) {
+        Some(t) if !t.is_empty() => {
+            if chosen(m, "type", "typeBy") {
+                m.insert("typeBy".into(), json!("you"));
+            }
+        }
+        _ => {
+            m.remove("type");
+        }
+    }
+    match finite(m, "difficulty") {
+        Some(d) => {
+            m.insert("difficulty".into(), num(d.round().clamp(1.0, 5.0)));
+            if chosen(m, "difficulty", "difficultyBy") {
+                m.insert("difficultyBy".into(), json!("you"));
+            }
+        }
+        None => {
+            m.remove("difficulty");
+        }
+    }
     let mut clamped = false;
     if let Some(minutes) = m.get("estMin").and_then(Value::as_f64) {
         let set = minutes.clamp(crate::mcp::MINUTES.0, crate::mcp::MINUTES.1);
@@ -493,8 +591,16 @@ fn task(
     ) {
         return refused("A task comes from you, a calendar, mail, a capture or Claude.");
     }
-    if m.get("estBy").is_some() && !one_of(m, "estBy", &["you", "claude", "default"]) {
-        return refused("An estimate is yours, Claude's or the default.");
+    if m.get("estBy").is_some() && !one_of(m, "estBy", &["you", "claude", "type", "default"]) {
+        return refused("An estimate is yours, Claude's, its type's or the default.");
+    }
+    if m.get("difficultyBy").is_some()
+        && !one_of(m, "difficultyBy", &["you", "claude", "type", "default"])
+    {
+        return refused("A difficulty is yours, Claude's, its type's or the default.");
+    }
+    if m.get("typeBy").is_some() && !one_of(m, "typeBy", &["you", "claude", "rule"]) {
+        return refused("A type is yours, Claude's or picked by the title.");
     }
     if let Some(day) = m.get("scheduledDate").and_then(Value::as_str) {
         if !is_day(day) {
@@ -548,6 +654,26 @@ fn task(
         if !world.tasks.iter().any(|t| t.id == parent) {
             return refused("That parent task isn't in Learn any more.");
         }
+    }
+    // A new task is matched to a home and a type and filled from it. One that
+    // changes its type, its home or its space follows the new one in what
+    // nobody set by hand; so does one whose estimate was cleared, and one
+    // retitled while its title still picks its type.
+    let cleared = moved(m, "estMin") && m.get("estMin").map_or(true, Value::is_null);
+    let follows = existing.is_none()
+        || ["type", "typeBy", "courseId", "projectId", "spaceId"]
+            .iter()
+            .any(|k| moved(m, k))
+        || cleared
+        || (moved(m, "title") && text(m, "typeBy") == "rule");
+    if follows {
+        crate::homes::inherit(m, &crate::homes::Ctx::load(world), existing.is_none(), false);
+    }
+    if !m.contains_key("type") {
+        m.insert("type".into(), json!(wi_heat::model::types::OTHER));
+    }
+    if !m.contains_key("difficulty") {
+        m.insert("difficulty".into(), json!(3));
     }
     Ok(clamped)
 }
@@ -654,7 +780,7 @@ fn project(m: &mut Map<String, Value>, world: &World) -> Result<()> {
             return refused("A target date is written YYYY-MM-DD.");
         }
     }
-    Ok(())
+    type_defs(m, "types")
 }
 
 fn milestone(m: &mut Map<String, Value>, existing: Option<&Value>, world: &World) -> Result<()> {
@@ -718,6 +844,18 @@ fn course(
     if text(m, "code").is_empty() {
         return refused("Give the course a code first.");
     }
+    let code = wi_heat::homes::kept_code(
+        &crate::homes::school_of(world).course_pattern,
+        text(m, "code"),
+    );
+    m.insert("code".into(), json!(code));
+    if m.get("status").is_some() && !one_of(m, "status", &["stub", "confirmed"]) {
+        return refused("A course is a stub or confirmed.");
+    }
+    if m.get("syllabusSource").is_some_and(|s| !s.is_object()) {
+        return refused("A course's syllabus source is its file's name and pages.");
+    }
+    type_defs(m, "types")?;
     if !m
         .get("termId")
         .and_then(Value::as_str)
@@ -758,6 +896,21 @@ fn course(
             return refused("A category's weight is a number, 0 or more.");
         }
         c.entry("keywords").or_insert_with(|| json!([]));
+        match c.get("dropLowest").cloned() {
+            None => {}
+            Some(Value::Null) => {
+                c.remove("dropLowest");
+            }
+            Some(v) => match v.as_f64().filter(|n| n.is_finite() && *n >= 0.0) {
+                Some(n) if n.floor() == 0.0 => {
+                    c.remove("dropLowest");
+                }
+                Some(n) => {
+                    c.insert("dropLowest".into(), num(n.floor()));
+                }
+                None => return refused("A category drops a whole number of its lowest scores."),
+            },
+        }
     }
     Ok(())
 }

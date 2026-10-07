@@ -481,6 +481,7 @@ pub fn import_artifact(
                 name: k.name.clone(),
                 weight: k.weight,
                 keywords: k.keywords.clone(),
+                drop_lowest: None,
             })
             .collect();
         courses.push(Course {

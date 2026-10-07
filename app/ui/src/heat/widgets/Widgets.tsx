@@ -2,14 +2,16 @@
 // order, each a brushed-metal panel with a small heading. Below 1240 pt the
 // column folds into a 44 px strip of icons, each opening its widget as a
 // popover. Habits, Mail and Grades only read the snapshot; Now and Hot
-// tasks act on tasks.
+// tasks act on tasks. A widget steps aside while its own tab is showing:
+// Grades on Grades, Habits on Habits, Mail on Mail, and Hot tasks on Today,
+// whose list already ranks them.
 
-import { type DragEvent, type ReactNode, useState } from 'react';
+import { type DragEvent, type ReactNode, useEffect, useState } from 'react';
 import { minuteOfDay } from '../../shared/time/zone';
 import { useActions } from '../actions';
 import type { Id } from '../client';
-import { clock, copy, dueText, effectiveDue } from '../fmt';
-import { useSelection, useTabs } from '../frame';
+import { clock, copy, courseLabel, dueText, effectiveDue } from '../fmt';
+import { type TabId, useSelection, useTabs } from '../frame';
 import { useHeat, useNow } from '../store';
 import { lcdLine, stripText, timerView } from '../timer';
 import { carriesTask, draggedTask, dragTask, Heat, SpaceDot } from '../ui';
@@ -22,6 +24,14 @@ const TITLES: Record<WidgetId, string> = {
   hot: copy.widgets.hotTasks,
   mail: copy.widgets.mail,
   grades: copy.widgets.grades,
+};
+
+/** The widget each tab shows in full already, so the rail leaves it out there. */
+export const HIDDEN_ON: Partial<Record<TabId, WidgetId>> = {
+  today: 'hot',
+  grades: 'grades',
+  habits: 'habits',
+  mail: 'mail',
 };
 
 const ICONS: Record<WidgetId, ReactNode> = {
@@ -69,14 +79,21 @@ export function Widgets({
   setPopover(id: string | null): void;
 }) {
   const { snap } = useHeat();
+  const { tab } = useTabs();
   // Grades stays hidden until a course exists (3.5).
-  const shown: WidgetId[] = [
+  const all: WidgetId[] = [
     'now',
     'habits',
     'hot',
     'mail',
     ...((snap?.records.course.length ?? 0) > 0 ? (['grades'] as const) : []),
   ];
+  const shown = all.filter((id) => id !== HIDDEN_ON[tab]);
+  // A popover whose widget has just stepped aside closes, so it isn't waiting when the tab changes back.
+  const stale = popover !== null && popover === HIDDEN_ON[tab];
+  useEffect(() => {
+    if (stale) setPopover(null);
+  }, [stale, setPopover]);
   const body = (id: WidgetId, close?: () => void): ReactNode => {
     switch (id) {
       case 'now':
@@ -294,12 +311,12 @@ function HotWidget() {
 
 const STATE_WORD = { grade: copy.mail.gradePosted, task: copy.mail.taskMade, nothing: copy.mail.nothingToDo } as const;
 
-/** Mail: the 3 newest school threads Claude recorded. */
+/** Mail: the 3 newest threads Claude recorded, from the store's one list, which Mail reads too. */
 function MailWidget({ close }: { close?: () => void }) {
-  const { snap } = useHeat();
+  const { idx } = useHeat();
   const { setTab } = useTabs();
-  const threads = [...(snap?.records.mailThread ?? [])].sort((a, b) => b.receivedAt - a.receivedAt).slice(0, 3);
-  if (threads.length === 0) return <p className="heat-widget-empty">No school mail recorded.</p>;
+  const threads = idx.mail.slice(0, 3);
+  if (threads.length === 0) return <p className="heat-widget-empty">{copy.widgets.mailEmpty}</p>;
   return (
     <>
       <ul className="heat-lines heat-plain">
@@ -307,7 +324,7 @@ function MailWidget({ close }: { close?: () => void }) {
           <li key={m.id} className="heat-mail">
             <span className="heat-line-title">{m.subject}</span>
             <span className="heat-line-sub" data-text="secondary">
-              {m.from.replace(/<.*>/, '').trim()} · {STATE_WORD[m.state]}
+              {(m.from ?? '').replace(/<.*>/, '').trim()} · {STATE_WORD[m.state]}
             </span>
           </li>
         ))}
@@ -333,7 +350,7 @@ function GradesWidget({ close }: { close?: () => void }) {
   if (!snap) return null;
   const graded = snap.records.course.flatMap((c) => {
     const d = snap.derived.courses[c.id];
-    return d && d.currentPct !== null ? [{ code: c.code, pct: d.currentPct, letter: d.letter }] : [];
+    return d && d.currentPct !== null ? [{ name: d.label ?? courseLabel(c), pct: d.currentPct, letter: d.letter }] : [];
   });
   const lowest = graded.reduce<(typeof graded)[number] | null>(
     (low, c) => (low === null || c.pct < low.pct ? c : low),
@@ -344,10 +361,12 @@ function GradesWidget({ close }: { close?: () => void }) {
     <>
       {lowest ? (
         <p className="heat-widget-line">
-          {lowest.code} <span className="heat-letter">{lowest.letter}</span>
+          {lowest.name} <span className="heat-letter">{lowest.letter}</span>
         </p>
       ) : (
-        <p className="heat-widget-empty">{snap.records.course.map((c) => c.code).join(', ')}</p>
+        <p className="heat-widget-empty">
+          {snap.records.course.map((c) => snap.derived.courses[c.id]?.label ?? courseLabel(c)).join(', ')}
+        </p>
       )}
       {pending > 0 && <p className="heat-widget-line">{copy.grades.toEnter(pending)}</p>}
       <button

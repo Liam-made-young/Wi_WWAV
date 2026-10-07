@@ -17,6 +17,7 @@ import {
   type HeatClient,
   heatClient,
   type Id,
+  type MailThread,
   type Milestone,
   type Project,
   type Snapshot,
@@ -37,6 +38,8 @@ export interface Index {
   project: Map<Id, Project>;
   habit: Map<Id, Habit>;
   capture: Map<Id, Capture>;
+  /** Every thread Claude recorded, newest first: the one list Mail and the Mail widget both read. */
+  mail: MailThread[];
   /** A recurring task's ticked days. */
   ticked: Map<Id, Set<DayKey>>;
   /** How many focus sessions a task has. */
@@ -66,6 +69,7 @@ export function buildIndex(snap: Snapshot | null): Index {
     project: byId(records?.project),
     habit: byId(records?.habit),
     capture: byId(records?.capture),
+    mail: [...(records?.mailThread ?? [])].sort((a, b) => (b.receivedAt ?? 0) - (a.receivedAt ?? 0)),
     ticked,
     sessions,
   };

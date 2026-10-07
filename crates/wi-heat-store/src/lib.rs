@@ -14,9 +14,13 @@
 //! - [`timer`]: Plan my day's drafts, the current task and the focus timer.
 //! - [`snapshot`]: what the views read, and the public view.
 //! - [`feed`]: calendars and Brightspace, from a feed the core fetched.
+//! - [`homes`]: a task's home (its course or project) and its type: the
+//!   minutes and difficulty every task starts with, courses found in what a
+//!   sync brings, and a syllabus previewed and accepted.
 
 mod derive;
 pub mod feed;
+pub mod homes;
 pub mod mail;
 pub mod mcp;
 pub mod ops;
@@ -62,6 +66,9 @@ pub mod kind {
     pub const SETTING: &str = "heatSetting";
     /// Outside the journal: what other calendars' feeds hold.
     pub const EVENT: &str = "calendarEvent";
+    /// Outside the journal, on this Mac only: a syllabus read and waiting to
+    /// be accepted. A draft is not a change.
+    pub const SYLLABUS: &str = "syllabusDraft";
 }
 
 #[derive(Debug, thiserror::Error)]

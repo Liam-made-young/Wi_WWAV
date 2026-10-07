@@ -141,6 +141,7 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
       askTook: (taskId) => setSheet({ kind: 'took', taskId }),
       openSheet: (node) => setSheet({ kind: 'custom', node }),
       closeSheet: () => setSheet(null),
+      sheetOpen: sheet !== null,
       drafts,
       focusInfo: () => document.querySelector<HTMLElement>('.heat-info [data-info-first]')?.focus(),
       focusLength,
@@ -149,7 +150,7 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
       registerKeys,
       touch,
     }),
-    [tab, spaceId, selection, selectTask, selectBlock, sidebar, focusLength, registerActs, registerKeys, drafts],
+    [tab, spaceId, selection, selectTask, selectBlock, sidebar, sheet, focusLength, registerActs, registerKeys, drafts],
   );
 
   // The frame's acts and keys live where the tabs are, so the tabs read them from the frame.
@@ -280,8 +281,10 @@ function Frame(p: FrameProps) {
     }
   };
 
+  // Sync ends in a fresh snapshot whether or not the core had anything to announce.
   const sync = async () => {
     const r = await act(client.calendars.sync());
+    await heat.refetch();
     if (r) say(r.line);
   };
 

@@ -24,6 +24,7 @@ mod bus;
 mod calendars;
 mod claude;
 mod claude_cli;
+mod homes_cmd;
 pub mod engine;
 mod export;
 mod heat;
@@ -168,6 +169,10 @@ pub struct Config {
     /// Whether mail is read on its own while the app is open (3.10). Off
     /// unless the app says so: a test's core never starts a run by itself.
     pub background_mail: bool,
+    /// Whether tasks no type matched are sent to Claude for an estimate
+    /// after a sync, without being asked (homes_cmd.rs). Off unless the app
+    /// turns it on: a test's core never starts Claude by itself.
+    pub auto_score: bool,
 }
 
 impl Config {
@@ -190,6 +195,7 @@ impl Config {
             now: None,
             claude: None,
             background_mail: false,
+            auto_score: false,
         }
     }
 }
@@ -207,6 +213,7 @@ pub(crate) struct Inner {
     helper: Option<PathBuf>,
     /// The Claude Code command line, when the config names one.
     claude: Option<PathBuf>,
+    auto_score: bool,
     /// The journal entries this process made, so the watcher tells the views
     /// only about other processes' (the MCP helper's).
     own: Mutex<BTreeSet<String>>,
@@ -326,6 +333,7 @@ impl Core {
             secrets,
             helper: config.helper.clone(),
             claude: config.claude.clone(),
+            auto_score: config.auto_score,
             own: Mutex::new(BTreeSet::new()),
             fixed_now: Mutex::new(config.now),
             uploads: Mutex::new(upload::Status::default()),
@@ -341,6 +349,7 @@ impl Core {
             heat::start(&inner),
             watch::start(&inner),
             calendars::start(&inner),
+            homes_cmd::start(&inner),
         ];
         Ok(Core { inner, workers })
     }

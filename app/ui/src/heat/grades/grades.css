@@ -109,8 +109,16 @@
 
 .heat-course-code {
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--type-desk-large);
   white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* "Needs syllabus": said quietly, beside the name. */
+.heat-tag-quiet {
+  color: var(--desk-ink2);
 }
 
 .heat-course-mark {
@@ -414,4 +422,101 @@
 
 .heat-grade-waiting {
   align-self: center;
+}
+
+/* ---- A syllabus: its state on a card, the ask, and the preview sheet --------- */
+
+.heat-grades-acts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-syllabus-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  margin: var(--space-s1) var(--space-s3) 0;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-grades-head .heat-syllabus-state {
+  margin-inline: 0;
+}
+
+.heat-syllabus-state[data-state='failed'] {
+  color: var(--desk-ink);
+}
+
+.heat-syllabus-words {
+  flex: 1;
+  min-width: 0;
+}
+
+.heat-syllabus-ask {
+  justify-content: space-between;
+}
+
+.heat-syllabus-line {
+  font-size: var(--type-desk-large);
+}
+
+.heat-syllabus-course {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-s2);
+}
+
+.heat-syllabus-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.heat-syllabus-table th,
+.heat-syllabus-table td {
+  padding: 2px var(--space-s2) 2px 0;
+  font-weight: normal;
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.heat-syllabus-table td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.heat-syllabus-table tfoot th {
+  padding-top: var(--space-s1);
+  font-size: var(--type-desk-small);
+}
+
+/* Weights that don't add to 100 are said plainly, in the sticky's yellow, with the words carrying it. */
+.heat-syllabus-flag {
+  margin: var(--space-s2) 0 0;
+  padding: var(--space-s1) var(--space-s2);
+  border: 1px solid color-mix(in srgb, var(--label-yellow) 65%, var(--desk-ink));
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--label-yellow) var(--sticky-mix), var(--desk-well));
+}
+
+/* ---- The course editor's assignment types ------------------------------------ */
+
+.heat-type-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 68px 60px minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: var(--space-s2);
+}
+
+.heat-type-row .field {
+  margin-bottom: 0;
+}
+
+.heat-type-row input,
+.heat-type-row select {
+  width: 100%;
+  min-width: 0;
 }

@@ -134,7 +134,7 @@ fn settings_claude_lists_claudes_changes_with_their_reasons_and_undoes_one_out_o
     let shown = snap(&core, "2026-10-07");
     assert_eq!(
         shown["derived"]["tasks"][task["id"].as_str().unwrap()]["estimate"],
-        json!({"min": 90, "by": "claude", "reason": "Two thousand words."})
+        json!({"min": 90, "by": "claude", "reason": "Two thousand words.", "typeFrom": null})
     );
     // Undo of Claude's estimate is refused once the person changed the task since.
     ok(

@@ -147,6 +147,10 @@ pub struct FeedItem {
     /// The summary without " - Due".
     pub title: String,
     pub course: Option<String>,
+    /// The course's name and term, when the feed gives the offering's full
+    /// name ("EGR101: Intro to Engineering Design_R01_F26").
+    pub course_name: Option<String>,
+    pub course_term: Option<String>,
     pub kind: String,
     pub due: Timestamp,
     pub notes: String,
@@ -201,11 +205,16 @@ pub fn feed_items(events: &[Event], school: &School, types: &[TypeRule]) -> Vec<
             .to_string();
         let course = course_code(&school.course_pattern, &e.location)
             .or_else(|| course_code(&school.course_pattern, &title));
+        // The location is the offering's own name, when D2L writes it whole.
+        let named = crate::homes::offering_in(&school.course_pattern, &e.location)
+            .filter(|o| o.is_whole() && Some(&o.code) == course.as_ref());
         items.push(FeedItem {
             uid: uid.clone(),
             kind: task_type(&title, types),
             title,
             course,
+            course_name: named.as_ref().and_then(|o| o.name.clone()),
+            course_term: named.and_then(|o| o.term),
             due,
             notes: e.description.clone(),
             url: e.url.clone(),

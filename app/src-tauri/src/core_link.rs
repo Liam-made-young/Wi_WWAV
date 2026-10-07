@@ -48,6 +48,8 @@ pub fn open<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<dyn Core>, CoreError> 
         opener,
     );
     config.sign_in_url = paths::sign_in();
+    // Tasks a sync brings that no type matches are estimated by Claude, once each.
+    config.auto_score = true;
     let core = wi_core::Core::open(&paths::library(app.path().audio_dir().ok()), config)?;
 
     let (events, meters) = (core.events(), core.meters());

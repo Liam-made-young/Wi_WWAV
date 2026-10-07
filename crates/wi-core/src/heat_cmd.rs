@@ -74,7 +74,8 @@ pub(crate) fn open_heat(i: &Inner) -> Result<(), CoreError> {
         heat::wrote_made(i, &made)?;
         i.bus.emit("heat", json!({"kinds": ["space"]}));
     }
-    Ok(())
+    // A library from before homes and types is brought over, once.
+    crate::homes_cmd::tidy_once(i)
 }
 
 pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError> {
@@ -266,6 +267,16 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             wrote_outside(i, &["heatSetting"]);
             Ok(json!({ "accounts": kept }))
         }
+
+        // ----- homes and types: courses, projects, a syllabus, a task's type -----
+        "heat.course.importSyllabus"
+        | "heat.course.update"
+        | "heat.project.update"
+        | "heat.syllabus.accept"
+        | "heat.syllabus.discard"
+        | "heat.task.setType"
+        | "heat.task.reapplyDefaults"
+        | "heat.tasks.score" => crate::homes_cmd::invoke(i, cmd, a),
 
         // ----- Settings → Claude -----
         "heat.claude.get" => claude::get(i),

@@ -1,12 +1,15 @@
 // The course editor (docs/SPEC.md 3.8): code, name, categories with their
-// weights and keywords, the scale, and notes. If the weights don't add up it
-// says so in a line as they are typed: "Weights add to 95%. The other 5% is
-// unassigned." The keywords are what file a new grade into a category (they
-// replace Heat's hard-coded rules). Esc keeps what was typed for next time;
-// Cancel throws it away. One Save is one undo step.
+// weights and keywords, the assignment types, the scale, and notes. If the
+// weights don't add up it says so in a line as they are typed: "Weights add
+// to 95%. The other 5% is unassigned." The keywords are what file a new grade
+// into a category (they replace Heat's hard-coded rules). A type gives the
+// course's tasks their minutes and difficulty, picked by the words in a
+// title; saving applies the types again to the tasks nothing was set by hand
+// on. Esc keeps what was typed for next time; Cancel throws it away. One Save
+// is one undo step.
 
 import { type FormEvent, useEffect, useRef, useState } from 'react';
-import type { Course, GradeCategory, Id, LetterStep } from '../client';
+import type { Course, GradeCategory, Id, LetterStep, TypeDef } from '../client';
 import { copy } from '../fmt';
 import { useDraft } from '../frame';
 import { DEFAULT_SCALE } from '../model/grades';
@@ -21,6 +24,16 @@ interface CategoryRow {
   keywords: string;
 }
 
+/** One assignment type as it is typed: the words comma-separated, the numbers as text, '' for none. */
+interface TypeRow {
+  key: string;
+  name: string;
+  patterns: string;
+  estMin: string;
+  difficulty: string;
+  category: string;
+}
+
 interface Form {
   code: string;
   name: string;
@@ -28,6 +41,7 @@ interface Form {
   termId: string;
   newTerm: string;
   categories: CategoryRow[];
+  types: TypeRow[];
   ownScale: boolean;
   scale: { key: string; letter: string; min: string }[];
   notes: string;
@@ -43,6 +57,15 @@ const rowOf = (c: GradeCategory): CategoryRow => ({
   name: c.name,
   weight: String(c.weight),
   keywords: c.keywords.join(', '),
+});
+
+const typeRowOf = (t: TypeDef): TypeRow => ({
+  key: rowKey(),
+  name: t.name,
+  patterns: t.patterns.join(', '),
+  estMin: t.estMin === null ? '' : String(t.estMin),
+  difficulty: t.difficulty === null ? '' : String(t.difficulty),
+  category: t.category ?? '',
 });
 
 const stepsOf = (scale: readonly LetterStep[]) =>
@@ -69,6 +92,7 @@ export function CourseSheet({ course, onClose }: { course?: Course; onClose(): v
           termId: course.termId,
           newTerm: '',
           categories: course.categories.map(rowOf),
+          types: (course.types ?? []).map(typeRowOf),
           ownScale: course.scale !== undefined && course.scale !== null,
           scale: stepsOf(course.scale ?? DEFAULT_SCALE),
           notes: course.notes,
@@ -79,6 +103,7 @@ export function CourseSheet({ course, onClose }: { course?: Course; onClose(): v
           termId: current?.id ?? '',
           newTerm: termNameFor(date),
           categories: [],
+          types: [],
           ownScale: false,
           scale: stepsOf(DEFAULT_SCALE),
           notes: '',
@@ -96,6 +121,8 @@ export function CourseSheet({ course, onClose }: { course?: Course; onClose(): v
   };
   const setRow = (key: string, change: Partial<CategoryRow>) =>
     set({ categories: form.categories.map((r) => (r.key === key ? { ...r, ...change } : r)) });
+  const setType = (key: string, change: Partial<TypeRow>) =>
+    set({ types: form.types.map((t) => (t.key === key ? { ...t, ...change } : t)) });
   const setStep = (key: string, change: Partial<Form['scale'][number]>) =>
     set({ scale: form.scale.map((s) => (s.key === key ? { ...s, ...change } : s)) });
 
@@ -111,6 +138,10 @@ export function CourseSheet({ course, onClose }: { course?: Course; onClose(): v
       return;
     }
     if (form.categories.some((r) => !r.name.trim())) return setWhy(copy.gradesUi.categoryNeedsName);
+    if (form.types.some((t) => !t.name.trim())) return setWhy(copy.types.needsName);
+    if (form.types.some((t) => t.estMin.trim() !== '' && !(Number(t.estMin) >= 5 && Number(t.estMin) <= 600))) {
+      return setWhy(copy.types.minutesRange);
+    }
     const steps = form.scale.map((s) => ({ letter: s.letter.trim(), min: Number(s.min) }));
     if (form.ownScale) {
       if (
@@ -133,20 +164,39 @@ export function CourseSheet({ course, onClose }: { course?: Course; onClose(): v
       weight: Number(r.weight) || 0,
       keywords: words(r.keywords),
     }));
+    // A type's category is kept by name, and only while the course still has a category of that name.
+    const types: TypeDef[] = form.types.map((t) => ({
+      name: t.name.trim(),
+      patterns: words(t.patterns).map((w) => w.toLowerCase()),
+      estMin: t.estMin.trim() === '' ? null : Math.round(Number(t.estMin)),
+      difficulty: t.difficulty === '' ? null : Number(t.difficulty),
+      ...(categories.some((c) => c.name === t.category) ? { category: t.category } : {}),
+    }));
     const fields = {
       termId,
       code: form.code.trim(),
       name: form.name.trim(),
       categories,
       notes: form.notes,
+      // A course that never had types keeps none, so a save that didn't touch them changes nothing there.
+      ...(types.length > 0 || course?.types ? { types } : {}),
     };
-    const r = course
-      ? await act(client.patch('course', course.id, { ...fields, scale: form.ownScale ? steps : (null as never) }))
+    // An existing course is saved through its own command, which applies its types to its tasks again.
+    const updated = course
+      ? await act(client.updateCourse(course.id, { ...fields, scale: form.ownScale ? steps : (null as never) }))
+      : null;
+    const added = course
+      ? null
       : await act(client.put('course', { ...fields, ...(form.ownScale ? { scale: steps } : {}), public: false }));
     setBusy(false);
-    if (!r) return;
+    if (!updated && !added) return;
     clear();
-    say(course ? `Saved ${fields.code}.` : `Added ${fields.code}.`);
+    const retimed = updated?.retimed ?? 0;
+    say(
+      course
+        ? `Saved ${fields.code}.${retimed > 0 ? ` ${copy.types.retimed(retimed)}.` : ''}`
+        : `Added ${fields.code}.`,
+    );
     onClose();
   };
 
@@ -262,6 +312,99 @@ export function CourseSheet({ course, onClose }: { course?: Course; onClose(): v
         <p className="heat-weights" data-text="secondary" role="status">
           {weights ?? (course ? saved : null)}
         </p>
+      </fieldset>
+
+      <fieldset className="heat-set">
+        <legend data-text="secondary">{copy.types.heading}</legend>
+        <p className="why" data-text="secondary">
+          {copy.types.hint}
+        </p>
+        <div className="heat-cat-rows">
+          {form.types.map((t, i) => (
+            <div key={t.key} className="heat-type-row">
+              <label className="field">
+                <span data-text="secondary">Name</span>
+                <input
+                  value={t.name}
+                  aria-label={`Type ${i + 1} name`}
+                  placeholder="Lab"
+                  onChange={(e) => setType(t.key, { name: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                <span data-text="secondary">Words</span>
+                <input
+                  value={t.patterns}
+                  aria-label={`Type ${i + 1} words`}
+                  placeholder="lab, lab report"
+                  onChange={(e) => setType(t.key, { patterns: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                <span data-text="secondary">Minutes</span>
+                <input
+                  type="number"
+                  min={5}
+                  max={600}
+                  value={t.estMin}
+                  aria-label={`Type ${i + 1} minutes`}
+                  onChange={(e) => setType(t.key, { estMin: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                <span data-text="secondary">Difficulty</span>
+                <select
+                  value={t.difficulty}
+                  aria-label={`Type ${i + 1} difficulty`}
+                  onChange={(e) => setType(t.key, { difficulty: e.target.value })}
+                >
+                  <option value="">—</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span data-text="secondary">Category</span>
+                <select
+                  value={form.categories.some((c) => c.name.trim() === t.category) ? t.category : ''}
+                  aria-label={`Type ${i + 1} category`}
+                  onChange={(e) => setType(t.key, { category: e.target.value })}
+                >
+                  <option value="">{copy.types.noCategory}</option>
+                  {form.categories
+                    .filter((c) => c.name.trim())
+                    .map((c) => (
+                      <option key={c.key} value={c.name.trim()}>
+                        {c.name.trim()}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="gel plain heat-cat-remove"
+                aria-label={`Remove type ${i + 1}`}
+                onClick={() => set({ types: form.types.filter((x) => x.key !== t.key) })}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="gel"
+          onClick={() =>
+            set({
+              types: [...form.types, { key: rowKey(), name: '', patterns: '', estMin: '', difficulty: '', category: '' }],
+            })
+          }
+        >
+          {copy.types.add}
+        </button>
       </fieldset>
 
       <fieldset className="heat-set">

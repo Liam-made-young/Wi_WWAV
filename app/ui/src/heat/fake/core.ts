@@ -194,8 +194,8 @@ export function createFake(seed: Partial<{ [K in Kind]: Records[K][] }> = {}, op
 
 // --- the commands every part shares ---------------------------------------
 
-register('heat.snapshot', (args, fake) => {
-  const date = (args.date as DayKey) ?? dayOf(fake.now, fake.zone);
+/** The snapshot for `date`, as `heat.snapshot` answers it: a command that counts what the views see reads it too. */
+export function snapshotOf(fake: Fake, date: DayKey = dayOf(fake.now, fake.zone)): Snapshot {
   const records = Object.fromEntries(KINDS.map((k) => [k, [...fake.store[k].values()]])) as Snapshot['records'];
   const snapshot: Snapshot = {
     now: fake.now,
@@ -217,7 +217,9 @@ register('heat.snapshot', (args, fake) => {
   };
   for (const d of derivers) d(snapshot, fake);
   return snapshot;
-});
+}
+
+register('heat.snapshot', (args, fake) => snapshotOf(fake, (args.date as DayKey | undefined) ?? undefined));
 
 const keyOf = (kind: Kind, record: Record<string, unknown>) => (kind === 'dailyNote' ? (record.date as string) : (record.id as string));
 

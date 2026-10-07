@@ -27,6 +27,7 @@ jiff = { version = "0.2", default-features = false, features = ["std", "tz-syste
 libc = "0.2"
 ureq = { version = "2", default-features = false, features = ["tls", "json"] }
 zip = { version = "8", default-features = false }
+pdf-extract = "0.12.1"
 
 [dev-dependencies]
 tempfile.workspace = true

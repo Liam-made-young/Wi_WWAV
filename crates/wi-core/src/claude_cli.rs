@@ -87,7 +87,6 @@ pub(crate) fn run(i: &Inner, ask: &Ask) -> Result<String, CoreError> {
 
 /// Runs `ask` and returns the one JSON object it answered: the structured
 /// output when `json_schema` was given, else the object its text holds.
-#[allow(dead_code)] // the syllabus and scoring jobs call it
 pub(crate) fn run_json(i: &Inner, ask: &Ask) -> Result<Value, CoreError> {
     let envelope = run_at(&binary(i)?, ask, &|| i.closing())?;
     answer_json(&envelope)

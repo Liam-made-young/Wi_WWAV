@@ -301,7 +301,8 @@ export function Shell() {
       listenForDrops((target, paths) => {
         if (target === 'capture') capture.current?.drop(paths);
         else if (target === 'drawer') drawer.current?.drop(paths);
-        else first.current?.drop(paths);
+        else if (target === 'import') first.current?.drop(paths);
+        // A syllabus dropped on Grades is Learn's own to hear (heat/grades/syllabus.tsx).
       }),
     [],
   );

@@ -116,13 +116,15 @@ pub enum TaskSource {
     Claude,
 }
 
-/// Who made a task's estimate: you typed it, Claude scored it, or it is the
-/// estimate chain's default (the type's average, else difficulty × 20).
+/// Who made a task's estimate: you typed it, Claude scored it, its type
+/// gave it (`model::types`), or it is the default: no type matched, and the
+/// number is the catch-all's until someone betters it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EstBy {
     You,
     Claude,
+    Type,
     Default,
 }
 
@@ -322,12 +324,21 @@ pub struct Term {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GradeCategory {
     pub id: Id,
     pub name: String,
     #[serde(serialize_with = "ser::num")]
     pub weight: f64,
     pub keywords: Vec<String>,
+    /// How many of the category's lowest scores the course drops, when its
+    /// syllabus says so. Absent in the TypeScript's records.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "ser::opt_num"
+    )]
+    pub drop_lowest: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

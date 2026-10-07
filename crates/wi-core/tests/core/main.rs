@@ -7,6 +7,7 @@ mod export;
 mod heat;
 mod heat_calendars;
 mod heat_commands;
+mod heat_homes;
 mod heat_public;
 mod heat_watch;
 mod history;

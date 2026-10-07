@@ -5,8 +5,11 @@ import { $, $$, button, click, mountHeat, press, type Rig, setViewport, settle }
 // docs/PLAN.md S2.4 and docs/SPEC.md 3.3. What a fail looks like: a tab with
 // no "+" (or Mail with one) or without its one secondary act; the right
 // column not folded into a 44 px strip of icons below 1240 pt, or folded at
-// 1240; the spaces filter without All, each space with its open count, and
-// "New space…"; Heat not refetching when the core says `heat` changed.
+// 1240; a widget still in the column while its own tab is showing (Hot tasks
+// on Today, Grades on Grades, Habits on Habits, Mail on Mail); the Mail widget
+// empty at launch until Mail is opened; the spaces filter without All, each
+// space with its open count, and "New space…"; Heat not refetching when the
+// core says `heat` changed, or after Sync.
 
 let rig: Rig;
 afterEach(() => rig?.unmount());
@@ -108,6 +111,8 @@ describe('the right column', () => {
 
   it('is five metal panels at 1240 pt and wider, with Grades once a course exists', async () => {
     rig = await mountHeat({ width: 1240 });
+    // Tasks and Calendar have no widget of their own, so they show all five.
+    await click(tabButton('Tasks'));
     expect($(rig, '.heat')!.getAttribute('data-folded')).toBe('false');
     expect(widgets()).toEqual(['Now', 'Habits', 'Hot tasks', 'Mail', 'Grades']);
     expect($(rig, '.heat-strip')).toBeNull();
@@ -115,6 +120,7 @@ describe('the right column', () => {
 
   it('folds into a 44 px strip of icons below 1240 pt, each opening its widget as a popover', async () => {
     rig = await mountHeat({ width: 1239 });
+    await click(tabButton('Tasks'));
     expect($(rig, '.heat')!.getAttribute('data-folded')).toBe('true');
     const icons = $$(rig, '.heat-widget-icon');
     expect(icons.map((i) => i.getAttribute('aria-label'))).toEqual(['Now', 'Habits', 'Hot tasks', 'Mail', 'Grades']);
@@ -124,6 +130,77 @@ describe('the right column', () => {
     expect($(rig, '.heat-popover')!.textContent).toContain('Grammar quiz 4');
     await click(icons[2]);
     expect($(rig, '.heat-popover')).toBeNull();
+  });
+
+  it('leaves out the widget the showing tab already is', async () => {
+    rig = await mountHeat({ width: 1280 });
+    // Today ranks the hot tasks itself.
+    expect(widgets()).toEqual(['Now', 'Habits', 'Mail', 'Grades']);
+    await click(tabButton('Calendar'));
+    expect(widgets()).toEqual(['Now', 'Habits', 'Hot tasks', 'Mail', 'Grades']);
+    await click(tabButton('Grades'));
+    expect(widgets()).toEqual(['Now', 'Habits', 'Hot tasks', 'Mail']);
+    await click(tabButton('Habits'));
+    expect(widgets()).toEqual(['Now', 'Hot tasks', 'Mail', 'Grades']);
+    await click(tabButton('Mail'));
+    expect(widgets()).toEqual(['Now', 'Habits', 'Hot tasks', 'Grades']);
+  });
+
+  it('leaves it out of the folded strip too, and closes its popover', async () => {
+    rig = await mountHeat({ width: 1100 });
+    const icons = () => $$(rig, '.heat-widget-icon').map((i) => i.getAttribute('aria-label'));
+    expect(icons()).toEqual(['Now', 'Habits', 'Mail', 'Grades']);
+    await click($$(rig, '.heat-widget-icon').find((i) => i.getAttribute('aria-label') === 'Mail'));
+    expect($(rig, '.heat-popover')!.getAttribute('aria-label')).toBe('Mail');
+    await click(tabButton('Mail'));
+    expect(icons()).toEqual(['Now', 'Habits', 'Hot tasks', 'Grades']);
+    expect($(rig, '.heat-popover')).toBeNull();
+    // Back on Today the popover stays closed: it was closed, not hidden.
+    await click(tabButton('Today'));
+    expect(icons()).toEqual(['Now', 'Habits', 'Mail', 'Grades']);
+    expect($(rig, '.heat-popover')).toBeNull();
+  });
+
+  it('lists the newest mail at launch, before Mail has ever been opened', async () => {
+    rig = await mountHeat({ width: 1280 });
+    expect($(rig, '[role="tab"][aria-selected="true"]')!.textContent).toBe('Today');
+    const mail = $$(rig, '.heat-widget').find((w) => $(w, '.heat-widget-title')!.textContent === 'Mail')!;
+    expect($$(mail, '.heat-mail .heat-line-title').map((t) => t.textContent)).toEqual([
+      'Quiz 4 moved to Thursday',
+      'Grade posted: Kanji quiz 3',
+      'Fall break reminder',
+    ]);
+    // A thread Claude records later shows without a visit to Mail either, newest first, three at most.
+    rig.fake.write(
+      'record mail',
+      ['mailThread'],
+      () =>
+        rig.fake.store.mailThread.set('mail-4', {
+          id: 'mail-4',
+          gmailThreadId: 'g-4',
+          subject: 'Studio invoice',
+          from: 'Dana <dana@example.com>',
+          receivedAt: rig.fake.now - 60_000,
+          state: 'nothing',
+          reason: 'A receipt.',
+          recordedBy: 'claude',
+          account: 'you@example.com',
+          category: 'money',
+        }),
+      { actor: 'claude', tool: 'record_mail_thread' },
+    );
+    await settle();
+    expect($$(mail, '.heat-mail .heat-line-title').map((t) => t.textContent)).toEqual([
+      'Studio invoice',
+      'Quiz 4 moved to Thursday',
+      'Grade posted: Kanji quiz 3',
+    ]);
+  });
+
+  it('says "No mail recorded." when Claude has recorded none', async () => {
+    rig = await mountHeat({ width: 1280, empty: true });
+    const mail = $$(rig, '.heat-widget').find((w) => $(w, '.heat-widget-title')!.textContent === 'Mail')!;
+    expect($(mail, '.heat-widget-empty')!.textContent).toBe('No mail recorded.');
   });
 
   it('folds and unfolds as the window is resized', async () => {
@@ -140,6 +217,7 @@ describe('the right column', () => {
 
   it('hides Grades until a course exists', async () => {
     rig = await mountHeat({ empty: true });
+    await click(tabButton('Tasks'));
     expect(widgets()).toEqual(['Now', 'Habits', 'Hot tasks', 'Mail']);
   });
 });
@@ -163,6 +241,21 @@ describe('the snapshot', () => {
     });
     await settle();
     expect(Number($$(rig, '.heat-spaces .heat-side-count')[0].textContent)).toBe(Number(before) + 1);
+  });
+
+  it('is fetched again after Sync, whether or not the core announces a change', async () => {
+    rig = await mountHeat();
+    // A core with nothing new to say: no `heat` event follows the sync.
+    rig.fake.emit = () => {};
+    const before = rig.calls.length;
+    await click(button(rig, 'Sync'));
+    expect(
+      rig.calls
+        .slice(before)
+        .map((c) => c.cmd)
+        .slice(0, 2),
+    ).toEqual(['heat.calendars.sync', 'heat.snapshot']);
+    expect(rig.status().save).toMatch(/^Saved on this Mac · Synced /);
   });
 
   it('tells the status bar the save line', async () => {

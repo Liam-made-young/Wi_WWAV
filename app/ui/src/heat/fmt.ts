@@ -38,6 +38,27 @@ export function dayText(day: DayKey, today: DayKey): string {
   return shortMonthDay(day);
 }
 
+/** A course's two names without the spaces and the case: "jpn101" and "JPN 101" say the same thing. */
+const squashed = (text: string) => text.replace(/\s+/g, '').toLowerCase();
+
+/**
+ * A course's name, written once: "ELE 209 · Intro to Computer Systems Lab",
+ * or the code alone when the name is empty or only says the code again. The
+ * snapshot carries it as `derived.courses[id].label`; this is for when it
+ * doesn't.
+ */
+export function courseLabel(course: { code: string; name?: string | null }): string {
+  const code = course.code.trim();
+  const name = (course.name ?? '').trim();
+  if (!name || squashed(name) === squashed(code)) return code;
+  return code ? copy.homes.label(code, name) : name;
+}
+
+/** Where a task belongs, as Get Info names it: its course, else its project, else its space. */
+export function homeLabel(derived: TaskDerived | undefined, fallback: { course?: string; project?: string; space?: string }): string {
+  return derived?.home?.label ?? fallback.course ?? fallback.project ?? fallback.space ?? '';
+}
+
 /** The Edit menu's words and the like, from "Undo mark done" to the toast's text. */
 export const undoSentence = (undo: string | null | undefined) => (undo ? undo : null);
 

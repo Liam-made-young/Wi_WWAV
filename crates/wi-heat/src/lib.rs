@@ -5,6 +5,8 @@
 //! - [`brightspace`] turns the feed into tasks: Heat's filters, the course and
 //!   type, the duplicate test, the "No longer in Brightspace" tag, the sync
 //!   rhythm and its status line (3.1, 3.11).
+//! - [`homes`] is what a task's home knows: a course read out of the name a
+//!   school gives it, a syllabus as JSON, and the batch Claude scores.
 //! - [`mail`] is the school mail path: the Gmail query, pending grades and the
 //!   announcements handed to Claude (3.1, 3.10).
 //! - [`sync`] merges Heat records between devices and mi-wwav.com field by
@@ -19,6 +21,7 @@
 
 pub mod assist;
 pub mod brightspace;
+pub mod homes;
 pub mod ical;
 pub mod mail;
 pub mod model;
