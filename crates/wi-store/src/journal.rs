@@ -319,6 +319,7 @@ pub struct Txn<'s> {
     tables: &'s Tables,
     room: Room,
     label: String,
+    actor: Actor,
     /// (table, row id, before, after) in the order they happened.
     rows: Vec<(&'static str, String, Option<Row>, Option<Row>)>,
     touched: HashSet<(&'static str, String)>,
@@ -330,12 +331,14 @@ impl<'s> Txn<'s> {
         tables: &'s Tables,
         room: Room,
         label: &str,
+        actor: Actor,
     ) -> Result<Txn<'s>> {
         Ok(Txn {
             tx: conn.transaction_with_behavior(TransactionBehavior::Immediate)?,
             tables,
             room,
             label: label.to_string(),
+            actor,
             rows: Vec::new(),
             touched: HashSet::new(),
         })
@@ -445,9 +448,13 @@ impl<'s> Txn<'s> {
         }
         discard_redo(&self.tx, self.room, &mine)?;
         let id = fresh_id(&self.tx)?;
+        let (actor, tool, reason) = match &self.actor {
+            Actor::You => ("you", None, None),
+            Actor::Claude { tool, reason } => ("claude", Some(tool.as_str()), Some(reason.as_str())),
+        };
         self.tx.execute(
-            "INSERT INTO txn (id, label, room, state) VALUES (?1, ?2, ?3, 'done')",
-            params![id, self.label, self.room.as_str()],
+            "INSERT INTO txn (id, label, room, state, actor, tool, reason) VALUES (?1, ?2, ?3, 'done', ?4, ?5, ?6)",
+            params![id, self.label, self.room.as_str(), actor, tool, reason],
         )?;
         let snapshot =
             |row: &Option<Row>| row.as_ref().map(|r| Value::Object(r.clone()).to_string());
@@ -719,6 +726,98 @@ pub(crate) fn acknowledge(conn: &Connection, clip_id: &str, remote_id: &str) -> 
         update.execute(params![txn, seq, stamp(before)?, stamp(after)?])?;
     }
     Ok(())
+}
+
+/// Who made a change. Claude's changes come through the MCP helper and carry
+/// the tool and Claude's one-sentence reason (docs/SPEC.md 3.13, 8.8).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum Actor {
+    #[default]
+    You,
+    Claude { tool: String, reason: String },
+}
+
+/// One journal entry as Settings → Claude lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntryInfo {
+    pub id: String,
+    /// "Claude's estimate": the Edit menu reads "Undo " + this.
+    pub label: String,
+    pub room: Room,
+    /// Done, or undone since.
+    pub done: bool,
+    pub actor: Actor,
+    /// Milliseconds since the epoch, from the entry's ULID.
+    pub at_ms: u64,
+}
+
+/// The newest entries first, only Claude's when `claude_only`.
+pub(crate) fn entries(conn: &Connection, claude_only: bool, limit: usize) -> Result<Vec<EntryInfo>> {
+    let filter = if claude_only { "WHERE actor = 'claude'" } else { "" };
+    let mut stmt = conn.prepare_cached(&format!(
+        "SELECT id, label, room, state, actor, tool, reason FROM txn {filter} ORDER BY id DESC LIMIT ?1"
+    ))?;
+    let rows = stmt.query_map([limit as i64], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, String>(3)?,
+            r.get::<_, String>(4)?,
+            r.get::<_, Option<String>>(5)?,
+            r.get::<_, Option<String>>(6)?,
+        ))
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (id, label, room, state, actor, tool, reason) = row?;
+        let room = Room::parse(&room)
+            .ok_or_else(|| Error::Corrupt(format!("a journal entry names no room: {room}")))?;
+        let actor = match actor.as_str() {
+            "claude" => Actor::Claude {
+                tool: tool.unwrap_or_default(),
+                reason: reason.unwrap_or_default(),
+            },
+            _ => Actor::You,
+        };
+        let at_ms = wwav_ids::ulid_ms(&id).unwrap_or(0);
+        out.push(EntryInfo { id, label, room, done: state == "done", actor, at_ms });
+    }
+    Ok(out)
+}
+
+/// Undoes one entry out of order, for Settings → Claude's list. Refused when
+/// it was undone already, when it took back a publish the server has, or
+/// when a later done entry changed the same values since.
+pub(crate) fn undo_entry(conn: &mut Connection, id: &str) -> Result<String> {
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let found = tx
+        .query_row(
+            "SELECT id, label, room, state FROM txn WHERE id = ?1",
+            [id],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?)),
+        )
+        .optional()?;
+    let Some((id, label, room, state)) = found else {
+        return Err(Error::Refused("That change isn't in the journal any more.".into()));
+    };
+    if state != "done" {
+        return Err(Error::Refused(format!("{label} is already undone.")));
+    }
+    let entry = to_entry((id, label, room))?;
+    if let Some(title) = unpublishes_what_the_server_has(&tx, &entry)? {
+        return Err(Error::Refused(format!("Can't undo a publish. Unpublish '{title}'…")));
+    }
+    if overlapping(&tx, &entry, "done", true)?.is_some() {
+        return Err(Error::Refused(
+            "This changed again since. Undo the later change first.".into(),
+        ));
+    }
+    replay(&tx, &entry.id, true)?;
+    tx.execute("UPDATE txn SET state = 'undone' WHERE id = ?1", [&entry.id])?;
+    crate::clips::drop_stale_parts(&tx)?;
+    tx.commit()?;
+    Ok(entry.label)
 }
 
 pub(crate) fn history(conn: &Connection, room: Room) -> Result<History> {
