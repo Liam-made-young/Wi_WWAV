@@ -30,7 +30,7 @@ use rusqlite::{Connection, ErrorCode};
 pub use clips::{
     ByExtension, Clip, Colour, Inspection, Inspector, Kind, NewClip, Placement, UPLOAD_QUEUE,
 };
-pub use journal::{History, Menu, Txn};
+pub use journal::{Actor, EntryInfo, History, Menu, Txn};
 pub use media::Files;
 pub use organise::{Pin, SmartFolder, SmartRule, Tag, TagKind};
 pub use records::{Doc, PluginScan, Purchase, Receipt, ScanStatus, Sequence};
@@ -162,7 +162,25 @@ impl Store {
     /// Opens a transaction: every edit made through it undoes as one, under
     /// `label` ("move clip" reads "Undo move clip"), in `room`.
     pub fn begin(&mut self, room: Room, label: &str) -> Result<Txn<'_>> {
-        Txn::begin(&mut self.conn, &self.tables, room, label)
+        Txn::begin(&mut self.conn, &self.tables, room, label, Actor::You)
+    }
+
+    /// As [`Store::begin`], for a change someone other than the person made:
+    /// Claude, through an MCP tool, with its reason (docs/SPEC.md 8.8).
+    pub fn begin_by(&mut self, room: Room, label: &str, actor: Actor) -> Result<Txn<'_>> {
+        Txn::begin(&mut self.conn, &self.tables, room, label, actor)
+    }
+
+    /// The newest journal entries first, only Claude's when `claude_only`.
+    pub fn entries(&self, claude_only: bool, limit: usize) -> Result<Vec<EntryInfo>> {
+        journal::entries(&self.conn, claude_only, limit)
+    }
+
+    /// Undoes one entry out of order and returns its label (Settings →
+    /// Claude's Undo). Refused, with a sentence, when a later change touched
+    /// the same values.
+    pub fn undo_entry(&mut self, id: &str) -> Result<String> {
+        journal::undo_entry(&mut self.conn, id)
     }
 
     /// Undoes the room's newest change and returns its label, or None when

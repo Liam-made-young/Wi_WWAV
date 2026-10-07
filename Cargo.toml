@@ -9,6 +9,7 @@ members = [
   "crates/wwav-tokens",
   "crates/wi-store",
   "crates/wi-heat",
+  "crates/wi-mcp",
   "crates/mock-engine",
   "crates/wwav-engine-cli",
   "app/src-tauri",

@@ -9,7 +9,7 @@ use rusqlite::{Connection, TransactionBehavior};
 
 use crate::{refused, Result};
 
-const MIGRATIONS: &[&str] = &[V1];
+const MIGRATIONS: &[&str] = &[V1, V2];
 
 /// How many migrations this version knows.
 pub const SCHEMA_VERSION: usize = MIGRATIONS.len();
@@ -174,6 +174,16 @@ CREATE TABLE plugin_scans (
   checked_ms  INTEGER NOT NULL,
   PRIMARY KEY (path, uid)
 );
+"#;
+
+/// Who made each change (docs/SPEC.md 3.16, 8.8): the person, or Claude
+/// through one of the MCP tools, with the tool's name and Claude's reason.
+/// Every entry from before says `you`, which is who made it.
+const V2: &str = r#"
+ALTER TABLE txn ADD COLUMN actor  TEXT NOT NULL DEFAULT 'you' CHECK (actor IN ('you', 'claude'));
+ALTER TABLE txn ADD COLUMN tool   TEXT;      -- the MCP tool, for Claude's changes
+ALTER TABLE txn ADD COLUMN reason TEXT;      -- Claude's one sentence
+CREATE INDEX txn_actor ON txn(actor, id);
 "#;
 
 /// Runs the migrations this library hasn't had. Each runs in a write

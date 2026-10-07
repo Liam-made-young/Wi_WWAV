@@ -299,6 +299,53 @@ impl Store {
     }
 }
 
+impl Store {
+    /// Writes a record outside the journal, for state that is not a change
+    /// anyone undoes: Heat's timer and plan drafts, Settings → Claude's
+    /// switches, what a calendar feed held (docs/HEAT.md). Refused for a
+    /// record the journal has ever touched, so undo never meets a value it
+    /// didn't write.
+    pub fn set_doc(&mut self, kind: &str, key: &str, json: &Value, text: &str) -> Result<()> {
+        if kind.is_empty() || kind.contains('/') {
+            return refused(format!("A record's kind can't be empty or hold '/': '{kind}'."));
+        }
+        let id = format!("{kind}/{key}");
+        let tx = self.conn.transaction()?;
+        let journaled: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM txn_row WHERE tbl = 'docs' AND row_id = ?1)",
+            [&id],
+            |r| r.get(0),
+        )?;
+        if journaled {
+            return refused(format!("'{id}' is kept in the journal, so it changes only through a Txn."));
+        }
+        tx.execute(
+            "INSERT INTO docs (id, kind, key, json, text) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET json = excluded.json, text = excluded.text",
+            params![id, kind, key, json.to_string(), text],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Removes a record written with [`Store::set_doc`].
+    pub fn remove_doc(&mut self, kind: &str, key: &str) -> Result<()> {
+        let id = format!("{kind}/{key}");
+        let tx = self.conn.transaction()?;
+        let journaled: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM txn_row WHERE tbl = 'docs' AND row_id = ?1)",
+            [&id],
+            |r| r.get(0),
+        )?;
+        if journaled {
+            return refused(format!("'{id}' is kept in the journal, so it changes only through a Txn."));
+        }
+        tx.execute("DELETE FROM docs WHERE id = ?1", [&id])?;
+        tx.commit()?;
+        Ok(())
+    }
+}
+
 fn missing_sequence<T>() -> Result<T> {
     refused("That session isn't in the library any more.")
 }

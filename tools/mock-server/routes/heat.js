@@ -112,7 +112,76 @@ function pull(ctx) {
   return json(200, { changes: out, cursor, more });
 }
 
+// The public Heat view (docs/SPEC.md 3.15, 8.7): what anyone who opens a
+// person's sun sees. Built from the same log, so it is the synced copies
+// and nothing else. A record shows only when its `public` field is true, and
+// only the fields 3.15 lists for its kind. Grades reach the server only once
+// they are switched public, and switching back deletes the copy, which
+// arrives here as `deleted`. Never a total, a count or a comparison.
+const SHOWN = {
+  task: ['title', 'due', 'done'],
+  project: ['title', 'status', 'targetDate'],
+  milestone: ['title', 'date', 'done'],
+  habit: ['title', 'log'],
+  note: ['title', 'markdown'],
+  dailyNote: ['date', 'markdown'],
+  course: ['code', 'name'],
+  grade: ['title', 'score', 'outOf'],
+  focusSession: ['startedAt', 'focusMin'],
+};
+
+function records(log) {
+  const out = new Map();
+  for (const e of log.current.values()) {
+    const key = `${e.kind}\u0000${e.id}`;
+    if (!out.has(key)) out.set(key, { kind: e.kind, id: e.id, fields: {} });
+    out.get(key).fields[e.field] = e.value;
+  }
+  for (const [key, r] of out) if (r.fields.deleted === true) out.delete(key);
+  return [...out.values()];
+}
+
+function shown(r, all) {
+  const item = { id: r.id };
+  for (const name of SHOWN[r.kind]) if (name in r.fields) item[name] = r.fields[name];
+  // A grade names its course, and a focus record its task, by title: the
+  // course's code and the task's title, never anything else of theirs.
+  const find = (kind, id) => all.find((o) => o.kind === kind && o.id === id);
+  if (r.kind === 'grade') item.course = find('course', r.fields.courseId)?.fields.code ?? null;
+  if (r.kind === 'focusSession') item.task = find('task', r.fields.taskId)?.fields.title ?? null;
+  return item;
+}
+
+function publicView(ctx) {
+  const id = Number(ctx.params.userId);
+  if (!Number.isSafeInteger(id) || !ctx.state.users.some((u) => u.id === id)) return error(404, 'No such account');
+  const log = ctx.state.heat.get(id) ?? { entries: [], current: new Map() };
+  const all = records(log);
+  const now = ctx.state.now();
+  const shares = all.filter((r) => r.kind === 'profileShare');
+  const live = (r) => !(typeof r.fields.clearsAt === 'number' && r.fields.clearsAt <= now);
+  const nowLine = shares.find((r) => r.fields.kind === 'now' && live(r) && typeof r.fields.text === 'string');
+  const timelines = shares
+    .filter((r) => r.fields.kind === 'timeline')
+    .map((r) => {
+      const project = all.find((o) => o.kind === 'project' && o.id === r.fields.sourceId);
+      const beads = all
+        .filter((o) => o.kind === 'milestone' && o.fields.projectId === r.fields.sourceId)
+        .sort((a, b) => String(a.fields.date).localeCompare(String(b.fields.date)) || (a.fields.order ?? 0) - (b.fields.order ?? 0))
+        .map((o) => ({ id: o.id, title: o.fields.title, date: o.fields.date, done: o.fields.done === true }));
+      return { projectId: r.fields.sourceId, targetId: r.fields.targetId, title: project?.fields.title ?? null, milestones: beads };
+    })
+    .filter((t) => t.title !== null);
+  const items = {};
+  for (const kind of Object.keys(SHOWN)) {
+    const list = all.filter((r) => r.kind === kind && r.fields.public === true).map((r) => shown(r, all));
+    if (list.length) items[kind] = list;
+  }
+  return json(200, { now: nowLine ? { text: nowLine.fields.text } : null, timelines, items });
+}
+
 export const routes = [
   ['GET', '/api/heat/changes', pull],
   ['POST', '/api/heat/changes', push],
+  ['GET', '/api/heat/public/:userId', publicView],
 ];
