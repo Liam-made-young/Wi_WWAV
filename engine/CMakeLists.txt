@@ -36,12 +36,14 @@ target_include_directories(prana_core PUBLIC ${WWAV_FORMATS}/prana/core)
 target_compile_options(prana_core PRIVATE ${PRANA_CORE_FLAGS} -Wall -Wextra -Wno-unused-parameter)
 
 # ---- The parts that need no JUCE ----------------------------------------------
-# Shared memory, media reading, the graph and the WAV writer. The unit tests
-# link this alone. The graph's sums and gains must round the same on arm64
-# and x86_64, so nothing here may fuse a multiply and an add.
+# Shared memory, media reading, the graph, JSON and the WAV writer. The unit
+# tests link this alone. The graph's sums and gains must round the same on
+# arm64 and x86_64, so nothing here may fuse a multiply and an add.
 add_library(wwav_engine_core STATIC
   src/graph.cpp
+  src/json.cpp
   src/media.cpp
+  src/pyjson.cpp
   src/shm.cpp
   src/wav.cpp)
 target_include_directories(wwav_engine_core PUBLIC include src)

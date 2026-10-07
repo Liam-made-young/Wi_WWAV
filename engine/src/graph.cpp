@@ -241,6 +241,17 @@ void Graph::prefill(int64_t pos) {
       if (c.source->streamed()) c.source->prefill(std::min(std::max<int64_t>(pos - c.at, 0), c.source->length()));
 }
 
+void Graph::wantLoop(int64_t start) {
+  for (Track& t : tracks) {
+    for (Clip& c : t.clips) {
+      if (!c.source->streamed()) continue;
+      // A loop that starts before the clip comes back to the clip's first frame.
+      const int64_t at = start < 0 ? -1 : std::max<int64_t>(start - c.at, 0);
+      c.source->wantLoop(at < c.source->length() ? at : -1);
+    }
+  }
+}
+
 bool Graph::ready(int64_t pos, int64_t frames) const {
   for (const Track& t : tracks) {
     for (const Clip& c : t.clips) {

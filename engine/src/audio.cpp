@@ -31,7 +31,9 @@ void sleepUntil(uint64_t ns) {
 
 }  // namespace
 
-AudioEngine::AudioEngine(SharedRegion& shm, juce::AudioDeviceManager& devices) : shm_(shm), devices_(devices) {}
+AudioEngine::AudioEngine(SharedRegion& shm, juce::AudioDeviceManager& devices,
+                         std::function<void(Transport)> rateStopped)
+    : shm_(shm), devices_(devices), rateStopped_(std::move(rateStopped)) {}
 
 AudioEngine::~AudioEngine() { close(); }
 
@@ -77,7 +79,7 @@ bool AudioEngine::open(const std::string& name, int rate, int block, std::string
     rate_ = rate;
     outputLatency_ = 0;
     nullStop_ = false;
-    running_ = true;
+    setRunning(true);
     null_ = std::thread([this, rate, block] { nullDevice(rate, block); });
     shm_.setFormat((uint32_t)rate, (uint32_t)block);
     return true;
@@ -109,7 +111,7 @@ bool AudioEngine::open(const std::string& name, int rate, int block, std::string
     outputLatency_ = device_.outputLatency;
     // The worker is waiting on this call, so nothing applies commands
     // itself once the callbacks start.
-    running_ = true;
+    setRunning(true);
     juceDevice_ = true;
     devices_.addAudioCallback(this);
     startTimer(250);
@@ -140,18 +142,27 @@ void AudioEngine::close() {
     nullStop_ = true;
     null_.join();
   }
-  running_ = false;
+  setRunning(false);
   device_ = DeviceInfo{};
   // What the audio thread didn't get to, the worker applies now, in order.
+  // Nothing more joins the queues: postParam now says no.
   drain(graph_.load());
 }
 
-void AudioEngine::timerCallback() { xruns_.store((uint32_t)std::max(0, devices_.getXRunCount())); }
+void AudioEngine::timerCallback() {
+  xruns_.store((uint32_t)std::max(0, devices_.getXRunCount()));
+  const uint32_t stops = rateStops_.load();
+  if (stops != rateStopsTold_) {
+    rateStopsTold_ = stops;
+    rateStopped_(Transport{false, playhead_.load(std::memory_order_relaxed)});
+  }
+}
 
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
   // Called before the device's callbacks start, also when it restarts with
   // new settings of its own. The clock and the header follow it; what hello
-  // and device.open report catches up at the next device.open.
+  // and device.open report catches up at the next device.open. A new rate
+  // that isn't the loaded graph's stops the graph in callback().
   rate_ = (int)device->getCurrentSampleRate();
   outputLatency_ = device->getOutputLatencyInSamples();
   shm_.setFormat((uint32_t)rate_, (uint32_t)device->getCurrentBufferSizeSamples());
@@ -227,6 +238,7 @@ void AudioEngine::drain(Graph* g) {
     run(c, g);
     last = c.seq;
   }
+  while (params_.pop(&c)) run(c, g);
   if (last) {
     ackPlaying_.store(transport_.playing, std::memory_order_relaxed);
     ackPos_.store(transport_.pos, std::memory_order_relaxed);
@@ -243,6 +255,20 @@ void AudioEngine::callback(float* const* out, int channels, int n) {
   Graph* g = parked ? nullptr : graph_.load();
   // While a render holds the graph, commands wait (the worker sends none).
   if (!parked) drain(g);
+  if (g && g->sampleRate != rate_) {
+    // A real device changed its own rate under the loaded session (a user's
+    // choice in Audio MIDI Setup, say). Played at this rate the graph would
+    // run fast or slow and off pitch, so it isn't played: silence, and the
+    // transport stopped, until a session at this rate is loaded or the
+    // device is opened again at the session's. (device.open and
+    // session.load refuse such a mismatch themselves.)
+    if (transport_.playing) {
+      transport_.playing = false;
+      ackPlaying_.store(false, std::memory_order_relaxed);
+      rateStops_.fetch_add(1, std::memory_order_relaxed);
+    }
+    g = nullptr;
+  }
 
   const bool playing = transport_.playing;
   ClockState clock;
@@ -317,6 +343,20 @@ void AudioEngine::post(Command c) {
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
+}
+
+void AudioEngine::setRunning(bool on) {
+  std::lock_guard<std::mutex> lock(paramLock_);
+  running_ = on;
+}
+
+bool AudioEngine::postParam(const Command& c) {
+  std::lock_guard<std::mutex> lock(paramLock_);
+  if (!running_) return false;
+  if (params_.push(c)) return true;
+  // 1024 changes waiting: the audio thread has stopped taking them.
+  fprintf(stderr, "wwav-engine: the audio thread isn't taking params; the worker will try\n");
+  return false;
 }
 
 Transport AudioEngine::apply(Command c) {

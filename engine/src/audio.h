@@ -2,8 +2,10 @@
 // The audio thread and what feeds it (docs/SPEC.md 9.2, 9.4): the device
 // (a real one through JUCE, or the null device's timer thread), the
 // transport, and the graph, which the worker swaps in with one atomic
-// pointer exchange. Commands reach the audio thread through a
-// single-producer queue; the worker thread is the only producer.
+// pointer exchange. Commands reach the audio thread through two
+// single-producer queues: one from the worker thread (the transport, the
+// debug ops, and a param.set that had to wait), one from the socket thread
+// (param.set, so a change never waits behind a load or a render).
 //
 // The audio thread never allocates or logs, and our code never locks on
 // it. One lock it does take is JUCE's: AudioDeviceManager holds its
@@ -13,7 +15,9 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 
 #include <atomic>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -48,7 +52,10 @@ struct DeviceInfo {
 
 class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Timer {
  public:
-  AudioEngine(SharedRegion& shm, juce::AudioDeviceManager& devices);
+  // `rateStopped` runs on the message thread when the audio thread has
+  // stopped the transport because a real device changed its own rate away
+  // from the loaded graph's (see callback()).
+  AudioEngine(SharedRegion& shm, juce::AudioDeviceManager& devices, std::function<void(Transport)> rateStopped);
   ~AudioEngine() override;
 
   // ---- the worker thread ----
@@ -61,6 +68,10 @@ class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Tim
 
   // Queues a command; with no device running, applies it now.
   void post(Command c);
+  // The socket thread: queues a SetParam for the audio thread. False when no
+  // device is calling back (or the queue is full), and nothing was queued:
+  // then the worker must post it.
+  bool postParam(const Command& c);
   // Waits until the audio thread has applied every command posted so far;
   // returns the transport as that block left it.
   Transport waitApplied();
@@ -92,18 +103,24 @@ class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Tim
   void run(const Command& c, Graph* g);
   void drain(Graph* g);
   void waitForCallbackEnd() const;
+  void setRunning(bool on);
   void nullDevice(int rate, int block);
   std::string findDevice(const std::string& name, juce::String* type);
 
   SharedRegion& shm_;
   juce::AudioDeviceManager& devices_;
   DeviceInfo device_;
-  bool running_ = false;  // the worker's view: a device is calling back
+  // The worker's view: a device is calling back. The worker writes it under
+  // paramLock_, which postParam reads it under, so no param is queued after
+  // close() has drained the queues.
+  bool running_ = false;
+  std::mutex paramLock_;
   bool juceDevice_ = false;
   std::thread null_;
   std::atomic<bool> nullStop_{false};
 
-  Spsc<Command, 1024> commands_;
+  Spsc<Command, 1024> commands_;         // from the worker
+  Spsc<Command, 1024> params_;           // from the socket thread
   uint64_t sent_ = 0;                    // the worker: the last command's seq
   std::atomic<uint64_t> applied_{0};     // the audio thread: the last command it applied
   std::atomic<bool> ackPlaying_{false};  // and the transport as that block left it
@@ -125,6 +142,12 @@ class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Tim
   int outputLatency_ = 0;
   std::atomic<uint32_t> late_{0};   // null device: blocks that started more than a block late
   std::atomic<uint32_t> xruns_{0};  // a real device's own count
+
+  // Times the audio thread stopped the transport for a device whose rate
+  // isn't the graph's; the message thread's timer tells the engine.
+  std::atomic<uint32_t> rateStops_{0};
+  uint32_t rateStopsTold_ = 0;
+  std::function<void(Transport)> rateStopped_;
 };
 
 }  // namespace wwav

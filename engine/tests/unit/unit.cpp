@@ -20,7 +20,9 @@
 #include <vector>
 
 #include "graph.h"
+#include "json.h"
 #include "media.h"
+#include "pyjson.h"
 #include "shm.h"
 #include "spsc.h"
 #include "wav.h"
@@ -666,6 +668,254 @@ static void streamedClipNeverReadsWrongAudio() {
       past->readNow(0, 100, l.data(), r.data());
     CHECK(l[9] == pattern(frames - 1, 0) && l[10] == 0.0f && r[99] == 0.0f);
   }
+  // A len far past the file's end holds only what the file has (it once
+  // allocated the whole len, and died of it).
+  auto huge = ClipSource::open(dir + "/long.wav", part, frames - 10, int64_t(1) << 40, true, &message);
+  CHECK(huge && huge->length() == int64_t(1) << 40);
+  huge->read(0, 100, l.data(), r.data());
+  CHECK(l[9] == pattern(frames - 1, 0) && l[10] == 0.0f && r[99] == 0.0f);
+  l[0] = 1.0f;
+  huge->read(int64_t(1) << 39, 512, l.data(), r.data());
+  CHECK(l[0] == 0.0f && r[511] == 0.0f);
+}
+
+static void aLoopFindsItsStartReady() {
+  std::string dir = tempDir();
+  const int frames = 400000;
+  writeFile(dir + "/loop.wav", wav(1, 2, 44100, 16, pattern16(frames)));
+  MediaPart part;
+  std::string code, message;
+  CHECK(probe(dir + "/loop.wav", "master", &part, &code, &message));
+  auto stream = ClipSource::open(dir + "/loop.wav", part, 0, frames, false, &message);
+  std::vector<float> l(512), r(512);
+  int misses = 0, wrong = 0;
+  auto play = [&](int64_t c) {
+    stream->want(c);
+    if (!stream->read(c, 512, l.data(), r.data())) {
+      misses++;
+      return;
+    }
+    for (int i = 0; i < 512; i++)
+      if (l[i] != pattern((int)(c + i), 0) || r[i] != pattern((int)(c + i), 1)) return (void)wrong++;
+  };
+  // A loop longer than the main window keeps behind the playhead, at about
+  // eight times real time: three times round, then a loop somewhere else.
+  stream->wantLoop(50000);
+  stream->prefill(50000);
+  Reader reader;
+  reader.add(stream.get());
+  for (auto loop : {std::pair<int64_t, int64_t>{50000, 150000}, {200000, 290000}}) {
+    stream->wantLoop(loop.first);
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));  // the reader fills the new loop's window
+    for (int64_t c = loop.first, k = 0; k < 3 * (loop.second - loop.first) / 512; k++) {
+      play(c);
+      c = c + 1024 > loop.second ? loop.first : c + 512;
+      std::this_thread::sleep_for(std::chrono::microseconds(1450));
+    }
+  }
+  CHECK(misses == 0);
+  CHECK(wrong == 0);
+  reader.remove(stream.get());
+}
+
+// What a parse reports, as one line: the shape and the decoded values.
+struct JsonTrace : json::Handler {
+  std::string t;
+  void beginObject() override { t += "{"; }
+  void beginArray() override { t += "["; }
+  void end() override { t += "}"; }
+  void key(const std::string& k) override { t += "k:" + k + " "; }
+  void string(const std::string& s) override { t += "s:" + s + " "; }
+  void number(const char* p, size_t n, bool integral) override {
+    t += (integral ? "i:" : "f:") + std::string(p, n) + " ";
+  }
+  void boolean(bool b) override { t += b ? "true " : "false "; }
+  void null() override { t += "null "; }
+  void nonFinite(double d) override { t += isnan(d) ? "nan " : d > 0 ? "inf " : "-inf "; }
+};
+
+static bool parses(const std::string& text, json::Dialect d, size_t depth = 0) {
+  return json::parseObject(text.data(), text.size(), d, depth, nullptr);
+}
+
+static std::string nested(int depth) {
+  return "{\"a\":" + std::string(depth - 1, '[') + std::string(depth - 1, ']') + "}";
+}
+
+static void jsonIsStrictAndPythonsDialectIsPythons() {
+  using json::Dialect;
+  // Both dialects: one object, whitespace around it, every kind of value.
+  for (const char* ok : {"{}", " \t\r\n{} \n", "{\"a\":1}", "{\"a\":[1,2,{\"b\":null}],\"c\":true,\"d\":false}",
+                         "{\"\":0}", "{\"a\":\"\\u0000\"}", "{\"a\":\"\\ud83d\\ude00\"}", "{\"a\":-0}",
+                         "{\"a\":0.5e-3}", "{\"a\":1E+2}", "{\"a\":\"\\/\\b\\f\\n\\r\\t\\\"\\\\\"}",
+                         "{\"a\":\"\xc3\xa9\xf0\x9f\x98\x80\"}", "{\"a\":\"\x7f\"}", "{\"a\":{},\"b\":[]}"}) {
+    CHECK(parses(ok, Dialect::Strict));
+    CHECK(parses(ok, Dialect::Python));
+  }
+  // Neither: not one object, not JSON, not UTF-8.
+  for (const char* bad : {"[]",
+                          "\"x\"",
+                          "1",
+                          "",
+                          " ",
+                          "{",
+                          "}",
+                          "{\"a\":1}x",
+                          "{\"a\":1}{\"b\":2}",
+                          "{\"a\":1,}",
+                          "{\"a\":[1,]}",
+                          "{,}",
+                          "{a:1}",
+                          "{'a':1}",
+                          "{\"a\":01}",
+                          "{\"a\":1.}",
+                          "{\"a\":.5}",
+                          "{\"a\":+1}",
+                          "{\"a\":- 1}",
+                          "{\"a\":1e}",
+                          "{\"a\":\"\\x\"}",
+                          "{\"a\":\"\\u12\"}",
+                          "{\"a\":\"\\u12g4\"}",
+                          "{\"a\":\"tab\there\"}",
+                          "{\"a\":\"\xff\"}",
+                          "{\"a\":\"\xc0\xaf\"}",
+                          "{\"a\":\"\xed\xa0\x80\"}",
+                          "{\"a\":\"\xf4\x90\x80\x80\"}",
+                          "{\"a\":\"\xe2\x82\"}",
+                          "{\"a\":1}/*c*/",
+                          "{\"a\" 1}",
+                          "{\"a\":1 \"b\":2}",
+                          "{\"a\":tru}",
+                          "{\"a\":nulls}",
+                          "\xef\xbb\xbf{}",
+                          "{\"a\":-NaN}",
+                          "{\"a\":infinity}",
+                          "{\"a\":+Infinity}",
+                          "{\"a\":[}",
+                          "{\"a\":]}",
+                          "{\"a\":[1}",
+                          "{\"a\":{]}",
+                          "{\"a\":\"x}"}) {
+    CHECK(!parses(bad, Dialect::Strict));
+    CHECK(!parses(bad, Dialect::Python));
+  }
+  // Python's json module also takes NaN, the infinities and lone surrogates; RFC 8259 and I-JSON don't.
+  for (const char* py : {"{\"a\":NaN}", "{\"a\":Infinity}", "{\"a\":-Infinity}", "{\"a\":\"\\ud800\"}",
+                         "{\"a\":\"\\udc00x\"}", "{\"a\":\"\\ud800\\ud800\"}", "{\"a\":\"\\ud800\\u0041\"}"}) {
+    CHECK(!parses(py, Dialect::Strict));
+    CHECK(parses(py, Dialect::Python));
+  }
+  // Python's int refuses over 4300 digits; a float of any length is fine.
+  const std::string digits(4300, '7');
+  CHECK(parses("{\"a\":" + digits + "}", Dialect::Python));
+  CHECK(parses("{\"a\":-" + digits + "}", Dialect::Python));
+  CHECK(!parses("{\"a\":" + digits + "7}", Dialect::Python));
+  CHECK(!parses("{\"a\":-" + digits + "7}", Dialect::Python));
+  CHECK(parses("{\"a\":" + digits + "7.0}", Dialect::Python));
+  CHECK(parses("{\"a\":" + digits + "7}", Dialect::Strict));
+  // Depth: a limit when asked for one, and no stack to overflow without one.
+  CHECK(parses(nested(128), Dialect::Strict, 128));
+  CHECK(!parses(nested(129), Dialect::Strict, 128));
+  CHECK(parses(nested(1000000), Dialect::Python));
+  // What the handler hears, decoded.
+  JsonTrace t;
+  const std::string text = "{\"k\" : [1, -2.5e3, {\"b\":\"a\\u00e9\\ud83d\\ude00\\u0000\"}], \"n\":null,\"t\":true}";
+  CHECK(json::parseObject(text.data(), text.size(), Dialect::Strict, 0, &t));
+  CHECK(t.t == std::string("{k:k [i:1 f:-2.5e3 {k:b s:a\xc3\xa9\xf0\x9f\x98\x80") + std::string(1, '\0') +
+                   " }}k:n null k:t true }");
+  JsonTrace py;
+  const std::string pyText = "{\"x\":[NaN,Infinity,-Infinity,\"\\ud800\"]}";
+  CHECK(json::parseObject(pyText.data(), pyText.size(), Dialect::Python, 0, &py));
+  CHECK(py.t == "{k:x [nan inf -inf s:\xed\xa0\x80 }}");
+}
+
+// Every expected string below is what Python 3.13 printed for the same input.
+static void pythonReadsAndPrintsAsPython() {
+  // repr() of floats: the shortest digits, laid out as Python lays them out.
+  const struct {
+    double d;
+    const char* repr;
+  } floats[] = {{0.0, "0.0"},
+                {-0.0, "-0.0"},
+                {1.0, "1.0"},
+                {0x1.999999999999ap-4, "0.1"},
+                {100.0, "100.0"},
+                {44100.0, "44100.0"},
+                {1e15, "1000000000000000.0"},
+                {1e16, "1e+16"},
+                {1234567890123456.0, "1234567890123456.0"},
+                {0x1.5ee2a2eb5a5c4p+53, "1.2345678901234568e+16"},
+                {0x1.a36e2eb1c432dp-14, "0.0001"},
+                {0x1.4f8b588e368f1p-17, "1e-05"},
+                {0x1.421f5f40d8376p-23, "1.5e-07"},
+                {0x1.7e43c8800759cp+996, "1e+300"},
+                {0x1.fffffffffffffp+1023, "1.7976931348623157e+308"},
+                {0x0.0000000000001p-1022, "5e-324"},
+                {0x1.0000000000000p-1022, "2.2250738585072014e-308"},
+                {0x1.edd2f1a9fbe77p+6, "123.456"},
+                {0x1.5555555555555p-2, "0.3333333333333333"},
+                {0x1.0000000000000p+53, "9007199254740992.0"},
+                {0x1.3333333333334p-2, "0.30000000000000004"},
+                {-0x1.a36e2eb1c432dp-16, "-2.5e-05"},
+                {0x1.0f0cf064dd592p+73, "1e+22"},
+                {0x1.52d02c7e14af6p+76, "1e+23"},
+                {0x1.1666666666666p+2, "4.35"},
+                {0x1.5af1d78b58c40p+66, "1e+20"},
+                {INFINITY, "inf"},
+                {-INFINITY, "-inf"},
+                {NAN, "nan"}};
+  for (const auto& f : floats) {
+    if (py::floatRepr(f.d) != f.repr) {
+      printf("  floatRepr(%a) is %s, not %s\n", f.d, py::floatRepr(f.d).c_str(), f.repr);
+      failures++;
+    }
+  }
+  // re.match(r"^\d+", s) and int() of it, with any script's digits.
+  bool positive;
+  CHECK(py::leadingDigits("0.1", &positive) && !positive);
+  CHECK(py::leadingDigits("000", &positive) && !positive);
+  CHECK(py::leadingDigits("99999999999999999999", &positive) && positive);
+  CHECK(py::leadingDigits("1.0", &positive) && positive);
+  CHECK(py::leadingDigits("\xd9\xa3x", &positive) && positive);         // U+0663 ARABIC-INDIC DIGIT THREE
+  CHECK(py::leadingDigits("\xef\xbc\x90.2", &positive) && !positive);   // U+FF10 FULLWIDTH DIGIT ZERO
+  CHECK(py::leadingDigits("\xf0\x9f\xaf\xb7", &positive) && positive);  // U+1FBF7 SEGMENTED DIGIT SEVEN
+  CHECK(!py::leadingDigits("", &positive) && !py::leadingDigits("v1", &positive));
+  CHECK(!py::leadingDigits("-1", &positive) && !py::leadingDigits("\xc2\xb2", &positive));  // superscript two isn't Nd
+
+  // json.loads, the last of a name winning, and str() of what it made.
+  const struct {
+    const char* json;
+    const char* frames;
+    const char* wwav;
+  } objects[] = {
+      {"{\"frames\": [1, \"a\", null, true, 1.5, {\"k\": \"it's\"}, [], {}], \"wwav\": \"0.1\"}",
+       "[1, 'a', None, True, 1.5, {'k': \"it's\"}, [], {}]", "0.1"},
+      {"{\"frames\": {\"x\\\"y\": \"\\u00a0\\u0007\\ud800\\t\", \"b\": [-0, 1e400, NaN, -Infinity]}}",
+       "{'x\"y': '\\xa0\\x07\\ud800\\t', 'b': [0, inf, nan, -inf]}", ""},
+      {"{\"frames\": 1, \"frames\": 2.50, \"wwav\": 7, \"wwav\": \"\\u0663x\"}", "2.5", "\xd9\xa3x"},
+      {"{\"frames\": \"44100\", \"wwav\": false}", "44100", "False"},
+      {"{\"frames\": {\"a\": {\"b\": [[1, 2], \"q\\\"'\"]}}, \"wwav\": null}", "{'a': {'b': [[1, 2], 'q\"\\'']}}",
+       "None"},
+  };
+  for (const auto& o : objects) {
+    std::vector<py::Value> v;
+    CHECK(py::readObject(o.json, {"frames", "wwav"}, &v));
+    if (v.size() != 2 || v[0].str != o.frames || v[1].str != o.wwav) {
+      printf("  %s gave frames %s and wwav %s\n", o.json, v.size() == 2 ? v[0].str.c_str() : "?",
+             v.size() == 2 ? v[1].str.c_str() : "?");
+      failures++;
+    }
+  }
+  std::vector<py::Value> v;
+  CHECK(py::readObject("{}", {"wwav"}, &v) && v[0].kind == py::Value::Missing && v[0].str.empty());
+  CHECK(!py::readObject("{\"a\": 1} x", {"a"}, &v));
+  CHECK(!py::readObject("[1]", {}, &v));
+  CHECK(!py::readObject("", {}, &v));
+  // Python's ==, for the frame count.
+  CHECK(py::readObject("{\"a\": 44100, \"b\": 44100.0, \"c\": true, \"d\": \"44100\", \"e\": -0, \"f\": 4.41e4}",
+                       {"a", "b", "c", "d", "e", "f"}, &v));
+  CHECK(py::equals(v[0], 44100) && py::equals(v[1], 44100) && py::equals(v[2], 1) && !py::equals(v[2], 44100));
+  CHECK(!py::equals(v[3], 44100) && py::equals(v[4], 0) && py::equals(v[5], 44100) && !py::equals(v[1], 44101));
 }
 
 int main() {
@@ -684,6 +934,9 @@ int main() {
       {"wav writer writes canonical headers", wavWriterWritesCanonicalHeaders},
       {"probe finds masters and stems", probeFindsMastersAndStems},
       {"streamed clip never reads wrong audio", streamedClipNeverReadsWrongAudio},
+      {"a loop finds its start ready", aLoopFindsItsStartReady},
+      {"json is strict, and python's dialect is python's", jsonIsStrictAndPythonsDialectIsPythons},
+      {"python reads and prints as python", pythonReadsAndPrintsAsPython},
   };
   for (auto& t : tests) {
     int before = failures;

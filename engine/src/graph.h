@@ -100,6 +100,10 @@ class Graph {
   void settle();
   // Before the reader thread knows them: fills streamed clips at `pos`.
   void prefill(int64_t pos);
+  // The worker: where the transport's loop jumps back to, as a session
+  // sample, or -1 when there is no loop. Streamed clips keep the frames
+  // from there ready.
+  void wantLoop(int64_t start);
 
   // Audio thread: a parameter change, heard from the next stretch.
   void set(int node, Param p, float value);

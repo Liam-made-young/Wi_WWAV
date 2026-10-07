@@ -17,6 +17,9 @@ namespace wwav {
 constexpr int kRun = 1024;                          // frames per read
 constexpr int kMaxBlock = 4096;                     // the most frames one stretch of a block asks for
 constexpr int64_t kHoldWhole = 32ll * 1024 * 1024;  // files under this are held whole
+// The furthest sample a position or a length may name: about 800 years at
+// 44.1 kHz, and far enough below 2^63 that no sum of them overflows.
+constexpr int64_t kMaxSample = int64_t(1) << 50;
 
 // Where one part of a file is: the master of a WAV or .wwav (its data
 // chunk), or one stem of a .wwav (its two channels inside wstm's frames).
@@ -45,7 +48,7 @@ bool probeMedia(const std::string& path, const std::string& source, MediaPart* o
 void decodeFrames(const uint8_t* raw, int n, const MediaPart& part, float* l, float* r);
 
 // Frames [in, in + len) of one part of a file. Frames past the file's end
-// are silence. Positions below are relative to the clip.
+// are silence, and take no memory. Positions below are relative to the clip.
 class ClipSource {
  public:
   ~ClipSource();
@@ -64,12 +67,17 @@ class ClipSource {
   bool read(int64_t c, int n, float* l, float* r);
   // Audio thread: where the playhead needs this clip next.
   void want(int64_t c) { want_.store(c, std::memory_order_relaxed); }
+  // The worker: where a loop jumps back to in this clip, or -1 for no loop.
+  // The reader keeps the frames from there in a second window, so the jump
+  // finds them while the main window starts over.
+  void wantLoop(int64_t c) { loopWant_.store(c, std::memory_order_relaxed); }
 
   // Render thread: the same frames, read from the file now if need be.
   void readNow(int64_t c, int n, float* l, float* r);
 
   // Reader thread: moves the window to the wanted frame if it is outside
-  // it, then reads ahead. True when it read anything.
+  // it, then reads ahead; and keeps the loop's window. True when it read
+  // anything.
   bool fill();
   // Before the reader thread knows this source: fills the window at `c`.
   void prefill(int64_t c);
@@ -80,12 +88,16 @@ class ClipSource {
   ClipSource() = default;
   // Decodes frames from the file, with `raw` as the bytes' buffer. Never on the audio thread.
   void readFile(int64_t c, int n, float* l, float* r, std::vector<uint8_t>& raw);
+  bool readMain(int64_t c, int n, float* l, float* r);
+  bool readLoop(int64_t c, int n, float* l, float* r);
+  bool fillMain();
+  bool fillLoop();
 
   MediaPart part_;
   int fd_ = -1;
   int64_t in_ = 0, len_ = 0;
   bool whole_ = true;
-  std::vector<float> l_, r_;     // whole: the clip; streamed: the ring
+  std::vector<float> l_, r_;     // whole: the frames the file has; streamed: the ring
   std::vector<uint8_t> raw_;     // file bytes for one run (the reader's)
   std::vector<uint8_t> rawNow_;  // and for readNow (the render thread's)
   std::vector<float> runL_, runR_;
@@ -96,6 +108,14 @@ class ClipSource {
   std::atomic<int64_t> start_{0};
   std::atomic<int64_t> end_{0};
   std::atomic<uint32_t> gen_{0};
+  // The loop's window: clip frames [loopStart_, loopEnd_) from the start of
+  // loopL_ and loopR_, read once and kept while the loop stays where it is.
+  // loopGen_ is odd while the reader moves it.
+  std::vector<float> loopL_, loopR_;
+  std::atomic<int64_t> loopWant_{-1};
+  std::atomic<int64_t> loopStart_{0};
+  std::atomic<int64_t> loopEnd_{0};
+  std::atomic<uint32_t> loopGen_{0};
 };
 
 // The disk thread: keeps every streamed clip ahead of the playhead.

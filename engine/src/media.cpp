@@ -9,16 +9,17 @@
 #include <algorithm>
 #include <chrono>
 
-#include "base/json.h"
 #include "disc/wav.h"
 #include "disc/wwav.h"
+#include "pyjson.h"
 
 namespace wwav {
 
 namespace {
 
 constexpr const char* kStems[4] = {"vocals", "drums", "other", "bass"};
-constexpr int64_t kRing = 1 << 17;  // frames a streamed clip keeps: about 3 s
+constexpr int64_t kRing = 1 << 17;      // frames a streamed clip keeps: about 3 s
+constexpr int64_t kLoopRing = 1 << 16;  // and from a loop's start: about 1.5 s
 
 std::string fileName(const std::string& path) {
   size_t slash = path.find_last_of('/');
@@ -83,32 +84,31 @@ WwavChunks walk(int fd, uint64_t fileSize) {
   return c;
 }
 
+// A chunk's payload, all of it, as the reference reader reads it; "" when it can't be read.
 std::string readText(int fd, const Chunk& c) {
   std::string s(c.size, '\0');
-  if (c.size > (1u << 20) || readAt(fd, c.at, &s[0], c.size) != c.size) return "";
+  if (c.size > 0 && readAt(fd, c.at, &s[0], c.size) != c.size) return "";
   return s;
 }
 
-bool isObject(const std::string& s) {
-  return !s.empty() && prana::json::find(s.data(), s.size(), "").type == prana::json::Type::Object;
-}
-
 // The reference reader's verdict on a .wwav's stems (wwav_pack.py's
-// Wwav.verdict), in its own words; "" when PRANA would play all four.
+// Wwav.verdict), in its own words; "" when PRANA would play all four. Its
+// JSON is read as Python's json module reads it, and its values printed as
+// str() prints them (pyjson.h).
 std::string stemVerdict(int fd, uint64_t fileSize, const prana::WavInfo& w, MediaPart* stems) {
   WwavChunks c = walk(fd, fileSize);
   if (w.format != 1 || w.channels != 2 || w.rate != 44100 || w.bits != 16 || !c.data.found)
     return "not listed: the master isn't 44.1 kHz 16-bit stereo PCM";
-  std::string wmet = c.wmet.found ? readText(fd, c.wmet) : "", wlin = c.wlin.found ? readText(fd, c.wlin) : "";
-  if (!isObject(wmet) || !isObject(wlin)) return "the master only: no wmet and wlin, so a plain WAV";
-  char version[32] = {0};
-  if (!prana::json::string(wmet.data(), wmet.size(), "wwav", version, sizeof version)) {
-    prana::json::Value v = prana::json::find(wmet.data(), wmet.size(), "wwav");
-    if (v.type == prana::json::Type::Number) memcpy(version, v.p, std::min(v.n, sizeof version - 1));
-  }
-  if (version[0] < '0' || version[0] > '9') return "the master only: wmet has no version";
-  if (atoi(version) > prana::kWwavMajor)
-    return std::string("the master only: version ") + version + " is newer than this reader (0.x)";
+  std::vector<py::Value> met, lin;
+  if (!c.wmet.found || !c.wlin.found || !py::readObject(readText(fd, c.wmet), {"wwav", "frames"}, &met) ||
+      !py::readObject(readText(fd, c.wlin), {}, &lin))
+    return "the master only: no wmet and wlin, so a plain WAV";
+  // str(wmet.get("wwav", "")), then its leading digits as an int.
+  const std::string version = met[0].str;
+  bool newer;
+  if (!py::leadingDigits(version, &newer)) return "the master only: wmet has no version";
+  static_assert(prana::kWwavMajor == 0, "the reference reader reads 0.x, so any leading number above 0 is newer");
+  if (newer) return "the master only: version " + version + " is newer than this reader (0.x)";
   uint8_t h[prana::kWstmHeader];
   if (!c.wstm.found || c.wstm.size < prana::kWstmHeader || readAt(fd, c.wstm.at, h, sizeof h) != sizeof h)
     return "the master only: no wstm";
@@ -116,12 +116,12 @@ std::string stemVerdict(int fd, uint64_t fileSize, const prana::WavInfo& w, Medi
   if (!prana::parseWstm(h, &s)) return "the master only: wstm isn't v1, 4 stereo 16-bit stems at 44.1 kHz";
   if (c.wstm.size < prana::kWstmHeader + s.pad + (uint64_t)s.frames * prana::kWwavFrameBytes)
     return "the master only: wstm is cut off";
-  int64_t metFrames = -1;
-  bool hasFrames = prana::json::whole(wmet.data(), wmet.size(), "frames", &metFrames);
-  uint64_t dataFrames = c.data.size / 4;
-  if (!(s.frames == dataFrames && hasFrames && (uint64_t)metFrames == dataFrames))
+  // s["frames"] == frames == wmet.get("frames"), as Python compares them.
+  const py::Value& frames = met[1];
+  const uint64_t dataFrames = c.data.size / 4;
+  if (!(s.frames == dataFrames && py::equals(frames, dataFrames)))
     return "the master only: frame counts differ (data " + std::to_string(dataFrames) + ", wstm " +
-           std::to_string(s.frames) + ", wmet " + (hasFrames ? std::to_string(metFrames) : "None") + ")";
+           std::to_string(s.frames) + ", wmet " + (frames.kind == py::Value::Missing ? "None" : frames.str) + ")";
   stems->rate = s.rate;
   stems->channels = 2;
   stems->bits = 16;
@@ -256,10 +256,12 @@ std::unique_ptr<ClipSource> ClipSource::open(const std::string& path, const Medi
   s->runL_.resize(kRun);
   s->runR_.resize(kRun);
   if (whole) {
-    s->l_.assign((size_t)len, 0.0f);
-    s->r_.assign((size_t)len, 0.0f);
-    for (int64_t c = 0; c < len; c += kRun) {
-      int n = (int)std::min<int64_t>(kRun, len - c);
+    // Only the frames the file has: past its end the clip is silence, however long its len.
+    const int64_t held = std::max<int64_t>(0, std::min<int64_t>(len, (int64_t)part.frames - in));
+    s->l_.assign((size_t)held, 0.0f);
+    s->r_.assign((size_t)held, 0.0f);
+    for (int64_t c = 0; c < held; c += kRun) {
+      int n = (int)std::min<int64_t>(kRun, held - c);
       s->readFile(c, n, &s->l_[(size_t)c], &s->r_[(size_t)c], s->raw_);
     }
     close(s->fd_);
@@ -267,6 +269,8 @@ std::unique_ptr<ClipSource> ClipSource::open(const std::string& path, const Medi
   } else {
     s->l_.assign(kRing, 0.0f);
     s->r_.assign(kRing, 0.0f);
+    s->loopL_.assign(kLoopRing, 0.0f);
+    s->loopR_.assign(kLoopRing, 0.0f);
     s->rawNow_.resize((size_t)kRun * part.stride);
     s->ahead_ = std::min<int64_t>(2 * (int64_t)part.rate, kRing - 2 * kMaxBlock);
   }
@@ -291,10 +295,21 @@ void ClipSource::readFile(int64_t c, int n, float* l, float* r, std::vector<uint
 
 bool ClipSource::read(int64_t c, int n, float* l, float* r) {
   if (whole_) {
-    memcpy(l, &l_[(size_t)c], (size_t)n * sizeof(float));
-    memcpy(r, &r_[(size_t)c], (size_t)n * sizeof(float));
+    const int64_t held = (int64_t)l_.size(), m = c < held ? std::min<int64_t>(n, held - c) : 0;
+    if (m > 0) {
+      memcpy(l, &l_[(size_t)c], (size_t)m * sizeof(float));
+      memcpy(r, &r_[(size_t)c], (size_t)m * sizeof(float));
+    }
+    for (int64_t i = std::max<int64_t>(m, 0); i < n; i++) l[i] = r[i] = 0.0f;
     return true;
   }
+  if (readMain(c, n, l, r) || readLoop(c, n, l, r)) return true;
+  memset(l, 0, (size_t)n * sizeof(float));
+  memset(r, 0, (size_t)n * sizeof(float));
+  return false;
+}
+
+bool ClipSource::readMain(int64_t c, int n, float* l, float* r) {
   // A seqlock over the window: copy, then check the reader hasn't moved the
   // window or overwritten what was copied. The copy itself races with the
   // reader's writes by design; the check after it throws such a copy away.
@@ -309,9 +324,19 @@ bool ClipSource::read(int64_t c, int n, float* l, float* r) {
     std::atomic_thread_fence(std::memory_order_acquire);
     if (start_.load(std::memory_order_relaxed) <= c && gen_.load(std::memory_order_relaxed) == gen) return true;
   }
-  memset(l, 0, (size_t)n * sizeof(float));
-  memset(r, 0, (size_t)n * sizeof(float));
   return false;
+}
+
+bool ClipSource::readLoop(int64_t c, int n, float* l, float* r) {
+  // The same seqlock. Within one generation the reader only appends, so a
+  // copy of frames already in the window can only be spoilt by a move.
+  uint32_t gen = loopGen_.load(std::memory_order_acquire);
+  int64_t start = loopStart_.load(std::memory_order_acquire), end = loopEnd_.load(std::memory_order_acquire);
+  if ((gen & 1) || c < start || c + n > end) return false;
+  memcpy(l, &loopL_[(size_t)(c - start)], (size_t)n * sizeof(float));
+  memcpy(r, &loopR_[(size_t)(c - start)], (size_t)n * sizeof(float));
+  std::atomic_thread_fence(std::memory_order_acquire);
+  return loopGen_.load(std::memory_order_relaxed) == gen;
 }
 
 void ClipSource::readNow(int64_t c, int n, float* l, float* r) {
@@ -323,6 +348,33 @@ void ClipSource::readNow(int64_t c, int n, float* l, float* r) {
 
 bool ClipSource::fill() {
   if (whole_) return false;
+  const bool main = fillMain();
+  return fillLoop() || main;
+}
+
+bool ClipSource::fillLoop() {
+  const int64_t want = loopWant_.load(std::memory_order_relaxed);
+  if (want < 0 || want >= len_) return false;
+  int64_t start = loopStart_.load(std::memory_order_relaxed), end = loopEnd_.load(std::memory_order_relaxed);
+  if (want != start) {
+    // A new loop start: the window starts over there.
+    uint32_t gen = loopGen_.load(std::memory_order_relaxed);
+    loopGen_.store(gen + 1, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
+    loopStart_.store(want, std::memory_order_relaxed);
+    loopEnd_.store(want, std::memory_order_relaxed);
+    loopGen_.store(gen + 2, std::memory_order_release);
+    start = end = want;
+  }
+  const int64_t limit = std::min(len_, start + kLoopRing);
+  if (end >= limit) return false;
+  const int n = (int)std::min<int64_t>(kRun, limit - end);
+  readFile(end, n, &loopL_[(size_t)(end - start)], &loopR_[(size_t)(end - start)], raw_);
+  loopEnd_.store(end + n, std::memory_order_release);
+  return true;
+}
+
+bool ClipSource::fillMain() {
   const int64_t w = std::min(std::max<int64_t>(want_.load(std::memory_order_relaxed), 0), len_);
   int64_t start = start_.load(std::memory_order_relaxed), end = end_.load(std::memory_order_relaxed);
   if (w < start || w > end) {
