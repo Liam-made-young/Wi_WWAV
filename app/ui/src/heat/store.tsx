@@ -237,7 +237,7 @@ export function HeatProvider({ client, clock = Date.now, children }: Props) {
 
 export function useHeat(): HeatStore {
   const store = useContext(Context);
-  if (!store) throw new Error('Heat is read through a HeatProvider.');
+  if (!store) throw new Error('Learn is read through a HeatProvider.');
   return store;
 }
 

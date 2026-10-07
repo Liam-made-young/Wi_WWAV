@@ -100,7 +100,7 @@ impl Room {
     /// The room as a sentence names it: "Undo it in the Console first."
     pub fn name(self) -> &'static str {
         match self {
-            Room::Heat => "Heat",
+            Room::Heat => "Learn",
             Room::Space => "Space",
             Room::Console => "the Console",
             Room::Library => "the library",

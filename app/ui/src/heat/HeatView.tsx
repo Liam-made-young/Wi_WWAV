@@ -341,7 +341,7 @@ function Frame(p: FrameProps) {
 
   return (
     <div className="heat register-desk" data-tab={tab} data-folded={folded} data-info={info}>
-      <header className="heat-toolbar" role="toolbar" aria-label="Heat">
+      <header className="heat-toolbar" role="toolbar" aria-label="Learn">
         {TAB_TABLE[tab].plus !== null && (
           <button
             type="button"
@@ -356,7 +356,7 @@ function Frame(p: FrameProps) {
             </svg>
           </button>
         )}
-        <div className="switcher heat-tabs" role="tablist" aria-label="Heat tabs">
+        <div className="switcher heat-tabs" role="tablist" aria-label="Learn tabs">
           {TAB_IDS.map((id, i) => (
             <button
               key={id}

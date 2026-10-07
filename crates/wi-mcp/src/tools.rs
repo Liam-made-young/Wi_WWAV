@@ -1,5 +1,7 @@
-//! The eight tools of docs/SPEC.md 3.13: names, what Claude is told about
-//! each, and the JSON Schema its arguments are checked against. The schemas
+//! The tools of docs/SPEC.md 3.13: names, what Claude is told about each,
+//! and the JSON Schema its arguments are checked against. The first eight
+//! are the mail and planning tools; the ten after them read the rest of the
+//! view and draft into it, under the same rule. The schemas
 //! are the door (8.8): every one closes `additionalProperties`, so no call
 //! can carry `done`, a score or `public`.
 
@@ -9,7 +11,7 @@ use serde_json::{json, Value};
 pub const WRITE_PREAMBLE: &str = "Estimates and drafts. Never decides: the person accepts, edits or undoes every change.\nNever invent metrics: only restate numbers this app returned.";
 
 /// Tool names, in the order 3.13's table gives them.
-pub const NAMES: [&str; 8] = [
+pub const NAMES: [&str; 18] = [
     "list_tasks",
     "add_task",
     "update_task",
@@ -18,6 +20,16 @@ pub const NAMES: [&str; 8] = [
     "add_pending_grade",
     "log_focus",
     "record_mail_thread",
+    "get_schedule",
+    "draft_block",
+    "list_habits",
+    "list_projects",
+    "add_project",
+    "add_milestone",
+    "get_notes",
+    "add_note",
+    "list_inbox",
+    "add_capture",
 ];
 
 /// What changing a tool leaves in the journal: `Undo ` + this.
@@ -28,24 +40,37 @@ pub fn undo_label(tool: &str) -> Option<&'static str> {
         "add_pending_grade" => Some("Claude's pending grade"),
         "log_focus" => Some("Claude's focus log"),
         "record_mail_thread" => Some("Claude's mail note"),
+        "add_project" => Some("Claude's project"),
+        "add_milestone" => Some("Claude's milestone"),
+        "add_note" => Some("Claude's note"),
+        "add_capture" => Some("Claude's capture"),
         _ => None,
     }
 }
 
-/// Changes nothing the journal keeps. `plan_day` writes only drafts, which
-/// aren't a change until the person accepts them (3.13).
-pub fn is_read_only(tool: &str) -> bool {
-    matches!(tool, "list_tasks" | "get_grades" | "plan_day")
+/// The pure reads: they write nothing at all.
+pub fn is_pure_read(tool: &str) -> bool {
+    matches!(tool, "list_tasks" | "get_grades" | "get_schedule" | "list_habits" | "list_projects" | "get_notes" | "list_inbox")
 }
 
-/// Gets the two-line preamble: everything but the two pure reads.
+/// Changes nothing the journal keeps. `plan_day` and `draft_block` write only
+/// drafts, which aren't a change until the person accepts them (3.13).
+pub fn is_read_only(tool: &str) -> bool {
+    is_pure_read(tool) || matches!(tool, "plan_day" | "draft_block")
+}
+
+/// Gets the two-line preamble: everything but the pure reads.
 fn opens_with_preamble(tool: &str) -> bool {
-    !matches!(tool, "list_tasks" | "get_grades")
+    !is_pure_read(tool)
+}
+
+fn day(what: &str) -> Value {
+    json!({"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": format!("{what}, YYYY-MM-DD.")})
 }
 
 fn reason() -> Value {
     json!({"type": "string", "minLength": 1, "maxLength": 200,
-           "description": "One sentence saying why. Heat shows it beside the change."})
+           "description": "One sentence saying why. Learn shows it beside the change."})
 }
 
 fn instant(what: &str) -> Value {
@@ -143,20 +168,98 @@ pub fn input_schema(tool: &str) -> Value {
             }),
             &["thread_id", "subject", "from", "received_at", "state", "reason"],
         ),
+        "get_schedule" => object(
+            json!({
+                "from": day("The first day. Default today"),
+                "to": day("The last day, at most 31 days on. Default the first day")
+            }),
+            &[],
+        ),
+        "draft_block" => object(
+            json!({
+                "task_id": text(100, "The task's id, from list_tasks."),
+                "date": day("The day. Default today"),
+                "start": {"type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$", "description": "HH:MM, 24-hour, in the person's time zone. Rounded to 15 minutes; between 07:00 and midnight."},
+                "minutes": {"type": "integer", "minimum": 15, "maximum": 240, "description": "How long. Rounded to 15 minutes."},
+                "reason": reason()
+            }),
+            &["task_id", "start", "minutes", "reason"],
+        ),
+        "list_habits" => object(json!({}), &[]),
+        "list_projects" => object(
+            json!({
+                "space": text(100, "A space's name or id. Default: every space."),
+                "status": {"type": "string", "enum": ["active", "on_hold", "someday", "archived", "all"], "description": "Which projects. Default active."}
+            }),
+            &[],
+        ),
+        "add_project" => object(
+            json!({
+                "title": text(200, "The project's name, as the person would write it."),
+                "space": text(100, "A space's name or id. Default: the person's first space."),
+                "target_date": day("When the person means to finish, if they said"),
+                "reason": reason()
+            }),
+            &["title", "reason"],
+        ),
+        "add_milestone" => object(
+            json!({
+                "title": text(200, "The milestone, as the person would write it."),
+                "date": day("The day it falls on"),
+                "project_id": text(100, "The project's id, from list_projects. Without it the milestone stands alone in its space."),
+                "space": text(100, "A space's name or id. Default: the project's space, else the person's first space."),
+                "reason": reason()
+            }),
+            &["title", "date", "reason"],
+        ),
+        "get_notes" => object(
+            json!({
+                "date": day("The day whose daily note to read. Default today"),
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "description": "At most this many notes, newest first. Default 20."}
+            }),
+            &[],
+        ),
+        "add_note" => object(
+            json!({
+                "title": text(200, "The note's title."),
+                "text": {"type": "string", "minLength": 1, "maxLength": 20000, "description": "The note, in Markdown."},
+                "project_id": text(100, "A project's id, from list_projects, if the note belongs to one."),
+                "reason": reason()
+            }),
+            &["title", "text", "reason"],
+        ),
+        "list_inbox" => object(json!({}), &[]),
+        "add_capture" => object(
+            json!({
+                "text": text(2000, "The line to keep, as the person would jot it. The first line becomes a title if they make it a task."),
+                "reason": reason()
+            }),
+            &["text", "reason"],
+        ),
         _ => Value::Null,
     }
 }
 
 fn summary(tool: &str) -> &'static str {
     match tool {
-        "list_tasks" => "Lists the person's tasks with Heat's numbers: due date, difficulty, estimate and who made it, and heat. Also the person's average minutes and count by task type, and each space's persona, so estimates fit the kind of work.",
+        "list_tasks" => "Lists the person's tasks with Learn's numbers: due date, difficulty, estimate and who made it, and heat. Also the person's average minutes and count by task type, and each space's persona, so estimates fit the kind of work.",
         "add_task" => "Adds a task, labelled as Claude's. If source_id matches a task already made, nothing is added and created is false. It never marks anything done and never changes a due date.",
         "update_task" => "Sets a task's difficulty, its estimate in minutes, or both, with a reason. Returns the task with its new heat, and clamped: true if the minutes were moved into 5–600.",
-        "plan_day" => "Runs Heat's Plan my day rule: open tasks in heat order, each a block the length of its estimate rounded up to 15 minutes and capped at 90, in the first gap that fits before the day ends. The blocks are drafts the person accepts or clears; this changes nothing.",
-        "get_grades" => "Reads the term's courses, their categories and weights, every graded item, and Heat's own percentages and letter. Read only.",
+        "plan_day" => "Runs Learn's Plan my day rule: open tasks in heat order, each a block the length of its estimate rounded up to 15 minutes and capped at 90, in the first gap that fits before the day ends. The blocks are drafts the person accepts or clears; this changes nothing.",
+        "get_grades" => "Reads the term's courses, their categories and weights, every graded item, and Learn's own percentages and letter. Read only.",
         "add_pending_grade" => "Adds a pending grade from a grade notice: no score, which only the person types. A grade for the same course and item is not made twice.",
         "log_focus" => "Logs minutes the person spent on a task, as a focus record. The minutes add to the task's time taken.",
-        "record_mail_thread" => "Records a school mail thread for Heat's Mail tab: subject, sender, time, course, and what was done with it. Never the message body. The same thread_id again updates its state and reason and leaves one row.",
+        "record_mail_thread" => "Records a school mail thread for Learn's Mail tab: subject, sender, time, course, and what was done with it. Never the message body. The same thread_id again updates its state and reason and leaves one row.",
+        "get_schedule" => "Reads what the time column and Calendar show between two days: the blocks already planned, calendar events, open tasks due, and drafts waiting to be accepted. Read only. Read it before draft_block, to find a free time.",
+        "draft_block" => "Drafts one block for a task at a time you name, for when the person asks for a specific time rather than Learn's own rule. The block is a draft the person accepts or clears; this changes nothing. A time already held by a block, a draft or a calendar event is refused. A second draft for the same task and day replaces the first.",
+        "list_habits" => "Reads the person's habits: whether each is ticked today, and its record line as Learn words it. Read only. Only the person ticks a habit; there is no tool that does.",
+        "list_projects" => "Reads projects with their milestones in order and how many open tasks each holds, and the milestones that stand alone. Read only.",
+        "add_project" => "Adds a project, marked as Claude's, active and empty. A space never gets two projects with the same name. It never archives, renames or deletes a project.",
+        "add_milestone" => "Adds a milestone on a day, marked as Claude's, to a project or alone in a space. It is never made done and never moved: only the person does that.",
+        "get_notes" => "Reads the person's notes, newest first, and one day's daily note. Long notes are cut at 4,000 characters and say so. Read only.",
+        "add_note" => "Adds a note, marked as Claude's, in Markdown. It never edits a note the person wrote and never writes the daily note.",
+        "list_inbox" => "Reads the captures waiting in the Inbox. Read only: only the person triages them.",
+        "add_capture" => "Drops one line into the Inbox, marked as Claude's, for the person to make into a task, a note or a project, or to throw away. Use it when you aren't sure something is a task: the person decides what it becomes.",
         _ => "",
     }
 }
@@ -180,6 +283,16 @@ fn title(tool: &str) -> &'static str {
         "add_pending_grade" => "Add a pending grade",
         "log_focus" => "Log focus time",
         "record_mail_thread" => "Record a mail thread",
+        "get_schedule" => "Read the schedule",
+        "draft_block" => "Draft a block",
+        "list_habits" => "List habits",
+        "list_projects" => "List projects",
+        "add_project" => "Add a project",
+        "add_milestone" => "Add a milestone",
+        "get_notes" => "Read notes",
+        "add_note" => "Add a note",
+        "list_inbox" => "Read the inbox",
+        "add_capture" => "Add to the inbox",
         _ => "",
     }
 }
@@ -196,7 +309,7 @@ pub fn definition(tool: &str) -> Value {
             "title": title(tool),
             "readOnlyHint": read_only,
             "destructiveHint": false,
-            "idempotentHint": matches!(tool, "add_pending_grade" | "record_mail_thread") || read_only,
+            "idempotentHint": matches!(tool, "add_pending_grade" | "record_mail_thread") || is_pure_read(tool) || tool == "plan_day",
             "openWorldHint": false
         }
     })

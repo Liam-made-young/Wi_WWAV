@@ -411,7 +411,7 @@ describe('3.15: the export’s fields are checked, not only its lists', () => {
     processedMailIds: [],
     lastSyncAt: null,
   };
-  const notExport = { error: 'This file isn’t a Heat export.' };
+  const notExport = { error: 'This file isn’t a Learn export.' };
 
   it('reads version 1 only as the integer 1', () => {
     expect(parseHeatExport(base)).toEqual(base);

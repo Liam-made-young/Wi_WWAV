@@ -68,8 +68,8 @@ export const undo = {
 // --- 3.4 and 3.6: spaces and Tasks -------------------------------------------
 
 export const tasks = {
-  empty: (space: string | null) => `Add your first ${space ? `${space} ` : ''}task and Heat will rank it.`,
-  rankIt: 'Heat will rank it.',
+  empty: (space: string | null) => `Add your first ${space ? `${space} ` : ''}task and Learn will rank it.`,
+  rankIt: 'Learn will rank it.',
   nameFirst: 'Give the task a name first.',
   all: 'All',
   newSpace: 'New space…',
@@ -302,8 +302,8 @@ export const status = {
 };
 
 export const moving = {
-  notExport: 'This file isn’t a Heat export.',
-  newer: 'This export is from a newer Heat. Update Wi_WWAV, then try again.',
+  notExport: 'This file isn’t a Learn export.',
+  newer: 'This export is from a newer Learn. Update Wi_WWAV, then try again.',
 };
 
 // --- The Public switch, in the words 3.15 gives each kind of record --------------------
@@ -393,6 +393,6 @@ export const mailUi = {
   claudeReason: 'Claude’s reason',
   made: 'What it made',
   openGrades: 'Open Grades',
-  noBody: 'Heat keeps only the subject, the sender, the time and Claude’s reason. The message itself stays in Gmail.',
+  noBody: 'Learn keeps only the subject, the sender, the time and Claude’s reason. The message itself stays in Gmail.',
   gmailUrl: (threadId: string) => `https://mail.google.com/mail/u/0/#all/${threadId}`,
 };

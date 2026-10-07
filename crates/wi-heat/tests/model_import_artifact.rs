@@ -77,7 +77,7 @@ fn dump_json() -> Value {
 }
 
 fn dump() -> HeatExport {
-    serde_json::from_value(dump_json()).expect("the dump is a Heat export")
+    serde_json::from_value(dump_json()).expect("the dump is a Learn export")
 }
 
 fn utc(text: &str) -> f64 {
@@ -88,7 +88,7 @@ fn utc(text: &str) -> f64 {
 
 fn not_export() -> Result<HeatExport, ExportError> {
     Err(ExportError {
-        error: "This file isn’t a Heat export.".into(),
+        error: "This file isn’t a Learn export.".into(),
     })
 }
 
@@ -96,7 +96,7 @@ fn not_export() -> Result<HeatExport, ExportError> {
 
 #[test]
 fn takes_a_heat_export_and_refuses_anything_else_in_one_line() {
-    let parsed = parse_heat_export(&dump_json()).expect("a Heat export");
+    let parsed = parse_heat_export(&dump_json()).expect("a Learn export");
     assert_eq!(serde_json::to_value(&parsed).unwrap(), dump_json());
     assert_eq!(parse_heat_export(&json!({"tasks": []})), not_export());
     assert_eq!(parse_heat_export(&Value::Null), not_export());
@@ -108,7 +108,7 @@ fn takes_a_heat_export_and_refuses_anything_else_in_one_line() {
     assert_eq!(
         parse_heat_export(&newer),
         Err(ExportError {
-            error: "This export is from a newer Heat. Update Wi_WWAV, then try again.".into()
+            error: "This export is from a newer Learn. Update Wi_WWAV, then try again.".into()
         })
     );
 }

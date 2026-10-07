@@ -56,7 +56,7 @@ pub fn set_school(store: &mut Store, args: &Map<String, Value>) -> Result<()> {
     };
     if School::new(&text("host"), &pattern, TimeZone::UTC).is_err() {
         return refused(
-            "The course pattern isn't one Heat can read. The default is ^([A-Z]{3})\\s?(\\d{3}).",
+            "The course pattern isn't one Learn can read. The default is ^([A-Z]{3})\\s?(\\d{3}).",
         );
     }
     let day = |k: &str| -> Result<Value> {
@@ -93,7 +93,7 @@ pub fn school(store: &Store, zone: &TimeZone) -> Result<School> {
         .unwrap_or(DEFAULT_COURSE_PATTERN);
     match School::new(host, pattern, zone.clone()) {
         Ok(s) => Ok(s),
-        Err(_) => refused("The course pattern in Settings → Heat isn't one Heat can read."),
+        Err(_) => refused("The course pattern in Settings → Learn isn't one Learn can read."),
     }
 }
 
@@ -141,7 +141,7 @@ pub fn save_calendar(store: &mut Store, record: &Value) -> Result<()> {
 /// stay: nothing a feed made is ever deleted for the person.
 pub fn remove_calendar(store: &mut Store, id: &str) -> Result<Value> {
     let Some(record) = one(store, kind::CALENDAR, id)? else {
-        return refused("That calendar isn't in Heat any more.");
+        return refused("That calendar isn't in Learn any more.");
     };
     let prefix = format!("{id}/");
     for d in store.docs(kind::EVENT)? {
@@ -273,7 +273,7 @@ pub fn apply_brightspace(
         .cloned()
         .collect();
     let Some(now) = stamp(clock.now_ms) else {
-        return refused("Heat can't read the clock.");
+        return refused("Learn can't read the clock.");
     };
     let report = sync_feed(&mut known, &items, now, &clock.zone);
 
@@ -328,7 +328,7 @@ pub fn apply_brightspace(
     let mut made_courses: Vec<Value> = Vec::new();
     let mut made_term: Option<Value> = None;
     if !report.new.is_empty() && space.is_none() {
-        return refused("There's no space yet. Open Heat in Wi_WWAV once.");
+        return refused("There's no space yet. Open Learn in Wi_WWAV once.");
     }
     for item in &report.new {
         let space = space.expect("checked above");

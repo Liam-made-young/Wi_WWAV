@@ -135,13 +135,13 @@ pub(crate) fn set_school(i: &Inner, a: &Args) -> Result<Value, CoreError> {
 fn sync_one(i: &Inner, cal: &Value, clock: &Clock) -> Result<Counts, String> {
     let id = cal["id"].as_str().unwrap_or_default();
     let name = cal["name"].as_str().unwrap_or("calendar");
-    let failed = || format!("Couldn't read the {name} calendar. Heat will try again in an hour.");
+    let failed = || format!("Couldn't read the {name} calendar. Learn will try again in an hour.");
     let item = cal["keychainRef"].as_str().unwrap_or_default();
     let address = match i.secrets.get(item) {
         Ok(Some(a)) => a,
         _ => {
             return Err(format!(
-            "The {name} calendar has no address in the Keychain. Add it again in Settings → Heat."
+            "The {name} calendar has no address in the Keychain. Add it again in Settings → Learn."
         ))
         }
     };
@@ -190,12 +190,12 @@ pub(crate) fn sync_calendars(i: &Inner, only: Option<&str>) -> Result<String, Co
         if cals.is_empty() {
             return Err(CoreError::new(
                 "refused",
-                "That calendar isn't in Heat any more.",
+                "That calendar isn't in Learn any more.",
             ));
         }
     }
     if cals.is_empty() {
-        return Ok("No calendars yet. Add one in Settings → Heat.".to_string());
+        return Ok("No calendars yet. Add one in Settings → Learn.".to_string());
     }
     let clock = i.clock();
     let (mut counts, mut read, mut failures) = (Counts::default(), false, Vec::new());
@@ -280,5 +280,5 @@ pub(crate) fn start(inner: &Arc<Inner>) -> JoinHandle<()> {
                 i.nap(Duration::from_secs(60));
             }
         })
-        .expect("a thread for Heat's calendars")
+        .expect("a thread for Learn's calendars")
 }

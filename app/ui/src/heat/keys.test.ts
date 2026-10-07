@@ -24,7 +24,7 @@ const ctx = (over: Partial<HeatKeyContext> = {}): HeatKeyContext => ({
   ...over,
 });
 
-describe('Heat’s keyboard', () => {
+describe('Learn’s keyboard', () => {
   it('opens the tabs on 1–6', () => {
     expect([1, 2, 3, 4, 5, 6].map((n) => heatRoute(key(String(n)), ctx()))).toEqual([
       { type: 'tab', tab: 'today' },

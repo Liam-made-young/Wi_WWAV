@@ -136,6 +136,8 @@ pub(crate) const SPECS: &[Spec] = &[
             "status",
             "targetDate",
             "link",
+            "source",
+            "claudeReason",
             "public",
         ],
         &[],
@@ -153,6 +155,8 @@ pub(crate) const SPECS: &[Spec] = &[
             "done",
             "order",
             "link",
+            "source",
+            "claudeReason",
             "public",
         ],
         &[],
@@ -205,7 +209,16 @@ pub(crate) const SPECS: &[Spec] = &[
     spec(
         "capture",
         "id",
-        &["id", "text", "link", "triagedAt", "resultType", "resultId"],
+        &[
+            "id",
+            "text",
+            "link",
+            "triagedAt",
+            "resultType",
+            "resultId",
+            "source",
+            "claudeReason",
+        ],
         &[],
         false,
     ),
@@ -219,7 +232,16 @@ pub(crate) const SPECS: &[Spec] = &[
     spec(
         "note",
         "id",
-        &["id", "title", "markdown", "projectId", "link", "public"],
+        &[
+            "id",
+            "title",
+            "markdown",
+            "projectId",
+            "link",
+            "source",
+            "claudeReason",
+            "public",
+        ],
         &[],
         true,
     ),
@@ -233,8 +255,8 @@ pub(crate) fn spec_of(kind: &str) -> Option<&'static Spec> {
 pub(crate) fn restricted(k: &str) -> Option<&'static str> {
     match k {
         kind::MAIL => Some("Mail lists only what Claude recorded. Ask Claude to read it."),
-        kind::CALENDAR => Some("Calendars are added and removed in Settings → Heat."),
-        kind::SHARE => Some("Show and Hide put a line or a timeline on your public Heat view."),
+        kind::CALENDAR => Some("Calendars are added and removed in Settings → Learn."),
+        kind::SHARE => Some("Show and Hide put a line or a timeline on your public Learn view."),
         _ => None,
     }
 }
@@ -246,7 +268,7 @@ pub(crate) fn writable(k: &str) -> Result<&'static Spec> {
     }
     match spec_of(k) {
         Some(s) => Ok(s),
-        None => refused(format!("Heat keeps no {k}.")),
+        None => refused(format!("Learn keeps no {k}.")),
     }
 }
 
@@ -483,7 +505,7 @@ fn task(
         if rule.is_empty() {
             m.remove("rrule");
         } else if recurrence::parse_rule(rule).is_none() {
-            return refused("Heat can't read that repeat rule.");
+            return refused("Learn can't read that repeat rule.");
         }
     }
     for (field, kind_of) in [
@@ -498,7 +520,7 @@ fn task(
                 _ => world.milestones.iter().any(|x| x.id == id),
             };
             if !found {
-                return refused(format!("That {kind_of} isn't in Heat any more."));
+                return refused(format!("That {kind_of} isn't in Learn any more."));
             }
         }
     }
@@ -524,7 +546,7 @@ fn task(
                 .and_then(|t| t.parent_task_id.clone());
         }
         if !world.tasks.iter().any(|t| t.id == parent) {
-            return refused("That parent task isn't in Heat any more.");
+            return refused("That parent task isn't in Learn any more.");
         }
     }
     Ok(clamped)
@@ -604,7 +626,7 @@ fn session(m: &mut Map<String, Value>, world: &World, _clock: &Clock) -> Result<
     }
     needs(m, "room", json!("heat"));
     if !one_of(m, "room", &["heat", "space", "console"]) {
-        return refused("A focus record was made in Heat, Space or the Console.");
+        return refused("A focus record was made in Learn, Space or the Console.");
     }
     if m.get("source").is_some() && !one_of(m, "source", &["timer", "claude"]) {
         return refused("A focus record comes from the timer or Claude.");
@@ -650,7 +672,7 @@ fn milestone(m: &mut Map<String, Value>, existing: Option<&Value>, world: &World
     }
     if let Some(project) = m.get("projectId").and_then(Value::as_str) {
         if !world.projects.iter().any(|p| p.id == project) {
-            return refused("That project isn't in Heat any more.");
+            return refused("That project isn't in Learn any more.");
         }
     }
     needs(m, "done", json!(false));

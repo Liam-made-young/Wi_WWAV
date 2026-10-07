@@ -7,6 +7,7 @@
 //! does the work, one store transaction per call.
 
 pub mod library;
+pub mod prompts;
 pub mod tools;
 
 use std::io::{BufRead, Write};
@@ -19,7 +20,7 @@ pub const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-2
 
 pub const SERVER_NAME: &str = "wi-wwav";
 
-const INSTRUCTIONS: &str = "Heat, the planner in Wi_WWAV, on this Mac: tasks, grades, focus time and school mail. Claude estimates and drafts; the person decides. Restate only numbers these tools return.";
+const INSTRUCTIONS: &str = "Learn, the planner in Wi_WWAV, on this Mac: tasks, the schedule, grades, focus time, habits, projects, notes, the inbox and school mail. Claude estimates and drafts; the person decides: nothing here marks anything done, enters a score, ticks a habit, deletes, or makes anything public. Restate only numbers these tools return.";
 
 /// One plain sentence for Claude, returned with the error flag set.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -39,6 +40,10 @@ pub trait Backend {
     fn enabled(&mut self, tool: &str) -> bool;
     /// Runs the tool. A write's result carries `undo_label`.
     fn call(&mut self, tool: &str, args: &Map<String, Value>) -> Result<Value, ToolError>;
+    /// The school from Settings → Learn, for the school mail prompt to name.
+    fn school(&mut self) -> prompts::School {
+        prompts::School::default()
+    }
 }
 
 /// Serves one client until stdin ends. Never panics on bad input: every
@@ -91,6 +96,15 @@ pub fn handle_line(line: &str, backend: &mut dyn Backend) -> Option<Value> {
             Ok(v) => result(id, v),
             Err((code, text)) => error(id, code, &text),
         },
+        "prompts/list" => result(id, json!({ "prompts": prompts::list() })),
+        "prompts/get" => {
+            let name = params.get("name").and_then(Value::as_str).unwrap_or("");
+            let args = params.get("arguments").and_then(Value::as_object).cloned().unwrap_or_default();
+            match prompts::get(name, &args, &backend.school()) {
+                Ok(v) => result(id, v),
+                Err(sentence) => error(id, -32602, &sentence),
+            }
+        }
         _ => error(id, -32601, &format!("Method not found: {method}")),
     })
 }
@@ -100,7 +114,7 @@ fn initialize(params: &Value) -> Value {
     let version = PROTOCOL_VERSIONS.iter().find(|v| **v == asked).unwrap_or(&PROTOCOL_VERSIONS[0]);
     json!({
         "protocolVersion": version,
-        "capabilities": { "tools": { "listChanged": false } },
+        "capabilities": { "tools": { "listChanged": false }, "prompts": { "listChanged": false } },
         "serverInfo": { "name": SERVER_NAME, "title": "Wi_WWAV", "version": env!("CARGO_PKG_VERSION") },
         "instructions": INSTRUCTIONS
     })

@@ -93,7 +93,7 @@ describe('heat changes', () => {
     );
   });
 
-  test('Heat is private: another account pulls nothing of it', async () => {
+  test('Learn is private: another account pulls nothing of it', async () => {
     const { changes } = await pullAll(ctx, ctx.ana);
     assert.deepEqual(changes, []);
   });

@@ -59,7 +59,7 @@ async function loadGateSong(page: Page) {
 
 // Each state, from a freshly opened shell.
 const STATES: [string, Setup, { idle?: boolean }?][] = [
-  ['Heat', view(1), { idle: true }],
+  ['Learn', view(1), { idle: true }],
   ['Space', view(2), { idle: true }],
   ['Console', view(3), { idle: true }],
   [
@@ -123,7 +123,7 @@ const STATES: [string, Setup, { idle?: boolean }?][] = [
   ['Galaxy chip menu', async (page) => page.getByRole('button', { name: 'You' }).click()],
   ['Settings · Account', pane(/^Account/)],
   ['Settings · Library', pane(/^Library/)],
-  ['Settings · Heat', pane(/^Heat/)],
+  ['Settings · Learn', pane(/^Learn/)],
   ['Settings · Audio & MIDI · Video', pane(/^Audio/)],
   ['Settings · Claude', pane(/^Claude/)],
   ['Settings · Privacy', pane(/^Privacy/)],

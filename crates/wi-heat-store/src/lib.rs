@@ -128,7 +128,7 @@ pub fn parse_instant(s: &str) -> Result<f64> {
     match s.parse::<Timestamp>() {
         Ok(t) => Ok(t.as_millisecond() as f64),
         Err(_) => refused(format!(
-            "'{s}' isn't a time Heat can read. Use ISO 8601 with an offset, such as 2026-10-07T23:59:00-04:00."
+            "'{s}' isn't a time Learn can read. Use ISO 8601 with an offset, such as 2026-10-07T23:59:00-04:00."
         )),
     }
 }
@@ -301,7 +301,7 @@ impl Outcome {
     }
 }
 
-/// The eight tools, every one on until switched off in Settings → Claude.
+/// The tools, every one on until switched off in Settings → Claude.
 pub fn tool_switches(store: &Store) -> Result<BTreeMap<String, bool>> {
     let saved = one(store, kind::SETTING, "claude.tools")?.unwrap_or(Value::Null);
     Ok(mcp::TOOLS

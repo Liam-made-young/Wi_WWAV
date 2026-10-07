@@ -1,17 +1,21 @@
-//! The store side of the eight MCP tools (docs/SPEC.md 3.13): one function
-//! per tool, each one transaction by Claude, with the tool's name and
-//! Claude's reason on the journal entry. The helper has already checked the
+//! The store side of the MCP tools (docs/SPEC.md 3.13): one function per
+//! tool, each one transaction by Claude, with the tool's name and Claude's
+//! reason on the journal entry. The first eight are the mail and planning
+//! tools; the ten after them read the rest of the view and draft into it. The helper has already checked the
 //! arguments against the tool's schema; the rules that need the library
 //! (clamps, dedupe, ids that must exist) live here.
 
 use serde_json::{json, Map, Value};
+use wi_heat::model::{habits, plan, zone};
 use wi_store::{Actor, Store};
 
 use crate::derive::{self, World};
-use crate::{change, kind, num, parse_instant, put, refused, round, Clock, Result};
+use crate::{
+    all, change, kind, num, one, parse_instant, put, refused, round, schema, Clock, Result,
+};
 
 /// The tools, in 3.13's order.
-pub const TOOLS: [&str; 8] = [
+pub const TOOLS: [&str; 18] = [
     "list_tasks",
     "add_task",
     "update_task",
@@ -20,7 +24,26 @@ pub const TOOLS: [&str; 8] = [
     "add_pending_grade",
     "log_focus",
     "record_mail_thread",
+    "get_schedule",
+    "draft_block",
+    "list_habits",
+    "list_projects",
+    "add_project",
+    "add_milestone",
+    "get_notes",
+    "add_note",
+    "list_inbox",
+    "add_capture",
 ];
+
+/// The most days `get_schedule` reads at once.
+pub const SCHEDULE_DAYS: f64 = 31.0;
+
+/// A block Claude drafts: 15 minutes to 4 hours, on the 15-minute grid.
+pub const DRAFT_MINUTES: (f64, f64) = (15.0, 240.0);
+
+/// How much of a note Claude reads.
+pub const NOTE_CHARS: usize = 4000;
 
 /// Minutes Claude may estimate, clamped (3.12).
 pub const MINUTES: (f64, f64) = (5.0, 600.0);
@@ -44,6 +67,16 @@ pub fn call(
         "add_pending_grade" => add_pending_grade(store, args),
         "log_focus" => log_focus(store, clock, args),
         "record_mail_thread" => record_mail_thread(store, args),
+        "get_schedule" => get_schedule(store, clock, args),
+        "draft_block" => draft_block(store, clock, args),
+        "list_habits" => list_habits(store, clock),
+        "list_projects" => list_projects(store, args),
+        "add_project" => add_project(store, clock, args),
+        "add_milestone" => add_milestone(store, clock, args),
+        "get_notes" => get_notes(store, clock, args),
+        "add_note" => add_note(store, clock, args),
+        "list_inbox" => list_inbox(store),
+        "add_capture" => add_capture(store, clock, args),
         _ => refused(format!("There's no tool called {tool}.")),
     }
 }
@@ -122,7 +155,7 @@ pub fn add_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
         Some(q) => world.space(q)?,
         None => match world.spaces.first() {
             Some(s) => s,
-            None => return refused("There's no space yet. Open Heat in Wi_WWAV once."),
+            None => return refused("There's no space yet. Open Learn in Wi_WWAV once."),
         },
     };
     let course = match text(args, "course") {
@@ -385,4 +418,491 @@ pub fn record_mail_thread(store: &mut Store, args: &Map<String, Value>) -> Resul
         |txn| put(txn, kind::MAIL, &thread),
     )?;
     Ok(json!({"thread": thread, "created": created, "undo_label": undo}))
+}
+
+/// A record Claude drafts, checked and completed the way a person's write
+/// is (`schema::finish`), and marked as Claude's with the reason.
+fn drafted(
+    world: &World,
+    clock: &Clock,
+    k: &str,
+    mut record: Map<String, Value>,
+    args: &Map<String, Value>,
+) -> Result<Value> {
+    record.insert("source".into(), json!("claude"));
+    if let Some(reason) = text(args, "reason") {
+        record.insert("claudeReason".into(), json!(reason));
+    }
+    let sp = schema::writable(k)?;
+    let done = schema::finish(sp, None, record, world, clock, &mut crate::ulid)?;
+    Ok(Value::Object(done.record))
+}
+
+/// `HH:MM` as minutes after midnight.
+fn minute_of(hhmm: &str) -> f64 {
+    let (h, m) = hhmm.split_once(':').unwrap_or(("0", "0"));
+    h.parse::<f64>().unwrap_or(0.0) * 60.0 + m.parse::<f64>().unwrap_or(0.0)
+}
+
+/// A draft as a tool answers it: the start as ISO 8601, with the title.
+fn draft_view(world: &World, clock: &Clock, d: &plan::Draft) -> Value {
+    let title = world
+        .tasks
+        .iter()
+        .find(|t| t.id == d.task_id)
+        .map(|t| t.title.as_str())
+        .unwrap_or_default();
+    json!({
+        "task_id": d.task_id,
+        "title": title,
+        "start": clock.iso(zone::at_minute(&d.date, d.start, &clock.zone)),
+        "minutes": num(d.minutes),
+        "reason": d.reason,
+    })
+}
+
+fn drafts_of(state: &Value) -> Vec<plan::Draft> {
+    state["planDrafts"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|d| serde_json::from_value(d.clone()).ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// `get_schedule`: what the time column and Calendar show between two days:
+/// blocks, calendar events, tasks due, and the drafts that wait. Read only.
+pub fn get_schedule(store: &Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let today = clock.today();
+    let from = text(args, "from").unwrap_or(&today).to_string();
+    let to = text(args, "to").unwrap_or(&from).to_string();
+    if !schema::is_day(&from) || !schema::is_day(&to) {
+        return refused("A day is written YYYY-MM-DD.");
+    }
+    if to < from {
+        return refused("The last day comes before the first.");
+    }
+    let starts = zone::at_minute(&from, 0.0, &clock.zone);
+    let ends = zone::at_minute(&to, 24.0 * 60.0, &clock.zone);
+    if (ends - starts) / 86_400_000.0 > SCHEDULE_DAYS + 0.5 {
+        return refused("Ask for 31 days or fewer at a time.");
+    }
+    let world = World::load(store)?;
+    let in_days = |date: &str| date >= from.as_str() && date <= to.as_str();
+    let mut blocks: Vec<_> = world.blocks.iter().filter(|b| in_days(&b.date)).collect();
+    blocks.sort_by(|a, b| (&a.date, a.start).partial_cmp(&(&b.date, b.start)).unwrap());
+    let blocks: Vec<Value> = blocks
+        .iter()
+        .map(|b| {
+            let title = match (&b.task_id, &b.habit_id) {
+                (Some(t), _) => world.tasks.iter().find(|x| &x.id == t).map(|x| &x.title),
+                (None, Some(h)) => world.habits.iter().find(|x| &x.id == h).map(|x| &x.title),
+                (None, None) => None,
+            };
+            let mut v = json!({
+                "id": b.id,
+                "title": title,
+                "start": clock.iso(zone::at_minute(&b.date, b.start, &clock.zone)),
+                "minutes": num(b.minutes),
+            });
+            if let Some(t) = &b.task_id {
+                v["task_id"] = json!(t);
+            }
+            if let Some(h) = &b.habit_id {
+                v["habit_id"] = json!(h);
+            }
+            v
+        })
+        .collect();
+    let mut events: Vec<_> = world
+        .events
+        .iter()
+        .filter(|e| e.start < ends && e.end > starts)
+        .collect();
+    events.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap());
+    let events: Vec<Value> = events
+        .iter()
+        .map(|e| {
+            json!({
+                "title": e.title,
+                "start": clock.iso(e.start),
+                "end": clock.iso(e.end),
+                "all_day": e.all_day,
+            })
+        })
+        .collect();
+    let mut due: Vec<_> = world
+        .tasks
+        .iter()
+        .filter(|t| !t.done && t.due.is_some_and(|d| d >= starts && d < ends))
+        .collect();
+    due.sort_by(|a, b| a.due.partial_cmp(&b.due).unwrap());
+    let due: Vec<Value> = due
+        .iter()
+        .map(|t| json!({"task_id": t.id, "title": t.title, "due": clock.iso(t.due.unwrap_or(0.0))}))
+        .collect();
+    let drafts: Vec<Value> = drafts_of(&crate::state(store)?)
+        .iter()
+        .filter(|d| in_days(&d.date))
+        .map(|d| draft_view(&world, clock, d))
+        .collect();
+    Ok(
+        json!({"from": from, "to": to, "blocks": blocks, "events": events, "due": due, "drafts": drafts}),
+    )
+}
+
+/// `draft_block`: one block for a task, as a draft the person accepts or
+/// clears. Written outside the journal, like `plan_day`'s: a draft isn't a
+/// change (8.8). A second draft for the same task and day replaces the first.
+pub fn draft_block(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let world = World::load(store)?;
+    let task_id = text(args, "task_id").unwrap_or_default();
+    if !world
+        .task_index(task_id)
+        .is_some_and(|i| !world.tasks[i].done)
+    {
+        return refused("No open task has that id.");
+    }
+    let today = clock.today();
+    let date = text(args, "date").unwrap_or(&today).to_string();
+    if !schema::is_day(&date) {
+        return refused("A day is written YYYY-MM-DD.");
+    }
+    if date < today {
+        return refused("That day is over. Plan today or a day ahead.");
+    }
+    let minutes = plan::snap(whole(args, "minutes").unwrap_or(0) as f64)
+        .clamp(DRAFT_MINUTES.0, DRAFT_MINUTES.1);
+    // The column runs from 7 AM to midnight in steps of 15 minutes (3.5).
+    let start = plan::snap(minute_of(text(args, "start").unwrap_or_default()));
+    if start < 7.0 * 60.0 || start + minutes > 24.0 * 60.0 {
+        return refused("A block sits between 7 AM and midnight.");
+    }
+    let at = zone::at_minute(&date, start, &clock.zone);
+    let until = at + minutes * 60_000.0;
+    if until <= clock.now_ms {
+        return refused("That time has passed.");
+    }
+    let mut state = crate::state(store)?;
+    let mut drafts = drafts_of(&state);
+    drafts.retain(|d| !(d.task_id == task_id && d.date == date));
+    let taken = world
+        .blocks
+        .iter()
+        .filter(|b| b.date == date && b.start < start + minutes && start < b.start + b.minutes)
+        .map(|_| "a block")
+        .chain(
+            drafts
+                .iter()
+                .filter(|d| {
+                    d.date == date && d.start < start + minutes && start < d.start + d.minutes
+                })
+                .map(|_| "a draft"),
+        )
+        .chain(
+            world
+                .events
+                .iter()
+                .filter(|e| !e.all_day && e.start < until && at < e.end)
+                .map(|_| "a calendar event"),
+        )
+        .next();
+    if let Some(what) = taken {
+        return refused(format!(
+            "{what} already holds that time. Read get_schedule and pick a free one.",
+            what = what.replacen('a', "A", 1)
+        ));
+    }
+    let draft = plan::Draft {
+        task_id: task_id.to_string(),
+        date,
+        start,
+        minutes,
+        left_min: 0.0,
+        reason: text(args, "reason").unwrap_or_default().to_string(),
+        left_line: None,
+    };
+    let view = draft_view(&world, clock, &draft);
+    drafts.push(draft);
+    drafts.sort_by(|a, b| (&a.date, a.start).partial_cmp(&(&b.date, b.start)).unwrap());
+    let waiting = drafts.len();
+    state["planDrafts"] = Value::Array(
+        drafts
+            .iter()
+            .filter_map(|d| serde_json::to_value(d).ok())
+            .collect(),
+    );
+    crate::set_state(store, &state)?;
+    Ok(json!({"draft": view, "drafts_waiting": waiting}))
+}
+
+/// `list_habits`: each habit, whether today is ticked, and its record line.
+/// Read only: only the person ticks a habit.
+pub fn list_habits(store: &Store, clock: &Clock) -> Result<Value> {
+    let world = World::load(store)?;
+    let today = clock.today();
+    let list: Vec<Value> = world
+        .habits
+        .iter()
+        .map(|h| {
+            json!({
+                "id": h.id,
+                "title": h.title,
+                "minutes": h.minutes.map(num),
+                "done_today": h.log.get(&today).copied().unwrap_or(false),
+                "record": habits::habit_line(h, &today),
+            })
+        })
+        .collect();
+    Ok(json!({"date": today, "habits": list}))
+}
+
+/// `list_projects`: projects with their milestones in order and how many
+/// open tasks each holds, and the milestones that belong to no project.
+pub fn list_projects(store: &Store, args: &Map<String, Value>) -> Result<Value> {
+    let world = World::load(store)?;
+    let space = match text(args, "space") {
+        Some(q) => Some(world.space(q)?.id.clone()),
+        None => None,
+    };
+    let status = text(args, "status").unwrap_or("active");
+    let space_name = |id: &str| {
+        world
+            .spaces
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.name.clone())
+    };
+    let milestone = |m: &wi_heat::model::records::Milestone| json!({"id": m.id, "title": m.title, "date": m.date, "done": m.done});
+    let mut ordered: Vec<_> = world.milestones.iter().collect();
+    ordered.sort_by(|a, b| a.order.partial_cmp(&b.order).unwrap());
+    let projects: Vec<Value> = world
+        .projects
+        .iter()
+        .filter(|p| space.as_ref().map_or(true, |s| &p.space_id == s))
+        .filter(|p| {
+            status == "all"
+                || serde_json::to_value(p.status)
+                    .ok()
+                    .as_ref()
+                    .and_then(Value::as_str)
+                    == Some(status)
+        })
+        .map(|p| {
+            json!({
+                "id": p.id,
+                "title": p.title,
+                "space": space_name(&p.space_id),
+                "status": p.status,
+                "target_date": p.target_date,
+                "milestones": ordered
+                    .iter()
+                    .filter(|m| m.project_id.as_deref() == Some(&p.id))
+                    .map(|m| milestone(m))
+                    .collect::<Vec<_>>(),
+                "open_tasks": world
+                    .tasks
+                    .iter()
+                    .filter(|t| !t.done && t.project_id.as_deref() == Some(&p.id))
+                    .count(),
+            })
+        })
+        .collect();
+    let loose: Vec<Value> = ordered
+        .iter()
+        .filter(|m| m.project_id.is_none())
+        .filter(|m| space.as_ref().map_or(true, |s| &m.space_id == s))
+        .map(|m| {
+            let mut v = milestone(m);
+            v["space"] = json!(space_name(&m.space_id));
+            v
+        })
+        .collect();
+    Ok(json!({"projects": projects, "milestones": loose}))
+}
+
+/// `add_project`: a project marked as Claude's, active, with nothing in it.
+pub fn add_project(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let world = World::load(store)?;
+    let space = match text(args, "space") {
+        Some(q) => world.space(q)?,
+        None => match world.spaces.first() {
+            Some(s) => s,
+            None => return refused("There's no space yet. Open Learn in Wi_WWAV once."),
+        },
+    };
+    let title = text(args, "title").unwrap_or_default();
+    if world
+        .projects
+        .iter()
+        .any(|p| p.space_id == space.id && p.title.trim().eq_ignore_ascii_case(title))
+    {
+        return refused(format!(
+            "{} already has a project called {title}.",
+            space.name
+        ));
+    }
+    let mut record = Map::new();
+    record.insert("spaceId".into(), json!(space.id));
+    record.insert("title".into(), json!(title));
+    if let Some(day) = text(args, "target_date") {
+        record.insert("targetDate".into(), json!(day));
+    }
+    let project = drafted(&world, clock, kind::PROJECT, record, args)?;
+    let undo = change(
+        store,
+        "Claude's project",
+        claude("add_project", args),
+        |txn| put(txn, kind::PROJECT, &project),
+    )?;
+    Ok(json!({"project": project, "undo_label": undo}))
+}
+
+/// `add_milestone`: a milestone marked as Claude's, never done, on a project
+/// or loose in a space.
+pub fn add_milestone(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let world = World::load(store)?;
+    let project = match text(args, "project_id") {
+        Some(id) => match world.projects.iter().find(|p| p.id == id) {
+            Some(p) => Some(p),
+            None => return refused("No project has that id."),
+        },
+        None => None,
+    };
+    let space_id = match (text(args, "space"), project) {
+        (Some(q), _) => world.space(q)?.id.clone(),
+        (None, Some(p)) => p.space_id.clone(),
+        (None, None) => match world.spaces.first() {
+            Some(s) => s.id.clone(),
+            None => return refused("There's no space yet. Open Learn in Wi_WWAV once."),
+        },
+    };
+    let mut record = Map::new();
+    record.insert("spaceId".into(), json!(space_id));
+    record.insert(
+        "title".into(),
+        json!(text(args, "title").unwrap_or_default()),
+    );
+    record.insert("date".into(), json!(text(args, "date").unwrap_or_default()));
+    if let Some(p) = project {
+        record.insert("projectId".into(), json!(p.id));
+    }
+    let milestone = drafted(&world, clock, kind::MILESTONE, record, args)?;
+    let undo = change(
+        store,
+        "Claude's milestone",
+        claude("add_milestone", args),
+        |txn| put(txn, kind::MILESTONE, &milestone),
+    )?;
+    Ok(json!({"milestone": milestone, "undo_label": undo}))
+}
+
+fn clipped(markdown: &str) -> (String, bool) {
+    let clipped: String = markdown.chars().take(NOTE_CHARS).collect();
+    let cut = clipped.len() < markdown.len();
+    (clipped, cut)
+}
+
+/// `get_notes`: the notes, newest first, and one day's daily note. Read only.
+pub fn get_notes(store: &Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let today = clock.today();
+    let date = text(args, "date").unwrap_or(&today);
+    if !schema::is_day(date) {
+        return refused("A day is written YYYY-MM-DD.");
+    }
+    let limit = whole(args, "limit").unwrap_or(20).clamp(1, 100) as usize;
+    let mut notes = all(store, kind::NOTE)?;
+    // Ids are ULIDs, so the newest sorts last.
+    notes.sort_by(|a, b| b["id"].as_str().cmp(&a["id"].as_str()));
+    let notes: Vec<Value> = notes
+        .iter()
+        .take(limit)
+        .map(|n| {
+            let (text, cut) = clipped(n["markdown"].as_str().unwrap_or_default());
+            json!({
+                "id": n["id"],
+                "title": n["title"],
+                "text": text,
+                "cut_short": cut,
+                "project_id": n["projectId"],
+                "by": n["source"].as_str().unwrap_or("you"),
+            })
+        })
+        .collect();
+    let daily = one(store, kind::DAILY_NOTE, date)?.map(|d| {
+        let (text, cut) = clipped(d["markdown"].as_str().unwrap_or_default());
+        json!({"date": date, "text": text, "cut_short": cut})
+    });
+    Ok(json!({"notes": notes, "daily_note": daily}))
+}
+
+/// `add_note`: a note marked as Claude's. It never touches a note the person
+/// wrote, and never the daily note.
+pub fn add_note(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let world = World::load(store)?;
+    let mut record = Map::new();
+    record.insert(
+        "title".into(),
+        json!(text(args, "title").unwrap_or_default()),
+    );
+    record.insert(
+        "markdown".into(),
+        json!(args.get("text").and_then(Value::as_str).unwrap_or("")),
+    );
+    if let Some(id) = text(args, "project_id") {
+        if !world.projects.iter().any(|p| p.id == id) {
+            return refused("No project has that id.");
+        }
+        record.insert("projectId".into(), json!(id));
+    }
+    let note = drafted(&world, clock, kind::NOTE, record, args)?;
+    let undo = change(store, "Claude's note", claude("add_note", args), |txn| {
+        put(txn, kind::NOTE, &note)
+    })?;
+    Ok(json!({"note": {"id": note["id"], "title": note["title"]}, "undo_label": undo}))
+}
+
+/// `list_inbox`: the captures that wait to be triaged. Read only: only the
+/// person triages.
+pub fn list_inbox(store: &Store) -> Result<Value> {
+    let world = World::load(store)?;
+    let raw = all(store, kind::CAPTURE)?;
+    let waiting: Vec<Value> = world
+        .captures
+        .iter()
+        .filter(|c| c.triaged_at.is_none())
+        .map(|c| {
+            let by = raw
+                .iter()
+                .find(|r| r["id"].as_str() == Some(&c.id))
+                .and_then(|r| r["source"].as_str())
+                .unwrap_or("you");
+            json!({"id": c.id, "text": c.text, "by": by})
+        })
+        .collect();
+    Ok(json!({"captures": waiting}))
+}
+
+/// `add_capture`: a line in the Inbox, marked as Claude's, for the person to
+/// triage into a task, a note or a project, or to throw away.
+pub fn add_capture(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let world = World::load(store)?;
+    let mut record = Map::new();
+    record.insert("text".into(), json!(text(args, "text").unwrap_or_default()));
+    let capture = drafted(&world, clock, kind::CAPTURE, record, args)?;
+    let undo = change(
+        store,
+        "Claude's capture",
+        claude("add_capture", args),
+        |txn| put(txn, kind::CAPTURE, &capture),
+    )?;
+    let waiting = world
+        .captures
+        .iter()
+        .filter(|c| c.triaged_at.is_none())
+        .count()
+        + 1;
+    Ok(json!({"capture": capture, "in_inbox": waiting, "undo_label": undo}))
 }

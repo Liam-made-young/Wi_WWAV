@@ -50,7 +50,7 @@ pub const SETTINGS: Item = item("settings", "Settings…", Some("CmdOrCtrl+,"));
 /// The view segments, in the switcher's order (2.1): Heat, the profile
 /// view; Space, the social view; the Console, the creation view.
 pub const ROOMS: [Item; 3] = [
-    item("room.heat", "Heat", Some("CmdOrCtrl+1")),
+    item("room.heat", "Learn", Some("CmdOrCtrl+1")),
     item("room.space", "Space", Some("CmdOrCtrl+2")),
     item("room.console", "Console", Some("CmdOrCtrl+3")),
 ];
@@ -451,7 +451,7 @@ mod tests {
         assert_eq!(
             got,
             [
-                ("Heat", "CmdOrCtrl+1"),
+                ("Learn", "CmdOrCtrl+1"),
                 ("Space", "CmdOrCtrl+2"),
                 ("Console", "CmdOrCtrl+3"),
             ]
@@ -536,7 +536,7 @@ mod tests {
         fn the_edit_menu_names_the_current_rooms_undo() {
             let app = app();
             assert_eq!(item(&app, UNDO.id), ("Undo".into(), false));
-            assert_eq!(ticked(&app), ["Heat"]);
+            assert_eq!(ticked(&app), ["Learn"]);
 
             let heat =
                 json!({ "room": "heat", "undo": "Undo mark done", "redo": null, "cant": null });
@@ -546,7 +546,7 @@ mod tests {
             assert_eq!(
                 item(&app, UNDO.id),
                 ("Undo mark done".into(), true),
-                "Space's history doesn't show in Heat"
+                "Space's history doesn't show in Learn"
             );
             assert_eq!(item(&app, REDO.id), ("Redo".into(), false));
 
@@ -577,7 +577,7 @@ mod tests {
             );
             show(&app, "library").unwrap();
             assert_eq!(item(&app, UNDO.id), ("Undo tag clip".into(), true));
-            assert_eq!(ticked(&app), ["Heat"]);
+            assert_eq!(ticked(&app), ["Learn"]);
         }
 
         #[test]

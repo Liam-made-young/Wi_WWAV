@@ -20,7 +20,7 @@ register('heat.school.set', (args, fake) => {
   try {
     new RegExp(pattern.replace(/^\/|\/[a-z]*$/g, ''));
   } catch {
-    refuse('That course-code pattern isn’t a pattern Heat can read.');
+    refuse('That course-code pattern isn’t a pattern Learn can read.');
   }
   const was = schools.get(fake);
   const url = typeof args.icalUrl === 'string' ? args.icalUrl.trim() : '';

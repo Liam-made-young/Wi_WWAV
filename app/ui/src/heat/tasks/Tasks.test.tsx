@@ -150,9 +150,9 @@ describe('Tasks’ list', () => {
     await settle();
     await click(tab('Tasks'));
     await click(button(rig, /^WWAV/));
-    expect($(rig, '.heat-tasks .heat-empty')!.textContent).toBe('Add your first WWAV task and Heat will rank it.');
+    expect($(rig, '.heat-tasks .heat-empty')!.textContent).toBe('Add your first WWAV task and Learn will rank it.');
     await click(button(rig, /^All/));
-    expect($(rig, '.heat-tasks .heat-empty')!.textContent).toBe('Add your first task and Heat will rank it.');
+    expect($(rig, '.heat-tasks .heat-empty')!.textContent).toBe('Add your first task and Learn will rank it.');
   });
 
   it('says Nothing here right now for an empty list when other tasks exist', async () => {

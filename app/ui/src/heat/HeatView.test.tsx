@@ -13,7 +13,7 @@ afterEach(() => rig?.unmount());
 
 const tabButton = (name: string) => button(rig, name)!;
 
-describe('Heat’s frame', () => {
+describe('Learn’s frame', () => {
   it('holds a "+", the six tabs as one segmented control, and Sync', async () => {
     rig = await mountHeat();
     const tabs = $$(rig, '[role="tab"]').map((t) => t.textContent);

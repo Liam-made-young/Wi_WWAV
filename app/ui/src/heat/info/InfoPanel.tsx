@@ -375,7 +375,7 @@ function estimateHint(task: Task, estimate: { min: number; by: 'you' | 'claude' 
     return `Claude's estimate: ${formatMinutes(estimate.min)}, difficulty ${task.difficulty}. It read the title, the notes and your past averages.`;
   }
   if (estimate.by === 'you') return 'Set by you.';
-  return 'Heat’s estimate: your average for this type, or difficulty × 20 minutes.';
+  return 'Learn’s estimate: your average for this type, or difficulty × 20 minutes.';
 }
 
 // --- a block -------------------------------------------------------------------

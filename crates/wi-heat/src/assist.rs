@@ -71,12 +71,12 @@ impl Task {
 /// Shown at the first use of scoring, which covers scoring one task and
 /// scoring synced tasks in a batch.
 pub const SCORING_CONSENT: &str =
-    "Heat will send this task's title, type and notes, and your average minutes per type. Nothing else.";
+    "Learn will send this task's title, type and notes, and your average minutes per type. Nothing else.";
 /// Reading email has its own switch. The spec gives it no sentence, so this
 /// one says what 2.11 lists it sending, in scoring's words, until the founder
 /// writes one.
 pub const MAIL_CONSENT: &str =
-    "Heat will send up to 8 school emails per sync, today's date and your time zone, and up to 80 of your task titles. Nothing else.";
+    "Learn will send up to 8 school emails per sync, today's date and your time zone, and up to 80 of your task titles. Nothing else.";
 pub const TURN_ON_SCORING: &str = "Turn on scoring";
 pub const NOT_NOW: &str = "Not now";
 

@@ -6,12 +6,12 @@ in the current spec (Decided, Proposed, Open, Exists today).
 
 ## The shape
 
-- The app has **three views**, not four rooms. The founder's words: "Heat ->
+- The app has **three views**, not four rooms. The founder's words: "Learn ->
   profile view, Space -> social view, Console -> creation view".
-  - **Heat** (⌘1) is the profile view.
+  - **Learn** (⌘1) is the profile view.
   - **Space** (⌘2) is the social view.
   - **Console** (⌘3) is the creation view.
-  - Keep the names Heat, Space and Console; describe each as the profile,
+  - Keep the names Learn, Space and Console; describe each as the profile,
     social or creation view.
 - **Unquantized is cut entirely.** "Eventually the space will hold commerce
   instead of having that be a 4th place." So commerce is **later**, inside
@@ -23,12 +23,12 @@ in the current spec (Decided, Proposed, Open, Exists today).
   defaults stay conservative, but nothing needs to be built for a public
   launch now.
 
-## Heat: the profile view
+## Learn: the profile view
 
-- Keep Heat as the spec has it now (chapter 3: Today with the time column,
+- Keep Learn as the spec has it now (chapter 3: Today with the time column,
   Plan my day and the Pomodoro; Tasks; Calendar; Grades; Habits; Mail; spaces;
   capture, notes and the weekly review). It stays "supremely useful".
-- **Privacy model (Decided):** "Heat is like a facebook typa thing. By default
+- **Privacy model (Decided):** "Learn is like a facebook typa thing. By default
   everything will be a private PKM, with a simple version appearing public, but
   I can toggle anything to be public, including grades." So:
   - Every record (task, project, milestone, habit, note, course, grade, focus
@@ -39,10 +39,10 @@ in the current spec (Decided, Proposed, Open, Exists today).
   - Any item can be toggled public, including grades. Grades are FERPA
     education records when a school holds them; here the student chooses to
     show their own, the default is private, and the toggle says so plainly.
-- **Two profile views (Decided):** your private Heat (the profile view, ⌘1),
-  and your **public Heat view**, which is what anyone sees when they open "the
+- **Two profile views (Decided):** your private Learn (the profile view, ⌘1),
+  and your **public Learn view**, which is what anyone sees when they open "the
   sun in the middle of your galaxy" in Space. The bio sun therefore opens your
-  public Heat view (plus your bio blocks).
+  public Learn view (plus your bio blocks).
 - **AI through MCP (Decided):** Wi_WWAV is an **MCP server**. Claude
   (claude.ai, Claude Desktop, Claude Code) connects to it and calls tools such
   as list_tasks, add_task, update_task (difficulty, estimate, reason),
@@ -62,7 +62,7 @@ in the current spec (Decided, Proposed, Open, Exists today).
     same way, through their private iCal addresses (Google Calendar has one),
     so the app needs no Google sign-in at all.
   - A local MCP server (stdio, for Claude Desktop and Claude Code) first; a
-    remote one through mi-wwav.com for claude.ai later, since it needs Heat
+    remote one through mi-wwav.com for claude.ai later, since it needs Learn
     sync.
   - Recommendation to record where it matters: MCP tools act on the local
     library through the same journal as the UI, so ⌘Z undoes them.
@@ -145,7 +145,7 @@ in the current spec (Decided, Proposed, Open, Exists today).
   remixes and forks; thin remixes; .swav 0.2's wgrd goes (no grade); words and
   garments stay Open (writing and fashion are kept); "Files in the store" goes
   (commerce is later).
-- Chapter 8 (look): two registers, the desk (Heat, the Console's chrome) and
+- Chapter 8 (look): two registers, the desk (Learn, the Console's chrome) and
   the night (Space); the interior register goes; room sound and house music
   go; the astronaut goes.
 - Chapter 9 (engineering): keep the two processes, the wire and clock, crash
@@ -175,6 +175,6 @@ The founder settled six more things. They carry the label **Decided** in the spe
 - **No commerce until the founder says so.** "commerce won't exist until I say it does." The app takes no money: no Pro, no Founding seats, no split packs, no store fee, no `tier` entitlement, and no plan bought in the browser. Pro, Founding and split packs were the iPhone app's plans; they stay there, and the desktop app neither sells nor reads them. Gate 1.4 stays open with no route.
 - **Galleries are made by uploading photos.** "lets just have people upload images for fashion gallery." Drop photos on a system and they become a gallery planet. An image editor "somewhere between photoshop and kidpics" comes after v1, "not yet".
 - **Plain export is WAV only for now.** "I really want .wwav and .swav to work but keep em out for now." MP3 and a plain MP4 wait.
-- **Heat's maths moves to the Rust core.** "heat math is fine thats actually better rust I trust more than typescript for this."
+- **Learn's maths moves to the Rust core.** "heat math is fine thats actually better rust I trust more than typescript for this."
 - **The dates.** "heat 100% done by the end of today" (7 Oct), the app "80-90% done by this weekend" (11 Oct), and "a working version of wi-wwav by january" (2027).
-- **Syllabus import and the Claude-drafted weekly note** were left to the build ("sounds good on any direction u feel comfortable on this"). They stay out of Heat's first version; each can come back as one more MCP tool.
+- **Syllabus import and the Claude-drafted weekly note** were left to the build ("sounds good on any direction u feel comfortable on this"). They stay out of Learn's first version; each can come back as one more MCP tool.

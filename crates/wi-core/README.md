@@ -23,7 +23,7 @@ let meters = core.meters();                            // raw bytes, at most onc
   app bundle, else `wi-mcp` beside the app's binary. `Config.now` and
   `Core::set_now` fix "now" (milliseconds) for tests of what the time decides.
 - `Core::open` returns at once; the engine starts in the background and
-  `engine.status` says "starting" until it runs. Heat doesn't wait for it: a
+  `engine.status` says "starting" until it runs. Learn doesn't wait for it: a
   missing engine binary leaves the engine "stopped", with its sentence, and
   every `heat.*` command works.
 
@@ -34,11 +34,11 @@ let meters = core.meters();                            // raw bytes, at most onc
 | `library.rename` | `{id, title, label}` | `{clips}`: Get Info's title; the file keeps its name and bytes |
 
 Rust-only, for the Console and tests: `Core::pause_player(PausedFor::Console
-| Film)` (2.3: pressing play in the Console), `Core::sync_heat()` (a Heat sync
+| Film)` (2.3: pressing play in the Console), `Core::sync_heat()` (a Learn sync
 round now), and `Core::engine()` (load a session, call an op, read the clock
 and meters, the session hash).
 
-Heat's commands (`heat.*`, `history.undoEntry`) are `docs/HEAT.md`'s. Each is
+Learn's commands (`heat.*`, `history.undoEntry`) are `docs/HEAT.md`'s. Each is
 a thin call into `wi-heat-store`, which `wi-mcp` shares, so a rule exists
 once. Three workers sit behind them: the watcher (`PRAGMA data_version` every
 500 ms; what another process, the MCP helper, committed is read from the
@@ -63,7 +63,7 @@ the Tauri event `core` `{event, payload}`, and each meters frame to the
 (`InvokeResponseBody::Raw`), never JSON. `app/src-tauri/README.md` has the
 whole contract, and `app/ui/src/bridge` is its other end.
 
-The app calls no model. Claude reaches Heat through an MCP server that
+The app calls no model. Claude reaches Learn through an MCP server that
 reuses wi-heat's rules (docs/SPEC.md 2.11, 8.8), so the core has no
 `assist.call` and no Anthropic key; Settings → Claude's switches for the
 helper's tools are `heat.claude.setTool`.
@@ -72,10 +72,10 @@ helper's tools are `heat.claude.setTool`.
 
 `cargo test -p wi-core` builds the workspace's mock-engine and runs the core
 against it, and against `tools/mock-server` (Node 22) for the account, the
-upload queue and Heat sync. `tests/core/mock_counts.mjs` starts the mock with
+upload queue and Learn sync. `tests/core/mock_counts.mjs` starts the mock with
 a side door that counts each upload part's sends.
 
-Heat's tests (`heat_commands`, `heat_calendars`, `heat_public`, `heat_watch`)
+Learn's tests (`heat_commands`, `heat_calendars`, `heat_public`, `heat_watch`)
 stand a core at a fixed time in New York (`Core::set_now`), read calendars from
 a feed server in the test, and build `wi-mcp` once and run it as a second
 process on the same library, to check that the app notices what Claude wrote.

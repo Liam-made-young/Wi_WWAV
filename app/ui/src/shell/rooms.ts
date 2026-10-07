@@ -12,7 +12,7 @@ export type RoomId = 'heat' | 'space' | 'console';
 export const ROOMS: readonly RoomId[] = ['heat', 'space', 'console'];
 
 export const ROOM_NAMES: Record<RoomId, string> = {
-  heat: 'Heat',
+  heat: 'Learn',
   space: 'Space',
   console: 'Console',
 };

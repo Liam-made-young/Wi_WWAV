@@ -36,7 +36,7 @@ fn keys(v: &Value) -> Vec<&str> {
 fn the_consent_sentence_is_exact_and_the_body_sends_nothing_else() {
     assert_eq!(
         assist::SCORING_CONSENT,
-        "Heat will send this task's title, type and notes, and your average minutes per type. Nothing else."
+        "Learn will send this task's title, type and notes, and your average minutes per type. Nothing else."
     );
     assert_eq!(assist::TURN_ON_SCORING, "Turn on scoring");
     assert_eq!(assist::NOT_NOW, "Not now");
@@ -421,7 +421,7 @@ fn a_review_draft_may_only_restate_numbers_heat_passed_in() {
     let invented = r#"{"draft":"What moved: 14 tasks, a 20% gain on last week."}"#;
     assert!(
         check_review(invented, &facts).is_none(),
-        "20 is not a number Heat passed in"
+        "20 is not a number Learn passed in"
     );
     // Numbers in words are held to the same rule, by value.
     for (draft, honest) in [

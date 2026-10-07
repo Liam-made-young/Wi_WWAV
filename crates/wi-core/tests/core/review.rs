@@ -556,7 +556,7 @@ fn review_a_milestone_planned_from_space_syncs() {
     ok(
         &mac,
         "records.mutate",
-        json!({"label": "plan in Heat", "room": "space", "ops": [{"op": "put", "kind": "milestone", "id": "m1", "value": {"title": "EP v1 mixed", "projectId": "p1"}}]}),
+        json!({"label": "plan in Learn", "room": "space", "ops": [{"op": "put", "kind": "milestone", "id": "m1", "value": {"title": "EP v1 mixed", "projectId": "p1"}}]}),
     );
     mac.sync_heat().unwrap();
     air.sync_heat().unwrap();

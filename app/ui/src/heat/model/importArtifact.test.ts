@@ -125,15 +125,15 @@ function dump(): HeatExport {
 }
 
 describe('parsing the export', () => {
-  it('takes a Heat export and refuses anything else in one line', () => {
+  it('takes a Learn export and refuses anything else in one line', () => {
     expect(parseHeatExport(JSON.parse(JSON.stringify(dump())))).toEqual(dump());
-    expect(parseHeatExport({ tasks: [] })).toEqual({ error: 'This file isn’t a Heat export.' });
-    expect(parseHeatExport(null)).toEqual({ error: 'This file isn’t a Heat export.' });
+    expect(parseHeatExport({ tasks: [] })).toEqual({ error: 'This file isn’t a Learn export.' });
+    expect(parseHeatExport(null)).toEqual({ error: 'This file isn’t a Learn export.' });
     const stray = dump();
     stray.tasks[0].workspace = 'nowhere';
-    expect(parseHeatExport(stray)).toEqual({ error: 'This file isn’t a Heat export.' });
+    expect(parseHeatExport(stray)).toEqual({ error: 'This file isn’t a Learn export.' });
     expect(parseHeatExport({ ...dump(), version: 2 })).toEqual({
-      error: 'This export is from a newer Heat. Update Wi_WWAV, then try again.',
+      error: 'This export is from a newer Learn. Update Wi_WWAV, then try again.',
     });
   });
 });

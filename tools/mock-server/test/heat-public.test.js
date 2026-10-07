@@ -31,7 +31,7 @@ function numbers(value, path = '') {
   return [];
 }
 
-describe('the public Heat view', () => {
+describe('the public Learn view', () => {
   const ctx = useServer();
 
   test('a private record never appears, and a public one shows only its listed fields', async () => {

@@ -207,7 +207,7 @@ fn a_tool_switched_off_in_settings_is_missing_and_refused_by_the_helper() {
     let core = heat_core(&setup, "2026-10-07 09:00");
     snap(&core, "2026-10-07");
     let mut helper = McpHelper::start(core.library());
-    assert_eq!(helper.tools().len(), 8);
+    assert_eq!(helper.tools().len(), 18);
     let tools = |core: &Core| -> Vec<(String, bool)> {
         ok(core, "heat.claude.get", json!({}))["tools"]
             .as_array()
@@ -222,7 +222,7 @@ fn a_tool_switched_off_in_settings_is_missing_and_refused_by_the_helper() {
             .collect()
     };
     let before = tools(&core);
-    assert_eq!(before.len(), 8);
+    assert_eq!(before.len(), 18);
     assert!(
         before.iter().all(|(_, on)| *on),
         "every tool is on until switched off"
@@ -301,7 +301,7 @@ fn s2_11_settings_claude_shows_the_exact_lines_with_the_helpers_real_path() {
         got.get("note").is_none(),
         "the helper is there, so nothing needs building"
     );
-    assert_eq!(got["tools"].as_array().unwrap().len(), 8);
+    assert_eq!(got["tools"].as_array().unwrap().len(), 18);
     drop(core);
 
     // A path with a space is quoted in the shell line, and escaped in the JSON.

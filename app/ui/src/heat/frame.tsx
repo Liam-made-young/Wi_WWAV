@@ -144,14 +144,14 @@ export const ScopeContext = createContext<{ tab: TabId; active: boolean } | null
 
 export function useFrame(): FrameApi {
   const frame = useContext(FrameContext);
-  if (!frame) throw new Error('A Heat tab lives inside HeatView.');
+  if (!frame) throw new Error('A Learn tab lives inside HeatView.');
   return frame;
 }
 
 /** Which tab this component is in, and whether that tab is the one showing. */
 export function useTabScope(): { tab: TabId; active: boolean } {
   const scope = useContext(ScopeContext);
-  if (!scope) throw new Error('A Heat tab lives inside HeatView.');
+  if (!scope) throw new Error('A Learn tab lives inside HeatView.');
   return scope;
 }
 

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "settings-window",
-  "description": "The settings window (docs/SPEC.md 2.13) reads and changes settings, the account and the engine's devices, cleans up media, and picks folders. Its Heat panes (spaces, school and calendars; Claude; Privacy) reach the Heat commands they need, not Heat's day-to-day ones. It can't touch the library's clips, publish or buy.",
+  "description": "The settings window (docs/SPEC.md 2.13) reads and changes settings, the account and the engine's devices, cleans up media, and picks folders. Its Learn panes (spaces, school and calendars; Claude; Privacy) reach the Learn commands they need, not Learn's day-to-day ones. It can't touch the library's clips, publish or buy.",
   "windows": ["settings"],
   "permissions": [
     {

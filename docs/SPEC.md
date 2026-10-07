@@ -1,6 +1,6 @@
 # Wi_WWAV
 
-*One desktop app with three views: Heat, where you plan your time and keep a private profile with a simple public face; Space, where you live among other people's work as a galaxy; and the Console, where you make songs and films on one clock.*
+*One desktop app with three views: Learn, where you plan your time and keep a private profile with a simple public face; Space, where you live among other people's work as a galaxy; and the Console, where you make songs and films on one clock.*
 
 - **Working name:** Wi_WWAV, said "we wave".
 - **Date:** 6 October 2026. **Scope narrowed:** 7 October 2026, in conversation with the founder (`docs/SCOPE_CUT.md`): three views instead of four rooms, the walkable shop and the paid plans cut (commerce waits until the founder says it exists), Space and the Console trimmed to their core, and Claude reached through an MCP server.
@@ -14,7 +14,7 @@ Four labels mark how settled each part is:
 | **Decided** | settled in conversation with the founder |
 | **Proposed** | this document's design for the new app, which is most of it |
 | **Open** | a decision the founder still has to make, given with a recommendation |
-| **Exists today** | already built in the repo or in Heat, with where it lives |
+| **Exists today** | already built in the repo or in Learn, with where it lives |
 
 **Contents**
 
@@ -22,7 +22,7 @@ Four labels mark how settled each part is:
 |---|---|---|
 | 1 | [The idea](#1-the-idea) | what the app is, the sketch translated, the two connections, the name, one day with it |
 | 2 | [One app, three views](#2-one-app-three-views) | the window, the Now strip, the library, one account, the shared grammar, Claude through MCP |
-| 3 | [Heat: the profile view](#3-heat-the-profile-view) | planning time: Today, tasks by heat, focus sessions, grades, habits, school mail; private by default, with a public view; the MCP server |
+| 3 | [Learn: the profile view](#3-learn-the-profile-view) | planning time: Today, tasks by heat, focus sessions, grades, habits, school mail; private by default, with a public view; the MCP server |
 | 4 | [Space: the social view](#4-space-the-social-view) | the universe of galaxies in real 3D, the planet player, the four media as worlds, lineage, commerce later |
 | 5 | [Console: the creation view](#5-console-the-creation-view) | one timeline for audio, MIDI and basic video, with plugins, takes, splits and export |
 | 6 | [Files: .wwav, .swav and the session](#6-files-wwav-swav-and-the-session) | the formats byte by byte, the session package, versions and forks |
@@ -39,7 +39,7 @@ Wi_WWAV is one native desktop app with three views (**Decided**).
 
 | View | Key | Is | What you do there |
 |---|---|---|---|
-| **Heat** | ⌘1 | the profile view | plan your time: today's plan, tasks ranked by heat, a focus timer, grades, habits, school mail. All of it is private by default, and a simple public version shows behind your sun in Space |
+| **Learn** | ⌘1 | the profile view | plan your time: today's plan, tasks ranked by heat, a focus timer, grades, habits, school mail. All of it is private by default, and a simple public version shows behind your sun in Space |
 | **Space** | ⌘2 | the social view | live among people and their work: every person is a galaxy, every project a solar system, every work a planet |
 | **Console** | ⌘3 | the creation view | make: one timeline for audio and video, with plugins, exporting `.wwav` songs and `.swav` films |
 
@@ -52,7 +52,7 @@ The archive gives every WWAV family one model: "a device, a format, and a market
 - **The device** is the Console.
 - **The format** is the pair `.wwav` and `.swav`.
 - **Space** carries work between people. It will hold the marketplace too, later (**Decided**; see 4).
-- **Heat** holds the hours all of it takes, and is the profile the work comes from.
+- **Learn** holds the hours all of it takes, and is the profile the work comes from.
 
 Some things are left out on purpose: a feed ranked by popularity, likes and follower counts, notifications, autoplay, and anything paid for with attention. The founder's own gates (`wi/GATES.md`) fail each of them. Where the sketch asks for one, this document makes the passing design the default, names the conflict, and marks it **Open** (see 9.6).
 
@@ -62,7 +62,7 @@ The founder's sketch draws four boxes and the lines between them. Three of the b
 
 | Sketch box | View | What it is | Reuses (**Exists today**) | Family |
 |---|---|---|---|---|
-| The organizer, in a window labelled "Wi-WWAV" | Heat, the profile view | Today with a time column, Plan my day and a Pomodoro timer; tasks, calendar, grades, habits, mail; a private PKM with a simple public version | Heat, a claude.ai artifact of 1,481 lines; the PKM (`portfolio/src/pkm/`) | none; it holds the time behind all of them |
+| The organizer, in a window labelled "Wi-WWAV" | Learn, the profile view | Today with a time column, Plan my day and a Pomodoro timer; tasks, calendar, grades, habits, mail; a private PKM with a simple public version | Learn, a claude.ai artifact of 1,481 lines; the PKM (`portfolio/src/pkm/`) | none; it holds the time behind all of them |
 | "souped up version of WWAV app v3", an "intergalactic 3D social media for music, film, writing & fashion" | Space, the social view | a universe you move through in real 3D; the player is the planet; the reply to a song is a fork | v3's planet player (`ios_v3/`); v4's galaxy (`wwav/`); v5's orbits and gallery planets (`ios_v4/`, `server/routes/v2/`) | Mi, Si, Ri, Gi as four kinds of world |
 | The "Mi-WWAV console": one timeline for audio and video, "the best parts of Premiere and Ableton smashed together" | Console, the creation view | a JUCE engine hosting VST3 and AU, MIDI through third-party instruments, local splits, and plain video cutting on the engine's clock | `prana/core`; MI-WWAV-OS's timeline and undo-journal designs (ideas, not code); WWAV Push (`vst_plugin/`) | Mi (Mi_pro_WWAV's software) and Si |
 
@@ -73,10 +73,10 @@ Zi_WWAV (furniture) stays out, because the sketch names four media and nothing i
 ### 1.3 The two connections
 
 ```
-Heat ── connected profiles ── Space ── connected uploads ── Console
+Learn ── connected profiles ── Space ── connected uploads ── Console
 ```
 
-**Connected profiles (Heat and Space).** Heat is a private PKM by default. A simple public version of it, your **public Heat view**, is what anyone sees when they open the sun in the middle of your galaxy (**Decided**). By default it has room for two things, each shown once you press Show: a "Now making" line and the milestone timelines of projects you link to a solar system. Anything else, a task, a habit, a note or a grade, stays private until you switch that one item public. Counts and comparisons between people never cross (3.15).
+**Connected profiles (Learn and Space).** Learn is a private PKM by default. A simple public version of it, your **public Learn view**, is what anyone sees when they open the sun in the middle of your galaxy (**Decided**). By default it has room for two things, each shown once you press Show: a "Now making" line and the milestone timelines of projects you link to a solar system. Anything else, a task, a habit, a note or a grade, stays private until you switch that one item public. Counts and comparisons between people never cross (3.15).
 
 **Connected uploads (Console and Space).** Dropping an export on a solar system publishes it. The server keeps the exact bytes and reads the work's family from the file's `wlin` chunk. Going back, **Open in Console** (⌘E) on any song or film in Space opens it as a session with four stem lanes, ready to tear apart and fork (4.12, 5.14).
 
@@ -100,7 +100,7 @@ The devlog pulls the other way twice. Post 1 wonders about "One medium: music; o
 
 ### 1.5 The name
 
-**Wi_WWAV** is said "we wave". The sketch labels the Heat window "Wi-WWAV", and the second devlog letter coins the word: "I think Wi-Wwav (we wave) is a perfect name for the people who are customers and fans of wwav, we are the wwav, so just shorten it and its Wi-WWAV." The app takes the name of the people it is for. The underscore follows the archive's rule for family names, "never a hyphen" (`archive/src/content.js:281`).
+**Wi_WWAV** is said "we wave". The sketch labels the Learn window "Wi-WWAV", and the second devlog letter coins the word: "I think Wi-Wwav (we wave) is a perfect name for the people who are customers and fans of wwav, we are the wwav, so just shorten it and its Wi-WWAV." The app takes the name of the people it is for. The underscore follows the archive's rule for family names, "never a hyphen" (`archive/src/content.js:281`).
 
 **Exists today:** www.wi-wwav.com is already Wi_WWAV, a private wall of `.wwav` and `.swav` files that one account can sign in to (`wi/`). The rest of this document calls that site **Wi**, or the wall, so "Wi_WWAV" always means the app. **Proposed:** it becomes the app's web face, serving share pages and downloads (8.7).
 
@@ -112,7 +112,7 @@ The devlog pulls the other way twice. Post 1 wonders about "One medium: music; o
 
 Tuesday, October 6. All of this is **Proposed**, and every name, key and number is the one the later chapters specify.
 
-**8:40 AM, Heat.** The app opens on Today and syncs, because the last sync was over 15 minutes ago: "Synced 8:41 AM: 2 new tasks, 1 date change". One task came from the Brightspace calendar feed: "Grammar quiz 4", JPN 201, due Wednesday 11:59 PM.
+**8:40 AM, Learn.** The app opens on Today and syncs, because the last sync was over 15 minutes ago: "Synced 8:41 AM: 2 new tasks, 1 date change". One task came from the Brightspace calendar feed: "Grammar quiz 4", JPN 201, due Wednesday 11:59 PM.
 
 Claude Desktop is open beside it. You ask it to score what came in. It calls `list_tasks`, then asks before its first `update_task`, as it does for any tool you haven't allowed. The quiz now reads "Claude's estimate: 45m, difficulty 2. It read the title, the notes and your past averages." The Edit menu reads "Undo Claude's estimate". Claude has also read last night's school mail through its own Gmail connector and recorded two threads in Mail: "Grade posted" for MTH 142, which waits as a pending grade, and "Nothing to do" for a classroom change.
 
@@ -133,11 +133,11 @@ At 11:59, while you're in class, the tube fills past 0.70 and turns red. The str
 
 You select OUTPUT and press Return with `.wwav` and `.swav` ticked. The sheet reads "This session is 48 kHz. The .wwav will be 44.1 kHz, 16-bit, resampled and dithered.", "Stems sum to the master." and "3:58 → about 210 MB." A minute later both files exist, and the film's parent is the song.
 
-**4:30 PM, Space.** You drag the export onto "Space" and drop it on the solar system World Ending. The planet condenses in while a ring traces the upload: "Up. Low Tide is in your galaxy." It is brick red, hsl(0, 58%, 42%), because A minor's hue is 0, and the ringed film hangs from it. Back in Heat you tick **Reached** on the milestone "Low Tide mixed", and its bead fills on the EP timeline behind your sun. Nothing else is published.
+**4:30 PM, Space.** You drag the export onto "Space" and drop it on the solar system World Ending. The planet condenses in while a ring traces the upload: "Up. Low Tide is in your galaxy." It is brick red, hsl(0, 58%, 42%), because A minor's hue is 0, and the ringed film hangs from it. Back in Learn you tick **Reached** on the milestone "Low Tide mixed", and its bead fills on the EP timeline behind your sun. Nothing else is published.
 
 **6:10 PM, Ana.** Ana has added your galaxy, so Low Tide tops her Newest. She mutes the vocals moon, pulls the drums moon in to 40%, and presses ↑ Push. A spark leaves the planet, and "Low Tide (fork)" joins your song's family at generation 1, owning no audio of its own. Nobody tells you.
 
-**8:15 PM, Space.** You open Ana's sun. Under her bio is her public Heat view: "Now making: glass hours, the last verse", and one timeline with three beads. Her grades aren't there, because she never switched them on.
+**8:15 PM, Space.** You open Ana's sun. Under her bio is her public Learn view: "Now making: glass hours, the last verse", and one timeline with three beads. Her grades aren't there, because she never switched them on.
 
 **10:30 PM, Since you last looked.** At the top of Space you find Ana's fork, two new works from galaxies you've added, and a letter that opens "Dear Wi-WWAV,". The list ends "That's everything since 8:15 PM." You go back to Ana's planet "glass hours" and press **Open in Console** (⌘E). A session opens with four stem lanes under the header "fork of glass hours · gen 3". You solo the bass, listen once, and quit. Nothing reaches out before morning, when the app opens on Today with the quiz at the top, Hot.
 
@@ -154,7 +154,7 @@ You select OUTPUT and press Return with `.wwav` and `.swav` ticked. The sheet re
 
 ## 2. One app, three views
 
-This chapter covers the shell, which is everything that stays put when you change views. Everything here is **Proposed** unless it carries another label. The views themselves are chapters 3 (Heat), 4 (Space) and 5 (Console).
+This chapter covers the shell, which is everything that stays put when you change views. Everything here is **Proposed** unless it carries another label. The views themselves are chapters 3 (Learn), 4 (Space) and 5 (Console).
 
 ### 2.1 The window
 
@@ -166,28 +166,28 @@ There is one main window. It opens at 1280 × 800 pt and can shrink to 1024 × 6
 | View | the rest | the current view |
 | Status bar | 22 pt | the view's own count · sync state · save state |
 
-The title bar is brushed metal in every view, in light and dark. As MI-WWAV-OS puts it, "Aqua is the case; the Game Boy is inside it." The case never changes, so the controls never move. What is inside the case does change: striped Aqua lists in Heat, the night in Space, and metal with DMG-green screens in the Console (see 7).
+The title bar is brushed metal in every view, in light and dark. As MI-WWAV-OS puts it, "Aqua is the case; the Game Boy is inside it." The case never changes, so the controls never move. What is inside the case does change: striped Aqua lists in Learn, the night in Space, and metal with DMG-green screens in the Console (see 7).
 
 The title bar holds four controls:
 
-- **View switcher.** A three-segment gel control, 76 pt per segment, reading "Heat", "Space", "Console", on ⌘1–⌘3. The selected segment wears the deepened blue gel (`#336dcc→#1B4C8C`), so its white label holds 5.0:1 (7.2). Changing views is a 140 ms cross-fade, the MI-WWAV-OS "beat", and a cut under Reduce Motion.
-- **Traffic lights.** Real window controls. Heat's are only decorative today.
+- **View switcher.** A three-segment gel control, 76 pt per segment, reading "Learn", "Space", "Console", on ⌘1–⌘3. The selected segment wears the deepened blue gel (`#336dcc→#1B4C8C`), so its white label holds 5.0:1 (7.2). Changing views is a 140 ms cross-fade, the MI-WWAV-OS "beat", and a cut under Reduce Motion.
+- **Traffic lights.** Real window controls. Learn's are only decorative today.
 - **Search pill.** Opens ⌘K.
 - **At narrow widths.** Below 1180 pt the search pill becomes a 28 pt magnifier and the Now strip narrows to 440 pt, so the title bar fits at 1024 pt.
-- **Galaxy chip.** A 28 pt miniature of your own galaxy. It opens "Your galaxy", "Your public Heat view", "Settings…", "Export everything…" and "Sign out".
+- **Galaxy chip.** A 28 pt miniature of your own galaxy. It opens "Your galaxy", "Your public Learn view", "Settings…", "Export everything…" and "Sign out".
 
 ### 2.2 The Now strip
 
-**Exists today:** Heat's toolbar LCD. It is pale olive `#f2f4e4→#dfe3c6` with ink `#262a17`, shows two lines over a 6 px meter, and becomes phosphor `#d7e0a8` on `#20241a` in dark mode.
+**Exists today:** Learn's toolbar LCD. It is pale olive `#f2f4e4→#dfe3c6` with ink `#262a17`, shows two lines over a 6 px meter, and becomes phosphor `#d7e0a8` on `#20241a` in dark mode.
 
 **Proposed:** the LCD grows to 520 × 44 pt and is split by an etched 1 px divider. The task sits on the left and the track on the right, so one glance answers "what am I doing" and "what am I hearing".
 
 | Half | Line 1 | Line 2 | Meter | Click |
 |---|---|---|---|---|
-| Task | "Hot: Grammar quiz 4" | "Today 4:00 PM, JPN 201 · focus 18:40 left" | that task's heat, cool→warm→hot | opens Heat with the task selected |
+| Task | "Hot: Grammar quiz 4" | "Today 4:00 PM, JPN 201 · focus 18:40 left" | that task's heat, cool→warm→hot | opens Learn with the task selected |
 | Track | 18 pt key-coloured planet, "World Ending" | four stem lights, "1:42 / 3:58" | the playhead | expands the player |
 
-The task half shows the current task (set with C or by starting focus; see 3.5), or else the hottest open task, as Heat's LCD does now. The track half shows whatever the audio engine is playing; in the Console it shows the session: "BAR 42.3 · 128.00 BPM · REC ARMED". The engine is the master clock and publishes its playhead in shared memory (see 8), so the strip and the video viewer read the same value and cannot disagree.
+The task half shows the current task (set with C or by starting focus; see 3.5), or else the hottest open task, as Learn's LCD does now. The track half shows whatever the audio engine is playing; in the Console it shows the session: "BAR 42.3 · 128.00 BPM · REC ARMED". The engine is the master clock and publishes its playhead in shared memory (see 8), so the strip and the video viewer read the same value and cannot disagree.
 
 **Stem lights.** There are four 8 pt lights, in PRANA's order and colours: vocals `#D23C2A`, drums `#F0B90B`, other `#2E9A55`, bass `#1F4E9E`.
 
@@ -212,7 +212,7 @@ Each view is built once and lives until you quit, so switching back finds its ca
 | Listening | Switch views | It keeps playing. |
 | Listening | Press play in the Console | Listening pauses and the strip reads "Paused for the Console". Stopping the Console doesn't resume it. |
 | Listening | Open a film | "The planet is paused while this plays." (v4) |
-| In a Heat focus session | Switch views | The countdown continues in the strip. It is silent unless you turned the chime on. |
+| In a Learn focus session | Switch views | The countdown continues in the strip. It is silent unless you turned the chime on. |
 
 Nothing resumes on its own. The Console can tear its video viewer or mixer off onto a second display. Plugin windows belong to the audio engine (see 5).
 
@@ -224,11 +224,11 @@ You have one WWAV account: the existing `Users` row at mi-wwav.com. Its 7-day JW
 |---|---|---|---|---|
 | Galaxy | your place in Space; the title-bar chip | `Galaxy`, one per user (slug, `skySeed`) | everyone | Exists today (v4) |
 | Bio sun | your page, in the middle of your galaxy | blocks v1 `{v:1, blocks:[…]}` | everyone | Exists today (`wwav/src/sun/blocks.js`) |
-| Public Heat view | the simple public version of Heat, shown under your bio when someone opens your sun | the items you've made public, synced to your account | everyone | Decided |
+| Public Learn view | the simple public version of Learn, shown under your bio when someone opens your sun | the items you've made public, synced to your account | everyone | Decided |
 | Stem player | your instrument's skin, wrapped from a photo or painted | `/api/user/stem-player-customization` | you | Exists today (v3) |
-| Heat | your time, as a private PKM | local SQLite, synced privately, except private grades and courses, which stay on the Mac | only you, except what you switch public | Proposed |
+| Learn | your time, as a private PKM | local SQLite, synced privately, except private grades and courses, which stay on the Mac | only you, except what you switch public | Proposed |
 
-**Two profile views** (**Decided**). Your private Heat (⌘1) is the whole profile, and only you see it. Your public Heat view is what anyone sees when they open your sun in Space. By default it has room for two things, each shown once you press Show: a "Now making" line and the milestone timelines of linked projects. Every other record (task, project, milestone, habit, note, course, grade, focus record) is private until you switch that item public, grades included (3.15).
+**Two profile views** (**Decided**). Your private Learn (⌘1) is the whole profile, and only you see it. Your public Learn view is what anyone sees when they open your sun in Space. By default it has room for two things, each shown once you press Show: a "Now making" line and the milestone timelines of linked projects. Every other record (task, project, milestone, habit, note, course, grade, focus record) is private until you switch that item public, grades included (3.15).
 
 **The stem player.** v3's tutorial says "the user's stem player IS their account". In Wi_WWAV your galaxy is who you are and the stem player is what you hold: your skin wraps the strip's planet when nothing is loaded. A loaded song always wears its own key colour.
 
@@ -238,7 +238,7 @@ Wi's rule carries over: "A post is a file." The library is a folder you can open
 
 ```
 ~/Music/Wi_WWAV/
-  library.sqlite   clips, tags, sequences, Heat records, the undo journal
+  library.sqlite   clips, tags, sequences, Learn records, the undo journal
   media/           01JA2B7X9Q4M8K3T5V6W0YHZRC.wwav   (ULID-named)
   sessions/        Console sessions (see 6)
   trash/           deleted media, kept until you empty it
@@ -270,15 +270,15 @@ A plain WAV comes in as master only and says so. Nothing is converted without a 
 
 | Connection | Views | What crosses | What never crosses |
 |---|---|---|---|
-| Connected profiles | Heat ↔ Space | your public Heat view: room for a "Now making" line and the milestone timelines of linked projects, each shown once you press **Show**; any other item you switch public, one at a time (3.15) | anything still private; counts and totals worked out across your records; any comparison between people |
+| Connected profiles | Learn ↔ Space | your public Learn view: room for a "Now making" line and the milestone timelines of linked projects, each shown once you press **Show**; any other item you switch public, one at a time (3.15) | anything still private; counts and totals worked out across your records; any comparison between people |
 | Connected uploads | Console ↔ Space | exported `.wwav`/`.swav` as exact bytes, with lineage read from `wlin`; any song or film back into the Console with **Open in Console** | unexported takes, unpublished sessions |
 
-Heat also links tasks and projects to Console sessions, so focus follows you into the Console (3.15). That link is private and never reaches Space.
+Learn also links tasks and projects to Console sessions, so focus follows you into the Console (3.15). That link is private and never reaches Space.
 
 **Connected profiles: a timeline behind your sun.**
 
-1. In Heat's sidebar, drag the project "EP" onto the solar system "World Ending" under "Your galaxy", or set it in Get Info → Project. The sheet reads "This links EP to World Ending. Its timeline will show on your public Heat view." **Show** adds the milestone beads (titles, dates, reached or not) to your public view and to the system's sun. **Keep private** links it and shows nothing. ⌘Z reads "Undo show timeline".
-2. Ticking **Reached** on "EP v1 mixed" later fills its bead and publishes nothing else. In the other direction, your project sun's secondary act, **Plan in Heat**, creates a linked milestone.
+1. In Learn's sidebar, drag the project "EP" onto the solar system "World Ending" under "Your galaxy", or set it in Get Info → Project. The sheet reads "This links EP to World Ending. Its timeline will show on your public Learn view." **Show** adds the milestone beads (titles, dates, reached or not) to your public view and to the system's sun. **Keep private** links it and shows nothing. ⌘Z reads "Undo show timeline".
+2. Ticking **Reached** on "EP v1 mixed" later fills its bead and publishes nothing else. In the other direction, your project sun's secondary act, **Plan in Learn**, creates a linked milestone.
 3. Any other item goes public the same way, one at a time, with the **Public** switch in Get Info. A grade's switch says plainly what it does: "Grades are private by default. Your school keeps them as education records. Turning this on shows this grade to anyone who opens your sun." ⌘Z reads "Undo make public".
 
 **Connected uploads: from a friend's planet to your fork.**
@@ -306,10 +306,10 @@ These rules come from MI-WWAV-OS. When a feature breaks one, the feature changes
 
 | Screen | Return | ⇧Return |
 |---|---|---|
-| Heat tab | edit the selected task | the tab's secondary action (Today: Plan my day; Tasks: Triage inbox; see 3.3) |
+| Learn tab | edit the selected task | the tab's secondary action (Today: Plan my day; Tasks: Triage inbox; see 3.3) |
 | Space sky | dive in, or open a work's player | Add (a private save) |
 | Planet player | play / pause | ↑ Push (fork the mix) |
-| Your sun | open | Plan in Heat |
+| Your sun | open | Plan in Learn |
 | Console timeline | select clip at playhead | Cut at playhead |
 | Library | open | add to selection |
 
@@ -323,11 +323,11 @@ These rules come from MI-WWAV-OS. When a feature breaks one, the feature changes
 **⌘⇧N is quick capture.** It opens a 420 × 160 pt panel from any view, or from any app if you turn that on.
 
 - **Capturing.** Type, paste a link, drop a file, or hold R to record a voice memo. Enter saves and keeps the panel open. The footer reads "3 in inbox · captured ✓" (**Exists today:** `portfolio/src/pkm/capture/CaptureModal.jsx`).
-- **Triage.** The inbox sits at the top of Heat → Today, with **→ task**, **→ note**, **→ project** and **→ upload** on each item.
+- **Triage.** The inbox sits at the top of Learn → Today, with **→ task**, **→ note**, **→ project** and **→ upload** on each item.
 
 | Keys | Does | Where |
 |---|---|---|
-| ⌘1 · ⌘2 · ⌘3 | Heat · Space · Console | everywhere |
+| ⌘1 · ⌘2 · ⌘3 | Learn · Space · Console | everywhere |
 | Space | play / pause | wherever media is, outside text |
 | ⌘K · ⌘⇧N · ⌘L | palette · quick capture · library drawer | everywhere |
 | ⌘Z · ⌘⇧Z | undo · redo, labelled | everywhere |
@@ -339,7 +339,7 @@ These rules come from MI-WWAV-OS. When a feature breaks one, the feature changes
 
 ### 2.8 Offline first
 
-What is local is the truth. Heat, the library and the Console work with no network for as long as you like. Space shows what you have already visited, marked "Seen Oct 4". Publishing, visiting somewhere new, and opening a work you've never opened in the Console each need a connection, and each says so on its button. The app's own MCP server is local and needs none; Claude needs its own (2.11).
+What is local is the truth. Learn, the library and the Console work with no network for as long as you like. Space shows what you have already visited, marked "Seen Oct 4". Publishing, visiting somewhere new, and opening a work you've never opened in the Console each need a connection, and each says so on its button. The app's own MCP server is local and needs none; Claude needs its own (2.11).
 
 **The upload queue is a query, not a list** (**Exists today:** `MI-WWAV-OS/proto/README.md`). A drop sets `published_at` at once, and `remote_id` fills in when the server acknowledges.
 
@@ -353,7 +353,7 @@ The status bar says only real stages:
 2. "Uploading World Ending · part 14 of 27"
 3. "Up. World Ending is in your galaxy."
 
-**Heat records sync privately** to your account, except private grades and courses, which stay on the Mac unless encrypted sync is on (8.7, **Open**). Each field has a monotonic sequence number, so a slow older write never overwrites a newer one (**Exists today:** the PKM's `useAutosave.js`; see 8). Items you switch public sync the same way and show on your public Heat view once the server has them.
+**Learn records sync privately** to your account, except private grades and courses, which stay on the Mac unless encrypted sync is on (8.7, **Open**). Each field has a monotonic sequence number, so a slow older write never overwrites a newer one (**Exists today:** the PKM's `useAutosave.js`; see 8). Items you switch public sync the same way and show on your public Learn view once the server has them.
 
 ### 2.9 You can leave with everything
 
@@ -389,14 +389,14 @@ Claude estimates and drafts, and never decides. Each change it makes carries a o
 **Two ways in.**
 
 - **Local, first.** A stdio server that Claude Desktop and Claude Code start on your Mac. It acts on the local library, so it needs no account and no network of its own.
-- **Remote, later.** A server through mi-wwav.com for claude.ai, which needs Heat sync first (8.7). The devlog already reaches claude.ai this way (**Exists today:** `/mcp` with OAuth sign-in, `server/mcp/devlog.js`, `server/mcp/auth.js`).
+- **Remote, later.** A server through mi-wwav.com for claude.ai, which needs Learn sync first (8.7). The devlog already reaches claude.ai this way (**Exists today:** `/mcp` with OAuth sign-in, `server/mcp/devlog.js`, `server/mcp/auth.js`).
 
 | Tool | Does | Shows in the app as |
 |---|---|---|
 | `list_tasks` | reads open tasks with heat, due date and estimate | nothing; reading changes nothing |
 | `add_task` | makes a task, such as one found in a school email | a new task, labelled as Claude's, with its reason |
 | `update_task` | sets difficulty, estimate and a one-line reason | "Claude's estimate: 45m. It read the title, the notes and your past averages." |
-| `plan_day` | runs Plan my day, Heat's own written rule | dashed blocks in the time column, waiting for Return |
+| `plan_day` | runs Plan my day, Learn's own written rule | dashed blocks in the time column, waiting for Return |
 | `get_grades` | reads courses and grades | nothing |
 | `add_pending_grade` | records a grade notice with no score, linked to Brightspace | a pending grade |
 | `log_focus` | logs a focus session on a task | a focus record |
@@ -412,7 +412,7 @@ Claude estimates and drafts, and never decides. Each change it makes carries a o
 
 - **Estimates** fall back to your average for the type, else difficulty × 20 min.
 - **Due dates** still arrive from the Brightspace calendar feed (3.11).
-- **Plan my day** is Heat's own rule, not Claude.
+- **Plan my day** is Learn's own rule, not Claude.
 - **Mail** shows only what Claude has recorded, and Gmail itself is one click away.
 
 ### 2.12 Accessibility bars
@@ -433,10 +433,10 @@ Settings is a classic Mac preferences window with an Aqua icon toolbar.
 |---|---|
 | Account | galaxy address, stem player skin, sign out, delete account (type DELETE) |
 | Library | location, copy or leave in place, Empty trash |
-| Heat | spaces, school, Brightspace calendar link, other calendars' iCal links |
+| Learn | spaces, school, Brightspace calendar link, other calendars' iCal links |
 | Audio & MIDI · Video | devices, buffer 64–1024 samples, plugin folders; hardware encode, proxy media |
 | Claude | the MCP connection: how to add Wi_WWAV to Claude Desktop and Claude Code, the tools offered with a switch on each, and Claude's recent changes, each with Undo |
-| Privacy | one table of everything public, with a switch on each; your public Heat view as others see it |
+| Privacy | one table of everything public, with a switch on each; your public Learn view as others see it |
 | Appearance · Keyboard | Light, Dark or Match system (Space is always night), text size (⌘+ / ⌘−); every shortcut |
 
 ### 2.14 First launch
@@ -445,17 +445,17 @@ There are five steps. Each has exactly one secondary action, "Skip for now", and
 
 1. **Sign in.** The button **Sign in or create an account** opens mi-wwav.com in your browser (8.7). The form there asks for email, username, password, a birthdate for the 13+ gate, and an invite key when one is required (**Exists today:** v4 registration). The browser hands the sign-in back to the app.
 
-   **Open:** should "Skip for now" let you in without an account? Recommendation: yes. Heat, the library and the Console are fully local. Space can be looked at but not published to or pushed from, which is how the signed-out universe already works.
-2. **Claim your galaxy.** The copy is v4's: "You have no galaxy yet. A galaxy is yours. Projects orbit it as solar systems, and each song or film is a world inside one. The sun at the centre is where you say who you are." The button reads **Make my galaxy**. An optional first line on your sun has the placeholder "Say it plainly". Below it: "Behind your sun, people can see a simple version of Heat, once you choose what goes there. Everything in Heat stays private until then."
+   **Open:** should "Skip for now" let you in without an account? Recommendation: yes. Learn, the library and the Console are fully local. Space can be looked at but not published to or pushed from, which is how the signed-out universe already works.
+2. **Claim your galaxy.** The copy is v4's: "You have no galaxy yet. A galaxy is yours. Projects orbit it as solar systems, and each song or film is a world inside one. The sun at the centre is where you say who you are." The button reads **Make my galaxy**. An optional first line on your sun has the placeholder "Say it plainly". Below it: "Behind your sun, people can see a simple version of Learn, once you choose what goes there. Everything in Learn stays private until then."
 3. **Import your folder.** Before anything is copied, you see what the folder holds: "214 files: 38 .wwav, 12 .swav, 160 plain audio, 4 other. Plain audio comes in as master only." The button reads **Bring them in**. It runs in the background, and pressing again picks up after an interruption.
 4. **Add your calendars.** Each comes in as a private iCal address, so the app needs no Google sign-in:
    - "Paste your Brightspace calendar link": the per-student iCal feed, which works now with no approval.
    - "Add another calendar": any calendar's private iCal address. Google Calendar gives one in each calendar's settings, as its secret address in iCal format.
 
    The school-approved route (Valence and LTI 1.3) is in chapter 3.
-5. **Connect Claude.** The sheet shows how to add Wi_WWAV to Claude Desktop or Claude Code, and lists the tools Claude will see (2.11). Skipping leaves Heat whole: estimates use your averages, and Plan my day is Heat's own rule.
+5. **Connect Claude.** The sheet shows how to add Wi_WWAV to Claude Desktop or Claude Code, and lists the tools Claude will see (2.11). Skipping leaves Learn whole: estimates use your averages, and Plan my day is Learn's own rule.
 
-The app then opens on Heat → Today. The strip reads "All clear" on the left and "Nothing playing" on the right.
+The app then opens on Learn → Today. The strip reads "All clear" on the left and "Nothing playing" on the right.
 
 ### 2.15 Left out, and why
 
@@ -468,17 +468,17 @@ The app then opens on Heat → Today. The strip reads "All clear" on the left an
 | Feedback on your work through Ripple | Cut on 7 Oct 2026 to narrow v1. |
 | OS notifications and Dock badges about other people | Anything that reaches out fails gate 1.1; "Since you last looked" is pulled, never pushed. |
 
-## 3. Heat: the profile view
+## 3. Learn: the profile view
 
-Heat is the profile view. It opens with ⌘1 and comes first in the view switcher, because the day starts there (see 2). It is where you plan your time and keep what you'd keep in a private notebook: tasks, grades, habits, notes and school mail. By default all of it is private, and a simple public version of it shows behind your sun in Space (**Decided**; see 3.15). Claude reaches Heat through the app's MCP server, and the app itself calls no model (**Decided**; see 3.12 and 3.13).
+Learn is the profile view. It opens with ⌘1 and comes first in the view switcher, because the day starts there (see 2). It is where you plan your time and keep what you'd keep in a private notebook: tasks, grades, habits, notes and school mail. By default all of it is private, and a simple public version of it shows behind your sun in Space (**Decided**; see 3.15). Claude reaches Learn through the app's MCP server, and the app itself calls no model (**Decided**; see 3.12 and 3.13).
 
-The founder already uses Heat: today it is a single-file artifact inside claude.ai. Section 3.1 describes that file exactly, and all of it is **Exists today** (Heat, one HTML file of 1,481 lines). From 3.2 on, everything is **Proposed** unless it is marked **Decided** or **Open**.
+The founder already uses Learn: today it is a single-file artifact inside claude.ai, where it is called Heat. Section 3.1 describes that file exactly, and all of it is **Exists today** (the Heat artifact, one HTML file of 1,481 lines). From 3.2 on, everything is **Proposed** unless it is marked **Decided** or **Open**.
 
-### 3.1 Heat today
+### 3.1 Learn today
 
-Heat is a personal task tracker that ranks work by urgency, which it calls heat. Around that ranking it keeps milestones, daily habits, grades, and a Brightspace sync that runs through Gmail and Google Calendar. Claude estimates difficulty and time. It runs on four claude.ai capabilities: `db` and `user` (live storage), `sample` (Claude) and `mcp` (connectors). Each one fails soft; without `db`, it shows "Saved in this browser".
+Learn is a personal task tracker that ranks work by urgency, which it calls heat. Around that ranking it keeps milestones, daily habits, grades, and a Brightspace sync that runs through Gmail and Google Calendar. Claude estimates difficulty and time. It runs on four claude.ai capabilities: `db` and `user` (live storage), `sample` (Claude) and `mcp` (connectors). Each one fails soft; without `db`, it shows "Saved in this browser".
 
-A segmented control at the top switches between three workspaces, each with its own Claude persona and types (plus Other in each): **Classes** (group label "Course": Homework, Quiz, Listening, Reading, Lab, Project, Exam prep), **WWAV** ("Milestone": Hardware, Software, Design, Music, Business, Content) and **Personal** ("Area": Errand, Admin, Money, Health, Home, Social). In Heat, "WWAV" means the handheld hardware and an album, not the social app. Habits exist only in Personal, Grades only in Classes, and the milestone timeline only in WWAV.
+A segmented control at the top switches between three workspaces, each with its own Claude persona and types (plus Other in each): **Classes** (group label "Course": Homework, Quiz, Listening, Reading, Lab, Project, Exam prep), **WWAV** ("Milestone": Hardware, Software, Design, Music, Business, Content) and **Personal** ("Area": Errand, Admin, Money, Health, Home, Social). In Learn, "WWAV" means the handheld hardware and an album, not the social app. Habits exist only in Personal, Grades only in Classes, and the milestone timeline only in WWAV.
 
 #### The heat algorithm
 
@@ -531,10 +531,10 @@ A course can bring its own scale. Letter pills are green for A, blue for B, ambe
 
 #### Brightspace sync and Claude
 
-- **Calendar path.** Heat reads the Google calendar named like `/university of rhode island/i`, from 2 hours ago to 70 days ahead, and keeps titles ending " - Due". It takes the course from the location ("MTH 142") and the type from keywords. It drops a duplicate when the due day and course match and the titles share at least 60% of their words.
-- **Gmail path.** Heat searches `brightspace newer_than:Nd`, with N between 2 and 14. Grade notices become **pending grades**, with no score and a link to `brightspace.uri.edu`. Up to 8 announcements per sync go to Claude, which pulls out only items with a future deadline. The last 400 message ids are remembered.
-- **Rhythm.** Heat syncs on open if the last sync was over 15 minutes ago, then hourly, and reports "Synced 3:41 PM: 2 new tasks, 1 date change, 1 new grade posted".
-- **Claude.** "Ask Claude to score" returns `{difficulty, minutes, reason}`, and the reason shows as the field's hint. If it fails, Heat says why in one line ("Too many requests. Wait a minute, then try again."), or hides the button when scoring isn't granted. Batch scoring of synced items fails silently and keeps the per-type defaults.
+- **Calendar path.** Learn reads the Google calendar named like `/university of rhode island/i`, from 2 hours ago to 70 days ahead, and keeps titles ending " - Due". It takes the course from the location ("MTH 142") and the type from keywords. It drops a duplicate when the due day and course match and the titles share at least 60% of their words.
+- **Gmail path.** Learn searches `brightspace newer_than:Nd`, with N between 2 and 14. Grade notices become **pending grades**, with no score and a link to `brightspace.uri.edu`. Up to 8 announcements per sync go to Claude, which pulls out only items with a future deadline. The last 400 message ids are remembered.
+- **Rhythm.** Learn syncs on open if the last sync was over 15 minutes ago, then hourly, and reports "Synced 3:41 PM: 2 new tasks, 1 date change, 1 new grade posted".
+- **Claude.** "Ask Claude to score" returns `{difficulty, minutes, reason}`, and the reason shows as the field's hint. If it fails, Learn says why in one line ("Too many requests. Wait a minute, then try again."), or hides the button when scoring isn't granted. Batch scoring of synced items fails silently and keeps the per-type defaults.
 
 The look is classic Mac OS X: brushed metal on a slate desk, gel buttons, Aqua stripes, selection in `#3875d7`, an olive iTunes LCD (`#f2f4e4`→`#dfe3c6`), and Lucida Grande at 13 px. Dark mode turns the LCD dark olive with phosphor ink.
 
@@ -553,11 +553,11 @@ The look is classic Mac OS X: brushed metal on a slate desk, gel buttons, Aqua s
 | Habits in Personal, Grades in Classes | Both global |
 | One private artifact | Everything private by default, a **Public** switch on every record, and a simple public version behind your sun |
 
-The heat algorithm, the estimate chain, the grade maths, the LCD, the sheets and the copy ("Heat will rank it.") carry over unchanged.
+The heat algorithm, the estimate chain, the grade maths, the LCD, the sheets and the copy ("Learn will rank it.") carry over unchanged.
 
 ### 3.3 The view's window
 
-Heat fills the view area of the one main window (see 2; **Decided**: one desktop app, Mac first): 1280 × 726 pt at the default window, 1024 × 606 at the smallest. Heat's LCD moves up into the title bar as the Now strip's task half (see 2.2), so from left to right Heat's toolbar holds "+", the six tabs as one segmented control and Sync. Search is the title bar's ⌘K pill (see 2.1). Below sit the 190 px sidebar, the main view, and a 290 px right column. Below 1240 pt of window width, the right column folds into a 44 px strip of widget icons that open as popovers.
+Learn fills the view area of the one main window (see 2; **Decided**: one desktop app, Mac first): 1280 × 726 pt at the default window, 1024 × 606 at the smallest. Learn's LCD moves up into the title bar as the Now strip's task half (see 2.2), so from left to right Learn's toolbar holds "+", the six tabs as one segmented control and Sync. Search is the title bar's ⌘K pill (see 2.1). Below sit the 190 px sidebar, the main view, and a 290 px right column. Below 1240 pt of window width, the right column folds into a 44 px strip of widget icons that open as popovers.
 
 Each tab has one primary action ("+" or N) and exactly one secondary action:
 
@@ -580,7 +580,7 @@ A space keeps the settings the old workspaces had built in, now editable in a sh
 
 ### 3.5 Today
 
-Today is the sketch's "today's plan", and Heat opens on it. The main view puts a 300 px time column on the left and the plan list on the right, with a 112 px Pomodoro panel across the bottom. The header reads "Today, Tuesday, October 6", with the subtitle "4 blocks · 3h 10m planned · 2 due today".
+Today is the sketch's "today's plan", and Learn opens on it. The main view puts a 300 px time column on the left and the plan list on the right, with a 112 px Pomodoro panel across the bottom. The header reads "Today, Tuesday, October 6", with the subtitle "4 blocks · 3h 10m planned · 2 due today".
 
 #### The time column
 
@@ -603,7 +603,7 @@ The Pomodoro timer is an olive LCD panel. It shows 32 px tabular digits ("24:59"
 
 - **Lengths.** Focus defaults to 25 minutes, with 50 minutes or a custom 10–90 as options. Breaks are 5 minutes, and every fourth break is 15.
 - **Keys.** F starts or pauses. ⇧F stops and logs. I marks "Pulled away", which pauses the timer and records an interruption. The space bar stays play/pause for media, because music under a focus session is the usual case.
-- **Ending.** The LCD reads "Focus done. 25m logged to Mix the second verse." It is silent unless you turned on Heat's chime, which is off by default (7.7). The break waits for you: "Break 5:00. Press F to start it." Nothing starts without a press.
+- **Ending.** The LCD reads "Focus done. 25m logged to Mix the second verse." It is silent unless you turned on Learn's chime, which is off by default (7.7). The break waits for you: "Break 5:00. Press F to start it." Nothing starts without a press.
 - **Other views.** The timer keeps running when you switch views. The Now strip's task half shows "focus 18:42 left" (see 2.2); the view switcher stays plain.
 
 Every focus session belongs to the **current task**, and its minutes add to that task's `actualMin`. If a task has logged time, checking it completes it at once, and the status bar says "Done. Took 1h 15m across 3 focus sessions." with an Undo. Get Info's "Took" field adjusts the time by hand. Only a task with no logged time still asks "Time it took". The per-type averages now come mostly from measured time.
@@ -624,9 +624,9 @@ One task is current at a time. You set it with C, by dragging a task onto Now, o
 
 ### 3.6 Tasks
 
-Tasks is Heat's List view with the gaps filled.
+Tasks is Learn's List view with the gaps filled.
 
-- **When.** A new **When** column (the scheduled date) brings in the PKM's rule: "scheduled (when I'll work on it) is distinct from due (deadline)". Heat still comes only from the due date.
+- **When.** A new **When** column (the scheduled date) brings in the PKM's rule: "scheduled (when I'll work on it) is distinct from due (deadline)". Learn still comes only from the due date.
 - **Sidebar.** Inbox, All open, Hot, Due this week, Scheduled, Someday, Done. Below them, Projects with their milestones, or Courses, or Areas, then "Your average time".
 - **Subtasks** indent under a disclosure triangle. A parent's estimate is the sum of its open children.
 - **Recurrence** is stored as an RRULE, as in the PKM ("Every weekday", "Custom…"). Each finished occurrence is a row of its own, and the series never flips to done. A recurring task's heat comes from its next occurrence. These rows show ↻.
@@ -634,7 +634,7 @@ Tasks is Heat's List view with the gaps filled.
 - **Keys.** ↑ and ↓ move the selection. Return edits, ⌘I opens Get Info, ⌘↩ marks done, and ⌫ deletes with Undo.
 - **Dragging a row:** onto a Calendar day to schedule it, onto Today's column to make a block, onto a milestone to link it, or onto "Your galaxy" to make it your Now making line (3.15).
 
-A task Claude added shows its source in Get Info ("Claude, Oct 6 8:41 AM") and the reason it gave. The empty state keeps Heat's line: "Add your first WWAV task and Heat will rank it."
+A task Claude added shows its source in Get Info ("Claude, Oct 6 8:41 AM") and the reason it gave. The empty state keeps Learn's line: "Add your first WWAV task and Learn will rank it."
 
 ### 3.7 Calendar
 
@@ -656,15 +656,15 @@ Grades are private by default. Each grade, and each course, has its own **Public
 
 Habits is global. It keeps the limit of 6, the orbs, the 14-day grid, the grace until midnight, and the advice: "Keep them small enough that you never skip." The log stops being pruned at 400 days, since a year of daily keys is about 6 KB. "Show the year" opens a 53 × 7 grid. A habit can have a length ("Practise kanji, 20m"). A habit with a length appears under Recurring in Today, can be blocked like a task, and ticks itself when a focus session on it reaches that length.
 
-**Open: the streak counter.** The sketch keeps Heat's "12-day streak". Gate 1.1 names them as a fail: "Anything stretches use past what the person came for: autoplay, infinite scroll, notifications, streaks, 'up next'". The gate-passing default replaces the counter with a record that only grows ("Done 41 days since August 26"), with the grids as the picture. Nothing breaks, so nothing pulls you back to protect a number. *Recommendation:* make the growing record the default, and keep the counter as a per-habit setting that is off by default.
+**Open: the streak counter.** The sketch keeps Learn's "12-day streak". Gate 1.1 names them as a fail: "Anything stretches use past what the person came for: autoplay, infinite scroll, notifications, streaks, 'up next'". The gate-passing default replaces the counter with a record that only grows ("Done 41 days since August 26"), with the grids as the picture. Nothing breaks, so nothing pulls you back to protect a number. *Recommendation:* make the growing record the default, and keep the counter as a per-habit setting that is off by default.
 
 ### 3.10 Mail
 
-Mail lists the school threads Claude has recorded. Heat does not read Gmail. Claude reads your mail through its own Gmail connector, then calls `record_mail_thread` for each thread (3.13), so a thread is on this tab only after Claude has been through it.
+Mail lists the school threads Claude has recorded. Learn does not read Gmail. Claude reads your mail through its own Gmail connector, then calls `record_mail_thread` for each thread (3.13), so a thread is on this tab only after Claude has been through it.
 
 The main view splits into a 320 px thread list and a pane for the selected thread. The sidebar holds **All** and the three states with counts. Each row shows the sender and time, then the subject, with chips for the course code and the thread's state: **Grade posted**, **Task made**, or **Nothing to do** (Claude found no deadline).
 
-The pane shows what Claude recorded: the subject, sender and time, the course, the state, Claude's one-line reason, and a link to what it made, such as the task "Grammar quiz 4" or the pending grade. Heat keeps no message body and no attachments, so there is nothing to render and no remote images to block.
+The pane shows what Claude recorded: the subject, sender and time, the course, the state, Claude's one-line reason, and a link to what it made, such as the task "Grammar quiz 4" or the pending grade. Learn keeps no message body and no attachments, so there is nothing to render and no remote images to block.
 
 Each thread has one action bar. **Open in Gmail** is the secondary action. It opens the thread at `mail.google.com` in your browser. **Make a task** (T) is for doing it by hand: it opens the task sheet with the subject as the title and notes that start "From mail:" with a link back to the thread. Mail has no reply, send or delete. Gmail already does those, and Wi_WWAV never touches your mailbox.
 
@@ -674,7 +674,7 @@ The app has no Google sign-in. It asks Google for nothing, so there is no restri
 
 ### 3.11 Calendars and Brightspace in the app
 
-Nothing is hard-coded to one school. A School sheet holds the name, the Brightspace host (`brightspace.uri.edu`), the Brightspace iCal link, the course-code pattern (default `/^([A-Z]{3})\s?(\d{3})/`) and the term dates. The time zone comes from the system, which gives America/New_York for URI without naming it. Settings → Heat holds the same sheet, with a list of other calendars below it (see 2.13).
+Nothing is hard-coded to one school. A School sheet holds the name, the Brightspace host (`brightspace.uri.edu`), the Brightspace iCal link, the course-code pattern (default `/^([A-Z]{3})\s?(\d{3})/`) and the term dates. The time zone comes from the system, which gives America/New_York for URI without naming it. Settings → Learn holds the same sheet, with a list of other calendars below it (see 2.13).
 
 Calendars come in only as **private iCal addresses**. Mail comes in only through Claude.
 
@@ -685,34 +685,34 @@ Calendars come in only as **private iCal addresses**. Mail comes in only through
 | **Claude's Gmail connector** | Grade notices and announcements, as tasks, pending grades and Mail rows | Claude, with Wi_WWAV's MCP tools (3.13) | Now, when you ask Claude |
 | D2L **Valence REST API** or an **LTI 1.3** tool | Real scores, exact due dates, course lists, gradebook weights | Registration by the school's Brightspace admin | Later, with the school |
 
-Anyone who holds an iCal address can read that calendar, so treat each like a password. Heat keeps them in the Keychain on this Mac and leaves them out of `heat.json`.
+Anyone who holds an iCal address can read that calendar, so treat each like a password. Learn keeps them in the Keychain on this Mac and leaves them out of `heat.json`.
 
-The iCal path keeps Heat's filters (titles ending " - Due"; skip `/non-graded/i` and cancelled items). They were written against the feed as Google Calendar shows it, so they are checked against a raw feed before shipping. The VEVENT `UID` becomes the task id, and tasks that arrived through Google Calendar in the artifact are matched by Heat's duplicate test (the due day and course match, and the titles share at least 60% of their words) and take it on. An item missing from two syncs in a row gets a grey "No longer in Brightspace" tag and is never deleted on its own.
+The iCal path keeps Learn's filters (titles ending " - Due"; skip `/non-graded/i` and cancelled items). They were written against the feed as Google Calendar shows it, so they are checked against a raw feed before shipping. The VEVENT `UID` becomes the task id, and tasks that arrived through Google Calendar in the artifact are matched by Learn's duplicate test (the due day and course match, and the titles share at least 60% of their words) and take it on. An item missing from two syncs in a row gets a grey "No longer in Brightspace" tag and is never deleted on its own.
 
-**Rhythm.** Heat syncs calendars on open if the last sync was over 15 minutes ago, then hourly, and reports "Synced 3:41 PM: 2 new tasks, 1 date change". Claude's changes arrive when it makes them, each labelled as Claude's. When a feed can't be read, the line says so and names the calendar: "Couldn't read the Brightspace calendar. Heat will try again in an hour."
+**Rhythm.** Learn syncs calendars on open if the last sync was over 15 minutes ago, then hourly, and reports "Synced 3:41 PM: 2 new tasks, 1 date change". Claude's changes arrive when it makes them, each labelled as Claude's. When a feed can't be read, the line says so and names the calendar: "Couldn't read the Brightspace calendar. Learn will try again in an hour."
 
 Grades are education records under FERPA. Whichever route brings them in, they stay private by default, and only you can switch one public (3.15).
 
-### 3.12 Claude in Heat
+### 3.12 Claude in Learn
 
-**Decided:** Claude works on Heat through the app's MCP tools (3.13), from Claude Desktop or Claude Code. The app holds no Anthropic key, has no Claude button and no daily limit, and makes no model call itself. Claude estimates and drafts. It never decides. Each change it makes shows its one-line reason, carries Claude's name, and can be undone.
+**Decided:** Claude works on Learn through the app's MCP tools (3.13), from Claude Desktop or Claude Code. The app holds no Anthropic key, has no Claude button and no daily limit, and makes no model call itself. Claude estimates and drafts. It never decides. Each change it makes shows its one-line reason, carries Claude's name, and can be undone.
 
-| Job | Claude calls | Reads | Writes | Shows in Heat as | Without Claude |
+| Job | Claude calls | Reads | Writes | Shows in Learn as | Without Claude |
 |---|---|---|---|---|---|
 | Score a task | `list_tasks`, `update_task` | Title, notes, due date, your average minutes by type, the space's persona | Difficulty, minutes, a one-line reason | "Claude's estimate: 45m, difficulty 2. It read the title, the notes and your past averages." as the field's hint | The estimate chain |
 | Score a batch of new tasks | `list_tasks`, then `update_task` for each | The same | Difficulty and minutes for each, clamped 5–600 | One estimate per task, each its own undo | Per-type defaults |
-| Make tasks from school mail | Claude's Gmail connector, `add_task`, `record_mail_thread` | The message (Claude reads it, never Heat), today's date and the existing tasks | A task with notes that start "From mail:", plus a Mail row in state **Task made** | A new task labelled as Claude's, with its reason | **Make a task** in Mail (T), or type it |
+| Make tasks from school mail | Claude's Gmail connector, `add_task`, `record_mail_thread` | The message (Claude reads it, never Learn), today's date and the existing tasks | A task with notes that start "From mail:", plus a Mail row in state **Task made** | A new task labelled as Claude's, with its reason | **Make a task** in Mail (T), or type it |
 | Record a grade notice | Claude's Gmail connector, `add_pending_grade`, `record_mail_thread` | The notice | A pending grade with no score and a link to Brightspace, plus a Mail row in state **Grade posted** | A yellow "Enter score" banner | Type the grade in |
 | Note a thread with nothing to do | `record_mail_thread` | The thread | A Mail row in state **Nothing to do** | A row in Mail | Nothing |
 | Plan the day | `plan_day` | Open tasks, free time, the day's end | Dashed drafts, not committed | Dashed blocks in the time column, waiting for Return | Plan my day, which is the same rule |
-| Look at your grades | `get_grades` | Courses, items, and the percentages Heat worked out | Nothing | Nothing | The Grades tab |
+| Look at your grades | `get_grades` | Courses, items, and the percentages Learn worked out | Nothing | Nothing | The Grades tab |
 | Log time you spent | `log_focus` | The task | A focus record | Minutes added to the task's time | The timer, or Get Info's "Took" |
 
 **Undo.** Each write goes through the same journal as an edit you make (2.7), so ⌘Z undoes it, and the Edit menu says whose change it is: "Undo Claude's estimate", "Undo Claude's task". Settings → Claude lists Claude's recent changes, each with Undo, for when you've moved to another view since.
 
-**Never invent metrics.** Ripple Creator's rule, "NEVER invent metrics", is written into the tool descriptions: Claude may only restate numbers Heat returned. Heat's own words stay plain. It does not use Ripple Creator's hype-coach voice.
+**Never invent metrics.** Ripple Creator's rule, "NEVER invent metrics", is written into the tool descriptions: Claude may only restate numbers Learn returned. Learn's own words stay plain. It does not use Ripple Creator's hype-coach voice.
 
-**Without Claude**, everything in Heat works. Estimates fall back to your average for the type, else difficulty × 20 minutes. Due dates still arrive from the calendar feeds. Plan my day is a written rule. Mail stays empty until Claude records something, and Gmail itself is one click away.
+**Without Claude**, everything in Learn works. Estimates fall back to your average for the type, else difficulty × 20 minutes. Due dates still arrive from the calendar feeds. Plan my day is a written rule. Mail stays empty until Claude records something, and Gmail itself is one click away.
 
 ### 3.13 The MCP server
 
@@ -722,7 +722,7 @@ Grades are education records under FERPA. Whichever route brings them in, they s
 
 **Common rules.**
 
-- **Reasons.** Every tool that changes something takes a required `reason`, one sentence of at most 200 characters. Heat shows it beside the change.
+- **Reasons.** Every tool that changes something takes a required `reason`, one sentence of at most 200 characters. Learn shows it beside the change.
 - **Dates and minutes.** Dates are ISO 8601 with the local offset, such as `2026-10-07T23:59:00-04:00`. Minutes are whole numbers.
 - **Results.** A tool returns plain JSON, and every write returns the record it changed and its `undo_label`. A failure returns one plain sentence, with the MCP error flag set: "No open task has that id."
 - **Labels.** The journal row carries the actor, `claude`, and the tool. The labels are fixed (below).
@@ -733,34 +733,47 @@ Estimates and drafts. Never decides: the person accepts, edits or undoes every c
 Never invent metrics: only restate numbers this app returned.
 ```
 
-- **What no tool can do.** No tool marks a task done, deletes anything, changes a due date, writes a score, sends mail, or reads or sets a **Public** switch. Privacy is yours alone (3.15).
+- **What no tool can do.** No tool marks a task or a milestone done, ticks a habit, triages a capture, accepts a draft, edits or deletes anything the person made, changes a due date, writes a score, sends mail, or reads or sets a **Public** switch. Privacy is yours alone (3.15).
 - **Consent.** Claude's own tool-permission prompts ask before a tool you haven't allowed. Settings → Claude has a switch for each tool, and a tool switched off is missing from the list the server offers.
 
-**The tools.** There are eight. The list agrees with 2.11.
+**The tools.** There are eighteen: the eight for mail and planning, then ten that read the rest of Learn and draft into it (**Decided** by the founder, 7 Oct 2026: more tools, the same rule).
 
 | Tool | Arguments | Result | Undo label |
 |---|---|---|---|
 | `list_tasks` | `status?` `open` (default), `done` or `all`; `space?`; `due_before?`; `limit?` (default 50, at most 200) | `tasks[]`: `id`, `title`, `type`, `space`, `course?`, `due`, `scheduled?`, `difficulty`, `estimate_min`, `estimate_by` (`you`, `claude` or `default`), `estimate_reason?`, `heat` (`v`, `level`), `notes`, `source`, `done`. Also `averages[]` (your average minutes and count by type) and `spaces[]` (name and persona) | none; reading changes nothing |
 | `add_task` | `title`; `space?`; `type?`; `course?` (a code such as `JPN 201`); `due?`; `notes?`; `source_id?` (such as a Gmail message id); `mail_thread_id?`; `reason` | `{ task, created }`. If `source_id` matches a task already made, `created` is false and nothing is added | "Undo Claude's task" |
 | `update_task` | `id`; `difficulty?` (1–5); `estimate_min?` (clamped to 5–600); `reason`. At least one of the first two | `{ task, clamped }`, with the new heat | "Undo Claude's estimate" |
-| `plan_day` | `date?` (default today); `day_ends?` (default 23:00) | `{ drafts[], unplanned[], minutes_left }`; each draft has `task_id`, `start`, `minutes` and Heat's `reason`. The drafts also appear dashed in the time column. Claude cannot accept them | none; a draft is not a change until you press Return, which is your edit |
-| `get_grades` | `course?` (a code) | `{ term, courses[] }`: each course has `code`, `name`, `scale`, categories with weights, `items[]` (`name`, `category`, `score?`, `out_of`, `dropped`, `pending`), and Heat's `current_pct`, `decided_pct` and `letter` | none |
+| `plan_day` | `date?` (default today); `day_ends?` (default 23:00) | `{ drafts[], unplanned[], minutes_left }`; each draft has `task_id`, `start`, `minutes` and Learn's `reason`. The drafts also appear dashed in the time column. Claude cannot accept them | none; a draft is not a change until you press Return, which is your edit |
+| `get_grades` | `course?` (a code) | `{ term, courses[] }`: each course has `code`, `name`, `scale`, categories with weights, `items[]` (`name`, `category`, `score?`, `out_of`, `dropped`, `pending`), and Learn's `current_pct`, `decided_pct` and `letter` | none |
 | `add_pending_grade` | `course`; `item`; `posted_at?`; `link?` (the Brightspace address); `mail_thread_id?`; `reason`. There is no score argument | `{ grade, created }`. A grade for the same course and item is not made twice | "Undo Claude's pending grade" |
 | `log_focus` | `task_id`; `minutes` (1–600); `started_at?` (default: now minus `minutes`); `reason` | `{ focus_record, actual_min }` | "Undo Claude's focus log" |
 | `record_mail_thread` | `thread_id` (Gmail's); `subject`; `from`; `received_at`; `course?`; `state` (`grade`, `task` or `nothing`); `task_id?`; `reason` | `{ thread, created }`. The same `thread_id` again updates the state and reason and leaves one row | "Undo Claude's mail note" |
 
+| `get_schedule` | `from?` (a day, default today); `to?` (default `from`; at most 31 days on) | `{ from, to, blocks[], events[], due[], drafts[] }`: blocks with `id`, `title`, `start`, `minutes` and `task_id` or `habit_id`; calendar events with `title`, `start`, `end`, `all_day`; open tasks due in the window; the drafts that wait | none |
+| `draft_block` | `task_id`; `date?` (default today); `start` (`HH:MM`); `minutes` (15–240); `reason`. Both are rounded to 15 minutes, between 7 AM and midnight | `{ draft, drafts_waiting }`. A time a block, a draft or a timed calendar event holds is refused; a second draft for the same task and day replaces the first. Claude cannot accept it | none; a draft is not a change |
+| `list_habits` | none | `{ date, habits[] }`: `id`, `title`, `minutes?`, `done_today`, and the `record` line as Learn words it. No tool ticks a habit | none |
+| `list_projects` | `space?`; `status?` `active` (default), `on_hold`, `someday`, `archived` or `all` | `{ projects[], milestones[] }`: each project has `id`, `title`, `space`, `status`, `target_date?`, its `milestones[]` in order (`id`, `title`, `date`, `done`) and `open_tasks`; `milestones[]` are the ones on no project | none |
+| `add_project` | `title`; `space?`; `target_date?`; `reason` | `{ project }`, active and empty, with `source: "claude"` and `claudeReason`. A space never gets two projects of one name | "Undo Claude's project" |
+| `add_milestone` | `title`; `date`; `project_id?`; `space?` (default: the project's, else the first); `reason`. There is no done argument | `{ milestone }`, with `source: "claude"` and `claudeReason` | "Undo Claude's milestone" |
+| `get_notes` | `date?` (whose daily note; default today); `limit?` (default 20, at most 100) | `{ notes[], daily_note }`: notes newest first with `id`, `title`, `text` (cut at 4,000 characters, with `cut_short`), `project_id?` and `by` (`you` or `claude`) | none |
+| `add_note` | `title`; `text` (Markdown, at most 20,000 characters); `project_id?`; `reason` | `{ note }`. It never edits a note the person wrote, and never the daily note | "Undo Claude's note" |
+| `list_inbox` | none | `{ captures[] }`: the ones not triaged, with `id`, `text` and `by` | none |
+| `add_capture` | `text`; `reason` | `{ capture, in_inbox }`. Only the person triages it | "Undo Claude's capture" |
+
 `record_mail_thread` stores the subject, sender, time and Claude's reason. It never takes the message body.
 
-Because `add_task`, `add_pending_grade` and `record_mail_thread` don't repeat themselves on the same source, Claude can read the same mail twice and leave nothing doubled. That replaces Heat's old list of the last 400 processed message ids.
+A project, milestone, note or capture Claude makes carries `source: "claude"` and `claudeReason`, as a task does, so a view can show whose it is (3.16 adds the two fields to those four records).
 
-**Remote, later.** A server through mi-wwav.com serves claude.ai with the same eight tools, arguments and labels. It needs Heat sync first (8.7). Sign-in works as the devlog's `/mcp/write` does (**Exists today:** `server/mcp/auth.js`). Its `get_grades` returns only the grades you made public, because private grades are not on the server (8.8).
+Because `add_task`, `add_pending_grade` and `record_mail_thread` don't repeat themselves on the same source, Claude can read the same mail twice and leave nothing doubled. That replaces Learn's old list of the last 400 processed message ids.
+
+**Remote, later.** A server through mi-wwav.com serves claude.ai with the same tools, arguments and labels. It needs Learn sync first (8.7). Sign-in works as the devlog's `/mcp/write` does (**Exists today:** `server/mcp/auth.js`). Its `get_grades` returns only the grades you made public, because private grades are not on the server (8.8).
 
 ### 3.14 Capture, notes and the weekly review
 
 These come from the PKM (`portfolio/src/pkm/`), which already runs them for one person.
 
 - **Quick capture (⌘⇧N, in every view).** A sheet that stays open for rapid entry and shows "4 in inbox · captured ✓". From the Console, a capture also stores the session and the playhead, so "fix the snare at 1:32" opens at 1:32. Captures wait in the Inbox until they are triaged "→ task", "→ note", "→ project" or "→ upload".
-- **Song / Project Brief.** A project can start from the PKM's template: "Vibe / references · Tempo / key · Status: sketch · Sections · Stems / instrumentation · To finish". On Save, Heat offers "Make 4 tasks from To finish?". When the project is linked to a Console session, the tempo and key fill in from it, and the project's dot takes the work's key colour.
+- **Song / Project Brief.** A project can start from the PKM's template: "Vibe / references · Tempo / key · Status: sketch · Sections · Stems / instrumentation · To finish". On Save, Learn offers "Make 4 tasks from To finish?". When the project is linked to a Console session, the tempo and key fill in from it, and the project's dot takes the work's key colour.
 - **Weekly review.** A five-step wizard adapted from the PKM's (Inbox → Active projects → Someday → Schedule next week → Done), with Ripple's weekly-report questions folded into the last step:
 
 | Step | What happens |
@@ -769,30 +782,30 @@ These come from the PKM (`portfolio/src/pkm/`), which already runs them for one 
 | 2 Last week | Facts only: tasks done and focus time per space, milestones reached, and estimate accuracy ("Homework: estimated 1h 15m, took 1h 32m across 4") |
 | 3 Projects | Each active project's next milestone; set it to active, on hold, someday or archived |
 | 4 Next week | Drag tasks onto the next 7 days |
-| 5 Note | Heat sets out "What moved / What slipped / Next week's one thing" with the facts from step 2 beneath each; you write the note and press "Review complete ✓" |
+| 5 Note | Learn sets out "What moved / What slipped / Next week's one thing" with the facts from step 2 beneath each; you write the note and press "Review complete ✓" |
 
-- **Export.** Heat's share of the whole-app export (see 2.9) is Obsidian-ready markdown with `[[wikilinks]]`, plus `heat.json` with every record and its public or private setting.
+- **Export.** Learn's share of the whole-app export (see 2.9) is Obsidian-ready markdown with `[[wikilinks]]`, plus `heat.json` with every record and its public or private setting.
 
 ### 3.15 Connections
 
 #### Private by default
 
-**Decided.** In the founder's words: "Heat is like a facebook typa thing. By default everything will be a private PKM, with a simple version appearing public, but I can toggle anything to be public, including grades."
+**Decided.** In the founder's words: "Learn is like a facebook typa thing. By default everything will be a private PKM, with a simple version appearing public, but I can toggle anything to be public, including grades."
 
 - **Private.** Every record is private: task, project, milestone, habit, note, course, grade and focus record. A record that belongs to another follows it: a task's blocks and occurrences, and a course's pending grades.
 - **A simple public version.** Two items are the default public version: your **Now making** line, and the **project timelines** you link to a solar system. Each shows once you set it, with one press on **Show**.
 - **Anything else.** Every record has a **Public** switch in Get Info, off by default. It works one item at a time, and grades have it too.
 
-Heat has two profile views (see 2.4). Your private Heat (⌘1) is the whole profile, and only you see it. Your **public Heat view** is what anyone sees when they open the sun in the middle of your galaxy in Space. It sits under your bio blocks, in this order: the Now making line, the project timelines, then any other public items under a heading for each kind. The galaxy chip's "Your public Heat view" opens it, and Settings → Privacy lists everything public with a switch on each (see 2.13).
+Learn has two profile views (see 2.4). Your private Learn (⌘1) is the whole profile, and only you see it. Your **public Learn view** is what anyone sees when they open the sun in the middle of your galaxy in Space. It sits under your bio blocks, in this order: the Now making line, the project timelines, then any other public items under a heading for each kind. The galaxy chip's "Your public Learn view" opens it, and Settings → Privacy lists everything public with a switch on each (see 2.13).
 
 The public version, as it ships by default:
 
 | Item | Where | Viewers see | Never shown |
 |---|---|---|---|
 | **Now making** | One line under your bio on your sun | The text you approved: "Now making: the second verse of More Love" | When it was set, time spent, the task, the space |
-| **Project timeline** | The project's sun, and your public Heat view | Milestone beads with titles, dates, and reached or not | Open-task counts, tasks, estimates |
+| **Project timeline** | The project's sun, and your public Learn view | Milestone beads with titles, dates, and reached or not | Open-task counts, tasks, estimates |
 
-Sharing is a drop. Drag a task onto "Your galaxy" in the sidebar, edit the line in the sheet ("This line will show on your public Heat view."), and press **Show**. Drag a project onto its solar system, listed under "Your galaxy", to show its timeline. Get Info has the same switch for keyboard use. The Now making line clears quietly when its task is done, or after 7 days.
+Sharing is a drop. Drag a task onto "Your galaxy" in the sidebar, edit the line in the sheet ("This line will show on your public Learn view."), and press **Show**. Drag a project onto its solar system, listed under "Your galaxy", to show its timeline. Get Info has the same switch for keyboard use. The Now making line clears quietly when its task is done, or after 7 days.
 
 #### The Public switch
 
@@ -815,7 +828,7 @@ A grade's switch says plainly what it does: "Grades are private by default. Your
 
 #### What never crosses
 
-Heat never sends Space a number worked out across records, and never compares people. That means no weekly load, no focus total, no done count, no habit streak, no course percentage or letter, and no ranking or side-by-side between two people, whatever is switched public. Wi_WWAV left counts out because a count "invites checking and comparing" (gate 1). A public record describes one piece of work, not the person.
+Learn never sends Space a number worked out across records, and never compares people. That means no weekly load, no focus total, no done count, no habit streak, no course percentage or letter, and no ranking or side-by-side between two people, whatever is switched public. Wi_WWAV left counts out because a count "invites checking and comparing" (gate 1). A public record describes one piece of work, not the person.
 
 The Public switch decides what other people see. It does not limit what Claude reads on your Mac. That is Claude's own permission prompt (3.13).
 
@@ -824,11 +837,11 @@ The Public switch decides what other people see. It does not limit what Claude r
 - **Links.** A task, milestone or project can point at a Console session, a solar system or a single work (`link: {kind, id}`). Double-clicking the link opens it in its view. A link is private and never reaches Space.
 - **Focus follows you.** Start focus on a task linked to a session, and Now offers "Open session". Over the Console, the Now strip keeps reading "Mix the second verse · focus 18:42 left" (see 2.2), and that time counts toward the same session.
 - **Milestones in Space.** A WWAV milestone linked to a solar system draws its bead with a small planet glyph in the system's colour. Reaching the milestone fills that bead if the timeline is shown, and publishes nothing else. Publishing stays a drop (see 4).
-- **Release plans become projects.** Ripple Creator (`server/routes/rippleCreator.js`, **Exists today**) generates plans with tasks in `pre`, `launch` and `post` phases. In Heat, "New release plan" makes three milestones (Pre-release at −28 days, Release day, Post-release at +28 days) with an empty three-phase template. If you ask Claude to fill a phase, it adds the tasks with `add_task`. Existing plans import as projects (draft → someday, active → active, completed and archived → archived).
+- **Release plans become projects.** Ripple Creator (`server/routes/rippleCreator.js`, **Exists today**) generates plans with tasks in `pre`, `launch` and `post` phases. In Learn, "New release plan" makes three milestones (Pre-release at −28 days, Release day, Post-release at +28 days) with an empty three-phase template. If you ask Claude to fill a phase, it adds the tasks with `add_task`. Existing plans import as projects (draft → someday, active → active, completed and archived → archived).
 
 ### 3.16 Data
 
-Heat's records live in the app's local database and sync to the person's account on mi-wwav.com (see 8). Grade rows are the exception: private grades stay on the Mac unless you turn on encrypted sync (Open, 8.9). A grade you switch public is copied to the server in the clear, because other people have to read it, and the copy is removed when you switch it back. The server tables are new, because the PKM's tables have no `userId`. Writes stay optimistic, and the status bar says where things stand: "Saved on this Mac · Synced 3:41 PM".
+Learn's records live in the app's local database and sync to the person's account on mi-wwav.com (see 8). Grade rows are the exception: private grades stay on the Mac unless you turn on encrypted sync (Open, 8.9). A grade you switch public is copied to the server in the clear, because other people have to read it, and the copy is removed when you switch it back. The server tables are new, because the PKM's tables have no `userId`. Writes stay optimistic, and the status bar says where things stand: "Saved on this Mac · Synced 3:41 PM".
 
 Every record below has a `public` flag, `false` by default. `ProfileShare` rows are the two default public items themselves, and exist only once you press **Show**. The app stores no Google token of any kind, because it has no Google sign-in.
 
@@ -843,16 +856,16 @@ TimeBlock    { id, taskId?|habitId?, date, start, minutes, origin: "you"|"plan" 
 FocusSession { id, taskId?|habitId?, startedAt, endedAt, focusMin, interruptions, view,
                source: "timer"|"claude", public }
 HeatState    { currentTaskId?, timer: { phase: "focus"|"break"|"idle", round, endsAt }, planDrafts[] }
-Project      { id, spaceId, title, status: "active"|"on_hold"|"someday"|"archived", targetDate?, link?, public }
-Milestone    { id, spaceId, projectId?, title, date, done, order, link?, public }
+Project      { id, spaceId, title, status: "active"|"on_hold"|"someday"|"archived", targetDate?, link?, source?, claudeReason?, public }
+Milestone    { id, spaceId, projectId?, title, date, done, order, link?, source?, claudeReason?, public }
 Habit        { id, title, minutes?, log: { "YYYY-MM-DD": true }, showCounter: false, public }
 Term / Course / Grade   // as today, plus termId, category keywords, source "you"|"claude"|"valence", public on Course and on each Grade
 MailThread   { id, gmailThreadId, subject, from, receivedAt, course?,
                state: "grade"|"task"|"nothing", reason, taskId?, recordedBy: "claude" }   // no body; never public
 Calendar     { id, name, kind: "brightspace"|"ical", keychainRef, lastSyncedAt }          // the address itself is in the Keychain
-Capture      { id, text, link?, triagedAt?, resultType?, resultId? }
+Capture      { id, text, link?, triagedAt?, resultType?, resultId?, source?, claudeReason? }   // source "claude" when add_capture made it (3.13)
 DailyNote    { date, markdown, public }
-Note         { id, title?, markdown, projectId?, link?, public }   // Proposed: the note that can go public (3.15's table); a daily note stays a DailyNote
+Note         { id, title?, markdown, projectId?, link?, source?, claudeReason?, public }   // Proposed: the note that can go public (3.15's table); a daily note stays a DailyNote
 ProfileShare { id, kind: "now"|"timeline", sourceId, text?, targetId, clearsAt? }   // the two default public items
 ```
 
@@ -864,7 +877,7 @@ The undo journal, in `library.sqlite`, records who made each change (`you` or `c
 
 | Key | Action |
 |---|---|
-| ⌘1 / 1–6 | Heat; then Today, Tasks, Calendar, Grades, Habits, Mail (no field focused) |
+| ⌘1 / 1–6 | Learn; then Today, Tasks, Calendar, Grades, Habits, Mail (no field focused) |
 | N, ⌘⇧N, ⌘K | New item; quick capture; command palette |
 | ↑ ↓, Return, ⌘I | Move; edit; Get Info |
 | ⌘↩, ⌫ | Mark done; delete (with Undo) |
@@ -879,23 +892,23 @@ The undo journal, in `library.sqlite`, records who made each change (`you` or `c
 
 | Left out | Why |
 |---|---|
-| Notifications, dock badges, reminders that fire on their own | Anything that reaches out fails gate 1.1; Heat shows what is due when it is open |
+| Notifications, dock badges, reminders that fire on their own | Anything that reaches out fails gate 1.1; Learn shows what is due when it is open |
 | Auto-starting the next round | An "up next" keeps a person past what they came for |
 | Ripple's momentum score and daily missions | A productivity score invites checking, and the weekly facts cover the same ground |
 | Replying or sending in Mail | Gmail already does it, and Wi_WWAV never touches your mailbox |
 | Submitting to Brightspace | Writing back needs the school's approval, and planning doesn't need it |
 | The PKM's kanban and graph views | The sketch names six tabs; the Obsidian export gives a graph to anyone who wants one |
 | Google sign-in, the Gmail restricted scope, Google verification and 7-day testing sign-ins | Claude reads mail through its own Gmail connector, and calendars come in as iCal addresses, so the app needs no Google account. |
-| Heat reading Gmail itself: its Brightspace query, School label and saved searches, message bodies, the reading pane, "Load images" | Mail shows only the threads Claude recorded, with their state. |
-| Heat's own calls to Claude: `/api/assist/:task`, a daily limit per account, consent sheets, the "Ask Claude to score" button | Wi_WWAV is an MCP server instead. Claude's own permission prompts ask before each tool call. |
-| Syllabus import by Claude | The app calls no model, and none of the eight tools writes a course, so a course is typed in. The founder left this call to the build (7 Oct 2026): it stays out of Heat's first version, and can come back later as one more tool that writes through the journal. |
-| A Claude-drafted weekly note | The same: no tool writes a note, and Heat lays out the facts for you to write it. It can come back the same way. |
+| Learn reading Gmail itself: its Brightspace query, School label and saved searches, message bodies, the reading pane, "Load images" | Mail shows only the threads Claude recorded, with their state. |
+| Learn's own calls to Claude: `/api/assist/:task`, a daily limit per account, consent sheets, the "Ask Claude to score" button | Wi_WWAV is an MCP server instead. Claude's own permission prompts ask before each tool call. |
+| Syllabus import by Claude | The app calls no model, and none of the tools writes a course, so a course is typed in. The founder left this call to the build (7 Oct 2026): it stays out of Learn's first version, and can come back later as one more tool that writes through the journal. |
+| A Claude-drafted weekly note | The same: no tool writes a note, and Learn lays out the facts for you to write it. It can come back the same way. |
 | A Claude tool that writes a score, marks a task done, or sets the Public switch | Claude estimates and drafts, never decides. Scores and privacy are yours. |
 | The "Finish payout setup so your shelf can open" task | Commerce comes later, inside Space. Cut on 7 Oct 2026 to narrow v1. |
 
 ### 3.19 The look, and open decisions
 
-Heat keeps its Aqua and brushed-metal skin (see 7). Its LCD stays iTunes olive while the Console's screens are DMG green, so the screen's colour says which view you're in. A check against gate 2.4 (body text 7:1, secondary 4.5:1) finds five pairs to fix: the LCD's dim text, the sidebar headings, the third ink, white on the `#3875d7` selection (4.47:1), and the label on the blue gel buttons. The fixes are in 7.2: selected rows fill `#1B4C8C` with white text (8.5:1) and keep a 3 px `#3875D7` bar at the leading edge.
+Learn keeps its Aqua and brushed-metal skin (see 7). Its LCD stays iTunes olive while the Console's screens are DMG green, so the screen's colour says which view you're in. A check against gate 2.4 (body text 7:1, secondary 4.5:1) finds five pairs to fix: the LCD's dim text, the sidebar headings, the third ink, white on the `#3875d7` selection (4.47:1), and the label on the blue gel buttons. The fixes are in 7.2: selected rows fill `#1B4C8C` with white text (8.5:1) and keep a 3 px `#3875D7` bar at the leading edge.
 
 | Open decision | Recommendation |
 |---|---|
@@ -904,8 +917,8 @@ Heat keeps its Aqua and brushed-metal skin (see 7). Its LCD stays iTunes olive w
 | **Valence / LTI with URI** | Ship on iCal and Claude's Gmail connector. Ask URI's Brightspace admins to register the app after the small-group stage (9.5), with the group's weekly reviews as evidence, because real scores end the pending-grade guesswork |
 | **Control size** (gate 2.4 fails any control under 44×44 pt; 26 px rows and 13 px habit squares fail it) | Keep 44 pt for buttons, tabs and orbs. Before testing, write a separate rule for dense rows and grids: 24×24 pt hit areas (the WCAG 2.2 minimum) and every action on the keyboard |
 | **Now making line** | Build it, shown only once you've written one. Drop it if it starts to feel like a status that has to be kept up |
-| **Remote MCP server** | Build it after Heat sync. Same eight tools and labels. A remote call writes to the synced copy, and the Mac journals it when it arrives, with the same "Undo Claude's…" label. Its `get_grades` returns only the grades you made public, because private grades are not on the server (8.8). |
-| **Who Heat is for** | One account first, with nothing hard-coded to a school, so a classmate could use it next. That is also the clearest route to gate 4 |
+| **Remote MCP server** | Build it after Learn sync. The same tools and labels. A remote call writes to the synced copy, and the Mac journals it when it arrives, with the same "Undo Claude's…" label. Its `get_grades` returns only the grades you made public, because private grades are not on the server (8.8). |
+| **Who Learn is for** | One account first, with nothing hard-coded to a school, so a classmate could use it next. That is also the clearest route to gate 4 |
 
 ## 4. Space: the social view
 
@@ -1078,9 +1091,9 @@ Writing and gallery works have no Open in Console; the Console is for sound and 
 **On desktop:**
 
 - **Editing.** Your own sun opens straight into the editor; other people's open to read. There is no layout to drag, size or rotate. The blocks flow in order.
-- **The bio sun** is in the middle of your galaxy. It opens your **public Heat view** under your bio blocks (**Decided**; see 2.4 and 3.15). The view holds what you have shown: a "Now making" line, then the milestone timelines of the projects you linked, then any other record you switched public, each kind under its own heading. Anyone who opens your sun sees it, read-only, and you see the same page through the galaxy chip's "Your public Heat view". It never shows a count or a comparison (see 3.15).
-- **A project sun** shows the milestone timelines linked to its solar system, as beads with titles, dates, and reached or not. On your own project sun, the secondary act (⇧Return) is **Plan in Heat**, which makes a linked milestone (see 2.6).
-- **Heat reaches a sun only when you show it.** Making a Now making line or a timeline public is one press on **Show** in Heat (see 3.15). Nothing else in Heat is on a sun.
+- **The bio sun** is in the middle of your galaxy. It opens your **public Learn view** under your bio blocks (**Decided**; see 2.4 and 3.15). The view holds what you have shown: a "Now making" line, then the milestone timelines of the projects you linked, then any other record you switched public, each kind under its own heading. Anyone who opens your sun sees it, read-only, and you see the same page through the galaxy chip's "Your public Learn view". It never shows a count or a comparison (see 3.15).
+- **A project sun** shows the milestone timelines linked to its solar system, as beads with titles, dates, and reached or not. On your own project sun, the secondary act (⇧Return) is **Plan in Learn**, which makes a linked milestone (see 2.6).
+- **Learn reaches a sun only when you show it.** Making a Now making line or a timeline public is one press on **Show** in Learn (see 3.15). Nothing else in Learn is on a sun.
 
 **Letters.** Every devlog post is a letter, opening "Dear Wi-WWAV," since the second post, where the founder coined the name ("Wi-WWAV (we wave)… we are the wwav"), and signed "LMY". A letter is a page with a greeting and a sign-off:
 
@@ -1206,7 +1219,7 @@ The Console fills the view area of the shell (see 2): 1280 × 726 pt at the defa
 | Browser | 220 pt | ⌥⌘B | filtered views of the library (see 2) plus your plugins; drag anything onto a lane |
 | Arrangement | the rest | always | 196 pt track headers, then lanes 56 pt tall (24–240). The last row is OUTPUT |
 | Viewer | 320 × 180 pt | appears with the first video track | the picture at the playhead; ⌥V widens it to half the window; tears off onto a second display |
-| Inspector | 320 pt | ⌘I | every field of the selection, in Heat's Get Info drawer style |
+| Inspector | 320 pt | ⌘I | every field of the selection, in Learn's Get Info drawer style |
 | Bottom panel | 240 pt (120–480) | ⌥1–⌥3; the open one again closes it | Editor (the piano roll for an instrument clip, the waveform, gain and loop for an audio clip), Chain (the track's devices), Mixer |
 
 **Metal outside, Game Boy inside.** The chrome is MI-WWAV-OS's metal (`#FBFCFD`, `#E6EAEF`, `#C9D0D8`, edge `#98A2AD`) with a 1 px pinstripe every 4 px that "reads as texture, never as stripes". Every readout sits behind glass as a DMG-green screen: the transport screen, tempo and key, the limiter's gain-reduction meter, a track's latency tag. The screens use the four DMG tones `#0B1F0B` / `#0F380F` / `#306230` / `#8BAC0F` with `#C6E24A` glow, in uppercase Menlo dot-matrix. **Exists today:** these tokens and the rule "Aqua is the case; the Game Boy is inside it" (`MI-WWAV-OS/app/lib/style/theme.dart`). The register is in 7. Look.
@@ -1217,7 +1230,7 @@ The Console fills the view area of the shell (see 2): 1280 × 726 pt at the defa
 
 **Decided: no clip-launch view in v1.** There is one view, and no second, Ableton-style session view with a grid of clips. A launch grid has no meaning for picture, and a second view would double the grammar ("exceptions are how a fourth verb gets in"). Playing live is recording: arm a track, play, and what you played is a take (5.6).
 
-**Heat in the Console.** A session can be linked to a task or project in Heat, and focus follows you in. The Now strip keeps the task on its left and shows the session on its right, "BAR 42.3 · 128.00 BPM · REC ARMED", and the focus countdown runs on (see 2.2 and 2.6). Pressing play here pauses a song you were listening to in the player, and nothing resumes on its own (see 2.3).
+**Learn in the Console.** A session can be linked to a task or project in Learn, and focus follows you in. The Now strip keeps the task on its left and shows the session on its right, "BAR 42.3 · 128.00 BPM · REC ARMED", and the focus countdown runs on (see 2.2 and 2.6). Pressing play here pauses a song you were listening to in the player, and nothing resumes on its own (see 2.3).
 
 ### 5.3 Tracks
 
@@ -1294,7 +1307,7 @@ The piano roll opens in the bottom panel (⌥1) when an instrument clip is selec
 > "The audio engine stopped. 'Tape Echo' on the track 'Keys' was running when it did. Restarting…"
 > then: "Back. 'Tape Echo' is off until you turn it on. Changes made inside its own window in the last 41 s may be lost."
 
-The buttons are **Keep it off** and **Try it again**. The engine reports plugin state on every stop, every 60 s and before every save, which is where "41 s" comes from. Heat lives in the app, so a focus countdown never stops. **Open:** one process per plugin. *Recommendation:* not in v1; log a month of engine crashes per plugin and decide on that.
+The buttons are **Keep it off** and **Try it again**. The engine reports plugin state on every stop, every 60 s and before every save, which is where "41 s" comes from. Learn lives in the app, so a focus countdown never stops. **Open:** one process per plugin. *Recommendation:* not in v1; log a month of engine crashes per plugin and decide on that.
 
 **Delay compensation** is automatic from each plugin's reported latency, shown as a DMG tag in the header: "+2,048 smp". While a track is armed, **Low-latency monitoring** bypasses plugins over 256 samples on that track's monitor path only ("bypassed while monitoring"); playback is untouched.
 
@@ -1814,13 +1827,13 @@ Rule 2 says to write down what a fail looks like before testing. Each of these f
 
 ## 7. Look, sound and feel
 
-The app speaks one design language in two registers. The case is the same in every view: a brushed-metal title bar, one light from the upper left, the same stem colours and the same words. What sits inside the case changes with the view. Heat and the Console's chrome are the **desk**, and Space is the **night**. Everything in this chapter is **Proposed** unless it carries another label. Where a value here differs from a raw token quoted in an earlier chapter, build this chapter's value.
+The app speaks one design language in two registers. The case is the same in every view: a brushed-metal title bar, one light from the upper left, the same stem colours and the same words. What sits inside the case changes with the view. Learn and the Console's chrome are the **desk**, and Space is the **night**. Everything in this chapter is **Proposed** unless it carries another label. Where a value here differs from a raw token quoted in an earlier chapter, build this chapter's value.
 
 ### 7.1 Where it comes from
 
 | System | Where it lives | The app takes | The app leaves |
 |---|---|---|---|
-| Heat's Aqua skin | Heat | the case: brushed metal, gel buttons, Aqua stripes, source list, sheets, the olive LCD, full dark tokens | the slate desk behind the window |
+| Learn's Aqua skin | Learn | the case: brushed metal, gel buttons, Aqua stripes, source list, sheets, the olive LCD, full dark tokens | the slate desk behind the window |
 | MI-WWAV-OS style | `MI-WWAV-OS/app/lib/style/theme.dart` | "Aqua is the case; the Game Boy is inside it"; DMG screens; deck metal with pinstripes; the 140 ms beat | Helvetica Neue (7.4) |
 | v3 iOS | `ios_v3/WWAV/Theme/`, `Visuals/` | the night palette, `WWAVLight.sun`, key colour, the starfield port, titles that end in a period | four pastel palettes, Nunito, the breathing tab pill |
 | v4 web | `wwav/src/styles/tokens.css`, `planet.css` | seven ink opacities, one accent with three uses, Cormorant over Inter, 120/240/420 ms | the limousine-black ground |
@@ -1835,30 +1848,30 @@ v1's scanlines and RGB fringe stay out; the founder called the old web look "so 
 
 | | Desk | Night |
 |---|---|---|
-| Views | Heat; the Console's chrome; Settings; every sheet | Space; the expanded player |
+| Views | Learn; the Console's chrome; Settings; every sheet | Space; the expanded player |
 | Ground | brushed metal, white wells, `#edf3fe` stripes | `#070A18` under a key-tinted starfield |
 | Ink | `#1b1b1b` | `#F4EFE6` |
 | One accent | Aqua highlight `#3875D7` | royal blue `#2946FF` |
 | Type | Lucida Grande, Menlo | Cormorant Garamond italic, Inter |
-| Light appearance | Heat's light tokens | night |
-| Dark appearance | Heat's dark tokens | night |
+| Light appearance | Learn's light tokens | night |
+| Dark appearance | Learn's dark tokens | night |
 
 The web face at www.wi-wwav.com keeps Wi's own look (**Exists today:** `wi/src/wi.css`): paper `#f7f6f2`, ink `#161616`, the system's type at 17 px, light and dark from the phone. A share page is read by someone who never installed anything, so it borrows none of the app's costume.
 
 #### The desk
 
-**Exists today (Heat):** Lucida Grande 13 px at 1.35; brushed metal (1 px light and dark lines over a radial highlight on `#e4e4e4→#c9c9c9`); gel pills with a hard break at 45/55%; white and `#edf3fe` rows; a `#e7ecf2` source list; sheets that drop from the title bar over a 25% black backdrop; Stickies yellow; glass beads; a 3 px `rgba(56,117,215,.6)` focus ring; and a full set of dark tokens (7.11).
+**Exists today (Learn):** Lucida Grande 13 px at 1.35; brushed metal (1 px light and dark lines over a radial highlight on `#e4e4e4→#c9c9c9`); gel pills with a hard break at 45/55%; white and `#edf3fe` rows; a `#e7ecf2` source list; sheets that drop from the title bar over a 25% black backdrop; Stickies yellow; glass beads; a 3 px `rgba(56,117,215,.6)` focus ring; and a full set of dark tokens (7.11).
 
-The desk has two metals with two jobs. **Case metal** is Heat's: title bar, toolbars, sheets, inspector. **Deck metal** is MI-WWAV-OS's paler `#FBFCFD`/`#E6EAEF`/`#C9D0D8`, with a 1 px pinstripe every 4 px that "reads as texture, never as stripes". It covers the Console's mixer strips and device cards (see 5.8 and 5.9).
+The desk has two metals with two jobs. **Case metal** is Learn's: title bar, toolbars, sheets, inspector. **Deck metal** is MI-WWAV-OS's paler `#FBFCFD`/`#E6EAEF`/`#C9D0D8`, with a 1 px pinstripe every 4 px that "reads as texture, never as stripes". It covers the Console's mixer strips and device cards (see 5.8 and 5.9).
 
-**The Game Boy inside.** Every Console readout sits behind glass as a DMG screen: `#0B1F0B` and `#0F380F` grounds, `#306230` for unlit segments, `#8BAC0F` for secondary text and `#C6E24A` glow for primary, in uppercase Menlo inside the bezel's scanlines and vignette (**Exists today:** MI-WWAV-OS `ScreenBezel`). Meters stay "DMG green until it is about to be too loud" (see 5.2). Heat keeps the iTunes olive LCD, so the screen's colour names the view: olive is planning, green is making. DMG screens look the same in light and dark, because a lit screen doesn't change with the room's lamp.
+**The Game Boy inside.** Every Console readout sits behind glass as a DMG screen: `#0B1F0B` and `#0F380F` grounds, `#306230` for unlit segments, `#8BAC0F` for secondary text and `#C6E24A` glow for primary, in uppercase Menlo inside the bezel's scanlines and vignette (**Exists today:** MI-WWAV-OS `ScreenBezel`). Meters stay "DMG green until it is about to be too loud" (see 5.2). Learn keeps the iTunes olive LCD, so the screen's colour names the view: olive is planning, green is making. DMG screens look the same in light and dark, because a lit screen doesn't change with the room's lamp.
 
 Five fixes bring the desk's pairs up to gate 2.4's bars (ratios in 7.11):
 
 - Selected rows fill `#1B4C8C`, MI-WWAV-OS's deep Aqua, with white text at 8.5:1 in both appearances. White on `#3875d7` is 4.47:1, so `#3875D7` stays the focus ring, the gel and a 3 px bar at the row's leading edge.
 - LCD dim text goes from `#6b7050` (3.9:1) to `#4b5034` (6.4:1).
 - Source-list headings go from `#6e7781` (3.8:1) to `#4f5761` (6.2:1).
-- Heat's third ink goes from `#7a7a7a` (4.3:1) to `#5f5f5f` (6.4:1).
+- Learn's third ink goes from `#7a7a7a` (4.3:1) to `#5f5f5f` (6.4:1).
 - Blue gel buttons take an ink label, as Mac OS X's default button did; the darkest stop under it is 4.6:1. Selected segments deepen to `#336dcc→#1B4C8C` so a white label holds 5.0:1. The dark gel's top stop goes from `#6a6d71` to `#5e6165`.
 
 #### The night
@@ -1885,7 +1898,7 @@ silent under a solo   filled at 45%, dashed ink ring
 selected              filled, plus a 2 pt notch beneath (PRANA blinks; the app doesn't)
 ```
 
-- **Heat's colours are fills.** Cool `#4f9be6`, warm `#efa431`, hot `#e0402c` and overdue `#8f1d16` fill tubes, pill borders and dots. The level word is ink, because hot on white is 4.25:1.
+- **Learn's colours are fills.** Cool `#4f9be6`, warm `#efa431`, hot `#e0402c` and overdue `#8f1d16` fill tubes, pill borders and dots. The level word is ink, because hot on white is 4.25:1.
 - **One accent per screen,** named in 7.2. v4's test holds: "If blue appears more than once or twice on a screen, something is wrong."
 - **Spacing and corners.** A 4 px grid: 4, 8, 12, 16, 24, 32, 48, 64. Radii: chip 6, button 10 (gels are full pills), card 14, a sheet's lower corners 8.
 
@@ -1893,7 +1906,7 @@ selected              filled, plus a 2 pt notch beneath (PRANA blinks; the app d
 
 | Face | Where | Sizes | Why |
 |---|---|---|---|
-| Lucida Grande (Mac), Lucida Sans Unicode (Windows) | the desk: rows, labels, sheets, menus | 11, 13, 15, 20 pt; body 13 at 1.35 | Heat's face and Aqua's, until Yosemite (2014) moved to Helvetica Neue. Both are Lucida Sans and ship with their systems, so nothing is bundled. |
+| Lucida Grande (Mac), Lucida Sans Unicode (Windows) | the desk: rows, labels, sheets, menus | 11, 13, 15, 20 pt; body 13 at 1.35 | Learn's face and Aqua's, until Yosemite (2014) moved to Helvetica Neue. Both are Lucida Sans and ship with their systems, so nothing is bundled. |
 | Menlo (Mac), Consolas (Windows) | DMG screens, timecode | 11, 13, 20 pt, capitals | MI-WWAV-OS's dot-matrix face. Fixed width keeps "128.00 BPM" from jittering, PRANA's rule for "1.00x". |
 | Cormorant Garamond italic, 300 and 400 | the name of a work, a person or a place, in the night | 20 pt minimum; 30 for headers; 46 for suns | v4's name face, from Crater. Line height 1.18 or more; weight 400 below 28 pt, where 300's hairlines thin. |
 | Inter | running text and labels in the night | 11 (capitals, +0.08 em), 13, 15, 17 for reading | v4's one family, for anything read twice. |
@@ -1911,7 +1924,7 @@ Inter and Cormorant Garamond are OFL fonts bundled with the app. **Nunito retire
 | A red rose (`heart.png`) | like | **Add**, a private save that is never counted (see 4.11) |
 | A two-masted schooner (`message.png`) | comments | the message door and letters: a ship carries post |
 | A looped paperclip (`copy.png`) | share | **Copy link** to the web face |
-| A plus (`plus.png`) | remix | **New**, the "+" on Heat's tabs and the **+ Lane** button (3.3, 5.5). Its tooltip says "New task" or "New lane", never "Add", which belongs to the rose |
+| A plus (`plus.png`) | remix | **New**, the "+" on Learn's tabs and the **+ Lane** button (3.3, 5.5). Its tooltip says "New task" or "New lane", never "Add", which belongs to the rose |
 | An up arrow (`up_arrow.png`) | unknown | **↑ Push** |
 
 They are redrawn as vectors on 16, 20 and 28 pt grids, one stroke weight per size, in the register's ink; the rose keeps its red inside an ink line. Play, stop, record and loop are drawn in the same hand. SF Symbols aren't used, because their licence covers Apple platforms and the app goes to Windows.
@@ -1924,7 +1937,7 @@ Motion comes from sound. Nothing on screen moves while nothing plays, and nothin
 |---|---|---|---|
 | `press` | 70 | a gel darkens to 88% | half a beat |
 | `beat` | 140 | mute, solo, select, a view change; every move under Reduce Motion | MI-WWAV-OS |
-| `fade` | 280 | fades, reveals, a sheet dropping | v4's 240 and Heat's 220, put on the beat |
+| `fade` | 280 | fades, reveals, a sheet dropping | v4's 240 and Learn's 220, put on the beat |
 | `morph` | 420 | the player opening | v4 |
 | `wash` | 760 | the sky taking a key colour | the portfolio's light-wash |
 | `dive` | 900 | entering a planet | the Works hub |
@@ -1948,7 +1961,7 @@ Meters, playheads and waveforms move whenever audio moves, because they are info
 The app is an instrument, so its own sounds must never be mistaken for the work or land in a take. **It makes no interface sounds**: no clicks, swooshes or alerts. There are two exceptions. Each starts only after a press and has its own switch.
 
 - **The Console's click.** Off by default in each session (see 5.4). An accent at 1,568 Hz and a beat at 1,047 Hz, 12 ms sine bursts at −12 dBFS on the cue bus, which no recording or export taps.
-- **Heat's chime.** One struck bell with a 1.2 s decay when a focus session ends, off by default (see 3.5). Nothing sounds to call you back from a break.
+- **Learn's chime.** One struck bell with a 1.2 s decay when a focus session ends, off by default (see 3.5). Nothing sounds to call you back from a break.
 
 Space makes no sound but the works. Meteors are silent, because in a sky full of songs a sound effect would be one more song.
 
@@ -1978,21 +1991,21 @@ Focus is the 3 px Aqua ring in the desk and a 2 pt ink ring in the night, since 
 
 The voice is the repo's: plain, second person, present tense, short. Real numbers replace adjectives. Every omission and every disabled control says why in one sentence. Endings are said out loud. No exclamation marks, no emoji. An ellipsis means a sheet follows ("Export everything…") or work is under way ("Syncing…").
 
-- **Case.** Buttons and menus are sentence case, as Heat writes them. Headings in the night are lowercase italic and end in a period. Labels are tracked capitals, and so are DMG screens. Product and view names keep their case ("Heat", "Mi_WWAV"), and a work's name is set exactly as its maker typed it.
+- **Case.** Buttons and menus are sentence case, as Learn writes them. Headings in the night are lowercase italic and end in a period. Labels are tracked capitals, and so are DMG screens. Product and view names keep their case ("Learn", "Mi_WWAV"), and a work's name is set exactly as its maker typed it.
 - **Claude.** The word "AI" never appears and nothing gets a sparkle; Counsel's spec already rules out "Any 'AI' branding in the UI". Claude is named wherever Claude acts, because you should know who made a change. Its work is labelled as an estimate or a draft, and it never gives a number it can't trace.
 - **Undo instead of questions.** ⌘Z replaces "Are you sure?". Confirmation remains only where undo can't reach: money moving, and deleting an account (type DELETE).
 
 | Moment | Copy | Source |
 |---|---|---|
-| Empty | "Nothing here right now." | Heat |
+| Empty | "Nothing here right now." | Learn |
 | The end | "That's everything." | Wi |
 | A limit and its reason | "A solar system holds 21 worlds. Start another one." | v4 |
 | A file that is less than it could be | "Plain audio comes in as master only." | 2.5 |
 | A pause you didn't ask for | "The planet is paused while this plays." | v4 |
 | Undo | menu "Undo move clip"; toast "Undone — move clip"; "Nothing to undo." | MI-WWAV-OS |
 | Waiting, honestly | "Splitting 'break.wav' · segment 4 of 12" | 5.10; v4's rule: "anything finer than these stages would be invented" |
-| Failing | "Couldn't save that change. Check your connection and try again." | Heat |
-| Disabled | "Habit limit reached" | Heat |
+| Failing | "Couldn't save that change. Check your connection and try again." | Learn |
+| Disabled | "Habit limit reached" | Learn |
 | Claude | "Claude's estimate: 45m. It read the title, the notes and your past averages." | Proposed |
 
 Never: "Oops", "Awesome", "AI-powered", "Trending", "Don't break your streak", "3 people are looking at this", or an unread count.
@@ -2010,14 +2023,14 @@ Every token lives in one file, `design/tokens.json`. The build compiles it into 
 
 | Token | Light | Dark | Contrast | From |
 |---|---|---|---|---|
-| `desk.ink` · `ink2` · `ink3` | `#1b1b1b` · `#4a4a4a` · `#5f5f5f` | `#ececec` · `#c2c2c2` · `#9a9a9a` | 17.2 · 8.9 · 6.4 on white; 12.5 · 8.3 · 5.3 on `#26282b` | Heat; `ink3` darkened |
-| `desk.well` · `stripe` | `#ffffff` · `#edf3fe` | `#26282b` · `#2c3038` | ink 15.5 on stripe | Heat |
-| `desk.caseMetal` | `#e4e4e4→#c9c9c9` | `#5a5d61→#3f4246` | ink 10.4 | Heat |
+| `desk.ink` · `ink2` · `ink3` | `#1b1b1b` · `#4a4a4a` · `#5f5f5f` | `#ececec` · `#c2c2c2` · `#9a9a9a` | 17.2 · 8.9 · 6.4 on white; 12.5 · 8.3 · 5.3 on `#26282b` | Learn; `ink3` darkened |
+| `desk.well` · `stripe` | `#ffffff` · `#edf3fe` | `#26282b` · `#2c3038` | ink 15.5 on stripe | Learn |
+| `desk.caseMetal` | `#e4e4e4→#c9c9c9` | `#5a5d61→#3f4246` | ink 10.4 | Learn |
 | `desk.deckMetal` | `#FBFCFD` `#E6EAEF` `#C9D0D8`, edge `#98A2AD` | case metal | `#161D26` 14.0; `#5D6975` 4.6 | MI-WWAV-OS |
 | `desk.select` | `#1B4C8C`, white text | same | 8.5 | MI-WWAV-OS |
-| `desk.highlight` | `#3875D7` | `#3a6fc4` | rings and gels only | Heat |
-| `desk.lcd` | `#f2f4e4→#dfe3c6`; ink `#262a17`; dim `#4b5034` | `#2c3121→#20241a`; `#d7e0a8`; `#8e9670` | 11.2 · 6.4; 9.6 · 5.1 | Heat; dim darkened |
-| `desk.sourceList` | `#e7ecf2`; heading `#4f5761` | `#2e3136`; `#9aa3ad` | 6.2; 5.1 | Heat; heading darkened |
+| `desk.highlight` | `#3875D7` | `#3a6fc4` | rings and gels only | Learn |
+| `desk.lcd` | `#f2f4e4→#dfe3c6`; ink `#262a17`; dim `#4b5034` | `#2c3121→#20241a`; `#d7e0a8`; `#8e9670` | 11.2 · 6.4; 9.6 · 5.1 | Learn; dim darkened |
+| `desk.sourceList` | `#e7ecf2`; heading `#4f5761` | `#2e3136`; `#9aa3ad` | 6.2; 5.1 | Learn; heading darkened |
 | `screen.dmg` | `#0B1F0B` `#0F380F` `#306230` `#8BAC0F` | same | `#8BAC0F` 5.0 on `#0F380F` | MI-WWAV-OS |
 | `screen.glow` · `amber` · `rec` | `#C6E24A` · `#F0A32E` · `#E0453A` | same | 9.0 · 6.3 · 3.2 (rec is never text) | MI-WWAV-OS |
 | `night.ground` · `deep` · `clay` | `#070A18` · `#030510` · `#1A2142` | same | | v3, v4 |
@@ -2025,7 +2038,7 @@ Every token lives in one file, `design/tokens.json`. The build compiles it into 
 | `night.star` · `accent` | `#DDE4FB` · `#2946FF` | same | 15.5 · 3.2 (rings only) | v3, v4 |
 | `night.sun` | `#fff8e6→#ffd89a→#f0a23c→#b25f12` | same | | v4 |
 | `stem.*` | `#D23C2A` `#F0B90B` `#2E9A55` `#1F4E9E` | same | carried by an ink ring | PRANA |
-| `heat.*` | `#4f9be6` `#efa431` `#e0402c` `#8f1d16` | same | fills only | Heat |
+| `heat.*` | `#4f9be6` `#efa431` `#e0402c` `#8f1d16` | same | fills only | Learn |
 | `light.sun` | (0.30, 0.25) | same | | v3 |
 
 ### 7.12 Left out, and open decisions
@@ -2034,10 +2047,10 @@ Every token lives in one file, `design/tokens.json`. The build compiles it into 
 |---|---|
 | Palettes you pick (v2's four, v3's four pastels) | Each palette is another set of contrast checks, and every work already brings its own colour |
 | A night mode that warms the screen | The system already does this (Wi's reason) |
-| Heat's slate desk `#7d8a99` | It was the web page behind the window; a native window sits on your own desktop |
+| Learn's slate desk `#7d8a99` | It was the web page behind the window; a native window sits on your own desktop |
 | The interior register: oak and felt, sand and clay, lamp light, PRANA's Turrell field, crema, the warm ink `#3D2E22`, Crater's amber lamps and sunset sky, "after hours" | The walkable shop is cut. "Eventually the space will hold commerce instead of having that be a 4th place." Cut on 7 Oct 2026 to narrow v1. |
 | Jost, and the shop's signs, tags and price cards | They were the shop's type (7.4). Cut on 7 Oct 2026 to narrow v1. |
-| The room sound, and house music from `portfolio/public/media/site-music/` | Cut with the shop. The app's only sounds are the Console's click and Heat's chime (7.7). |
+| The room sound, and house music from `portfolio/public/media/site-music/` | Cut with the shop. The app's only sounds are the Console's click and Learn's chime (7.7). |
 | The shop's idle motions (field drift, steam, lamp flicker), and haptics for records, garments, shelves, the FX moons and the tempo and pitch dials | Cut on 7 Oct 2026 to narrow v1. |
 | The astronaut and any avatar | Cut on 7 Oct 2026 to narrow v1. Your galaxy chip is who you are (4.14). |
 | The plus as "＋ add a song" | "Remixing is Mi-WWAV and Console, not Space." The plus is now New (7.5). |
@@ -2059,31 +2072,31 @@ This is the engineering plan. The two-process split, Tauri, JUCE hosting third-p
 | `Wi_WWAV.app` | Tauri 2: a Rust core, and the web UI in WKWebView (WebView2 on Windows) | windows, menus, the three views, the library, undo, sync, the account, video | Tauri's event loop |
 | `wwav-engine` (`Contents/Helpers/wwav-engine.app`) | JUCE 8 (C++) with PRANA's `prana/core` | the audio device, the graph, MIDI, third-party plugins and their windows | JUCE's message loop |
 | `wwav-scan` | JUCE, command line | one pass over the plugin folders, then exits | none |
-| `wi-mcp` (in `Contents/Helpers/`) | Rust, command line | the eight tools over the library (8.8); no window, no network | none; a stdio loop |
+| `wi-mcp` (in `Contents/Helpers/`) | Rust, command line | the eighteen tools over the library (8.8); no window, no network | none; a stdio loop |
 
 The app and the engine are the split. Why two:
 
-1. **A plugin is someone else's code inside the audio callback.** A crashing plugin takes its process with it: in one process, the whole app, mid-sentence in Heat; split, only the engine, which the app restarts (8.3).
+1. **A plugin is someone else's code inside the audio callback.** A crashing plugin takes its process with it: in one process, the whole app, mid-sentence in Learn; split, only the engine, which the app restarts (8.3).
 2. **Both frameworks want the main thread.** On macOS one framework drives `NSApplication` from it. In the app that is Tauri; wherever plugin editors live it must be JUCE, because AU and VST3 editors build their views on the message thread and many assume it is the main one.
 3. **Real-time hygiene.** The audio thread shares its process with nothing that compiles JavaScript, collects garbage or decodes video.
 
 The engine is a faceless helper app (`LSUIElement`, no Dock icon), so plugin windows belong to a real application. Keys a plugin window doesn't take go back to the app's single input router (MI-WWAV-OS's one raw-key reader, `router.dart`), so ⌘Z, ⌘K, ⌘1–⌘3 and Space still work.
 
-`wi-mcp` is not part of the split. Claude Desktop or Claude Code starts it, not the app, and it is one more reader and writer of the library. It never talks to the engine, because none of the eight tools touches audio.
+`wi-mcp` is not part of the split. Claude Desktop or Claude Code starts it, not the app, and it is one more reader and writer of the library. It never talks to the engine, because none of the tools touches audio.
 
 ```
 +---------------------------- Wi_WWAV.app (Tauri 2) ------------------------------+
 | main thread: event loop, windows, menus, the one input router                   |
 |                                                                                 |
 | +------------------- web UI (WKWebView) ------------------+ +-- viewer -------+ |
-| | Heat | Space | Console                                  | | CAMetalLayer    | |
+| | Learn | Space | Console                                  | | CAMetalLayer    | |
 | | timeline, mixer, three.js Space                         | | wgpu, one pass  | |
 | +-----------------------------^---------------------------+ +-------^---------+ |
 |          commands (JSON) / channels (raw bytes)                     |           |
 | +-----------------------------+------- Rust core -------------------+---------+ |
 | | library.sqlite + ULID media | undo journal | upload queue | Keychain auth   | |
 | | video: FFmpeg decode -> wgpu -> VideoToolbox encode | take writer           | |
-| | engine supervisor | Heat rules | mi-wwav.com and iCal clients               | |
+| | engine supervisor | Learn rules | mi-wwav.com and iCal clients               | |
 | +----------+------------------------------------------+-----------------------+ |
 +------------|------------------------------------------|-------------------------+
              | command socket                           | shared memory
@@ -2150,7 +2163,7 @@ The target is 2 s plus the plugins' own load time.
 - **Hangs.** If the clock stalls for 500 ms while playing, or a ping goes unanswered for 1 s, the app kills the engine and runs the same steps.
 - **Repeat crashes.** Three in ten minutes from one plugin and it stays off: "crashed 3 times".
 - **If the app dies,** the engine sees its parent's pipe close, stops the audio and exits.
-- **Heat and Claude carry on.** Heat lives in the app, so a focus countdown never stops, and `wi-mcp` has no use for the engine, so Claude's tools work while it restarts.
+- **Learn and Claude carry on.** Learn lives in the app, so a focus countdown never stops, and `wi-mcp` has no use for the engine, so Claude's tools work while it restarts.
 
 One process per plugin stays **Open** in 5.7, with its recommendation: not in v1; decide after a month of crash logs.
 
@@ -2201,11 +2214,11 @@ Video lives in the Rust core (**Decided**). It is basic (5.11): clips on tracks,
 
 The library is the folder `~/Music/Wi_WWAV/` (2.5).
 
-- **`library.sqlite`** holds clips, tags, sequences, Heat's records, the Claude tool switches, plugin scan results and the undo journal, in WAL mode with FTS5 for search. Every committed change is its own transaction, so nothing needs saving; the status bar says "Saved on this Mac". A nightly `VACUUM INTO` keeps seven dated copies. The app and `wi-mcp` both write this file (8.8).
+- **`library.sqlite`** holds clips, tags, sequences, Learn's records, the Claude tool switches, plugin scan results and the undo journal, in WAL mode with FTS5 for search. Every committed change is its own transaction, so nothing needs saving; the status bar says "Saved on this Mac". A nightly `VACUUM INTO` keeps seven dated copies. The app and `wi-mcp` both write this file (8.8).
 - **`media/`** holds every imported, recorded and rendered file under a ULID, written once and never edited (**Exists today:** `MI-WWAV-OS/engine/src/ids.rs`).
 - **`sessions/`** holds `.wwavsession` packages (6.5).
 
-**Heat's records** are the tables of 3.16. Each record has a `public` flag, `false` by default. The two default public items are `ProfileShare` rows (3.16); each appears on your public Heat view once you press Show (3.15). The flag is part of the row, so switching it is one journalled change, "Undo make public", like any other.
+**Learn's records** are the tables of 3.16. Each record has a `public` flag, `false` by default. The two default public items are `ProfileShare` rows (3.16); each appears on your public Learn view once you press Show (3.15). The flag is part of the row, so switching it is one journalled change, "Undo make public", like any other.
 
 **The undo journal** follows MI-WWAV-OS's design (**Exists today:** `MI-WWAV-OS/engine/src/store.rs`), reimplemented in the app's Rust core. MI-WWAV-OS contributes the idea, not the code (**Decided**). Every mutation runs in a transaction that snapshots the affected rows before and after.
 
@@ -2226,7 +2239,7 @@ CREATE TABLE txn_row (txn_id TEXT NOT NULL REFERENCES txn(id),
 - Settings → Claude lists the entries whose actor is `claude`, each with Undo, for when you have moved on to another view. Undoing an entry that is not the newest first checks that none of its rows has changed since. If one has, nothing is written: "Can't undo this. The task changed after Claude's estimate."
 - No `ON DELETE CASCADE` anywhere: "an unjournaled row is an unrestorable one."
 - A session keeps the same shape in its own `journal/undo.ndjson`, so its history travels with it (6.5).
-- Work that has left the Mac is not a journal entry, and the Edit menu says so. Publishing is undoable only while the upload is queued: ⌘Z clears `published_at` and the queue loses it. Once the server has it, the Edit menu reads "Can't undo a publish. Unpublish 'World Ending'…" (see 2.7). Making a Heat item public is different: it is a journal entry, and undoing it removes the public copy at the next sync (8.7).
+- Work that has left the Mac is not a journal entry, and the Edit menu says so. Publishing is undoable only while the upload is queued: ⌘Z clears `published_at` and the queue loses it. Once the server has it, the Edit menu reads "Can't undo a publish. Unpublish 'World Ending'…" (see 2.7). Making a Learn item public is different: it is a journal entry, and undoing it removes the public copy at the next sync (8.7).
 
 **Media is reclaimed only on a press.** Deleting removes rows, never files. **Clean up media…** lists files that no row and no journal entry names ("1.8 GB in 214 files") and moves them to `trash/`; emptying the trash deletes them. So undo can always bring a deleted clip back with its sound.
 
@@ -2236,9 +2249,9 @@ The server stays (**Decided**): Express, Postgres and R2 on Heroku. What is loca
 
 **The queue is a query** (**Exists today:** `MI-WWAV-OS/proto/README.md`): `published_at IS NOT NULL AND remote_id IS NULL`. Each 8 MiB part is signed just before it goes up, because presigned URLs last 300 s, and recorded in `upload_part(clip_id, n, etag)`, so a resumed upload skips it. Retries back off from 2 s to 5 min with jitter. The publish body carries `settings: {origin: "wi_wwav", clipId}` (2.8), so a retry never posts twice.
 
-**Heat sync** goes to new per-user tables, because the PKM's tables have no `userId` (3.16). Each field carries a sequence number from a per-device counter, and the server keeps the higher one field by field, so a slow older write never overwrites a newer one (the PKM's `useAutosave.js` pattern). Only the app syncs. A change that `wi-mcp` made while the app was closed is an ordinary journalled change, and it goes up when the app next opens.
+**Learn sync** goes to new per-user tables, because the PKM's tables have no `userId` (3.16). Each field carries a sequence number from a per-device counter, and the server keeps the higher one field by field, so a slow older write never overwrites a newer one (the PKM's `useAutosave.js` pattern). Only the app syncs. A change that `wi-mcp` made while the app was closed is an ordinary journalled change, and it goes up when the app next opens.
 
-**What reaches the server from Heat** (**Decided**, from 3.15 and 3.16):
+**What reaches the server from Learn** (**Decided**, from 3.15 and 3.16):
 
 | What | Where it goes |
 |---|---|
@@ -2275,8 +2288,8 @@ A public copy is written by the same push as any other change, and removed by th
 |---|---|
 | desktop sign-in, authorization code with PKCE | below |
 | `/api/upload/parts` | multipart straight to R2: `/sign` is one PUT capped at 250 MB, and a 6-minute `.wwav` is about 318 MB |
-| `/api/heat/changes` | Heat sync, pulled with a cursor, pushed in batches; it carries public copies and their removal |
-| `/api/heat/public/:userId` | reading a person's public Heat items, for the public Heat view on their sun (4.8) |
+| `/api/heat/changes` | Learn sync, pulled with a cursor, pushed in batches; it carries public copies and their removal |
+| `/api/heat/public/:userId` | reading a person's public Learn items, for the public Learn view on their sun (4.8) |
 | `/desktop/latest.json` | the update manifest (8.10) |
 | the web face (share pages) | share pages and public read routes on www.wi-wwav.com, because `WiPosts` serves one account today (below) |
 
@@ -2294,7 +2307,7 @@ Production doesn't run `sync({ alter: true })` for new tables, so each new model
 
 **The helper.** `wi-mcp` is a small Rust program shipped inside the app, in `Contents/Helpers/`. Claude Desktop and Claude Code start it as a child process and speak MCP to it over stdio. Settings → Claude shows the lines to paste into Claude's config, with the helper's path as it is now, so they stay right after the app updates or moves. It opens no port and makes no network call.
 
-**One tool call, one transaction** (**Proposed**). The helper links the same store code the app does, and the rules that Heat's tools depend on live there too. Heat's maths sits in the Rust core (**Decided**; in the founder's words, "heat math is fine thats actually better rust I trust more than typescript for this"): the heat algorithm, the estimate chain, grades and Plan my day, which the web UI reaches through commands. So Claude and the window never disagree about heat, and a rule such as "clamp 5–600" or "the same `source_id` twice makes one task" exists once. A call goes like this:
+**One tool call, one transaction** (**Proposed**). The helper links the same store code the app does, and the rules that Learn's tools depend on live there too. Learn's maths sits in the Rust core (**Decided**; in the founder's words, "heat math is fine thats actually better rust I trust more than typescript for this"): the heat algorithm, the estimate chain, grades and Plan my day, which the web UI reaches through commands. So Claude and the window never disagree about heat, and a rule such as "clamp 5–600" or "the same `source_id` twice makes one task" exists once. A call goes like this:
 
 1. Claude sends `tools/call` on stdin.
 2. The helper checks that the tool is switched on, then checks the arguments against 3.13's table.
@@ -2314,12 +2327,12 @@ A read (`list_tasks`, `get_grades`) writes nothing. `plan_day` writes only the d
 
 - **Local only, by default.** stdio has no address to reach. Nothing outside your Mac can call a tool.
 - **No network credentials.** The helper holds no account token, never opens the Keychain, and makes no network call. The iCal addresses and the account's JWT are out of its reach.
-- **The door is the list.** The helper offers eight tools, and the store functions behind them take only the fields in 3.13's table. There is no argument that can set `done`, a score or the `public` flag, delete a record, change an existing due date, send mail or read the Public switch.
+- **The door is the list.** The helper offers eighteen tools, and the store functions behind them take only the fields in 3.13's table. There is no argument that can set `done`, a score or the `public` flag, delete a record, change an existing due date, send mail or read the Public switch.
 - **Switches.** Settings → Claude has a switch for each tool, kept in the library. The helper reads them on every list and every call, so a tool switched off is missing from what it offers, and a call to it is refused: "This tool is switched off in Wi_WWAV."
 - **Claude's words are data.** Titles, notes and reasons Claude sends are length-limited and drawn as plain text, never HTML, like words other people wrote (8.9).
 - **What Claude reads.** The Public switch decides what other people see. It does not stop Claude reading your Mac's library through a tool you allowed. That is Claude's own permission prompt (3.13).
 
-**Remote, later.** A server through mi-wwav.com for claude.ai needs Heat sync first (8.7). It offers the same eight tools, arguments and labels, and signs in as the devlog's `/mcp/write` does (**Exists today:** `server/mcp/devlog.js`, `server/mcp/auth.js`), here against real accounts. It writes to the synced copy, and the Mac journals the change when it arrives, with the same "Undo Claude's…" label. Two limits follow from 8.7. It can't read private grades, which the server doesn't hold or holds only as ciphertext, so its `get_grades` returns the grades you made public and says so. And a change made while the Mac is off waits in `/api/heat/changes` until the app opens.
+**Remote, later.** A server through mi-wwav.com for claude.ai needs Learn sync first (8.7). It offers the same tools, arguments and labels, and signs in as the devlog's `/mcp/write` does (**Exists today:** `server/mcp/devlog.js`, `server/mcp/auth.js`), here against real accounts. It writes to the synced copy, and the Mac journals the change when it arrives, with the same "Undo Claude's…" label. Two limits follow from 8.7. It can't read private grades, which the server doesn't hold or holds only as ciphertext, so its `get_grades` returns the grades you made public and says so. And a change made while the Mac is off waits in `/api/heat/changes` until the app opens.
 
 ### 8.9 Security and privacy
 
@@ -2328,7 +2341,7 @@ A read (`list_tasks`, `get_grades`) writes nothing. `plan_day` writes only the d
 - **There are no Google tokens.** The app has no Google sign-in. Claude reads school mail through its own Gmail connector and records a thread with `record_mail_thread`, which takes the subject, sender, time and a reason, and never the message body. So an email's text never reaches the app or the server.
 - **Library validation is relaxed only where plugins load,** in the engine and the scanner.
 - **The web view is fenced.** Tauri 2 capabilities give each window only the commands it uses, no remote scripts load, and words other people wrote, and words Claude wrote, render as sanitized Markdown or plain text, never HTML.
-- **Heat is private by default** (**Decided**). Every record is private. Two items make the simple public version: the Now making line and the project timelines you linked. Anything else goes public only when you switch that one item, and the switch is yours alone: no tool sets it (8.8).
+- **Learn is private by default** (**Decided**). Every record is private. Two items make the simple public version: the Now making line and the project timelines you linked. Anything else goes public only when you switch that one item, and the switch is yours alone: no tool sets it (8.8).
 - **A public copy holds only the fields 3.15 lists** for that kind of record, and exists only while the switch is on. The public copy never carries a notes field, an estimate or a streak. The server has no total, no count and no comparison to send, because none is ever made (3.15).
 - **Grades default to private.** Grades are FERPA education records while a school holds them. Here the student chooses to show their own, and the switch says so: "Grades are private by default. Your school keeps them as education records. Turning this on shows this grade to anyone who opens your sun." A public grade is copied to the server in the clear, since other people have to read it, and the copy is removed when you switch it back. **Open:** whether private grade rows sync at all. Recommendation: off by default; when on, encrypted on the Mac with a Keychain key, so the server holds only ciphertext.
 - **No analytics.** Crash reports are opt-in, carry no media, titles or tokens, and name the plugin, because that's what fixes the bug.
@@ -2398,7 +2411,7 @@ A new repository (**Decided**); `wi-wwav-desktop` is a working name.
 
 ```
 wi-wwav-desktop/
-  app/src-tauri/      Rust core: store, journal, Heat rules, sync, auth, video, engine supervisor
+  app/src-tauri/      Rust core: store, journal, Learn rules, sync, auth, video, engine supervisor
   app/ui/             web UI: shell/, heat/, space/, console/
   mcp/                wi-mcp, the stdio helper; builds against the store in app/src-tauri/
   engine/             wwav-engine and wwav-scan (JUCE, CMake); test-plugins/
@@ -2428,7 +2441,7 @@ Reference machine: a 2020 M1 MacBook Air with 8 GB. Reference session: 24 audio 
 | UI | 60 fps everywhere; 120 fps on ProMotion for timeline scrolling and the Space camera |
 | Space | 60 fps at 2560 × 1600 with up to 2,000 galaxies as instanced points (4.5) |
 | Video | a 4K stream with cuts, no dropped frames; footage over 1080p scrubs on proxies |
-| Cold launch | Heat usable in 1.5 s; the engine opens its device in 0.8 s alongside, and Heat never waits for it or a scan |
+| Cold launch | Learn usable in 1.5 s; the engine opens its device in 0.8 s alongside, and Learn never waits for it or a scan |
 | Engine restart | 2 s plus plugin load |
 | Offline render | 10× real time or faster for sessions of built-ins |
 | Library search | 50 ms at 50,000 clips |
@@ -2475,7 +2488,7 @@ Those six lines become five commitments, each kept in code rather than copy:
 
 1. **The artist keeps the masters.** WWAV takes no rights in a work beyond hosting and delivering it. Distribution without a label in the middle is the rebellion. Nothing in the app sells; on mi-wwav.com a digital sale pays the seller 90% today (**Exists today:** `server/routes/purchase.js`, `connect.js`).
 2. **Leaving costs nothing.** Export and Export everything are free and work while you are signed out (see 2.9).
-3. **Everybody can reach it.** The app is free and whole: Heat, the Console with plugins, and a galaxy.
+3. **Everybody can reach it.** The app is free and whole: Learn, the Console with plugins, and a galaxy.
 4. **It does what a phone can't.** Hosting VST3 and AU plugins, cutting a film against four stems on one clock, and drawing a universe in real 3D need a computer (see 1.4). That is "irreplaceable by the iphone" for software; the device line in 9.2 is the hardware answer. A direct download with no Apple cut (**Decided**) is the founder's "taking another bite out of apple" (devlog, Sep 29).
 5. **Money will come from selling things, never from attention.** When commerce comes, it sells a thing: a work, a device, hosting or an hour of someone's time. Nothing sells a view. This is the app's hypothesis for gate 1.4 (9.6).
 
@@ -2506,11 +2519,11 @@ The fourth clause, **makes discs**, waits: "PRANA disc not ready yet, so definit
 
 | Step | What the app does |
 |---|---|
-| "1. build beta v1" | Heat's WWAV space holds the milestones (its placeholder today reads "Beta v1 working"). |
+| "1. build beta v1" | Learn's WWAV space holds the milestones (its placeholder today reads "Beta v1 working"). |
 | "2. ^ use beta v1 to find cofounders" | Letters on a sun show the build (4.8). The published gates and left-out tables show the inside, which is gate 2.5's question: "Would you show the inside to someone you respect, who knows what they're looking at?" |
 | "3. build beta v2 with cofounders" | Testers' remixes come back as forks with lineage. Until PRANA discs can be written, those are remixes made in the Console. A survey can't give that test data. |
 | "4. build out a kickstarter campaign" | The campaign runs on Kickstarter, as the post says, and a letter to Wi-WWAV points to it. |
-| "5. start selling preorders & manufacturing beta v3" | Heat holds the manufacturing timeline. Taking preorders in the app waits for commerce in Space. |
+| "5. start selling preorders & manufacturing beta v3" | Learn holds the manufacturing timeline. Taking preorders in the app waits for commerce in Space. |
 
 Kickstarter adds a 5% platform fee on top of payment processing. The old question, Kickstarter or the store's own preorders, is closed for now, because the app has no store.
 
@@ -2561,7 +2574,7 @@ What already exists elsewhere stays where it is. The desktop app neither sells n
 
 ### 9.5 School
 
-Heat started as a student's tool. Its prompts describe "a college student in computer engineering and Japanese", and the artifact's sync is hard-coded to the University of Rhode Island (see 3.11).
+Learn started as a student's tool. Its prompts describe "a college student in computer engineering and Japanese", and the artifact's sync is hard-coded to the University of Rhode Island (see 3.11).
 
 School matters to the business because of gate 4: "Did someone who doesn't consider themselves an artist make something with it?" The gate "fails until it happens". The Wi wall can't pass it, because it is locked to one account (`wi/GATES.md`). A university is full of people who don't consider themselves artists, and they already open a planner every day.
 
@@ -2570,7 +2583,7 @@ School matters to the business because of gate 4: "Did someone who doesn't consi
 | Stage | Who | Needs | Limit |
 |---|---|---|---|
 | 1. One | the founder | the Brightspace iCal feed; Claude's Gmail connector, if wanted | none |
-| 2. A small group | 5–20 classmates: a club or one section | nothing hard-coded to one school (3.11); each person pastes their own Brightspace link; Claude is optional, because Heat works without it (3.12) | none from Google, because the app asks Google for nothing |
+| 2. A small group | 5–20 classmates: a club or one section | nothing hard-coded to one school (3.11); each person pastes their own Brightspace link; Claude is optional, because Learn works without it (3.12) | none from Google, because the app asks Google for nothing |
 | 3. The school | anyone at URI | registration in the school's Brightspace, through Valence or LTI 1.3 | the school's terms |
 
 A class, with a teacher and a class system in Space, is later and not designed now (see 10.1).
@@ -2581,13 +2594,13 @@ Stage 2 is the first point where gate 4 can pass. Its fail criterion is written 
 - The answers go into `GATES.md`, with each person's permission.
 - The gate passes the first time someone who answered no makes something and keeps it.
 
-**The Brightspace ask.** The iCal feed works now and needs no approval: each student pastes their own private calendar link, and Heat reads the due dates. Real scores, course lists and gradebook weights need D2L's Valence REST API or an LTI 1.3 tool, and the school's Brightspace administrator has to register either one. The ask, in plain words:
+**The Brightspace ask.** The iCal feed works now and needs no approval: each student pastes their own private calendar link, and Learn reads the due dates. Real scores, course lists and gradebook weights need D2L's Valence REST API or an LTI 1.3 tool, and the school's Brightspace administrator has to register either one. The ask, in plain words:
 
 > We'd like Wi_WWAV registered as a read-only Brightspace app. Each student connects their own account and can disconnect it at any time. It reads their courses, due dates and grades so they can plan their week. Grades are private by default: they appear nowhere unless the student chooses to show one of their own, they are never sold, and they are deleted when the student asks. We'll sign the school's data-privacy agreement.
 
 Grades are education records under FERPA. Keeping them private is part of the design, not a setting a student has to find: every grade starts private, and only the student can switch one public (see 3.15).
 
-**Open: when to ask.** *Recommendation:* ask after stage 2, with the group's weekly reviews as evidence that Heat helps; twenty students make a different request from one.
+**Open: when to ask.** *Recommendation:* ask after stage 2, with the group's weekly reviews as evidence that Learn helps; twenty students make a different request from one.
 
 **Open: money from the school.** Universities fund student ventures through innovation centres, pitch competitions and grants. *Recommendation:* apply to the ones that take no equity, and lead with gate 4 and the conservatory. Before taking school money or using school equipment, read the university's intellectual-property policy for student work, because some policies claim work made with significant school resources.
 
@@ -2599,10 +2612,10 @@ Rule 2 says to write down what a fail looks like before testing. The new repo's 
 |---|---|---|---|
 | 1.1 Healthier | anything stretches use past what the person came for: autoplay, a list without an end, notifications, badges, streak counters, "up next" | "Since you last looked", pull only (2.10); every list ends "That's everything." (4.10); focus rounds never start on their own (3.5); nothing plays without a press | open; conflicts below |
 | 1.2 Freer | any file can't leave as its exact bytes, or the whole account can't leave in one action | Export everything with ⌘⇧E, even when signed out (2.9) | open; testable at the first slice |
-| 1.3 Not addicted | anyone, owners included, is shown a count of other people's attention, or anything is ordered by engagement or sales | private saves; Add galaxy; newest first; the public Heat view shows records, never totals or comparisons (3.15) | open; read every API field, `/api/heat/public/:userId` included |
+| 1.3 Not addicted | anyone, owners included, is shown a count of other people's attention, or anything is ordered by engagement or sales | private saves; Add galaxy; newest first; the public Learn view shows records, never totals or comparisons (3.15) | open; read every API field, `/api/heat/public/:userId` included |
 | 1.4 Business | written before the first price, once the founder says commerce exists | none yet: the app takes no money (9.4) | open; no route until commerce exists |
-| 2.1 Complexity | for any view's verb, steps after ≥ steps before, counted by doing them | Heat: *knowing what to do next*. Space: *hearing a song apart*. Console: *making a song that comes apart*, and *cutting a film and its four-stem score on one clock* | open; count at each view's first build |
-| 2.2 Flourishing | no positive answer after a month | *a term planned and kept, and a song finished that comes apart*; Heat's own records are the month of evidence | open |
+| 2.1 Complexity | for any view's verb, steps after ≥ steps before, counted by doing them | Learn: *knowing what to do next*. Space: *hearing a song apart*. Console: *making a song that comes apart*, and *cutting a film and its four-stem score on one clock* | open; count at each view's first build |
+| 2.2 Flourishing | no positive answer after a month | *a term planned and kept, and a song finished that comes apart*; Learn's own records are the month of evidence | open |
 | 2.3 Freedom | Wi's (a)–(c), plus (d): a session or export needs WWAV's server to open | offline first (2.8); files play in `ffmpeg` and the pack tools; the local MCP helper needs no network (8.8) | open |
 | 2.4 Being & body | chapter 2's desktop bars: body text 7:1 and secondary 4.5:1, 44 × 44 pt targets, every gesture on a key, nothing moves while nothing plays, nothing plays without a press | the starfield moves only while something plays (4.4); the app makes no interface sounds (7.7) | open; dense rows need their own rule (3.19) |
 | 2.5 Craft | an independent review finds a bug that is left unfixed; the tests aren't green; one plugin can take the app down | the audio engine runs as a separate process and restarts with the session reloaded (**Decided**; 8.1, 8.3) | open |
@@ -2611,7 +2624,7 @@ Rule 2 says to write down what a fail looks like before testing. The new repo's 
 | 3.2 Invisible | seconds spent thinking about the tool | proxy: presses from opening a `.wwav` in Finder to hearing it apart (target 2: double-click, Space) | unscored |
 | 3.3 Paradigm | the behaviour that stops | a song shared as a sealed, flattened file; a label standing between an artist and a listener | unscored |
 | 3.4 Fresh | how far outside its category it sits | it adopts the planner, the DAW and the social network, and moves outside them by sharing one file across all three views | unscored |
-| 3.5 Anti-entropy | what accumulates and what decays | lineage links and Heat's records accumulate; signed links and plugin compatibility decay | unscored |
+| 3.5 Anti-entropy | what accumulates and what decays | lineage links and Learn's records accumulate; signed links and plugin compatibility decay | unscored |
 | 4 Mission | fails until it happens | the school stages (9.5) | fails |
 
 **Gate 1.4 has no route yet.** On the Wi wall, 1.4 stays open because no business runs on it, and the app is the same: it takes no money until the founder says commerce exists (9.4). Rule 2 still holds, so the gate's fail criterion is written and committed before the first price, not after the first sale.
@@ -2626,7 +2639,7 @@ Rule 2 says to write down what a fail looks like before testing. The new repo's 
 | Follows and follower counts | 1.3 | Add galaxy, kept private | if anything, a single line such as "LMY added your galaxy", never a number | 4.11 |
 | Push notifications, badges | 1.1 | "Since you last looked" | the default | 2.10 |
 | Popularity and trending | 1.3 | newest only | the default | 4.10 |
-| "Heat is like a facebook typa thing": anything can be made public, grades included | 1.3, and FERPA for grades | everything private by default; the **Public** switch makes one item public at a time; items go public, never totals or comparisons | the switch is off by default and no tool sets it; a grade's switch says plainly what it does | 3.15 |
+| "Learn is like a facebook typa thing": anything can be made public, grades included | 1.3, and FERPA for grades | everything private by default; the **Public** switch makes one item public at a time; items go public, never totals or comparisons | the switch is off by default and no tool sets it; a grade's switch says plainly what it does | 3.15 |
 
 Six rows left with the features they were about. "Walk around infinitely", the shop's ambiance, Mii-like crowds, drop progress bars and paid promotion belonged to the walkable shop. They wait for commerce, and are asked again if it returns. Fuel economy and aimed comets went with the game layer (4.14).
 
@@ -2669,11 +2682,11 @@ The order follows the file. Every view reads and writes `.wwav` and `.swav`, so 
 | Stage | What exists at the end | Target |
 |---|---|---|
 | 0. Thin slice | the seven items in 10.3, end to end, passing on a second Mac | the Linux half by 11 Oct; all seven on a second Mac by January 2027 |
-| 1. Shell and library | the window, view switcher and Now strip; `~/Music/Wi_WWAV/` with import, reader verdicts, tags and pins; ⌘K, ⌘⇧N and labelled ⌘Z; sign-in through the browser; the upload queue; Export everything with its offline `index.html` (see 2); the Tauri updater with `/desktop/latest.json` (8.10; **Proposed**) | 7 Oct 2026, with Heat |
-| 2. Heat, with the MCP server | Today with the time column, Plan my day and the Pomodoro timer; Tasks, Calendar, Grades, Habits and Mail; spaces; the Brightspace and other iCal feeds; the artifact's records imported with every id kept (see 3.16); quick capture, notes and the weekly review (see 3.14); `wi-mcp` with its eight tools and the journal's Claude labels (see 3.13 and 8.8); Heat's maths in the Rust core (**Decided**; 8.8). Heat records are kept on the Mac, and sync arrives with stage 5 (see 8.7) | 100% by the end of 7 Oct 2026 (**Decided**) |
+| 1. Shell and library | the window, view switcher and Now strip; `~/Music/Wi_WWAV/` with import, reader verdicts, tags and pins; ⌘K, ⌘⇧N and labelled ⌘Z; sign-in through the browser; the upload queue; Export everything with its offline `index.html` (see 2); the Tauri updater with `/desktop/latest.json` (8.10; **Proposed**) | 7 Oct 2026, with Learn |
+| 2. Learn, with the MCP server | Today with the time column, Plan my day and the Pomodoro timer; Tasks, Calendar, Grades, Habits and Mail; spaces; the Brightspace and other iCal feeds; the artifact's records imported with every id kept (see 3.16); quick capture, notes and the weekly review (see 3.14); `wi-mcp` with its tools and the journal's Claude labels (see 3.13 and 8.8); Learn's maths in the Rust core (**Decided**; 8.8). Learn records are kept on the Mac, and sync arrives with stage 5 (see 8.7) | 100% by the end of 7 Oct 2026 (**Decided**) |
 | 3. Console, audio | audio, instrument and stem-group tracks; VST3 and AU effects and instruments; MIDI and the piano roll; takes, one per pass; the four stem buses and the six built-in effects (see 5); the `.wwavsession` package with autosave and recovery (see 6.5); `.wwav` export; the upload queue sends exports to your library on mi-wwav.com | 80–90% by 11 Oct 2026 |
 | 4. Console, video | basic cutting on video tracks, proxies for 4K, the viewer on the engine's clock, `.swav` export (see 5.11) | 80–90% by 11 Oct 2026 |
-| 5. Space | the sky in three.js, the same on every machine; the planet player with level, mute and solo on the four moons, and ↑ Push; the four media to view; suns and letters, with the public Heat view and Heat sync; lineage and the family tree; Add, Add galaxy and the Saved shelf; the message door; Newest; "Since you last looked"; Open in Console (see 4); Push to Space (see 5.16); the web face and its share pages (8.7; **Proposed**) | 80–90% by 11 Oct 2026 |
+| 5. Space | the sky in three.js, the same on every machine; the planet player with level, mute and solo on the four moons, and ↑ Push; the four media to view; suns and letters, with the public Learn view and Learn sync; lineage and the family tree; Add, Add galaxy and the Saved shelf; the message door; Newest; "Since you last looked"; Open in Console (see 4); Push to Space (see 5.16); the web face and its share pages (8.7; **Proposed**) | 80–90% by 11 Oct 2026 |
 | 6. Demucs splitting | Split into stems (⌃⌘S) in a background worker: the htdemucs model, the stem group made in place, the CPU fallback and its warning (see 5.10) | 80–90% by 11 Oct 2026 |
 | 7. Windows | the same app on WebView2, ASIO or WASAPI, VST3, DX12 and Authenticode (see 8.10) | 3–6 weeks after the Mac (**Decided**) |
 
@@ -2683,9 +2696,9 @@ The order follows the file. Every view reads and writes `.wwav` and `.swav`, so 
 
 **Why this order.**
 
-- **Heat comes second** because it is finished first, on 7 Oct, and gets used every day. Its records become the month of evidence gate 2.2 asks for. The MCP server goes with it, because the eight tools work on Heat's records and need no engine and no server (8.8).
+- **Learn comes second** because it is finished first, on 7 Oct, and gets used every day. Its records become the month of evidence gate 2.2 asks for. The MCP server goes with it, because the tools work on Learn's records and need no engine and no server (8.8).
 - **The Console comes third** because it is the longest and riskiest stage, and Space has nothing new to carry until it exports. Audio comes before video: a song is finished first, and a film is cut to it. A `.swav`'s sound is the mix (5.13).
-- **Space comes after the Console** because a planet is an export, and **Open in Console** needs a Console to open. The server routes Space needs already exist, and the public Heat view needs Heat's records.
+- **Space comes after the Console** because a planet is an export, and **Open in Console** needs a Console to open. The server routes Space needs already exist, and the public Learn view needs Learn's records.
 - **Splitting comes after** because a song can be made from recorded and imported audio without it, and it runs in its own background worker, apart from the audio engine (5.10).
 - **Windows waits** for a Mac v1, so it ports a finished app rather than a moving one.
 
@@ -2708,7 +2721,7 @@ The order follows the file. Every view reads and writes `.wwav` and `.swav`, so 
 - a PRANA view in the app, once the disc exists (5.18);
 - film stems (6.10);
 - Gi's pattern file (6.11);
-- the remote MCP server for claude.ai, after Heat sync (3.13, 8.8);
+- the remote MCP server for claude.ai, after Learn sync (3.13, 8.8);
 - an ARM64 Windows engine (8.10).
 
 #### Left out of the plan, and why
@@ -2718,7 +2731,7 @@ The order follows the file. Every view reads and writes `.wwav` and `.swav`, so 
 | A stage for Unquantized: the door, plaza and halls, booths, the counter and bag, the back room, List view, and the fixes that had to close before it took money | Unquantized is cut entirely. "Eventually the space will hold commerce instead of having that be a 4th place." Cut on 7 Oct 2026 to narrow v1. |
 | Make a disc, and the disc round trip, in the Console stage | "PRANA disc not ready yet, so definitely not writing software yet." |
 | Video grade, titles and generators in the video stage | Decided: video is basic, with no effects (5.11). Cut on 7 Oct 2026 to narrow v1. |
-| Google sign-in and Google verification in Heat's stage | Claude reads mail through its own Gmail connector, and calendars come in as iCal addresses (3.11). |
+| Google sign-in and Google verification in Learn's stage | Claude reads mail through its own Gmail connector, and calendars come in as iCal addresses (3.11). |
 | The game layer, constellations, the astronaut and the remix deck in Space's stage | Cut on 7 Oct 2026 to narrow v1 (4.14). |
 | Parties ("Come with me"), commissions for every maker, and PRANA as a USB controller | They belonged to the shop or to cut Console features. Cut on 7 Oct 2026 to narrow v1. |
 | A clip-launch decision | Closed: no clip-launch view in v1 (5.2). |
@@ -2732,10 +2745,10 @@ An agent working alone can build and verify much of the app on Linux. Some check
 | Files | the Rust `.wwav` and `.swav` writers, byte for byte against `wwav_pack.py` and `swav_pack.py`; one verdict from all four readers; a session that reopens identical | the Finder package icon; double-click opening a `.wwav` as a planet | whether 44.1 kHz holds into 1.0 (6.7) |
 | Audio | golden renders of our own sessions (8.12); Surge XT as VST3; `delay-n`; 200 kills with `crasher` and `hanger` | AU hosting; CoreAudio and CoreMIDI devices; the loopback latency test (an interface and a cable); the 8-hour soak on the reference M1 Air | whether a song can be finished in the Console; how the founder's own plugins behave |
 | Video | frame-indexed export maths; FFmpeg software decode | VideoToolbox decode and encode; the `CAMetalLayer` presenter; the flash-and-click test, with two tracks stacked | whether cutting feels like cutting |
-| Views | the web UI in Playwright against `mock-engine`; Heat's maths (heat, Plan my day, grades); Space's layout hashes; journal undo-all and redo-all | WKWebView behaviour; Keychain; Force Touch; Reduce Motion; 60 fps on the reference machine | gesture timings; Lucida or Inter; 17 or 19 pt at the founder's desk |
+| Views | the web UI in Playwright against `mock-engine`; Learn's maths (heat, Plan my day, grades); Space's layout hashes; journal undo-all and redo-all | WKWebView behaviour; Keychain; Force Touch; Reduce Motion; 60 fps on the reference machine | gesture timings; Lucida or Inter; 17 or 19 pt at the founder's desk |
 | MCP | `wi-mcp` over stdio against a test library: every tool called, one journal entry per write, a repeated `source_id` making no second row, a tool switched off refused, 200 random kills, 1,000 interleaved writes with the app running (8.12) | the same suite nightly; Claude Desktop and Claude Code starting the helper from the app bundle, and the lines in Settings → Claude staying right after the app moves | whether Claude's estimates are worth accepting; how the tool descriptions read in a real conversation |
-| Public Heat view | a private record, grade or note never appears in `/api/heat/public/:userId`; a public record shows only its listed fields; switching back removes its copy; a Now making line disappears at its `clearsAt` with the Mac off; no response carries a count (8.12) | — | whether the view says enough and no more; which grades the founder is willing to show |
-| Server | multipart parts, and Heat sync with its public copies, against test Postgres and an R2 stand-in, as Wi's gates were run | — | whether and when commerce exists |
+| Public Learn view | a private record, grade or note never appears in `/api/heat/public/:userId`; a public record shows only its listed fields; switching back removes its copy; a Now making line disappears at its `clearsAt` with the Mac off; no response carries a count (8.12) | — | whether the view says enough and no more; which grades the founder is willing to show |
+| Server | multipart parts, and Learn sync with its public copies, against test Postgres and an R2 stand-in, as Wi's gates were run | — | whether and when commerce exists |
 | Accounts | the iCal parser against a stored raw feed | — | the founder's Brightspace link; the Apple Developer account and its Developer ID |
 | Shipping | the universal build script | signing, hardened runtime, entitlements, notarization, and Gatekeeper on a second Mac | when anyone else gets a copy |
 | Gates | every fail criterion, written before testing | gate 2.4's measurements at 1024 × 680 and 1280 × 800 | gate 2.2's month of use; gate 4's question asked in person; every decision in 10.4 |
@@ -2760,7 +2773,7 @@ The slice proves the architecture with the least of each part: two processes, th
 - a second Mac;
 - one effect plugin the founder actually uses.
 
-**What it leaves out:** Heat and its MCP helper, Space, the library beyond one file, local splits, instrument tracks and the piano roll (MIDI and instrument plugins still arrive at the start of stage 3, as **Decided**, and the slice's engine protocol and session format carry MIDI events from the first commit), and Windows. Each is a later stage. The slice exists to learn early whether the two processes, the clock and signing behave.
+**What it leaves out:** Learn and its MCP helper, Space, the library beyond one file, local splits, instrument tracks and the piano roll (MIDI and instrument plugins still arrive at the start of stage 3, as **Decided**, and the slice's engine protocol and session format carry MIDI events from the first commit), and Windows. Each is a later stage. The slice exists to learn early whether the two processes, the clock and signing behave.
 
 ### 10.4 Open decisions
 
@@ -2773,13 +2786,13 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | 1 | Hyphen or underscore: Wi-WWAV or Wi_WWAV | 1.5, 9.3 | Use the underscore for the app and the hyphen for the people in letters. Domains keep the hyphen either way, because hostnames can't contain underscores. |
 | 2 | Which "v3" the sketch means | 1.5, 4.1 | Read "v3" as "the iPhone app", leave the archive's numbering alone, and give Wi_WWAV its own archive entry. |
 | 3 | Copy or reference on import | 2.5 | Copy songs, films and anything under 2 GB, so the library and its export are complete. Offer "Leave in place" for camera folders and long raw video. |
-| 4 | Using the app without an account | 2.14 | Yes. Heat, the library and the Console are fully local. Space can be looked at, but not published to or pushed from. |
+| 4 | Using the app without an account | 2.14 | Yes. Learn, the library and the Console are fully local. Space can be looked at, but not published to or pushed from. |
 | 5 | Reminders, deadline alerts and Dock badges | 2.10, 3.19, 9.6 | Never notify or badge about what other people do. Allow one alarm you set yourself on a single task or focus session; it is off by default and fires once. |
 | 6 | One sans or two | 7.4, 7.12 | Lucida Grande (Lucida Sans Unicode on Windows) in the desk and Inter elsewhere; recheck on the Windows build. |
 | 7 | Reading size: 17 or 19 pt | 7.9, 7.12 | Test both with the founder at their own desk, and fix the number before any gate run. |
 | 8 | Wi's adjusted stem hues | 7.12 | When the wall becomes the web face, move it to PRANA's exact hexes with ink rings. |
 
-#### Heat
+#### Learn
 
 | # | Decision | From | Recommendation |
 |---|---|---|---|
@@ -2787,9 +2800,9 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | 10 | Valence or LTI 1.3: when to ask URI | 3.19, 9.5 | Ship on the iCal feed and Claude's Gmail connector. Ask URI's Brightspace admins after the small-group stage, with the group's weekly reviews as evidence. |
 | 11 | Control size for dense rows | 3.19 | Keep 44 pt for buttons, tabs and orbs. Before testing, write a separate rule for rows and grids: 24 × 24 pt hit areas (WCAG 2.2) and every action on the keyboard. |
 | 12 | The "Now making" line | 3.19 | Build it, shown only once you've written one, and clear it when its task is done or after 7 days. Drop it if it starts to feel like a status to keep up. |
-| 13 | Who Heat is for | 3.19 | One account first, with nothing hard-coded to a school, so a classmate can use it next. |
+| 13 | Who Learn is for | 3.19 | One account first, with nothing hard-coded to a school, so a classmate can use it next. |
 | 14 | Whether private grade rows sync | 3.16, 8.9 | Off by default. When on, encrypt them on the Mac with a Keychain key, so the server holds only ciphertext. |
-| 15 | The remote MCP server | 3.19, 8.8 | Build it after Heat sync, with the same eight tools and labels. A remote call writes to the synced copy, and the Mac journals it when it arrives, with the same "Undo Claude's…" label. Its `get_grades` returns only the grades you made public. |
+| 15 | The remote MCP server | 3.19, 8.8 | Build it after Learn sync, with the same tools and labels. A remote call writes to the synced copy, and the Mac journals it when it arrives, with the same "Undo Claude's…" label. Its `get_grades` returns only the grades you made public. |
 
 #### Space
 
@@ -2842,24 +2855,24 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | ⌘K, ⌘⇧N, ⌘L | The command palette, quick capture, and the library drawer, in every view | 2.7 |
 | Add | The private save that replaces the like; it goes to your Saved shelf and is never counted | 4.11 |
 | Add galaxy | The private replacement for following; it feeds Newest and "Since you last looked" | 4.11 |
-| Aqua | The classic Mac OS X look Heat wears: brushed metal, gel buttons, striped rows; its highlight `#3875D7` is the desk's one accent | 7.2 |
+| Aqua | The classic Mac OS X look Learn wears: brushed metal, gel buttons, striped rows; its highlight `#3875D7` is the desk's one accent | 7.2 |
 | AU, VST3 | The plugin formats the engine hosts: AU on the Mac, VST3 on both; CLAP and AAX are left out | 8.4 |
-| Bio sun | The sun at the centre of your galaxy: your page, with your public Heat view under your bio blocks | 4.8 |
-| Brightspace | D2L's learning system, used at URI; Heat reads its iCal feed now and Valence or LTI later | 3.11 |
+| Bio sun | The sun at the centre of your galaxy: your page, with your public Learn view under your bio blocks | 4.8 |
+| Brightspace | D2L's learning system, used at URI; Learn reads its iCal feed now and Valence or LTI later | 3.11 |
 | Built-in effects | PRANA's reverb, delay, distortion, tremolo, filter and master limiter, with one amount each; there is no built-in EQ, compressor or instrument | 5.9 |
-| Case metal, deck metal | Heat's brushed metal (title bar, sheets) and MI-WWAV-OS's paler pinstriped metal (mixer strips, device cards) | 7.2 |
+| Case metal, deck metal | Learn's brushed metal (title bar, sheets) and MI-WWAV-OS's paler pinstriped metal (mixer strips, device cards) | 7.2 |
 | Claude | Anthropic's model, run in the person's own Claude (claude.ai, Claude Desktop, Claude Code), which reaches Wi_WWAV through MCP. It estimates and drafts and never decides; the app calls no model and holds no key | 2.11, 3.12 |
 | Clip | Any one thing in the library: a `.wwav`, a `.swav`, plain audio or video, an image or text (from MI-WWAV-OS) | 2.5 |
-| Connected profiles | Heat and Space: your public Heat view crosses, and nothing private does | 1.3, 2.6 |
+| Connected profiles | Learn and Space: your public Learn view crosses, and nothing private does | 1.3, 2.6 |
 | Connected uploads | Console and Space: exports go up as exact bytes, and any song or film comes back as a session through Open in Console | 1.3, 2.6 |
 | Console | The creation view (⌘3), and the software side of Mi_pro_WWAV | 5 |
-| Cool, Warm, Hot, Overdue | Heat's four levels: under 0.34, from 0.34, from 0.70, and past due | 3.1 |
+| Cool, Warm, Hot, Overdue | Learn's four levels: under 0.34, from 0.34, from 0.70, and past due | 3.1 |
 | Crater | The portfolio's Turrell-lit page, the source of the night's 760 ms light-wash and of its name face, Cormorant Garamond | 7.1, 7.4 |
 | Current task | The one task that focus time is logged to; set with C | 3.5 |
 | Decided, Proposed, Open, Exists today | This document's four status labels | front matter |
 | Delay compensation | Automatic alignment of signal paths through plugins that report latency | 5.7, 8.4 |
 | Demucs | The stem-splitting model (htdemucs, four stems); it runs locally in the Console and on Replicate for phones | 5.10 |
-| Desk, night | The two visual registers: Heat and the Console's chrome, and Space | 7.2 |
+| Desk, night | The two visual registers: Learn and the Console's chrome, and Space | 7.2 |
 | DISCMAN | The codename of the spring 2026 iPhone app (v3) | 1.5, 4.1 |
 | DMG screen | A Game Boy-green readout behind glass in the Console | 5.2, 7.2 |
 | Drop | How publishing works: drag a work onto a system or a view segment | 2.7 |
@@ -2871,14 +2884,14 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Fold rule, fold check | How N tracks become four stems, and the export test that the stems sum to the master | 5.3, 6.6 |
 | Fork | A work taken somewhere new, by anyone: a new id with a parent. Fork edges are facts, not claims | 4.9, 6.8 |
 | Galaxy | One person in Space: a bio sun and their solar systems | 4.2 |
-| Galaxy chip | A 28 pt miniature of your own galaxy in the title bar; it opens your galaxy, your public Heat view and Settings | 2.1 |
+| Galaxy chip | A 28 pt miniature of your own galaxy in the title bar; it opens your galaxy, your public Learn view and Settings | 2.1 |
 | Gallery planet | A photo or fashion work: a lit sphere with up to 40 photos on it, made by dropping photos on a system | 4.7 |
 | Gates, the | The founder's written design audit (`wi/GATES.md`): 1 corruption, 2 good design, 3 great design (scored), 4 mission. Fail criteria are written before testing | 9.6 |
 | Generation | How many forks a work is from its root (`wlin.generation`) | 6.1 |
-| Get Info | Heat's inspector drawer for one record; it holds the Public switch | 3.1, 3.15 |
+| Get Info | Learn's inspector drawer for one record; it holds the Public switch | 3.1, 3.15 |
 | Gi_WWAV | The garments family (fashion) | 1.2, 9.2 |
-| Heat | The profile view (⌘1), for planning time, grown from the founder's claude.ai artifact of the same name | 3 |
-| Heat algorithm | The rule that ranks tasks: v = 1 − days left ÷ runway, clamped to 0–1; 1.1 when overdue, 0.05 with no due date | 3.1 |
+| Learn | The profile view (⌘1), for planning time, grown from the founder's claude.ai artifact, Heat. In full, WWL (Wi-WWAV-Learn). Until 7 Oct 2026 the view was called Heat too, and the code still is (`heat.*`, `wi-heat`; `docs/PLAN.md`). A task's score is still its heat | 3 |
+| Learn algorithm | The rule that ranks tasks: v = 1 − days left ÷ runway, clamped to 0–1; 1.1 when overdue, 0.05 with no due date | 3.1 |
 | JUCE | The C++ audio framework (version 8) the engine and the scanner are built on | 8.1 |
 | Key colour | A work's colour: hue = ((pc · 7) mod 12) · 30 with A = 0; major hsl(h, 72%, 58%), minor hsl(h, 58%, 42%); night indigo, hue 232, when the key is unknown | 4.7, 7.3 |
 | Kepler motion | Worlds move on real ellipses; in Space only while something plays | 4.4 |
@@ -2888,7 +2901,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Lineage link | A claim between works (influence, sample, collab, cover, custom) that waits for the other owner's **Agree** | 4.9 |
 | LMY | Liam, the founder; how the letters are signed | 9.3 |
 | Mail thread | A row in Mail made by Claude's `record_mail_thread`: subject, sender, time, state and a reason, never the body | 3.10 |
-| MCP server | A server that speaks the Model Context Protocol so Claude can call its tools. Wi_WWAV is one, with eight tools | 2.11, 3.13, 8.8 |
+| MCP server | A server that speaks the Model Context Protocol so Claude can call its tools. Wi_WWAV is one, with eighteen tools | 2.11, 3.13, 8.8 |
 | Message door | A message to one person. It opens once two people have added each other, with no read receipts and no unread badge | 4.11 |
 | mi-wwav.com | The existing server, which stays: Heroku, Express, Postgres and Cloudflare R2 | 8.7 |
 | Mi_cro_WWAV, Mi_pro_WWAV | Mi's pocket tier and its desktop-studio tier | 9.2 |
@@ -2904,31 +2917,31 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Page planet | A written work as a world: paper with ruled latitude lines | 4.7 |
 | Pending grade | A grade notice with no score, made by Claude or by you; you type the score in | 3.8 |
 | PKM | The founder's personal knowledge manager at `/admin/pkm`, the source of capture, recurrence and the weekly review | 3.14 |
-| Plan my day | Heat's rule-based drafting of blocks into the day's free time | 3.5 |
+| Plan my day | Learn's rule-based drafting of blocks into the day's free time | 3.5 |
 | Planet | One work in Space: a song, film, page or gallery | 4.2 |
-| Pomodoro | Heat's focus timer: 25-minute rounds and 5-minute breaks, with 15 minutes every fourth break | 3.5 |
+| Pomodoro | Learn's focus timer: 25-minute rounds and 5-minute breaks, with 15 minutes every fourth break | 3.5 |
 | PRANA | Mi-WWAV Beta 1: a Teensy 4.1 stem player with four faders and a disc bay. Its C++ core runs the device, its simulator and the app's built-in effects | 5.9, 8.4 |
 | PRISMON | The portfolio's three.js engine, which already runs the three.js version Space uses | 4.5 |
-| Profile view, social view, creation view | Heat, Space and Console, each named for what you do there | 1.1 |
+| Profile view, social view, creation view | Learn, Space and Console, each named for what you do there | 1.1 |
 | Proxy | A half-resolution ProRes copy of footage over 1080p, used for editing | 5.11, 8.5 |
-| Public Heat view | What anyone sees when they open your bio sun: your Now making line, the timelines of linked projects, and any record you switched public. It never shows a count or a comparison | 2.4, 3.15 |
+| Public Learn view | What anyone sees when they open your bio sun: your Now making line, the timelines of linked projects, and any record you switched public. It never shows a count or a comparison | 2.4, 3.15 |
 | Public switch | The switch in Get Info on every record, off by default and available on grades too; no Claude tool can set it | 3.15 |
 | Quantize | An act on selected MIDI notes (Q); each note keeps its played time, and ⌥Q returns to it. Audio is never quantized | 5.4 |
 | Ri_WWAV | The words family (writing) | 9.2 |
-| Ripple Creator | The server's release-plan writer (`rippleCreator.js`); Heat imports its plans as projects, and its rule "never invent metrics" is written into the MCP tool descriptions | 3.15 |
+| Ripple Creator | The server's release-plan writer (`rippleCreator.js`); Learn imports its plans as projects, and its rule "never invent metrics" is written into the MCP tool descriptions | 3.15 |
 | Rule 2 | "Write down what a fail looks like before testing" | 9.6 |
 | Runway | How many days before a due date heat starts rising: 2 × difficulty + 1 | 3.1 |
 | Screening room | Where a film plays in Space: it fills the stage, and it is for viewing only | 4.7 |
 | Secondary act | The one extra action each screen has, on ⇧Return | 2.7 |
 | Sequence | An edit list, never media; a Console session is one | 2.5, 5.12 |
-| Show / Keep private | The two buttons on the sheet that links a project or sets a Now making line: **Show** puts it on your public Heat view, and **Keep private** links it and shows nothing | 2.6, 3.15 |
+| Show / Keep private | The two buttons on the sheet that links a project or sets a Now making line: **Show** puts it on your public Learn view, and **Keep private** links it and shows nothing | 2.6, 3.15 |
 | Si_WWAV | The sight family (film) | 9.2 |
 | Since you last looked | The pull-only list at the top of Space: forks, links waiting on you, and new work and letters from galaxies you've added | 2.10 |
 | SOLAR SYSTEM | The codename of WWAV v4 (web, summer 2026, `/summer_26`) and v5 (iOS): the galaxy model | 4.1 |
 | Solar system | One project: a sun and up to 21 worlds, seven to a ring | 4.2 |
 | `song_id`, `film_id` | 128-bit ids written as 32 hex characters; songs and films share one id space | 6.1 |
 | Space | The social view (⌘2), named after v4's first tab | 4 |
-| Spaces | User-defined filters that replace Heat's three fixed workspaces | 3.4 |
+| Spaces | User-defined filters that replace Learn's three fixed workspaces | 3.4 |
 | Split | A Demucs run. Local splits are free; the iPhone and the web meter cloud splits | 5.10, 9.4 |
 | Stem | One of a song's four parts, always in the order vocals, drums, other, bass | 6.1 |
 | Stem bus | One of the mixer's four buses; its output is that stem in the export | 6.6 |
@@ -2949,7 +2962,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | URI | The University of Rhode Island, the founder's school | 3.11, 9.5 |
 | Valence, LTI 1.3 | D2L's REST API and the LTI standard: the route to real grades, registered by the school | 3.11 |
 | Version | A new export of your own work: the same id, with the version number one higher | 6.8 |
-| View | One of the app's three: Heat, Space or Console | 1.1 |
+| View | One of the app's three: Learn, Space or Console | 1.1 |
 | Web face | www.wi-wwav.com as share pages and downloads | 1.5, 8.7 |
 | wgpu | The Rust GPU layer that composites video (Metal on Mac, DX12 on Windows) | 8.5 |
 | Wi | The existing private wall at www.wi-wwav.com (`wi/`): one account, every post a `.wwav` or `.swav`; Proposed to become the app's web face | 1.5, 8.7 |
@@ -2971,7 +2984,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 
 Every **Exists today** claim in this document comes from these sources, read in October 2026. The cut of 7 Oct 2026 is the founder's conversation, recorded in `docs/SCOPE_CUT.md`.
 
-- **Heat:** the founder's claude.ai artifact, one HTML file of 1,481 lines. It is not in this repo.
+- **Heat:** the founder's claude.ai artifact that Learn grew from, one HTML file of 1,481 lines. It is not in this repo.
 - **The sketch:** four boxes and their connections, as described in conversation.
 - **Devlog:** posts 1, 2, 34 and 67 in `DevlogPosts`, read through the `/mcp` connector (`server/routes/devlog.js`, `server/mcp/devlog.js`).
 - **Philosophy and names:** `wi/GATES.md`, `wi/README.md`, `archive/src/content.js`, `intro.md`.

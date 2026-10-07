@@ -36,7 +36,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { WebDriver } from './webdriver.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
-const VIEWS = ['Heat', 'Space', 'Console'];
+const VIEWS = ['Learn', 'Space', 'Console'];
 const SONG = join(ROOT, 'tests/corpus/original.wwav');
 const ENGINE = join(ROOT, 'target/debug/mock-engine');
 const argApp = process.argv.indexOf('--app');

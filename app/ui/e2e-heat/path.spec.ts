@@ -84,7 +84,7 @@ test('the timer keeps running in another room and the strip reads "focus 18:42 l
   await expect(page.locator('.heat-lcd-digits')).toHaveText(/^1[89]:\d\d$/);
 });
 
-test('⌘K opens a task in Heat, and ⌘⇧N captures into the inbox', async ({ page }) => {
+test('⌘K opens a task in Learn, and ⌘⇧N captures into the inbox', async ({ page }) => {
   await openHeat(page);
   await page.keyboard.press(`${CMD}+3`);
   await page.keyboard.press(`${CMD}+k`);
@@ -119,7 +119,7 @@ test('a task dragged from the hot list onto the time column becomes a block as l
   await expect(page.locator('.case-status')).toContainText('Undo add block');
 });
 
-test('P plans the selected task into the next free gap, and every key of 3.17 reaches Heat', async ({ page }) => {
+test('P plans the selected task into the next free gap, and every key of 3.17 reaches Learn', async ({ page }) => {
   await openHeat(page);
   await page.keyboard.press('2');
   await expect(page.locator('.heat-tabs [role="tab"][aria-selected="true"]')).toHaveText('Tasks');

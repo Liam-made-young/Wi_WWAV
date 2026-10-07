@@ -36,10 +36,10 @@ The settings window loads `index.html?window=settings`.
   and the system's open and save pickers (`plugin:dialog|open`, `save`).
 - `settings.json`: `app.hello`, `app.settings.*`, `account.*`, `engine.*`,
   `library.cleanup.*`, `library.trash.empty`, the open picker, and what
-  Heat's panes need: `heat.snapshot`, `heat.put`, `heat.patch`, `heat.delete`
+  Learn's panes need: `heat.snapshot`, `heat.put`, `heat.patch`, `heat.delete`
   (spaces), `heat.school.set`, `heat.calendars.*`, `heat.claude.*`,
   `heat.public.set`, `heat.publicView` and `history.undoEntry` (Claude's
-  list). Heat's day-to-day commands (`heat.done`, `heat.focus.*`, …) are the
+  list). Learn's day-to-day commands (`heat.done`, `heat.focus.*`, …) are the
   main window's.
 - A window in no file, such as one that shows someone else's page, can call
   nothing. No window can drive the updater.
@@ -68,6 +68,7 @@ Run the Tauri CLI from this folder: the build hooks find `ui/` from here.
 | `WI_WWAV_LIBRARY` | `~/Music/Wi_WWAV` | a throwaway library |
 | `WI_WWAV_ENGINE` | `wwav-engine` beside the app (`Contents/Helpers/wwav-engine.app` on macOS) | `mock-engine` or a fresh build |
 | `WI_WWAV_SERVER` | `https://www.mi-wwav.com` | `tools/mock-server` |
+| `WI_WWAV_SIGN_IN` | `https://www.wi-wwav.com`, or `WI_WWAV_SERVER` when that is set | the sign-in page somewhere else |
 
 `tests/keychain.rs` needs `dbus-daemon`, `gnome-keyring-daemon` and
 `secret-tool` (Debian and Ubuntu: dbus, gnome-keyring, libsecret-tools); it

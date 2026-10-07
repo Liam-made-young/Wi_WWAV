@@ -411,7 +411,7 @@ describe('the Pomodoro timer', () => {
     expect(rig.fake.state.timer).toMatchObject({ phase: 'break', running: true });
   });
 
-  it('keeps counting when Heat’s tab changes, and reads "focus 18:42 left" for the Now strip', async () => {
+  it('keeps counting when Learn’s tab changes, and reads "focus 18:42 left" for the Now strip', async () => {
     const { stripText } = await import('../timer');
     rig = await mountHeat();
     await press(rig, 'f');
@@ -575,7 +575,7 @@ describe('P, ⌘↩ and ⌫', () => {
   });
 });
 
-describe('Heat’s chime', () => {
+describe('Learn’s chime', () => {
   const rings: number[] = [];
   const stub = class {
     constructor() {

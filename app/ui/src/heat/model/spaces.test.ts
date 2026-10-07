@@ -164,9 +164,9 @@ describe('groups', () => {
 });
 
 describe('the empty Tasks list', () => {
-  it('keeps Heat’s line', () => {
+  it('keeps Learn’s line', () => {
     const [, wwav] = defaultSpaces(ids());
-    expect(tasksEmptyLine(wwav)).toBe('Add your first WWAV task and Heat will rank it.');
-    expect(tasksEmptyLine(null)).toBe('Add your first task and Heat will rank it.');
+    expect(tasksEmptyLine(wwav)).toBe('Add your first WWAV task and Learn will rank it.');
+    expect(tasksEmptyLine(null)).toBe('Add your first task and Learn will rank it.');
   });
 });

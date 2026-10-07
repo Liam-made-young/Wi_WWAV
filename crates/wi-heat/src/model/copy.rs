@@ -278,6 +278,6 @@ pub mod review {
 // --- 3.15: moving in --------------------------------------------------------
 
 pub mod moving {
-    pub const NOT_EXPORT: &str = "This file isn’t a Heat export.";
-    pub const NEWER: &str = "This export is from a newer Heat. Update Wi_WWAV, then try again.";
+    pub const NOT_EXPORT: &str = "This file isn’t a Learn export.";
+    pub const NEWER: &str = "This export is from a newer Learn. Update Wi_WWAV, then try again.";
 }

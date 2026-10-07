@@ -69,7 +69,7 @@ fn bad_lines_get_json_rpc_errors() {
 }
 
 #[test]
-fn the_list_has_the_eight_tools_with_closed_schemas() {
+fn the_list_has_every_tool_with_closed_schemas() {
     let mut b = Fake::default();
     let r = ask(&mut b, json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}));
     let list = r["result"]["tools"].as_array().unwrap();
@@ -80,16 +80,23 @@ fn the_list_has_the_eight_tools_with_closed_schemas() {
         assert_eq!(t["inputSchema"]["type"], "object", "{name}");
         assert_eq!(t["inputSchema"]["additionalProperties"], false, "{name}");
         let props = t["inputSchema"]["properties"].as_object().unwrap();
-        for forbidden in ["done", "score", "public", "delete", "due_date"] {
+        for forbidden in ["done", "score", "public", "delete", "due_date", "status", "log", "triaged_at"] {
+            if (name, forbidden) == ("list_tasks", "status") || (name, forbidden) == ("list_projects", "status") {
+                continue; // a filter on a read, not a field to set
+            }
             assert!(!props.contains_key(forbidden), "{name} takes {forbidden}");
         }
-        let writes = !matches!(name, "list_tasks" | "get_grades");
+        let writes = !tools::is_pure_read(name);
         assert_eq!(t["description"].as_str().unwrap().starts_with(tools::WRITE_PREAMBLE), writes, "{name}");
         assert_eq!(t["annotations"]["readOnlyHint"], tools::is_read_only(name), "{name}");
     }
-    // Only add_task, update_task, add_pending_grade, log_focus and record_mail_thread journal.
+    assert_eq!(names.len(), 18);
+    // The nine that journal: every tool that is neither a read nor a draft.
     let labelled: Vec<_> = tools::NAMES.iter().filter(|t| tools::undo_label(t).is_some()).collect();
-    assert_eq!(labelled.len(), 5);
+    assert_eq!(labelled.len(), 9);
+    for t in tools::NAMES {
+        assert_eq!(tools::undo_label(t).is_some(), !tools::is_read_only(t), "{t}");
+    }
 }
 
 #[test]
@@ -99,7 +106,7 @@ fn a_tool_switched_off_is_missing_and_refused() {
     let r = ask(&mut b, json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}));
     let names: Vec<_> = r["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].clone()).collect();
     assert!(!names.contains(&json!("log_focus")));
-    assert_eq!(names.len(), 7);
+    assert_eq!(names.len(), 17);
     let r = call(&mut b, "log_focus", json!({"task_id": "t1", "minutes": 25, "reason": "Worked on it."}));
     assert_eq!(r["result"]["isError"], true);
     assert_eq!(r["result"]["content"][0]["text"], "This tool is switched off in Wi_WWAV.");
@@ -126,6 +133,22 @@ fn arguments_outside_the_table_never_reach_the_store() {
         ("plan_day", json!({"day_ends": "24:00"})),
         ("list_tasks", json!({"limit": 201})),
         ("list_tasks", json!({"status": "deleted"})),
+        ("add_milestone", json!({"title": "Mix v1", "date": "2026-10-20", "done": true, "reason": "r"})),
+        ("add_milestone", json!({"title": "Mix v1", "date": "Oct 20", "reason": "r"})),
+        ("add_project", json!({"title": "EP", "status": "archived", "reason": "r"})),
+        ("add_project", json!({"title": "EP", "public": true, "reason": "r"})),
+        ("add_note", json!({"title": "Plan", "text": "x", "public": true, "reason": "r"})),
+        ("add_note", json!({"title": "Plan", "text": "x"})),
+        ("add_capture", json!({"text": "  ", "reason": "r"})),
+        ("add_capture", json!({"text": "x", "triaged_at": 1, "reason": "r"})),
+        ("draft_block", json!({"task_id": "t1", "start": "25:00", "minutes": 30, "reason": "r"})),
+        ("draft_block", json!({"task_id": "t1", "start": "14:00", "minutes": 241, "reason": "r"})),
+        ("draft_block", json!({"task_id": "t1", "start": "14:00", "minutes": 30})),
+        ("list_habits", json!({"tick": "h1"})),
+        ("list_inbox", json!({"triage": "c1"})),
+        ("list_projects", json!({"status": "deleted"})),
+        ("get_schedule", json!({"from": "today"})),
+        ("get_notes", json!({"limit": 101})),
     ];
     for (tool, args) in refused {
         let r = call(&mut b, tool, args.clone());
@@ -204,4 +227,54 @@ fn update_task_needs_no_more_than_the_table_says() {
     // "At least one of the first two" is the store's check; the schema only
     // closes the door. An empty update reaches it and is refused there.
     assert!(check(&tools::input_schema("update_task"), json!({"id": "t", "reason": "r"}).as_object().unwrap()).is_ok());
+}
+
+#[test]
+fn the_school_mail_prompt_words_the_job_and_names_the_school() {
+    struct WithSchool(Fake);
+    impl Backend for WithSchool {
+        fn enabled(&mut self, tool: &str) -> bool {
+            self.0.enabled(tool)
+        }
+        fn call(&mut self, tool: &str, args: &Map<String, Value>) -> Result<Value, ToolError> {
+            self.0.call(tool, args)
+        }
+        fn school(&mut self) -> wi_mcp::prompts::School {
+            wi_mcp::prompts::School { name: "URI".into(), host: "brightspace.uri.edu".into() }
+        }
+    }
+    let get = |b: &mut dyn Backend, params: Value| {
+        handle_line(&json!({"jsonrpc": "2.0", "id": 1, "method": "prompts/get", "params": params}).to_string(), b).unwrap()
+    };
+    let mut b = Fake::default();
+    let init = ask(&mut b, json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}));
+    assert!(init["result"]["capabilities"]["prompts"].is_object());
+    let listed = ask(&mut b, json!({"jsonrpc": "2.0", "id": 2, "method": "prompts/list"}));
+    assert_eq!(listed["result"]["prompts"][0]["name"], "school_mail");
+    assert_eq!(listed["result"]["prompts"][0]["arguments"][0]["required"], false);
+
+    // With no school saved, the query still finds Brightspace's own notices.
+    let plain = get(&mut b, json!({"name": "school_mail"}));
+    let text = plain["result"]["messages"][0]["content"]["text"].as_str().unwrap();
+    assert_eq!(plain["result"]["messages"][0]["role"], "user");
+    assert!(text.contains("newer_than:7d (brightspace OR d2l)"), "{text}");
+    assert!(text.contains("The school is my school."));
+
+    let mut named = WithSchool(Fake::default());
+    let text = get(&mut named, json!({"name": "school_mail", "arguments": {"days": "14"}}));
+    let text = text["result"]["messages"][0]["content"]["text"].as_str().unwrap();
+    assert!(text.contains("newer_than:14d (from:brightspace.uri.edu OR from:uri.edu OR brightspace OR d2l)"), "{text}");
+    assert!(text.contains("The school is URI."));
+    // The rule, in the job's own words: every tool it names exists, and none decides.
+    for tool in ["list_tasks", "get_grades", "add_pending_grade", "add_task", "record_mail_thread"] {
+        assert!(text.contains(tool) && tools::NAMES.contains(&tool), "{tool}");
+    }
+    for line in ["There is no score argument", "never guess one", "Never pass the message body", "Don't mark anything done"] {
+        assert!(text.contains(line), "{line}");
+    }
+    assert!(named.0.calls.is_empty(), "a prompt calls no tool");
+
+    for bad in [json!({"name": "school_mail", "arguments": {"days": "0"}}), json!({"name": "school_mail", "arguments": {"days": "soon"}}), json!({"name": "school_mail", "arguments": {"days": 61}}), json!({"name": "delete_everything"})] {
+        assert_eq!(get(&mut b, bad.clone())["error"]["code"], -32602, "{bad}");
+    }
 }

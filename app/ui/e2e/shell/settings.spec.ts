@@ -14,7 +14,7 @@ test('Settings → Account has the galaxy address, stem player skin, sign out an
   await expect(tabs).toHaveText([
     'Account',
     'Library',
-    'Heat',
+    'Learn',
     'Audio & MIDI · Video',
     'Claude',
     'Privacy',

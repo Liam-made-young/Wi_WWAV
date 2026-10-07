@@ -184,13 +184,13 @@ Not here: `/galaxies/:slug/lineage`, `/lineage-web` and `/constellations`
 (9.7 doesn't list them), galleries, films, page planets (4.7 names no API for them),
 `/api/v2/views`, the leaderboard, fuel, comets and wormholes.
 
-## Heat sync (2.8, 3.15, 9.7): new
+## Learn sync (2.8, 3.15, 9.7): new
 
 | Endpoint | Body / query | Answer |
 |---|---|---|
 | `POST /api/heat/changes` | `{device, cursor?, changes: [{kind, id, field, value, seq}]}`, at most 500 | `{cursor, kept: [{kind, id, field, value, seq, device}]}`; 413 over 500; 400 for a bad change or no device; 409 `cursor_ahead` (nothing is stored) |
 | `GET /api/heat/changes` | `cursor` (default 0), `limit` (default and max 500) | `{changes: [{kind, id, field, value, seq, device}], cursor, more}`; 409 `{error, code: "cursor_ahead"}` for a cursor past the end of the log (from before a reset or a restore): pull again from 0 |
-| `GET /api/heat/public/:userId` | — | `{now: {text} \| null, timelines: [{projectId, targetId, title, milestones: [{id, title, date, done}]}], items: {<kind>: [{id, ...only 3.15's fields}]}}`; 404 for an unknown account | **New** (3.15, 8.7): the public Heat view, built from the synced copies. A record shows only when its `public` field is true, with only the fields 3.15 lists; a grade adds its course's code and a focus record its task's title. The Now making line is gone at its `clearsAt`. No count or total in any answer. Open to anyone |
+| `GET /api/heat/public/:userId` | — | `{now: {text} \| null, timelines: [{projectId, targetId, title, milestones: [{id, title, date, done}]}], items: {<kind>: [{id, ...only 3.15's fields}]}}`; 404 for an unknown account | **New** (3.15, 8.7): the public Learn view, built from the synced copies. A record shows only when its `public` field is true, with only the fields 3.15 lists; a grade adds its course's code and a focus record its task's title. The Now making line is gone at its `clearsAt`. No count or total in any answer. Open to anyone |
 
 Private to the account. The server keeps, field by field, the change with the
 higher `seq`, so a slower older write never overwrites a newer one (PLAN

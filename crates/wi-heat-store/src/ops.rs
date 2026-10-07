@@ -808,7 +808,7 @@ pub fn share_timeline(
 /// `heat.share.hide`: a line or a timeline back off the public view.
 pub fn share_hide(store: &mut Store, _clock: &Clock, id: &str) -> Result<Outcome> {
     let Some(share) = one(store, kind::SHARE, id)? else {
-        return refused("That isn't on your public Heat view.");
+        return refused("That isn't on your public Learn view.");
     };
     let label = if share["kind"] == "now" {
         "hide Now making"

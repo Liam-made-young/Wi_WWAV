@@ -1,8 +1,8 @@
-# Heat in the code
+# Learn in the code
 
-How Heat (`docs/SPEC.md` chapter 3) and its MCP server (3.13, 8.8) are built:
+How Learn (`docs/SPEC.md` chapter 3) and its MCP server (3.13, 8.8) are built:
 where each part lives, what is stored, the core's `heat.*` commands, and the
-eight tools. The spec says what Heat does; this file says how the parts talk.
+eighteen tools. The spec says what Learn does; this file says how the parts talk.
 Where they disagree, the spec wins and this file is fixed.
 
 ## Where things live
@@ -10,9 +10,9 @@ Where they disagree, the spec wins and this file is fixed.
 | Part | Does | Never |
 |---|---|---|
 | `crates/wi-heat` | The rules and the maths, as plain functions over plain records: `model/` (heat, the estimate chain, grades, Plan my day, focus, habits, recurrence, the weekly review's facts, moving in), the iCal and Brightspace parsers, the mail rules, sync's clock | I/O, the clock (time comes in as `now`), global state |
-| `crates/wi-heat-store` | Heat's reads and writes on `library.sqlite`, through `wi-store`'s journal: one function per operation below, each one transaction. The core and `wi-mcp` both call it, so a rule exists once | the network, the Keychain, the engine |
-| `crates/wi-core` | The `heat.*` commands (thin wrappers over `wi-heat-store`), the iCal fetch (network, addresses from the Keychain), Heat sync, and the watcher that notices other processes' commits | maths of its own |
-| `crates/wi-mcp` | The stdio helper: MCP over JSON-RPC, the eight tools, the switches. Calls `wi-heat-store` with `actor = claude` | the network, the Keychain, any write a tool's table doesn't name |
+| `crates/wi-heat-store` | Learn's reads and writes on `library.sqlite`, through `wi-store`'s journal: one function per operation below, each one transaction. The core and `wi-mcp` both call it, so a rule exists once | the network, the Keychain, the engine |
+| `crates/wi-core` | The `heat.*` commands (thin wrappers over `wi-heat-store`), the iCal fetch (network, addresses from the Keychain), Learn sync, and the watcher that notices other processes' commits | maths of its own |
+| `crates/wi-mcp` | The stdio helper: MCP over JSON-RPC, the eighteen tools, the switches. Calls `wi-heat-store` with `actor = claude` | the network, the Keychain, any write a tool's table doesn't name |
 | `app/ui/src/heat/` | The views. Reads `heat.snapshot`, writes through `heat.*`, refetches on the `heat` event | sorting by heat, clamping, planning, grade arithmetic: the snapshot carries every derived value |
 
 The TS model in `app/ui/src/heat/model/` is the reference the Rust was ported
@@ -21,7 +21,7 @@ the snapshot carries.
 
 ## What is stored
 
-Heat's records are rows of `wi-store`'s `docs` table: `kind`, `key` (the
+Learn's records are rows of `wi-store`'s `docs` table: `kind`, `key` (the
 record's own id) and the record as JSON, exactly as 3.16 gives it, with
 camelCase fields. `text` is what ⌘K searches (titles, notes, note text).
 
@@ -31,7 +31,7 @@ camelCase fields. `text` is what ⌘K searches (titles, notes, note text).
 | `dailyNote` | the date, `YYYY-MM-DD` | journaled |
 | `heatState` | `state` | the timer, the current task and `planDrafts`, and under `focus` the timer machine's whole state (never shown to a view); **not** journaled (a draft is not a change, 8.8) |
 | `heatSetting` | `claude.tools`, `school`, `dayEnds`, `feed.<calendarId>`, `feedDismissed`, `seeded`, `mailIds` | `claude.tools` is `{tool: bool}`, all true by default; `feed.*` holds a feed's missed-sync counts and `feedDismissed` the Brightspace items you deleted, so a sync doesn't make them again; `seeded` marks the three first spaces as made; **not** journaled |
-| `calendar` | the record's `id` | a calendar's name, kind, sync times and `keychainRef`; added and removed in Settings → Heat, so **not** journaled: ⌘Z never takes a calendar away |
+| `calendar` | the record's `id` | a calendar's name, kind, sync times and `keychainRef`; added and removed in Settings → Learn, so **not** journaled: ⌘Z never takes a calendar away |
 | `calendarEvent` | `<calendarId>/<UID>` | what other calendars' feeds hold; written by sync, outside the journal, replaced each sync |
 
 Two fields beyond 3.16's lists: a task Claude added keeps `claudeReason`,
@@ -105,7 +105,10 @@ timer, a setting, a calendar) emits `heat` with `heatState`, `heatSetting`,
 
 ### Reading
 
-`heat.snapshot {date, from?, to?}` → everything the views draw for `date`.
+`heat.snapshot {date, from?, to?}` → everything the views draw for `date`,
+and `school`: the School sheet for Settings → Learn (`name`, `host`,
+`codePattern`, `termStart`, `termEnd`, and `icalSaved`, which says a
+Brightspace link is in the Keychain and never the link).
 `from` and `to` are the days shown plus today (the views widen the window to
 take in today); `timeBlock`, `taskOccurrence` and `events` are bounded by them,
 and `derived.occurrences` is drawn for them. Every other record comes whole.
@@ -165,7 +168,7 @@ sun would see (3.15), from the local records: the same shape the server's
 
 | cmd | args | result |
 |---|---|---|
-| `heat.put` | `{kind, record}` | `{record, undo}`. New when `record.id` is absent (a ULID is made). Checked against the kind's fields and rules: a 7th habit is refused ("Habit limit reached"), minutes are clamped 5–600, unknown fields are refused ("A task has no field called 'colour'."). `mailThread`, `calendar` and `profileShare` are refused: Mail lists only what Claude recorded, calendars are added in Settings → Heat, and Show and Hide make the shares |
+| `heat.put` | `{kind, record}` | `{record, undo}`. New when `record.id` is absent (a ULID is made). Checked against the kind's fields and rules: a 7th habit is refused ("Habit limit reached"), minutes are clamped 5–600, unknown fields are refused ("A task has no field called 'colour'."). `mailThread`, `calendar` and `profileShare` are refused: Mail lists only what Claude recorded, calendars are added in Settings → Learn, and Show and Hide make the shares |
 | `heat.patch` | `{kind, id, set}` | `{record, undo}`. Fields not in `set` are untouched. `public` is refused here: it has its own command |
 | `heat.delete` | `{kind, id}` | `{undo}`. Takes the record's dependents with it, in the same entry; a space that still holds tasks, projects or milestones, and a term that still holds courses, are refused with a sentence. Deleting the current task, or one in a draft, clears it there |
 | `heat.done` | `{taskId, done, date?}` | `{task, took?, undo}`. A recurring task gets or loses a `taskOccurrence` for `date` (the views always send it); a series never flips to done. With logged time, `took` is "Done. Took 1h 15m across 3 focus sessions." Marking the current task done makes nothing current, and clears a Now making line that shows it |
@@ -200,18 +203,30 @@ sun would see (3.15), from the local records: the same shape the server's
 and stdout, logs on stderr only. It answers `initialize` (with the client's
 `protocolVersion` when it supports it, else its newest; capabilities
 `{tools: {}}`, server name `wi-wwav`), `notifications/initialized`, `ping`,
-`tools/list` and `tools/call`; anything else is error -32601.
+`tools/list`, `tools/call`, `prompts/list` and `prompts/get`; anything else
+is error -32601.
 
 - **Library.** It finds the library the app uses from the app's settings, with
   `--library <dir>` as an override for tests. No library, or a newer layout
   than it knows: one sentence, nothing written: "No Wi_WWAV library yet. Open
   the app once."
-- **Tools.** The eight in 3.13, with those arguments, results and labels. Each
+- **Tools.** The eighteen in 3.13, with those arguments, results and labels:
+  the first eight for mail and planning, then `get_schedule`, `draft_block`,
+  `list_habits`, `list_projects`, `add_project`, `add_milestone`, `get_notes`,
+  `add_note`, `list_inbox` and `add_capture`. The four that add a record go
+  through `schema::finish`, as a person's `heat.put` does, and mark the record
+  `source: "claude"` with `claudeReason`. `draft_block` writes
+  `heatState.planDrafts` only, as `plan_day` does. Each
   `inputSchema` is a JSON Schema with `additionalProperties: false`, so no
   call can carry `done`, a score or `public`. Read tools carry
   `annotations.readOnlyHint: true`. Every write tool's description opens with
   the two lines of 3.13. A result is `content: [{type: "text", text: <the JSON>}]`
   plus `structuredContent` with the same object.
+- **Prompts.** One, `school_mail {days?}` (1–60, default 7): the job of 3.12's
+  mail rows written out for Claude, naming the school and its Brightspace
+  host from Settings → Learn in a Gmail query. A prompt calls no tool and
+  writes nothing; it is how the person starts the job in one step
+  (`/mcp__wi-wwav__school_mail` in Claude Code).
 - **Failures** set `isError: true` with one sentence: "No open task has that
   id." A tool switched off is missing from `tools/list` and answers "This tool
   is switched off in Wi_WWAV."

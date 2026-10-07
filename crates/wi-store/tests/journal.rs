@@ -463,7 +463,7 @@ fn undo_acts_only_in_its_room() {
     assert_eq!(
         title(&store, &clip),
         "Low Tide v2",
-        "⌘Z in Heat must not touch the Console's rename"
+        "⌘Z in Learn must not touch the Console's rename"
     );
     assert_eq!(
         store.history(Room::Console).unwrap().undo_text(),

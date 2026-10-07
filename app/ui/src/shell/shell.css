@@ -711,6 +711,40 @@ input[type='range'] {
   font-size: var(--type-mono-small);
 }
 
+/* Settings → Claude: the lines to paste, a switch per tool, recent changes. */
+.claude-line {
+  margin: 0 0 var(--space-s2);
+  padding: var(--space-s2);
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+}
+
+.claude-tools,
+.claude-recent {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.claude-tools code {
+  min-width: 170px;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-small);
+}
+
+.claude-recent li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  margin-bottom: var(--space-s2);
+}
+
 /* ⌘K */
 .palette {
   top: 0;
@@ -1284,6 +1318,53 @@ input[type='range'] {
 .shortcut-keys {
   font-family: var(--type-mono-family);
   white-space: nowrap;
+}
+
+/* Settings → Learn: the School sheet and the calendars below it. */
+.school .field,
+.calendar-add {
+  max-width: 440px;
+}
+
+.school input,
+.calendar-add input {
+  min-height: 24px;
+}
+
+.school-term {
+  display: flex;
+  gap: var(--space-s3);
+}
+
+.school-acts,
+.calendars li,
+.calendar-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.calendars {
+  margin: 0 0 var(--space-s2);
+  padding: 0;
+  list-style: none;
+}
+
+.calendars li {
+  min-height: 28px;
+}
+
+.calendar-name {
+  min-width: 140px;
+}
+
+.calendar-add input {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-said {
+  margin-top: var(--space-s2);
 }
 
 /* Export everything and first launch: cards in the middle of the view. */

@@ -15,6 +15,16 @@ export const TOOLS = [
   'add_pending_grade',
   'log_focus',
   'record_mail_thread',
+  'get_schedule',
+  'draft_block',
+  'list_habits',
+  'list_projects',
+  'add_project',
+  'add_milestone',
+  'get_notes',
+  'add_note',
+  'list_inbox',
+  'add_capture',
 ] as const;
 
 const HELPER = '/Applications/Wi_WWAV.app/Contents/Helpers/wi-mcp';

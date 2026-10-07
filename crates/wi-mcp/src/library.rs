@@ -4,9 +4,10 @@
 use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
-use wi_heat_store::{mcp, tool_switches, Clock, Error};
+use wi_heat_store::{feed, mcp, tool_switches, Clock, Error};
 use wi_store::Store;
 
+use crate::prompts::School;
 use crate::{Backend, ToolError};
 
 /// The sentence for a library that isn't there (8.8).
@@ -70,7 +71,14 @@ impl Backend for Library {
         };
         mcp::call(store, &Clock::system(), tool, args).map_err(|e| match e {
             Error::Refused(sentence) => ToolError::new(sentence),
-            Error::Store(e) => ToolError::new(format!("Heat couldn't save that: {e}")),
+            Error::Store(e) => ToolError::new(format!("Learn couldn't save that: {e}")),
         })
+    }
+
+    fn school(&mut self) -> School {
+        self.reach();
+        let sheet = self.store.as_ref().and_then(|store| feed::school_sheet(store).ok()).unwrap_or_default();
+        let text = |k: &str| sheet[k].as_str().unwrap_or_default().to_string();
+        School { name: text("name"), host: text("host") }
     }
 }

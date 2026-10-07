@@ -223,7 +223,7 @@ const keyOf = (kind: Kind, record: Record<string, unknown>) => (kind === 'dailyN
 
 register('heat.put', (args, fake) => {
   const kind = args.kind as Kind;
-  if (!KINDS.includes(kind)) refuse(`Heat keeps no ${kind}.`);
+  if (!KINDS.includes(kind)) refuse(`Learn keeps no ${kind}.`);
   const record = { ...(args.record as Record<string, unknown>) };
   const isNew = kind === 'dailyNote' ? !fake.store.dailyNote.has(record.date as string) : !record.id;
   if (kind !== 'dailyNote' && !record.id) record.id = fake.newId();

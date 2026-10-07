@@ -332,7 +332,7 @@ fn s2_5_a_calendar_that_cant_be_read_says_which_and_changes_nothing() {
     let core = heat_core_on(&setup, NOW, NO_SERVER);
     brightspace(&core, &feed);
     sync_line(&core);
-    let sentence = "Couldn't read the Brightspace calendar. Heat will try again in an hour.";
+    let sentence = "Couldn't read the Brightspace calendar. Learn will try again in an hour.";
     // The login page an expired link returns; an error; nothing listening.
     for (status, body) in [
         (200, "<html><body>Sign in to Brightspace</body></html>"),
@@ -357,7 +357,7 @@ fn s2_5_a_calendar_that_cant_be_read_says_which_and_changes_nothing() {
     let empty = heat_core_on(&other, NOW, NO_SERVER);
     assert_eq!(
         sync_line(&empty),
-        "No calendars yet. Add one in Settings → Heat."
+        "No calendars yet. Add one in Settings → Learn."
     );
     // A calendar named for what it is.
     let work = FeedServer::start(b"not a calendar");
@@ -368,7 +368,7 @@ fn s2_5_a_calendar_that_cant_be_read_says_which_and_changes_nothing() {
     );
     assert_eq!(
         sync_line(&empty),
-        "Couldn't read the Work calendar. Heat will try again in an hour."
+        "Couldn't read the Work calendar. Learn will try again in an hour."
     );
 }
 
@@ -585,7 +585,7 @@ fn the_school_sheet_is_kept_checked_and_its_link_goes_to_the_keychain() {
     );
     assert_eq!(
         bad.1,
-        "The course pattern isn't one Heat can read. The default is ^([A-Z]{3})\\s?(\\d{3})."
+        "The course pattern isn't one Learn can read. The default is ^([A-Z]{3})\\s?(\\d{3})."
     );
     let backwards = refused(
         &core,
@@ -593,6 +593,12 @@ fn the_school_sheet_is_kept_checked_and_its_link_goes_to_the_keychain() {
         json!({"name": "URI", "host": "h", "codePattern": "", "termStart": "2026-12-18", "termEnd": "2026-08-31"}),
     );
     assert_eq!(backwards.1, "The term can't end before it starts.");
+    // Before a sheet is saved, Settings → Learn reads an empty one with the default pattern.
+    let empty = snap(&core, "2026-10-06")["school"].clone();
+    assert_eq!(
+        empty,
+        json!({"name": "", "host": "", "codePattern": "^([A-Z]{3})\\s?(\\d{3})", "termStart": null, "termEnd": null, "icalSaved": false})
+    );
     let set = ok(
         &core,
         "heat.school.set",
@@ -613,6 +619,13 @@ fn the_school_sheet_is_kept_checked_and_its_link_goes_to_the_keychain() {
         setup.secrets.get(item).unwrap().as_deref(),
         Some(feed.address(TOKEN).as_str())
     );
+    // The sheet comes back with the snapshot, saying a link is saved and never the link.
+    let shown = snap(&core, "2026-10-06");
+    assert_eq!(
+        shown["school"],
+        json!({"name": "URI", "host": "brightspace.uri.edu", "codePattern": "^([A-Z]{3})\\s?(\\d{3})", "termStart": "2026-08-31", "termEnd": "2026-12-18", "icalSaved": true})
+    );
+    assert!(!shown.to_string().contains(TOKEN), "the address is in the snapshot");
     assert_eq!(sync_line(&core), "Synced 8:40 AM: 9 new tasks");
     // A pattern of the school's own picks the course out of the feed.
     ok(

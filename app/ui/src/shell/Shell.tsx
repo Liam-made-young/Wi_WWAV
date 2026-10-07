@@ -18,11 +18,11 @@ import { type UndoRoom, useAppearance, useCoreEvent, useHistory, useNarrow, useS
 import { type Command, type KeyContext, type Overlay, route } from './keys';
 import { type Clip, type DrawerHandle, LibraryDrawer } from './LibraryDrawer';
 import { NowStrip } from './NowStrip';
-import { type Item, Palette, type PaletteHandle } from './Palette';
+import { type Item, Palette, type PaletteHandle } from './CommandPalette';
 import { IS_MAC, keys } from './platform';
 import { PlayerSheet } from './PlayerSheet';
 import { ROOM_NAMES, ROOMS, type RoomId } from './rooms';
-import { Rooms } from './Rooms';
+import { Rooms } from './RoomViews';
 import { type Account, PANES, type Pane, Settings, type SettingsValue } from './Settings';
 import { type ScreenStatus, StatusBar } from './StatusBar';
 import { GalaxyMenu, TitleBar } from './TitleBar';
@@ -438,8 +438,8 @@ export function Shell() {
             items={[
               { label: 'Your galaxy', run: () => (setRoom('space'), close('menu')) },
               {
-                label: 'Your public Heat view',
-                run: () => (setRoom('space'), close('menu'), notInSpace('Your public Heat view, behind your sun,')),
+                label: 'Your public Learn view',
+                run: () => (setRoom('space'), close('menu'), notInSpace('Your public Learn view, behind your sun,')),
               },
               { label: 'Settings…', run: () => (close('menu'), open('settings')) },
               { label: 'Export everything…', run: () => (close('menu'), open('export')) },

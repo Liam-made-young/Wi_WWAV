@@ -5,9 +5,10 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { call } from '../bridge';
-import { CLAUDE_TOOLS } from './claudeTools';
+import { ClaudePane } from './ClaudePane';
 import { SHORTCUTS } from './keys';
 import { NotYet } from './NotYet';
+import { SchoolSheet } from './SchoolSheet';
 import { keys } from './platform';
 
 export interface SettingsValue {
@@ -23,7 +24,7 @@ export interface SettingsValue {
 export const PANES = [
   { id: 'account', label: 'Account' },
   { id: 'library', label: 'Library' },
-  { id: 'heat', label: 'Heat' },
+  { id: 'heat', label: 'Learn' },
   { id: 'audio', label: 'Audio & MIDI · Video' },
   { id: 'claude', label: 'Claude' },
   { id: 'privacy', label: 'Privacy' },
@@ -108,7 +109,7 @@ function Account({ account, onSignIn, onSignOut }: Pick<Props, 'account' | 'onSi
         <p>
           {account.signedIn
             ? `Signed in as ${account.username ?? 'you'}.`
-            : 'You’re not signed in. Heat, the library and the Console work fully without an account.'}
+            : 'You’re not signed in. Learn, the library and the Console work fully without an account.'}
         </p>
         <button type="button" className="gel" onClick={account.signedIn ? onSignOut : onSignIn}>
           {account.signedIn ? 'Sign out' : 'Sign in or create an account'}
@@ -214,19 +215,9 @@ function LibraryPane({
 function HeatPane({ settings, onPatch }: { settings: SettingsValue; onPatch: Props['onPatch'] }) {
   const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [here];
-  const [school, setSchool] = useState(settings.heat.school ?? '');
-  useEffect(() => setSchool(settings.heat.school ?? ''), [settings.heat.school]);
   return (
     <>
-      <NotYet label="Spaces…" why="Spaces are set in Heat’s room, which isn’t in this build yet." />
-      <Row label="School">
-        <input
-          aria-label="School"
-          value={school}
-          onChange={(e) => setSchool(e.target.value)}
-          onBlur={() => onPatch({ heat: { school: school.trim() || null } })}
-        />
-      </Row>
+      <NotYet label="Spaces…" why="Spaces are set in Learn’s room, which isn’t in this build yet." />
       <Row label="Time zone">
         <select
           aria-label="Time zone"
@@ -241,14 +232,7 @@ function HeatPane({ settings, onPatch }: { settings: SettingsValue; onPatch: Pro
           ))}
         </select>
       </Row>
-      <NotYet
-        label="Brightspace calendar link…"
-        why="The link is kept in the keychain, and this build can’t store it there yet."
-      />
-      <NotYet
-        label="Other calendars’ iCal links…"
-        why="Each address is kept in the keychain, and this build can’t store it there yet."
-      />
+      <SchoolSheet />
     </>
   );
 }
@@ -299,43 +283,15 @@ function AudioPane({ settings, onPatch }: { settings: SettingsValue; onPatch: Pr
   );
 }
 
-function ClaudePane() {
-  return (
-    <>
-      <Row label="How Claude reaches Wi_WWAV">
-        <p>
-          Claude connects to Wi_WWAV as an MCP server, from Claude Desktop or Claude Code. The app holds no Anthropic key
-          and calls no model. Claude asks before it calls a tool you haven’t allowed, and every change it makes is
-          labelled and can be undone.
-        </p>
-      </Row>
-      <NotYet label="Add Wi_WWAV to Claude…" why="The MCP server isn’t in this build yet." />
-      <Row label="The tools Claude will see">
-        <ul className="tools">
-          {CLAUDE_TOOLS.map((t) => (
-            <li key={t.name}>
-              <code>{t.name}</code> {t.does}
-            </li>
-          ))}
-        </ul>
-        <p className="why" data-text="secondary">
-          Each will have a switch, and Claude’s recent changes will list here with Undo, once the server is in this
-          build.
-        </p>
-      </Row>
-    </>
-  );
-}
-
 function PrivacyPane() {
   return (
     <>
       <NotYet
         label="Everything public…"
-        why="The table of what is public, and your public Heat view as others see it, come with Space, which isn’t in this build yet."
+        why="The table of what is public, and your public Learn view as others see it, come with Space, which isn’t in this build yet."
       />
       <p className="why" data-text="secondary">
-        Until then everything in Heat stays private.
+        Until then everything in Learn stays private.
       </p>
     </>
   );

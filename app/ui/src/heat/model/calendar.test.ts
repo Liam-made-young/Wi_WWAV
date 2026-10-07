@@ -43,7 +43,7 @@ describe('the month grid (3.1)', () => {
     expect(monthGrid('2026-10-01', data({ tasks: tasks.slice(0, 3) }), now, NY)[11].more).toBeNull();
   });
 
-  it('shows a task whose rule Heat can’t read on its own due date', () => {
+  it('shows a task whose rule Learn can’t read on its own due date', () => {
     const odd = task({ title: 'Odd', due: ny('2026-10-09 23:59'), rrule: 'FREQ=HOURLY' });
     const cells = monthGrid('2026-10-01', data({ tasks: [odd] }), now, NY);
     expect(cells.filter((c) => c.pills.length > 0).map((c) => c.date)).toEqual(['2026-10-09']);

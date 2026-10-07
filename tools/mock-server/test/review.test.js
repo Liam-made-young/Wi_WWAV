@@ -256,7 +256,7 @@ describe('review: desktop sign-in (S1.11)', () => {
   });
 });
 
-describe('review: Heat (S2.7)', () => {
+describe('review: Learn (S2.7)', () => {
   const ctx = useServer();
   const push = (token, device, changes) => ctx.call('POST', '/api/heat/changes', { token, body: { device, changes } });
 
@@ -300,7 +300,7 @@ describe('review: Heat (S2.7)', () => {
   });
 });
 
-describe("review: Heat push's cursor", () => {
+describe("review: Learn push's cursor", () => {
   const ctx = useServer();
   const push = (token, device, changes) => ctx.call('POST', '/api/heat/changes', { token, body: { device, changes } });
 

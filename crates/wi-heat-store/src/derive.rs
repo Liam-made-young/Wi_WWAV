@@ -56,7 +56,7 @@ fn typed<T: serde::de::DeserializeOwned>(kind: &str, raw: Vec<Value>) -> (Vec<T>
             Err(e) => {
                 let id = v.get("id").and_then(Value::as_str).unwrap_or("?");
                 eprintln!(
-                    "wi-heat-store: Heat's {kind} record {id} doesn't read, so it is left out: {e}"
+                    "wi-heat-store: Learn's {kind} record {id} doesn't read, so it is left out: {e}"
                 );
             }
         }

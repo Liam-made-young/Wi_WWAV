@@ -25,7 +25,7 @@ test('the empty halves read 2.2’s sentences', async ({ page, core }) => {
   await expect(strip.locator('.strip-track')).toHaveText('Nothing playingSelect anything and press Space.');
 });
 
-test('the task half shows the hottest open task, or the current one, and opens Heat on it', async ({ page, core }) => {
+test('the task half shows the hottest open task, or the current one, and opens Learn on it', async ({ page, core }) => {
   await clearTasks(core);
   const now = Date.now();
   await core.call('records.mutate', {

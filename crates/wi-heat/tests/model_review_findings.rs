@@ -293,7 +293,7 @@ fn row(due: &str) -> Value {
 
 fn not_export() -> Result<HeatExport, ExportError> {
     Err(ExportError {
-        error: "This file isn’t a Heat export.".into(),
+        error: "This file isn’t a Learn export.".into(),
     })
 }
 
@@ -598,7 +598,7 @@ fn twice() -> HeatExport {
         base(),
         json!({"tasks": tasks, "courses": courses, "grades": grades}),
     ))
-    .expect("a Heat export")
+    .expect("a Learn export")
 }
 
 #[test]

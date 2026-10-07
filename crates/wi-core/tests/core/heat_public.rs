@@ -221,7 +221,7 @@ fn s2_9_a_private_grade_never_leaves_the_mac_and_a_public_one_goes_up_as_its_cop
     );
     assert!(
         rows.iter().any(|c| c["kind"] == "term"),
-        "the rest of Heat syncs"
+        "the rest of Learn syncs"
     );
 
     // The switch says what it does, in the words of 3.15.

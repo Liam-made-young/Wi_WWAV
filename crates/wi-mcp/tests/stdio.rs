@@ -116,7 +116,7 @@ fn seeded() -> (tempfile::TempDir, PathBuf) {
 fn dump(root: &Path) -> String {
     let store = Store::open(root).unwrap();
     let mut out = String::new();
-    for kind in ["space", "task", "term", "course", "grade", "focusSession", "mailThread"] {
+    for kind in ["space", "task", "term", "course", "grade", "focusSession", "mailThread", "project", "milestone", "note", "capture", "habit", "timeBlock"] {
         for doc in store.docs(kind).unwrap() {
             out.push_str(&format!("{kind}/{} {}\n", doc.key, doc.json));
         }
@@ -132,7 +132,7 @@ fn claude_entries(root: &Path) -> Vec<wi_store::EntryInfo> {
 fn every_tool_answers_and_each_write_is_one_entry_by_claude() {
     let (_dir, root) = seeded();
     let mut h = Helper::start(&root);
-    assert_eq!(h.tools().len(), 8);
+    assert_eq!(h.tools().len(), 18);
 
     let before = dump(&root);
     let listed = h.call("list_tasks", json!({})).unwrap();
@@ -153,6 +153,10 @@ fn every_tool_answers_and_each_write_is_one_entry_by_claude() {
         ("add_pending_grade", json!({"course": "JPN 201", "item": "Quiz 3", "reason": "A grade was posted."}), "Claude's pending grade"),
         ("log_focus", json!({"task_id": "t-lab", "minutes": 25, "reason": "They said they worked on it."}), "Claude's focus log"),
         ("record_mail_thread", json!({"thread_id": "th-1", "subject": "Quiz 3 graded", "from": "D2L", "received_at": "2026-10-07T09:12:00-04:00", "state": "grade", "course": "JPN 201", "reason": "A grade notice."}), "Claude's mail note"),
+        ("add_project", json!({"title": "EP v1", "space": "WWAV", "target_date": "2026-12-01", "reason": "They said the EP is the next thing."}), "Claude's project"),
+        ("add_milestone", json!({"title": "Mix the second verse", "date": "2026-10-20", "space": "WWAV", "reason": "They named the date."}), "Claude's milestone"),
+        ("add_note", json!({"title": "Essay outline", "text": "# Outline\n\n1. Thesis", "reason": "They asked for an outline to start from."}), "Claude's note"),
+        ("add_capture", json!({"text": "Ask the TA about lab 6", "reason": "It came up and isn't clearly a task."}), "Claude's capture"),
     ];
     for (n, (tool, args, label)) in writes.iter().enumerate() {
         let state_before = dump(&root);
@@ -184,6 +188,105 @@ fn every_tool_answers_and_each_write_is_one_entry_by_claude() {
     assert_eq!(essay["estimate_min"], 90);
     assert_eq!(essay["estimate_by"], "claude");
     assert_eq!(essay["estimate_reason"], "Two thousand words.");
+}
+
+/// The ten tools past 3.13's first eight: the reads change nothing, the
+/// drafts mark their records as Claude's with the reason, and nothing they
+/// make is done, public or triaged.
+#[test]
+fn the_reads_change_nothing_and_the_drafts_are_marked_as_claudes() {
+    let (_dir, root) = seeded();
+    {
+        let mut store = Store::open(&root).unwrap();
+        let mut txn = store.begin(Room::Heat, "seed more").unwrap();
+        txn.put_doc("habit", "h-walk", &json!({"id": "h-walk", "title": "Walk", "minutes": 20, "log": {}, "showCounter": false}), "Walk").unwrap();
+        txn.put_doc("note", "n-mine", &json!({"id": "n-mine", "title": "Mine", "markdown": "x".repeat(5000)}), "Mine").unwrap();
+        txn.put_doc("capture", "cap-done", &json!({"id": "cap-done", "text": "old", "triagedAt": 1}), "old").unwrap();
+        txn.put_doc("timeBlock", "b-1", &json!({"id": "b-1", "taskId": "t-lab", "date": "2099-01-05", "start": 600, "minutes": 60, "origin": "you"}), "").unwrap();
+        txn.commit().unwrap();
+    }
+    let mut h = Helper::start(&root);
+    let before = dump(&root);
+    let habits = h.call("list_habits", json!({})).unwrap();
+    assert_eq!(habits["habits"][0]["title"], "Walk");
+    assert_eq!(habits["habits"][0]["done_today"], false);
+    let notes = h.call("get_notes", json!({})).unwrap();
+    assert_eq!(notes["notes"][0]["text"].as_str().unwrap().len(), 4000);
+    assert_eq!(notes["notes"][0]["cut_short"], true);
+    assert_eq!(notes["notes"][0]["by"], "you");
+    assert!(notes["daily_note"].is_null());
+    assert_eq!(h.call("list_inbox", json!({})).unwrap()["captures"], json!([]));
+    assert_eq!(h.call("list_projects", json!({})).unwrap(), json!({"projects": [], "milestones": []}));
+    let day = h.call("get_schedule", json!({"from": "2099-01-05"})).unwrap();
+    assert_eq!(day["blocks"].as_array().unwrap().len(), 1, "{day}");
+    assert_eq!(day["blocks"][0]["title"], "Lab 5a");
+    assert_eq!(day["blocks"][0]["minutes"], 60);
+    assert_eq!(dump(&root), before, "the reads change no record");
+    assert!(claude_entries(&root).is_empty(), "the reads journal nothing");
+
+    // A draft is not a change: nothing is journaled and no block is made.
+    let draft = h.call("draft_block", json!({"task_id": "t-essay", "date": "2099-01-05", "start": "14:10", "minutes": 50, "reason": "They asked for the afternoon."})).unwrap();
+    assert_eq!(draft["draft"]["title"], "Essay draft");
+    assert_eq!(draft["draft"]["minutes"], 45, "rounded to the 15-minute grid");
+    assert!(draft["draft"]["start"].as_str().unwrap().starts_with("2099-01-05T14:15:00"), "{draft}");
+    assert_eq!(draft["drafts_waiting"], 1);
+    assert_eq!(dump(&root), before, "a draft makes no block");
+    assert!(claude_entries(&root).is_empty(), "a draft journals nothing");
+    let day = h.call("get_schedule", json!({"from": "2099-01-05"})).unwrap();
+    assert_eq!(day["drafts"][0]["reason"], "They asked for the afternoon.");
+    // The same task and day again replaces the draft; a held time is refused.
+    let moved = h.call("draft_block", json!({"task_id": "t-essay", "date": "2099-01-05", "start": "16:00", "minutes": 30, "reason": "Later."})).unwrap();
+    assert_eq!(moved["drafts_waiting"], 1);
+    let held = h.call("draft_block", json!({"task_id": "t-essay", "date": "2099-01-05", "start": "10:30", "minutes": 30, "reason": "r"})).unwrap_err();
+    assert_eq!(held, "A block already holds that time. Read get_schedule and pick a free one.");
+    let on_draft = h.call("draft_block", json!({"task_id": "t-lab", "date": "2099-01-05", "start": "16:15", "minutes": 30, "reason": "r"})).unwrap_err();
+    assert_eq!(on_draft, "A draft already holds that time. Read get_schedule and pick a free one.");
+    assert_eq!(h.call("draft_block", json!({"task_id": "t-lab", "date": "2020-01-05", "start": "16:15", "minutes": 30, "reason": "r"})).unwrap_err(), "That day is over. Plan today or a day ahead.");
+    assert_eq!(h.call("draft_block", json!({"task_id": "t-lab", "date": "2099-01-05", "start": "06:00", "minutes": 30, "reason": "r"})).unwrap_err(), "A block sits between 7 AM and midnight.");
+    assert_eq!(h.call("draft_block", json!({"task_id": "nope", "start": "16:15", "minutes": 30, "reason": "r"})).unwrap_err(), "No open task has that id.");
+
+    let project = h.call("add_project", json!({"title": "EP v1", "space": "wwav", "reason": "The EP is next."})).unwrap()["project"].clone();
+    assert_eq!(project["source"], "claude");
+    assert_eq!(project["claudeReason"], "The EP is next.");
+    assert_eq!(project["status"], "active");
+    assert_eq!(project["public"], false);
+    assert_eq!(h.call("add_project", json!({"title": "ep V1", "space": "WWAV", "reason": "Again."})).unwrap_err(), "WWAV already has a project called ep V1.");
+    let milestone = h.call("add_milestone", json!({"title": "Mixed", "date": "2026-11-01", "project_id": project["id"], "reason": "They named it."})).unwrap()["milestone"].clone();
+    assert_eq!(milestone["done"], false);
+    assert_eq!(milestone["spaceId"], "sp-wwav", "a milestone takes its project's space");
+    assert_eq!(milestone["source"], "claude");
+    assert_eq!(h.call("add_milestone", json!({"title": "x", "date": "2026-02-30", "reason": "r"})).unwrap_err(), "A milestone needs a day, as YYYY-MM-DD.");
+    assert_eq!(h.call("add_milestone", json!({"title": "x", "date": "2026-11-01", "project_id": "nope", "reason": "r"})).unwrap_err(), "No project has that id.");
+    let listed = h.call("list_projects", json!({"space": "WWAV"})).unwrap();
+    assert_eq!(listed["projects"][0]["milestones"][0]["title"], "Mixed");
+    assert_eq!(listed["projects"][0]["open_tasks"], 0);
+
+    h.call("add_note", json!({"title": "Outline", "text": "# One", "project_id": project["id"], "reason": "A place to start."})).unwrap();
+    let notes = h.call("get_notes", json!({})).unwrap();
+    let outline = notes["notes"].as_array().unwrap().iter().find(|n| n["title"] == "Outline").unwrap();
+    assert_eq!(outline["by"], "claude");
+    assert_eq!(outline["text"], "# One");
+    assert_eq!(h.call("add_note", json!({"title": "x", "text": "y", "project_id": "nope", "reason": "r"})).unwrap_err(), "No project has that id.");
+
+    let captured = h.call("add_capture", json!({"text": "Ask the TA about lab 6", "reason": "Not clearly a task."})).unwrap();
+    assert_eq!(captured["in_inbox"], 1, "the triaged capture isn't counted");
+    let inbox = h.call("list_inbox", json!({})).unwrap();
+    assert_eq!(inbox["captures"], json!([{"id": captured["capture"]["id"], "text": "Ask the TA about lab 6", "by": "claude"}]));
+
+    // Nothing Claude made is done, public or triaged, and the person's records are as they were.
+    let store = Store::open(&root).unwrap();
+    for kind in ["project", "milestone", "note", "capture"] {
+        for doc in store.docs(kind).unwrap() {
+            assert_ne!(doc.json["public"], true, "{kind}");
+            assert_ne!(doc.json["done"], true, "{kind}");
+            if doc.json["source"] == "claude" {
+                assert!(doc.json.get("triagedAt").is_none(), "{kind}");
+            }
+        }
+    }
+    assert_eq!(store.docs("habit").unwrap()[0].json["log"], json!({}), "no habit was ticked");
+    assert_eq!(store.docs("timeBlock").unwrap().len(), 1, "no block was made");
+    assert_eq!(claude_entries(&root).len(), 4, "one entry for each of the four records");
 }
 
 #[test]
@@ -244,7 +347,7 @@ fn with_no_library_every_call_says_to_open_the_app_and_nothing_is_made() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("Wi_WWAV");
     let mut h = Helper::start(&root);
-    assert_eq!(h.tools().len(), 8);
+    assert_eq!(h.tools().len(), 18);
     assert_eq!(h.call("list_tasks", json!({})).unwrap_err(), "No Wi_WWAV library yet. Open the app once.");
     assert!(!root.exists(), "the helper never makes a library");
 }

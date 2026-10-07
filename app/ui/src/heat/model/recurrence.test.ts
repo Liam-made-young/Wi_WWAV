@@ -39,7 +39,7 @@ describe('parsing the RRULE subset', () => {
     expect(parseRule('FREQ=DAILY;UNTIL=20261231')?.until).toEqual({ day: '2026-12-31' });
   });
 
-  it('refuses what Heat does not handle rather than guessing', () => {
+  it('refuses what Learn does not handle rather than guessing', () => {
     for (const bad of [
       '',
       'nonsense',
@@ -272,7 +272,7 @@ describe('recurring tasks', () => {
 });
 
 describe('openTasks', () => {
-  it('keeps a task whose rule Heat can’t read as a plain task, rather than losing it', () => {
+  it('keeps a task whose rule Learn can’t read as a plain task, rather than losing it', () => {
     const now = ny('2026-10-06 08:00');
     const odd = task({ due: ny('2026-10-09 23:59'), rrule: 'FREQ=HOURLY' });
     expect(openTasks([odd], [], now, NY)).toEqual([odd]);

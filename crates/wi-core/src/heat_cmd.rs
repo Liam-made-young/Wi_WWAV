@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use serde_json::{json, Map, Value};
 use wi_heat_store::snapshot::Window;
-use wi_heat_store::{ops, snapshot, timer, Outcome};
+use wi_heat_store::{feed, ops, snapshot, timer, Outcome};
 use wi_store::{DocChange, Store};
 
 use crate::args::Args;
@@ -88,7 +88,18 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
                 to: a.opt_str("to").map(String::from),
                 synced_at: i.kv.get("heat.syncedAt")?.and_then(|v| v.as_f64()),
             };
-            snapshot::snapshot(&i.store(), &i.clock(), &window).map_err(core_error)
+            let clock = i.clock();
+            let store = i.store();
+            let mut snap = snapshot::snapshot(&store, &clock, &window).map_err(core_error)?;
+            // The School sheet for Settings → Learn (3.11). The Brightspace
+            // address stays in the Keychain: the sheet only says one is saved.
+            let mut school = feed::school_sheet(&store).map_err(core_error)?;
+            school["icalSaved"] = json!(feed::calendars(&store)
+                .map_err(core_error)?
+                .iter()
+                .any(|c| c["kind"] == "brightspace"));
+            snap["school"] = school;
+            Ok(snap)
         }
         "heat.whatItWouldTake" => {
             snapshot::what_it_would_take(&i.store(), a.str("courseId")?, a.str("letter")?)

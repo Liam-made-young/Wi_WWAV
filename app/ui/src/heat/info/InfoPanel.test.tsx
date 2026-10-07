@@ -95,7 +95,7 @@ describe('Get Info for a task', () => {
       $$(rig, '.heat-hint')
         .map((h) => h.textContent)
         .join(' '),
-    ).toContain('Heat’s estimate: your average for this type, or difficulty × 20 minutes.');
+    ).toContain('Learn’s estimate: your average for this type, or difficulty × 20 minutes.');
   });
 
   it('sets the estimate as the person’s own, keeps minutes in 5–600, and each is an undo step', async () => {

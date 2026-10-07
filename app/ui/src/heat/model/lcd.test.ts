@@ -11,7 +11,7 @@ function data(over: Partial<LcdData> = {}): LcdData {
   return { tasks: [], occurrences: [], sessions: [], courses: [jpn102, jpn201], milestones: [], ...over };
 }
 
-describe('the Now strip’s task half (2.2, from Heat’s LCD in 3.1)', () => {
+describe('the Now strip’s task half (2.2, from Learn’s LCD in 3.1)', () => {
   const now = ny('2026-10-06 12:30');
 
   it('shows the hottest open task, its due and group, and the week’s load', () => {

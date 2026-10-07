@@ -1322,7 +1322,7 @@ fn heat_commands_say_so_when_they_are_wrong() {
     );
     assert_eq!(
         refused(&core, "heat.put", json!({"kind": "gizmo", "record": {}})).1,
-        "Heat keeps no gizmo."
+        "Learn keeps no gizmo."
     );
     assert_eq!(
         refused(&core, "heat.put", json!({"kind": "task"})).0,
@@ -1372,7 +1372,7 @@ fn heat_commands_say_so_when_they_are_wrong() {
             json!({"kind": "calendar", "record": {"name": "x"}})
         )
         .1,
-        "Calendars are added and removed in Settings → Heat."
+        "Calendars are added and removed in Settings → Learn."
     );
 }
 
@@ -1412,7 +1412,7 @@ fn s2_6_moving_in_keeps_every_id_and_everything_comes_in_private() {
     assert_eq!(
         records(&shown, "space").len(),
         3,
-        "the workspaces moved into the spaces Heat made"
+        "the workspaces moved into the spaces Learn made"
     );
     assert_eq!(
         records(&shown, "habit")[0]["log"],
@@ -1446,7 +1446,7 @@ fn s2_6_moving_in_keeps_every_id_and_everything_comes_in_private() {
             json!({"json": {"format": "something else"}})
         )
         .1,
-        "This file isn’t a Heat export."
+        "This file isn’t a Learn export."
     );
 }
 

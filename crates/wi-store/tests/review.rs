@@ -495,7 +495,7 @@ fn tags_lowercase_unicode_and_the_thirteenth_is_refused_with_the_sentence() {
     });
     assert!(
         store.undo(Room::Space).is_err(),
-        "Heat's untag touched the count later"
+        "Learn's untag touched the count later"
     );
     store.undo(Room::Heat).unwrap();
     store.undo(Room::Space).unwrap();

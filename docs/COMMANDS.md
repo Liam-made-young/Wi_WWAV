@@ -24,7 +24,7 @@ calls travel two ways:
   worlds. Start another one.").
 - Every mutation takes a `label` and runs in one journal transaction in the
   current view, so ⌘Z can name it ("Undo mark done"). The core never asks
-  "Are you sure?": undo replaces it (8.10). A view is Heat, Space or the
+  "Are you sure?": undo replaces it (8.10). A view is Learn, Space or the
   Console (`heat`, `space`, `console`: there are three, and no fourth), or
   `library` for the drawer over them. The commands still call it `room`
   (`{room}`), the journal's own name for where a change was made; the spec's
@@ -34,7 +34,7 @@ calls travel two ways:
   of `docs/ENGINE.md` 4.4.
 - Nothing the UI shows as a count of other people's attention exists in any
   result (gate 1.3).
-- The app calls no model. Claude reaches Heat through an MCP server, so there
+- The app calls no model. Claude reaches Learn through an MCP server, so there
   is no command that asks Claude for anything, no Claude switch in the
   settings and no key (docs/SPEC.md 2.11).
 
@@ -66,10 +66,10 @@ such a change touched is held, and says it "changed on another device since".
 
 ### records (journaled documents for the views)
 
-Heat's records (3.15) are documents of a `kind` with an `id`, kept in
+Learn's records (3.15) are documents of a `kind` with an `id`, kept in
 `library.sqlite` and journaled. They sync with the account whichever view
-wrote them (a milestone planned from Space is Heat's as much as one planned
-in Heat), except private grades and courses, which stay on the Mac.
+wrote them (a milestone planned from Space is Learn's as much as one planned
+in Learn), except private grades and courses, which stay on the Mac.
 
 | cmd | args | result |
 |---|---|---|
@@ -165,13 +165,13 @@ Events: `status` `{area: "upload", sentence: "Uploading World Ending · part 14 
 
 ### heat (3, 8.8)
 
-Heat's reads and writes, its calendars and its Claude pane: `heat.snapshot`,
+Learn's reads and writes, its calendars and its Claude pane: `heat.snapshot`,
 `heat.put`, `heat.patch`, `heat.delete`, `heat.done`, `heat.plan.*`,
 `heat.focus.*`, `heat.capture.*`, `heat.public.set`, `heat.calendars.*`,
 `heat.claude.*` and the rest. `docs/HEAT.md` lists each one's arguments,
 result and refusals, and what the snapshot carries. Every write answers
 `{..., undo}` with the Edit menu's text, and the core sends `heat`
-`{kinds: [...]}` after any Heat change, the app's own, Claude's (`wi-mcp`)
+`{kinds: [...]}` after any Learn change, the app's own, Claude's (`wi-mcp`)
 or a sync's, so views refetch.
 
 ### export (2.9)

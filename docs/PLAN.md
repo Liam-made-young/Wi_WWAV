@@ -18,23 +18,23 @@ Where each check runs:
 
 Rules for this work, from the founder (7 Oct 2026): the main agent plus at most two Sonnet subagents at once while coding.
 
-**Dates** (Decided, `docs/SPEC.md` 10.1): Heat 100% by the end of 7 Oct 2026; the app 80–90% by Sunday 11 Oct, which counts everything an agent can build and check on Linux; a working version by January 2027.
+**Dates** (Decided, `docs/SPEC.md` 10.1): Learn 100% by the end of 7 Oct 2026; the app 80–90% by Sunday 11 Oct, which counts everything an agent can build and check on Linux; a working version by January 2027.
 
 The spec rewrite is done: `docs/SPEC.md`, with the decisions in `docs/SCOPE_CUT.md`. Edit the spec directly from now on.
 
 **Where 7 Oct ended** (the founder asked to wrap up; everything below is merged and pushed on `claude/relaxed-cori-x2igz9`):
 
-- [x] A. Heat's maths in Rust (`crates/wi-heat/src/model/`): 242 tests mirroring the TS ones, and 59,067 generated vectors where Rust and TS agree byte for byte (S2.1)
+- [x] A. Learn's maths in Rust (`crates/wi-heat/src/model/`): 242 tests mirroring the TS ones, and 59,067 generated vectors where Rust and TS agree byte for byte (S2.1)
 - [x] B. The shell branches merged and brought to the spec: three views on ⌘1–⌘3, the galaxy chip, no Unquantized, first launch and Settings → Account per 2.13–2.14, the review findings fixed
-- [x] C. Heat's store and commands: `crates/wi-heat-store` and every `heat.*` command in wi-core, the journal's `actor`/`tool`/`reason`, the 500 ms watcher, calendars with addresses in the Keychain, Heat sync of public copies, export (`heat.json` and Obsidian markdown), and Heat running with no audio engine (S2.2–S2.6, S2.9–S2.11 through the commands: 43 core tests)
-- [x] D. `wi-mcp`: the eight tools over stdio; 8.12's suite passes (S2.8)
-- [x] E, part 1. Heat's screens: the frame, Today (time column, Plan my day, Pomodoro, the five widgets), Tasks, Calendar, Grades, Habits, Mail, Get Info with the Public switch, capture and inbox triage
+- [x] C. Learn's store and commands: `crates/wi-heat-store` and every `heat.*` command in wi-core, the journal's `actor`/`tool`/`reason`, the 500 ms watcher, calendars with addresses in the Keychain, Learn sync of public copies, export (`heat.json` and Obsidian markdown), and Learn running with no audio engine (S2.2–S2.6, S2.9–S2.11 through the commands: 43 core tests)
+- [x] D. `wi-mcp`: the eight tools over stdio; 8.12's suite passes (S2.8). Ten more since (S2.14)
+- [x] E, part 1. Learn's screens: the frame, Today (time column, Plan my day, Pomodoro, the five widgets), Tasks, Calendar, Grades, Habits, Mail, Get Info with the Public switch, capture and inbox triage
 - [x] The frames of Space (the sky in three.js, a sample catalogue marked as one) and the Console (its regions per 5.2, the real library, the engine's state)
 - [x] An end-to-end check through the real core: Claude's helper adds a task from its own process while the app runs, it shows as Claude's, and ⌘Z takes it back (`app/ui/e2e/heat/claude.spec.ts`)
-- [ ] E, part 2. Not built yet in the UI, though every command behind them exists: Settings → Heat (the School sheet and calendars), Settings → Claude (the config lines, the switches, recent changes) and Settings → Privacy; dropping a task on "Your galaxy" and the public Heat view page; the space sheet; notes; the weekly review; hiding widgets from the View menu
+- [ ] E, part 2. Not built yet in the UI, though every command behind them exists: Settings → Learn (the School sheet and calendars), Settings → Claude (the config lines, the switches, recent changes) and Settings → Privacy; dropping a task on "Your galaxy" and the public Learn view page; the space sheet; notes; the weekly review; hiding widgets from the View menu
 - [ ] Mac checks: the Tauri build itself has not been run on a Mac or under Xvfb with today's code (the container's disk couldn't hold it), nor the WebKit pass
 
-**Green on the last merge (520fe28):** `cargo clippy --workspace --all-targets -D warnings` clean; wi-core, wi-store, wi-heat-store and wi-mcp tests all pass (97 in wi-core); `tsc` clean; Vitest 703 pass; the Claude end-to-end check passes. The agents' own runs: `cargo test --workspace` 900 pass, mock server 128, Playwright 29 (shell) and 30 (Heat on the fake core).
+**Green on the last merge (520fe28):** `cargo clippy --workspace --all-targets -D warnings` clean; wi-core, wi-store, wi-heat-store and wi-mcp tests all pass (97 in wi-core); `tsc` clean; Vitest 703 pass; the Claude end-to-end check passes. The agents' own runs: `cargo test --workspace` 900 pass, mock server 128, Playwright 29 (shell) and 30 (Learn on the fake core).
 
 **Then, to the weekend:** Console audio, VST effects and MIDI → Space in three.js → Console video and `.swav` → Demucs.
 
@@ -73,7 +73,7 @@ Done only when all seven pass on a second Mac that has never built the app
 
 ## Stage 1: shell and library
 
-Target: 7 Oct 2026, with Heat. Partial work is on `build/core`, `build/tauri` and `build/shell` (item B above).
+Target: 7 Oct 2026, with Learn. Partial work is on `build/core`, `build/tauri` and `build/shell` (item B above).
 
 | # | Milestone | Fails if | Runs on | Status |
 |---|---|---|---|---|
@@ -86,27 +86,30 @@ Target: 7 Oct 2026, with Heat. Partial work is on `build/core`, `build/tauri` an
 | S1.7 | The library | Import names a file anything but a ULID; renaming a song renames a file; a plain WAV comes in as anything but master only, without saying so; a tag isn't lowercase or a clip takes a 13th; a fifth pin fits; a delete removes a file; the verdict in Get Info differs from `wwav_pack.py info` | Linux | open |
 | S1.8 | Search | Library search takes over 50 ms at 50,000 clips | Linux | **passed**: `crates/wi-store/tests/search_speed.rs` (12–13.5 ms at 50,000 clips) |
 | S1.9 | The upload queue | The queue is anything but `published_at IS NOT NULL AND remote_id IS NULL`; a resumed upload re-sends a finished part; a retry posts twice | Linux (mock server) | open |
-| S1.10 | Export everything | The export misses any file, or any file's sha256 differs; it needs a sign-in; `index.html` opened offline doesn't play every song apart and every film, or show every Heat record | Linux | open |
+| S1.10 | Export everything | The export misses any file, or any file's sha256 differs; it needs a sign-in; `index.html` opened offline doesn't play every song apart and every film, or show every Learn record | Linux | open |
 | S1.11 | Sign-in | The app sees a password; the PKCE verifier or state isn't checked; the token lands anywhere but the Keychain (the OS store) | Linux (mock server, Secret Service); Mac (Keychain) | open |
 
-## Stage 2: Heat, with the MCP server
+## Stage 2: Learn, with the MCP server
 
-Target: 100% by the end of 7 Oct 2026 (Decided). Heat's maths lives in the Rust core (Decided); the TS model in `app/ui/src/heat/model` is the reference it is ported from.
+Target: 100% by the end of 7 Oct 2026 (Decided). Learn's maths lives in the Rust core (Decided); the TS model in `app/ui/src/heat/model` is the reference it is ported from.
 
 | # | Milestone | Fails if | Runs on | Status |
 |---|---|---|---|---|
-| S2.1 | Heat's maths, in Rust | The heat value, level or "Warm at / Hot at" table differs from 3.1 for any difficulty; the estimate chain or weekly load differs; any grade, letter or "what it would take" result differs from 3.1 and 3.8; for any generated input, the Rust result differs from the TS model's | Linux | **passed**: `crates/wi-heat/tests/model_*.rs` (242 tests, 240 pass, 2 ignored for TS bugs, QUESTIONS #175 and #176) and `model_vectors.rs` (59,067 TS-generated cases over 115 functions, equal byte for byte) |
+| S2.1 | Learn's maths, in Rust | The heat value, level or "Warm at / Hot at" table differs from 3.1 for any difficulty; the estimate chain or weekly load differs; any grade, letter or "what it would take" result differs from 3.1 and 3.8; for any generated input, the Rust result differs from the TS model's | Linux | **passed**: `crates/wi-heat/tests/model_*.rs` (242 tests, 240 pass, 2 ignored for TS bugs, QUESTIONS #175 and #176) and `model_vectors.rs` (59,067 TS-generated cases over 115 functions, equal byte for byte) |
 | S2.2 | Today | Plan my day uses anything but the written rule (heat order, estimate rounded up to 15 min, capped at 90, first gap that fits, before "Day ends at"); a draft lacks its reason; Return doesn't accept all; Esc doesn't clear them | Linux | open: the rule passes in TS (`plan.test.ts`) |
 | S2.3 | Focus | A round or break starts without a press; minutes don't add to the current task's `actualMin`; the timer stops when switching views; the chime sounds while off | Linux | open: the state machine passes in TS (`focus.test.ts`) |
 | S2.4 | Tasks, Calendar, Grades, Habits, Mail | Any tab lacks its one "+" act and one secondary act from 3.3; a habit 7th fits; the streak counter shows by default; Mail can reply, send or delete; Mail shows anything but the threads Claude recorded | Linux | open |
 | S2.5 | Calendars by iCal | Against a stored raw feed, a due item is missed, a non-graded or cancelled item is kept, a UID changes, or an item missing from two syncs is deleted; an iCal address is logged or stored outside the Keychain | Linux | open: the parser and rules pass against a synthesised D2L feed (`crates/wi-heat/tests/brightspace_feed.rs`); the founder's real feed is not stored yet |
 | S2.6 | Moving in | Importing the artifact's JSON changes any id, so the first sync finds anything new | Linux | open: passes in TS (`importArtifact.test.ts`) |
-| S2.7 | Heat sync | A slower older write overwrites a newer one on any field | Linux (mock server) | **passed**: `crates/wi-heat/tests/heat_sync.rs` (512 proptest cases, three devices, clocks ±10 min off) and `tools/mock-server/test/heat.test.js` |
+| S2.7 | Learn sync | A slower older write overwrites a newer one on any field | Linux (mock server) | **passed**: `crates/wi-heat/tests/heat_sync.rs` (512 proptest cases, three devices, clocks ±10 min off) and `tools/mock-server/test/heat.test.js` |
 | S2.8 | The MCP server | Any of the eight tools in 3.13 is missing or takes other arguments; a write tool adds anything but exactly one journal entry with `actor` `claude`, its fixed label and its result's `undo_label`; undoing it doesn't return the library byte for byte; a read or `plan_day` adds an entry; a repeated `source_id` or `thread_id` makes a second row; a tool switched off is listed or answers; any argument sets `done`, a score or `public`; of 200 kills at random moments, a call leaves its change without its entry or the reverse; with the app running, 1,000 interleaved writes lose one | Linux; Mac (Claude Desktop starting the helper from the bundle) | **passed** on Linux: `crates/wi-mcp/tests/stdio.rs` (every tool over real stdio; one entry per write by Claude with its label and undo returning the library byte for byte; reads and plan_day journal nothing; repeats make no second row; a switched-off tool is missing and refused; 200 SIGKILLs mid-call; 1,000 interleaved writes from two processes) and `tests/protocol.rs` (11); the Mac half (Claude Desktop starting the helper) is open |
 | S2.9 | Public and private | A private record, grade or note appears in `/api/heat/public/:userId` or the preview; a public record shows more than the fields 3.15 lists; switching it back doesn't remove its copy at the next sync; a Now making line outlives its `clearsAt`; any response carries a count or a total; a grade's switch doesn't say what it does | Linux (mock server) | open |
 | S2.10 | Capture, notes and the weekly review | Capture loses a line on Enter; a note can't be switched public on its own; the weekly review shows a score, a streak or a comparison; it writes the note for you | Linux | open |
 | S2.11 | Settings → Claude and Privacy | Settings → Claude doesn't show the exact lines for Claude Desktop and Claude Code, with a switch per tool; Settings → Privacy doesn't list every public item with its switch | Linux | open |
-| S2.12 | Heat used for a week | The founder stops opening it | Founder | open |
+| S2.12 | Learn used for a week | The founder stops opening it | Founder | open |
+| S2.14 | Ten more tools for Claude, under the same rule | A new tool can mark anything done, tick a habit, triage a capture, accept a draft, set a score or a Public switch, or edit or delete what the person made; a read or `draft_block` adds a journal entry or a record; a record Claude adds lacks `source: "claude"` or its reason, or makes more than one entry; undoing it doesn't return the library byte for byte | Linux; Mac | **passed** on the Mac, 7 Oct 2026: `crates/wi-mcp/tests/stdio.rs` (`the_reads_change_nothing_and_the_drafts_are_marked_as_claudes`, and the four new writes in `every_tool_answers_and_each_write_is_one_entry_by_claude`) and `tests/protocol.rs`. Open: the views don't show whose a project, milestone, note or capture is yet, and Settings → Claude's pane isn't built |
+| S2.15 | Calendars and mail, set up from the window | Settings → Learn can't save the School sheet, the Brightspace link or another calendar's iCal address through the core; a saved address is shown again, or is anywhere but the Keychain; Settings → Claude doesn't show the core's own lines, a switch per tool and Claude's changes with Undo; the school mail prompt names a tool that doesn't exist, asks for a score, a guessed due date or a message body | Linux; Mac | **passed** on the Mac, 7 Oct 2026, against the fake core and the real one: `app/ui/src/shell/SchoolSheet.test.tsx`, `ClaudePane.test.tsx`, `crates/wi-core/tests/core/heat_calendars.rs` (the sheet in the snapshot), `crates/wi-mcp/tests/protocol.rs` (the prompt). Open: nobody has pasted a real Brightspace link or run the prompt on real mail yet; spaces in Settings; the WebKit pass |
+| S2.13 | Heat becomes Learn in the code | Anything a person or Claude reads still calls the view Heat; after the code rename, a library made before it doesn't open with every record, or a device on the old names can't sync with one on the new | Linux; Mac | open. The founder renamed the view on 7 Oct 2026: Learn, in full WWL (Wi-WWAV-Learn). **Done:** every visible name (the switcher, menus, Settings, sentences, the MCP tools' descriptions, the docs). A task's score stays its heat (Hot, Warm, heat order, `is:hot`). **Not done, on purpose, until the parallel build branches have merged:** the code's names (`heat.*` commands and the `heat` event, `Room::Heat` and its stored `heat`, `crates/wi-heat` and `wi-heat-store`, `app/ui/src/heat`, `docs/HEAT.md`, `/api/heat/*`). That rename needs a migration for stored rooms and a server that answers both paths for a while |
 
 ## Stage 3: Console, audio
 
@@ -150,7 +153,7 @@ Target: 80–90% by 11 Oct 2026. Real 3D in three.js (Decided).
 | S5.5 | Lineage | A family tree layout differs from v3's ring rule; a link touching someone else's work shows before they agree | Linux | open: the layout passes, bit-identical with a port of v3 over 11,000 families (`lineage.test.ts`) |
 | S5.6 | Newest and Since you last looked | Any order but newest; no "That's everything."; any count | Linux | open: the model passes (`newest.test.ts`) |
 | S5.7 | Open in Console | ⌘E on any song or film doesn't open it as a session whose lanes are its stems; it changes the work in Space | Linux | open |
-| S5.8 | The public Heat view on the sun | Opening someone's sun shows anything S2.9 forbids, or a count | Linux (mock server) | open |
+| S5.8 | The public Learn view on the sun | Opening someone's sun shows anything S2.9 forbids, or a count | Linux (mock server) | open |
 | S5.9 | Galleries from photos | Dropping photos on a system doesn't make a gallery planet of up to 40; a 41st is accepted; the app changes a photo's bytes | Linux (mock server) | open |
 | S5.10 | 60 fps | Under 60 fps at 2560 × 1600 with 2,000 galaxies as instanced points | Mac | open |
 
@@ -181,7 +184,7 @@ release and written here beside the budget.
 | UI | 60 fps; 120 fps on ProMotion for timeline scrolling and the Space camera | — |
 | Space | 60 fps at 2560 × 1600 with up to 2,000 galaxies as instanced points | — |
 | Video | a 4K stream with cuts, no dropped frames; over 1080p scrubs on proxies | — |
-| Cold launch | Heat usable in 1.5 s; engine opens its device in 0.8 s alongside | — |
+| Cold launch | Learn usable in 1.5 s; engine opens its device in 0.8 s alongside | — |
 | Engine restart | 2 s plus plugin load | — |
 | Offline render | 10× real time or faster for built-ins | — |
 | Library search | 50 ms at 50,000 clips | 12–13.5 ms on the Linux CI box (not the reference machine) |

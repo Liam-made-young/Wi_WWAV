@@ -11,7 +11,7 @@ Run 2026-10-07.
 
 | State | Window | Appearance | Texts | Lowest body | Lowest secondary | Smallest text | Targets | Tightest target | Still 5 s | Fails |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Heat | 1024 × 680 | light | 10 | 8.86 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
+| Learn | 1024 × 680 | light | 10 | 8.86 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Space | 1024 × 680 | light | 8 | 8.55 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Console | 1024 × 680 | light | 8 | 9.03 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Now strip filled, paused | 1024 × 680 | light | 10 | 8.86 | 5 | 11 | 11 | 76 × 44 (needs 44) | yes | 0 |
@@ -23,7 +23,7 @@ Run 2026-10-07.
 | Galaxy chip menu | 1024 × 680 | light | 13 | 11.18 | 5 | 11 | 11 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Account | 1024 × 680 | light | 24 | 11.18 | 5 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Library | 1024 × 680 | light | 25 | 11.18 | 5 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
-| Settings · Heat | 1024 × 680 | light | 23 | 11.18 | 5 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
+| Settings · Learn | 1024 × 680 | light | 23 | 11.18 | 5 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Audio & MIDI · Video | 1024 × 680 | light | 24 | 11.18 | 5 | 11 | 17 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Claude | 1024 × 680 | light | 37 | 11.18 | 5 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Privacy | 1024 × 680 | light | 18 | 11.18 | 5 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |
@@ -35,7 +35,7 @@ Run 2026-10-07.
 | First launch 3: Import your folder | 1024 × 680 | light | 14 | 11.18 | 5 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 4: Add your calendars | 1024 × 680 | light | 16 | 11.18 | 5 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 5: Connect Claude | 1024 × 680 | light | 31 | 11.18 | 5 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
-| Heat | 1024 × 680 | dark | 10 | 8.3 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
+| Learn | 1024 × 680 | dark | 10 | 8.3 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Space | 1024 × 680 | dark | 8 | 8.55 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Console | 1024 × 680 | dark | 8 | 9.03 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Now strip filled, paused | 1024 × 680 | dark | 10 | 8.3 | 4.83 | 11 | 11 | 76 × 44 (needs 44) | yes | 0 |
@@ -47,7 +47,7 @@ Run 2026-10-07.
 | Galaxy chip menu | 1024 × 680 | dark | 13 | 9.64 | 4.83 | 11 | 11 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Account | 1024 × 680 | dark | 24 | 9.64 | 4.71 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Library | 1024 × 680 | dark | 25 | 9.64 | 4.71 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
-| Settings · Heat | 1024 × 680 | dark | 23 | 9.64 | 4.71 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
+| Settings · Learn | 1024 × 680 | dark | 23 | 9.64 | 4.71 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Audio & MIDI · Video | 1024 × 680 | dark | 24 | 9.64 | 4.71 | 11 | 17 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Claude | 1024 × 680 | dark | 37 | 9.64 | 4.71 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Privacy | 1024 × 680 | dark | 18 | 9.64 | 4.71 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |
@@ -59,7 +59,7 @@ Run 2026-10-07.
 | First launch 3: Import your folder | 1024 × 680 | dark | 14 | 9.64 | 4.83 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 4: Add your calendars | 1024 × 680 | dark | 16 | 9.64 | 4.83 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 5: Connect Claude | 1024 × 680 | dark | 31 | 9.64 | 4.83 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
-| Heat | 1280 × 800 | light | 12 | 8.86 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
+| Learn | 1280 × 800 | light | 12 | 8.86 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Space | 1280 × 800 | light | 10 | 8.55 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Console | 1280 × 800 | light | 10 | 9.03 | 5 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Now strip filled, paused | 1280 × 800 | light | 12 | 8.86 | 5 | 11 | 11 | 76 × 44 (needs 44) | yes | 0 |
@@ -71,7 +71,7 @@ Run 2026-10-07.
 | Galaxy chip menu | 1280 × 800 | light | 15 | 11.18 | 5 | 11 | 11 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Account | 1280 × 800 | light | 26 | 11.18 | 5 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Library | 1280 × 800 | light | 27 | 11.18 | 5 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
-| Settings · Heat | 1280 × 800 | light | 25 | 11.18 | 5 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
+| Settings · Learn | 1280 × 800 | light | 25 | 11.18 | 5 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Audio & MIDI · Video | 1280 × 800 | light | 26 | 11.18 | 5 | 11 | 17 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Claude | 1280 × 800 | light | 39 | 11.18 | 5 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Privacy | 1280 × 800 | light | 20 | 11.18 | 5 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |
@@ -83,7 +83,7 @@ Run 2026-10-07.
 | First launch 3: Import your folder | 1280 × 800 | light | 16 | 11.18 | 5 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 4: Add your calendars | 1280 × 800 | light | 18 | 11.18 | 5 | 11 | 9 | 76 × 44 (needs 44) | — | 0 |
 | First launch 5: Connect Claude | 1280 × 800 | light | 33 | 11.18 | 5 | 11 | 8 | 76 × 44 (needs 44) | — | 0 |
-| Heat | 1280 × 800 | dark | 12 | 8.3 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
+| Learn | 1280 × 800 | dark | 12 | 8.3 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Space | 1280 × 800 | dark | 10 | 8.55 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Console | 1280 × 800 | dark | 10 | 9.03 | 4.83 | 11 | 6 | 76 × 44 (needs 44) | yes | 0 |
 | Now strip filled, paused | 1280 × 800 | dark | 12 | 8.3 | 4.83 | 11 | 11 | 76 × 44 (needs 44) | yes | 0 |
@@ -95,7 +95,7 @@ Run 2026-10-07.
 | Galaxy chip menu | 1280 × 800 | dark | 15 | 9.64 | 4.83 | 11 | 11 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Account | 1280 × 800 | dark | 26 | 9.64 | 4.71 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Library | 1280 × 800 | dark | 27 | 9.64 | 4.71 | 11 | 16 | 76 × 44 (needs 44) | — | 0 |
-| Settings · Heat | 1280 × 800 | dark | 25 | 9.64 | 4.71 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
+| Settings · Learn | 1280 × 800 | dark | 25 | 9.64 | 4.71 | 11 | 18 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Audio & MIDI · Video | 1280 × 800 | dark | 26 | 9.64 | 4.71 | 11 | 17 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Claude | 1280 × 800 | dark | 39 | 9.64 | 4.71 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |
 | Settings · Privacy | 1280 × 800 | dark | 20 | 9.64 | 4.71 | 11 | 14 | 76 × 44 (needs 44) | — | 0 |

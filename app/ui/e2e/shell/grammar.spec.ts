@@ -38,7 +38,7 @@ test('⌘Z is labelled before and after: in the status bar, then a 2.6 s toast',
 test('⌘Z acts on the view you are in, and says so when there is nothing there', async ({ page }) => {
   await openShell(page);
   await page.keyboard.press(`${CMD}+Shift+n`);
-  await page.getByRole('textbox', { name: 'Capture' }).fill('a thought in Heat');
+  await page.getByRole('textbox', { name: 'Capture' }).fill('a thought in Learn');
   await page.keyboard.press('Enter');
   await page.keyboard.press('Escape');
   await page.keyboard.press(`${CMD}+3`);

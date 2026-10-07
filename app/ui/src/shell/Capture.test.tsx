@@ -30,7 +30,7 @@ describe('quick capture', () => {
     expect(errors).toEqual([]);
   });
 
-  it('saves nothing for an empty capture, and the inbox waits in Heat', async () => {
+  it('saves nothing for an empty capture, and the inbox waits in Learn', async () => {
     const handle = createRef<CaptureHandle>();
     rig = await mountWith(<Capture ref={handle} shown onError={() => {}} />);
     await act(async () => handle.current!.save());

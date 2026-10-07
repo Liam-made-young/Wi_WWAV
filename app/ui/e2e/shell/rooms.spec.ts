@@ -10,7 +10,7 @@ import { CMD, expect, openShell, test } from './kit';
 // 140 ms cross-fade, or isn't a cut under Reduce Motion.
 
 const ROOMS = ['heat', 'space', 'console'] as const;
-const NAMES = ['Heat', 'Space', 'Console'];
+const NAMES = ['Learn', 'Space', 'Console'];
 
 test('⌘1–⌘3 and the segments switch between the three views, and there is no fourth', async ({ page }) => {
   await openShell(page);

@@ -119,7 +119,7 @@ function commandKey(e: KeyLike, ctx: KeyContext): Command | null {
 
 /** Every shortcut the shell answers, for Settings → Keyboard (2.13). */
 export const SHORTCUTS: readonly { keys: string; does: string; where: string }[] = [
-  { keys: '⌘1 · ⌘2 · ⌘3', does: 'Heat · Space · Console', where: 'everywhere' },
+  { keys: '⌘1 · ⌘2 · ⌘3', does: 'Learn · Space · Console', where: 'everywhere' },
   { keys: 'Space', does: 'Play or pause', where: 'outside text' },
   { keys: '⌘K', does: 'Search everything', where: 'everywhere' },
   { keys: '⌘⇧N', does: 'Quick capture', where: 'everywhere' },

@@ -51,7 +51,7 @@ describe('the voice (8.10)', () => {
     }
   });
 
-  it('writes buttons in sentence case, as Heat does', () => {
+  it('writes buttons in sentence case, as Learn does', () => {
     const buttons = [
       copy.tabs.secondary.Today,
       copy.tabs.secondary.Grades,

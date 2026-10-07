@@ -220,7 +220,7 @@ fn load(i: &Inner) -> Result<Replica, CoreError> {
     match i.kv.get(REPLICA)? {
         Some(v) => serde_json::from_value::<Saved>(v)
             .map(Replica::restore)
-            .map_err(|e| CoreError::new("library", format!("Heat's sync state doesn't read: {e}"))),
+            .map_err(|e| CoreError::new("library", format!("Learn's sync state doesn't read: {e}"))),
         None => Ok(Replica::new(&wwav_ids::ulid())),
     }
 }
@@ -416,7 +416,7 @@ pub(crate) fn start(inner: &Arc<Inner>) -> JoinHandle<()> {
                 }
             }
         })
-        .expect("a thread for Heat sync")
+        .expect("a thread for Learn sync")
 }
 
 fn change_json(c: &Change) -> Value {
@@ -459,7 +459,7 @@ pub(crate) fn sync_now(i: &Inner) -> Result<Value, CoreError> {
         }
         Err(Fail::Offline) => {
             i.bus
-                .status("sync", "Offline. Heat syncs when you're back.");
+                .status("sync", "Offline. Learn syncs when you're back.");
             Err(Fail::Offline.into())
         }
         Err(f) => Err(f.into()),

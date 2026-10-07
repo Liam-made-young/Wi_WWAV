@@ -12,7 +12,7 @@ import { connect } from '../support/core';
 // get through; the flow coming back after it was finished.
 
 base(
-  'five steps, each with only "Skip for now", ending on Heat with All clear and Nothing playing',
+  'five steps, each with only "Skip for now", ending on Learn with All clear and Nothing playing',
   async ({ page }) => {
     const core = await connect();
     await clearTasks(core);
