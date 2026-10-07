@@ -76,7 +76,6 @@ fn reference_verdict(script: &Path, file: &Path) -> Option<String> {
 /// no wmet and wlin, so a plain WAV". (tools/parity/check.py --corpus on a
 /// folder holding it reports only the Rust reader as differing.)
 #[test]
-#[ignore = "review finding: JSON nested over 500 levels isn't JSON to the Rust reader (json.rs MAX_DEPTH)"]
 fn a_deeply_nested_wmet_gets_the_references_verdict() {
     let dir = tmp("review-deep");
     let path = dir.join("deep.wwav");
@@ -96,7 +95,6 @@ fn a_deeply_nested_wmet_gets_the_references_verdict() {
 /// Finding: the same depth limit in a film's wmet. swav_pack.py and Wi say
 /// "a .swav: the film, its wmet and wlin"; Rust says "a plain MP4".
 #[test]
-#[ignore = "review finding: JSON nested over 500 levels isn't JSON to the Rust reader (json.rs MAX_DEPTH)"]
 fn a_deeply_nested_swav_wmet_gets_the_references_verdict() {
     let dir = tmp("review-deep-swav");
     let path = dir.join("deep.swav");
@@ -129,7 +127,6 @@ fn a_deeply_nested_swav_wmet_gets_the_references_verdict() {
 /// hour: a library scan or the file inspector stalls on one crafted file.
 /// Here 40,000 keys (about 500 KB) must open in under 2 s.
 #[test]
-#[ignore = "review finding: reading a JSON object is quadratic in its keys (json.rs Parser::object)"]
 fn a_wmet_with_many_keys_opens_in_linear_time() {
     let dir = tmp("review-keys");
     let path = dir.join("keys.wwav");
@@ -280,4 +277,66 @@ fn unpack_never_writes_over_its_input() {
         before.len(),
         after.len()
     );
+}
+
+/// A RIFF WAVE of these chunks, each padded to even.
+fn riff(chunks: &[(&[u8; 4], &[u8])]) -> Vec<u8> {
+    let body: Vec<u8> = chunks.iter().flat_map(|(id, b)| chunk(id, b)).collect();
+    let mut out = b"RIFF".to_vec();
+    out.extend_from_slice(&(4 + body.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"WAVE");
+    out.extend(body);
+    out
+}
+
+/// Finding: info kept the chunk ids it had printed in a Vec and searched
+/// it for every chunk, and repr of each float formatted 800 digits to find
+/// a halfway tie, so a crafted file of many chunks or many floats held
+/// `wwav info` for seconds where python took a fraction of one. Here
+/// 100,000 distinct empty chunks and a wmet of 100,000 floats must each
+/// read and print in well under the time a quadratic walk takes.
+#[test]
+fn many_chunks_and_many_floats_read_in_linear_time() {
+    let dir = tmp("review-many");
+    let fmt: Vec<u8> = [1u16, 2]
+        .iter()
+        .flat_map(|v| v.to_le_bytes())
+        .chain(44_100u32.to_le_bytes())
+        .chain(176_400u32.to_le_bytes())
+        .chain(4u16.to_le_bytes())
+        .chain(16u16.to_le_bytes())
+        .collect();
+    let ids: Vec<[u8; 4]> = (0..100_000u32).map(|i| i.to_le_bytes()).collect();
+    let mut chunks: Vec<(&[u8; 4], &[u8])> = vec![(b"fmt ", &fmt), (b"data", &[0; 16])];
+    chunks.extend(ids.iter().map(|id| (id, &[][..])));
+    let floats: Vec<String> = (0..100_000)
+        .map(|i| format!("{}", f64::from(i) * 1.37 + 0.001))
+        .collect();
+    let wmet = format!(r#"{{"wwav": "0.1", "x": [{}]}}"#, floats.join(", "));
+    for (name, data) in [
+        ("chunks.wwav", riff(&chunks)),
+        (
+            "floats.wwav",
+            riff(&[
+                (b"fmt ", &fmt),
+                (b"data", &[0; 16]),
+                (b"wmet", wmet.as_bytes()),
+                (b"wlin", b"{}"),
+            ]),
+        ),
+    ] {
+        let path = dir.join(name);
+        std::fs::write(&path, data).unwrap();
+        let start = Instant::now();
+        let info = wwav::Wwav::open(&path).unwrap().info(s(&path));
+        let took = start.elapsed();
+        assert!(took < Duration::from_secs(3), "{name}: info took {took:?}");
+        if wwav_pack().exists() && has("python3") {
+            assert_eq!(
+                info,
+                ok(python(&wwav_pack(), &["info", s(&path)])),
+                "{name}"
+            );
+        }
+    }
 }

@@ -18,7 +18,7 @@ use crate::json::{self, Value};
 use crate::meta::{Kind, Lineage, SongMeta};
 use crate::text::{basename, join, key_values, py_float, title_of, today};
 use crate::writer::{wav_header, WwavWriter};
-use crate::wwav::{chunks, read_at, Fmt, Wwav, FRAME, STEMS, STEM_FRAME};
+use crate::wwav::{read_at, ChunkWalk, Fmt, Wwav, FRAME, STEMS, STEM_FRAME};
 use crate::{msg, Error};
 
 const NAMED: [&str; 5] = [
@@ -71,7 +71,8 @@ impl Input {
             return Err(msg(format!("{path}: not a WAV")));
         }
         let mut fmt = None;
-        for c in chunks(&mut file, size)? {
+        let mut walk = ChunkWalk::new(size);
+        while let Some(c) = walk.next_chunk(&mut file)? {
             if &c.id == b"fmt " {
                 fmt = Fmt::parse(&read_at(&mut file, c.at, c.size.min(40))?, 26);
             } else if &c.id == b"data" {

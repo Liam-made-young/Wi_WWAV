@@ -23,7 +23,9 @@ use std::path::Path;
 
 use crate::json::{self, Value};
 use crate::meta::{Lineage, SongMeta, Wrmx};
-use crate::wwav::{read_at, Fmt, Verdict, Wwav, ALIGN, FRAME, RATE, STEM_FRAME, WSTM_HEADER};
+use crate::wwav::{
+    read_at, ChunkWalk, Fmt, Verdict, Wwav, ALIGN, FRAME, RATE, STEM_FRAME, WSTM_HEADER,
+};
 use crate::{msg, not_same, Error};
 
 /// A RIFF file's size field is 32 bits: no file is longer.
@@ -332,8 +334,15 @@ pub fn wrap_wav(src: &Path, out: &Path, meta: &SongMeta, creator: &str) -> Resul
     if frames == 0 {
         return Err(msg("It has no audio (the data chunk is empty)"));
     }
-    let d = w.chunks.iter().position(|c| &c.id == b"data").unwrap_or(0);
-    let before = w.chunks[..d].iter().rfind(|c| &c.id == b"fmt ").copied();
+    // the last fmt before the first data chunk
+    let (mut walk, mut before) = (ChunkWalk::new(w.size), None);
+    while let Some(c) = walk.next_chunk(&mut file)? {
+        match &c.id {
+            b"data" => break,
+            b"fmt " => before = Some(c),
+            _ => {}
+        }
+    }
     let fmt_before = |file: &mut File, extensible| -> io::Result<Option<Fmt>> {
         Ok(match before {
             Some(c) => Fmt::parse(&read_at(file, c.at, c.size.min(40))?, extensible),
@@ -369,7 +378,7 @@ pub fn wrap_wav(src: &Path, out: &Path, meta: &SongMeta, creator: &str) -> Resul
     // The appended chunks are only found if the chunk walk ends exactly
     // where the file does (after a missing pad byte, which is added).
     let size = w.size;
-    let last = *w.chunks.last().ok_or_else(|| msg("It has no chunks"))?;
+    let last = w.last.ok_or_else(|| msg("It has no chunks"))?;
     let h = read_at(&mut file, last.at - 4, 4)?;
     let n = u32::from_le_bytes([h[0], h[1], h[2], h[3]]) as u64;
     if last.at + n > size {

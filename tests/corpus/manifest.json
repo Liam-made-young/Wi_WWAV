@@ -162,6 +162,12 @@
       "sha256": "da4bbcd961f244a39d765af93ed367c1db7a2f3766acd8e501948371eac916da"
     },
     {
+      "file": "deep-wmet.wwav",
+      "why": "A wmet holding a list nested 600 deep: JSON every reader reads, however deep.",
+      "verdict": "4 stems, and the master",
+      "sha256": "8bde4af326020b2bd2dec4be724268b8784ac794b61d60f6f321786b10bd3182"
+    },
+    {
       "file": "frames-wmet.wwav",
       "why": "wmet's frames one more than the master's.",
       "verdict": "the master only: frame counts differ (data 600, wstm 600, wmet 601)",
@@ -296,6 +302,12 @@
       "why": "plain.swav with a box after wlin: it reads, but unpack refuses to move the film.",
       "verdict": "a .swav: the film, its wmet and wlin",
       "sha256": "08e2da7f8a26c32a1642e3fd0182f2d53d2b326aa516ddb09df7749788cc8438"
+    },
+    {
+      "file": "deep.swav",
+      "why": "A wmet holding a list nested 600 deep: JSON every reader reads, however deep.",
+      "verdict": "a .swav: the film, its wmet and wlin",
+      "sha256": "2c783e040f3d65bf69773b939cc276ea0466a0db7fa32460fbd885501bbef740"
     },
     {
       "file": "child.swav",

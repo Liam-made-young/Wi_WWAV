@@ -13,6 +13,7 @@
 //! gets its real size written first. Readers take the first wmet and wlin;
 //! NaN and Infinity aren't JSON here.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
@@ -283,7 +284,7 @@ pub fn txt_path(film: &str) -> String {
 /// the command line's --title, --artist and --creator (empty means unset).
 fn original(
     film: &str,
-    info: &std::collections::HashMap<String, String>,
+    info: &HashMap<String, String>,
     title: &str,
     artist: &str,
     creator: &str,
@@ -331,6 +332,21 @@ pub fn pack_original(
     );
     let total = pack(Path::new(film), Path::new(out), &meta, &lineage)?;
     Ok((meta, total))
+}
+
+/// `{**a, **b}`: each key's value, b's where both have it, and the keys in
+/// the order they first appear.
+fn merged<'a>(
+    a: &'a [(String, Value)],
+    b: &'a [(String, Value)],
+) -> (HashMap<&'a str, &'a Value>, Vec<&'a str>) {
+    let (mut values, mut keys) = (HashMap::new(), Vec::new());
+    for (k, v) in a.iter().chain(b) {
+        if values.insert(k.as_str(), v).is_none() {
+            keys.push(k.as_str());
+        }
+    }
+    (values, keys)
 }
 
 /// What unpack wrote, and the tool's warning if packing again won't give
@@ -385,34 +401,28 @@ pub fn unpack(path: &str, out: &str) -> Result<Unpacked, Error> {
     let rest = read_at(&mut s.file, end, s.size - end)?;
     let mut warning = None;
     if end < s.size && rest != again {
-        let merge = |a: &[(String, Value)], b: &[(String, Value)]| {
-            let mut m: Vec<(String, Value)> = a.to_vec();
-            for (k, v) in b {
-                match m.iter_mut().find(|(mk, _)| mk == k) {
-                    Some(item) => item.1 = v.clone(),
-                    None => m.push((k.clone(), v.clone())),
-                }
-            }
-            m
-        };
-        let parsed = |t: String| match json::loads(t.as_bytes(), false) {
-            Some(Value::Dict(d)) => d,
-            _ => Vec::new(),
-        };
-        let old = merge(lin, meta);
-        let new = merge(&parsed(again_lin.wlin()), &parsed(again_meta.wmet()));
-        let mut keys: Vec<&String> = old.iter().map(|(k, _)| k).collect();
-        keys.extend(
-            new.iter()
-                .map(|(k, _)| k)
-                .filter(|k| !old.iter().any(|(o, _)| o == *k)),
+        let (again_lin, again_meta) = (
+            json::loads(again_lin.wlin().as_bytes(), false),
+            json::loads(again_meta.wmet().as_bytes(), false),
         );
-        let value =
-            |d: &[(String, Value)], k: &str| json::get(d, k).cloned().unwrap_or(Value::Null);
-        let changed: Vec<&str> = keys
+        fn items(v: &Option<Value>) -> &[(String, Value)] {
+            match v {
+                Some(Value::Dict(d)) => d,
+                _ => &[],
+            }
+        }
+        let (old, old_keys) = merged(lin, meta);
+        let (new, new_keys) = merged(items(&again_lin), items(&again_meta));
+        let null = Value::Null;
+        // dict.fromkeys([*old, *new])
+        let keys = old_keys
             .into_iter()
-            .filter(|k| !json::py_eq(&value(&old, k), &value(&new, k)))
-            .map(String::as_str)
+            .chain(new_keys.into_iter().filter(|k| !old.contains_key(k)));
+        let changed: Vec<&str> = keys
+            .filter(|k| {
+                let (was, now) = (old.get(k).copied(), new.get(k).copied());
+                !json::py_eq(was.unwrap_or(&null), now.unwrap_or(&null))
+            })
             .collect();
         let what = if changed.is_empty() {
             "wmet and wlin as written".to_string()

@@ -18,16 +18,20 @@
 //! Where this parts from python, on texts no writer makes: a lone
 //! surrogate from "\ud800" becomes U+FFFD, since a Rust `String` can't
 //! hold one (python can't print one either: it raises UnicodeEncodeError);
-//! and nesting deeper than 500 isn't JSON here, so reading, printing and
-//! comparing a value never runs a thread out of stack, where python 3.13
-//! reads 9,998 levels and raises RecursionError past them. `str()` of a
-//! string inside a list escapes the characters python counts unprintable;
-//! for a character Unicode assigned after 15.1 (python 3.13's tables) this
-//! goes by Rust's tables.
+//! and nesting deeper than 9,998 levels is read here, as JSON.parse and
+//! PRANA read it, where python 3.13 raises RecursionError and the tools
+//! die with a traceback. Reading, printing, comparing, cloning and
+//! dropping a value never recurse, so no nesting runs a thread out of
+//! stack. `str()` of a string inside a list escapes the characters python
+//! counts unprintable; for a character Unicode assigned after 15.1
+//! (python 3.13's tables) this goes by Rust's tables.
 
-use std::fmt::Write;
+use std::collections::HashMap;
+use std::fmt::{self, Write};
 
-#[derive(Clone, Debug, PartialEq)]
+/// A JSON value. Cloning, comparing (`==`, as Rust compares: NaN isn't
+/// equal to itself, 1 isn't 1.0), printing with `{:?}` and dropping work
+/// through the nesting with a stack of their own.
 pub enum Value {
     Null,
     Bool(bool),
@@ -39,6 +43,125 @@ pub enum Value {
     List(Vec<Value>),
     /// Keys in the order they first appeared.
     Dict(Vec<(String, Value)>),
+}
+
+impl Drop for Value {
+    /// Takes nested lists and objects apart onto a stack first, so dropping
+    /// them doesn't recurse.
+    fn drop(&mut self) {
+        fn nested(v: &mut Value, into: &mut Vec<Value>) {
+            let nests = |v: &Value| matches!(v, Value::List(_) | Value::Dict(_));
+            match v {
+                Value::List(items) => into.extend(items.drain(..).filter(nests)),
+                Value::Dict(items) => into.extend(items.drain(..).map(|(_, v)| v).filter(nests)),
+                _ => {}
+            }
+        }
+        let mut stack = Vec::new();
+        nested(self, &mut stack);
+        while let Some(mut v) = stack.pop() {
+            nested(&mut v, &mut stack);
+        }
+    }
+}
+
+impl Clone for Value {
+    fn clone(&self) -> Value {
+        enum Open<'a> {
+            List(std::slice::Iter<'a, Value>, Vec<Value>),
+            Dict(
+                std::slice::Iter<'a, (String, Value)>,
+                Vec<(String, Value)>,
+                String,
+            ),
+        }
+        let mut open: Vec<Open> = Vec::new();
+        let mut next = self;
+        loop {
+            let mut done = match next {
+                Value::List(items) => {
+                    open.push(Open::List(items.iter(), Vec::with_capacity(items.len())));
+                    None
+                }
+                Value::Dict(items) => {
+                    let copy = Vec::with_capacity(items.len());
+                    open.push(Open::Dict(items.iter(), copy, String::new()));
+                    None
+                }
+                Value::Null => Some(Value::Null),
+                Value::Bool(b) => Some(Value::Bool(*b)),
+                Value::Int(t) => Some(Value::Int(t.clone())),
+                Value::Float(f) => Some(Value::Float(*f)),
+                Value::Str(s) => Some(Value::Str(s.clone())),
+            };
+            // a copy made goes in its list or object, which goes on to its
+            // next item or, when it has none left, is made itself
+            loop {
+                let Some(top) = open.last_mut() else {
+                    return done.unwrap_or(Value::Null); // always Some here
+                };
+                match top {
+                    Open::List(items, copy) => {
+                        copy.extend(done.take());
+                        if let Some(x) = items.next() {
+                            next = x;
+                            break;
+                        }
+                    }
+                    Open::Dict(items, copy, key) => {
+                        if let Some(v) = done.take() {
+                            copy.push((std::mem::take(key), v));
+                        }
+                        if let Some((k, x)) = items.next() {
+                            key.clone_from(k);
+                            next = x;
+                            break;
+                        }
+                    }
+                }
+                done = match open.pop() {
+                    Some(Open::List(_, copy)) => Some(Value::List(copy)),
+                    Some(Open::Dict(_, copy, _)) => Some(Value::Dict(copy)),
+                    None => None,
+                };
+            }
+        }
+    }
+}
+
+impl PartialEq for Value {
+    /// Rust's `==`, item by item: NaN isn't equal to itself, and an Int is
+    /// never a Float (python's `==` is [`py_eq`]).
+    fn eq(&self, other: &Value) -> bool {
+        use Value::*;
+        let mut pairs = vec![(self, other)];
+        while let Some(pair) = pairs.pop() {
+            match pair {
+                (Null, Null) => {}
+                (Bool(a), Bool(b)) if a == b => {}
+                (Int(a), Int(b)) | (Str(a), Str(b)) if a == b => {}
+                (Float(a), Float(b)) if a == b => {}
+                (List(a), List(b)) if a.len() == b.len() => pairs.extend(a.iter().zip(b)),
+                (Dict(a), Dict(b)) if a.len() == b.len() => {
+                    for ((j, v), (k, w)) in a.iter().zip(b) {
+                        if j != k {
+                            return false;
+                        }
+                        pairs.push((v, w));
+                    }
+                }
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
+impl fmt::Debug for Value {
+    /// The value as `json.dumps` writes it.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&dumps(self))
+    }
 }
 
 /// `dict.get(key)`.
@@ -59,7 +182,6 @@ pub fn truthy(v: &Value) -> bool {
     }
 }
 
-const MAX_DEPTH: usize = 500;
 const MAX_INT_DIGITS: usize = 4300; // sys.int_info.default_max_str_digits
 
 /// `json.loads(bytes.decode("utf-8"))`, or None where python raises
@@ -76,7 +198,7 @@ pub fn loads(bytes: &[u8], constants: bool) -> Option<Value> {
         constants,
     };
     p.ws();
-    let v = p.value(0)?;
+    let v = p.value()?;
     p.ws();
     (p.at == p.s.len()).then_some(v)
 }
@@ -85,6 +207,14 @@ struct Parser<'a> {
     s: &'a [u8],
     at: usize,
     constants: bool,
+}
+
+/// A list or object being read, its items so far.
+enum Open {
+    List(Vec<Value>),
+    /// The items, where each key is in them (a repeated key keeps its
+    /// first place: python's dict), and the key whose value comes next.
+    Dict(Vec<(String, Value)>, HashMap<String, usize>, String),
 }
 
 impl Parser<'_> {
@@ -106,14 +236,99 @@ impl Parser<'_> {
         found
     }
 
-    fn value(&mut self, depth: usize) -> Option<Value> {
-        if depth > MAX_DEPTH {
+    /// A value and everything in it, read with a stack of the lists and
+    /// objects still open rather than by recursion, so any nesting reads.
+    /// The grammar is python's scanner's: after "[" or "{" whitespace, then
+    /// "]" or "}" at once or an item; after each item whitespace, then ","
+    /// (and whitespace) or the close.
+    fn value(&mut self) -> Option<Value> {
+        let mut open: Vec<Open> = Vec::new();
+        'item: loop {
+            let mut done = match self.peek()? {
+                b'[' => {
+                    self.at += 1;
+                    self.ws();
+                    if !self.eat("]") {
+                        open.push(Open::List(Vec::new()));
+                        continue 'item;
+                    }
+                    Value::List(Vec::new())
+                }
+                b'{' => {
+                    self.at += 1;
+                    self.ws();
+                    if !self.eat("}") {
+                        let key = self.key()?;
+                        open.push(Open::Dict(Vec::new(), HashMap::new(), key));
+                        continue 'item;
+                    }
+                    Value::Dict(Vec::new())
+                }
+                _ => self.scalar()?,
+            };
+            // a whole value: it goes in the innermost open list or object,
+            // and closes it if that's the end of it
+            loop {
+                let Some(top) = open.last_mut() else {
+                    return Some(done);
+                };
+                self.ws();
+                match top {
+                    Open::List(items) => {
+                        items.push(done);
+                        if self.eat(",") {
+                            self.ws();
+                            continue 'item;
+                        }
+                        if !self.eat("]") {
+                            return None;
+                        }
+                    }
+                    Open::Dict(items, index, next) => {
+                        let key = std::mem::take(next);
+                        match index.get(&key) {
+                            Some(&i) => items[i].1 = done,
+                            None => {
+                                index.insert(key.clone(), items.len());
+                                items.push((key, done));
+                            }
+                        }
+                        if self.eat(",") {
+                            self.ws();
+                            *next = self.key()?;
+                            continue 'item;
+                        }
+                        if !self.eat("}") {
+                            return None;
+                        }
+                    }
+                }
+                done = match open.pop() {
+                    Some(Open::List(items)) => Value::List(items),
+                    Some(Open::Dict(items, ..)) => Value::Dict(items),
+                    None => return None,
+                };
+            }
+        }
+    }
+
+    /// An object's key, its ":" and the whitespace around it.
+    fn key(&mut self) -> Option<String> {
+        if self.peek()? != b'"' {
             return None;
         }
+        let key = self.string()?;
+        self.ws();
+        if !self.eat(":") {
+            return None;
+        }
+        self.ws();
+        Some(key)
+    }
+
+    fn scalar(&mut self) -> Option<Value> {
         match self.peek()? {
             b'"' => self.string().map(Value::Str),
-            b'{' => self.object(depth),
-            b'[' => self.list(depth),
             b'n' if self.eat("null") => Some(Value::Null),
             b't' if self.eat("true") => Some(Value::Bool(true)),
             b'f' if self.eat("false") => Some(Value::Bool(false)),
@@ -242,69 +457,16 @@ impl Parser<'_> {
         }
         Some(char::from_u32(c).unwrap_or('\u{fffd}'))
     }
-
-    fn object(&mut self, depth: usize) -> Option<Value> {
-        self.at += 1;
-        let mut items: Vec<(String, Value)> = Vec::new();
-        self.ws();
-        if self.eat("}") {
-            return Some(Value::Dict(items));
-        }
-        loop {
-            if self.peek()? != b'"' {
-                return None;
-            }
-            let key = self.string()?;
-            self.ws();
-            if !self.eat(":") {
-                return None;
-            }
-            self.ws();
-            let v = self.value(depth + 1)?;
-            match items.iter_mut().find(|(k, _)| *k == key) {
-                Some(item) => item.1 = v,
-                None => items.push((key, v)),
-            }
-            self.ws();
-            if self.eat("}") {
-                return Some(Value::Dict(items));
-            }
-            if !self.eat(",") {
-                return None;
-            }
-            self.ws();
-        }
-    }
-
-    fn list(&mut self, depth: usize) -> Option<Value> {
-        self.at += 1;
-        let mut items = Vec::new();
-        self.ws();
-        if self.eat("]") {
-            return Some(Value::List(items));
-        }
-        loop {
-            items.push(self.value(depth + 1)?);
-            self.ws();
-            if self.eat("]") {
-                return Some(Value::List(items));
-            }
-            if !self.eat(",") {
-                return None;
-            }
-            self.ws();
-        }
-    }
 }
 
 /// `json.dumps(v, ensure_ascii=False)`.
 pub fn dumps(v: &Value) -> String {
     let mut out = String::new();
-    dump(v, &mut out);
+    write_nested(v, &mut out, dump_scalar, quote_into);
     out
 }
 
-fn dump(v: &Value, out: &mut String) {
+fn dump_scalar(v: &Value, out: &mut String) {
     match v {
         Value::Null => out.push_str("null"),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
@@ -315,27 +477,70 @@ fn dump(v: &Value, out: &mut String) {
         }
         Value::Float(f) => out.push_str(&float_repr(*f)),
         Value::Str(s) => quote_into(s, out),
-        Value::List(items) => {
-            out.push('[');
-            for (i, x) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                dump(x, out);
+        Value::List(_) | Value::Dict(_) => {}
+    }
+}
+
+/// Writes `v` as `[a, b]` and `{k: v}` with ", " and ": ", its scalars by
+/// `scalar` and its keys by `key`, keeping the open lists and objects on a
+/// stack of its own: `json.dumps` and `repr` both lay a value out this way.
+fn write_nested(
+    v: &Value,
+    out: &mut String,
+    scalar: fn(&Value, &mut String),
+    key: fn(&str, &mut String),
+) {
+    enum Open<'a> {
+        List(std::slice::Iter<'a, Value>, bool),
+        Dict(std::slice::Iter<'a, (String, Value)>, bool),
+    }
+    let mut open: Vec<Open> = Vec::new();
+    let mut next = v;
+    loop {
+        match next {
+            Value::List(items) => {
+                out.push('[');
+                open.push(Open::List(items.iter(), true));
             }
-            out.push(']');
+            Value::Dict(items) => {
+                out.push('{');
+                open.push(Open::Dict(items.iter(), true));
+            }
+            _ => scalar(next, out),
         }
-        Value::Dict(items) => {
-            out.push('{');
-            for (i, (k, x)) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                quote_into(k, out);
-                out.push_str(": ");
-                dump(x, out);
+        // the next item of the innermost list or object still open
+        loop {
+            match open.last_mut() {
+                None => return,
+                Some(Open::List(items, first)) => match items.next() {
+                    Some(x) => {
+                        if !std::mem::take(first) {
+                            out.push_str(", ");
+                        }
+                        next = x;
+                        break;
+                    }
+                    None => {
+                        out.push(']');
+                        open.pop();
+                    }
+                },
+                Some(Open::Dict(items, first)) => match items.next() {
+                    Some((k, x)) => {
+                        if !std::mem::take(first) {
+                            out.push_str(", ");
+                        }
+                        key(k, out);
+                        out.push_str(": ");
+                        next = x;
+                        break;
+                    }
+                    None => {
+                        out.push('}');
+                        open.pop();
+                    }
+                },
             }
-            out.push('}');
         }
     }
 }
@@ -413,12 +618,12 @@ fn shortest(f: f64) -> (String, i32) {
         )
     };
     let (mut digits, exp) = split(&format!("{f:e}"));
-    // every double's exact decimal expansion fits in 800 digits
-    let (exact, exact_exp) = split(&format!("{f:.800e}"));
+    // Halfway, the value is exactly those digits with a 5 after them. One
+    // more digit, correctly rounded, then ends in 5, and is the value itself.
     let n = digits.len();
-    let halfway = exact_exp == exp && exact[n] == b'5' && exact[n + 1..].iter().all(|&d| d == b'0');
-    if halfway {
-        let mut even = exact[..n].to_vec();
+    let (longer, longer_exp) = split(&format!("{f:.n$e}"));
+    if longer_exp == exp && longer[n] == b'5' && exactly(f, &longer, exp - n as i32) {
+        let mut even = longer[..n].to_vec();
         if even[n - 1] % 2 == 1 {
             even[n - 1] += 1; // odd, so never a 9 carrying over
         }
@@ -430,6 +635,36 @@ fn shortest(f: f64) -> (String, i32) {
         }
     }
     (String::from_utf8(digits).unwrap_or_default(), exp)
+}
+
+/// Whether `f` (finite, positive) is exactly the decimal `digits` × 10^`p`
+/// (at most 18 digits): m × 2^q = d × 2^p × 5^p, compared by their powers
+/// of 2 and 5 and what's left of each.
+fn exactly(f: f64, digits: &[u8], p: i32) -> bool {
+    let d = digits
+        .iter()
+        .fold(0u64, |d, &c| d * 10 + u64::from(c - b'0'));
+    let bits = f.to_bits();
+    let e = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & ((1 << 52) - 1);
+    let (m, q) = if e == 0 {
+        (fraction, -1074)
+    } else {
+        (fraction | 1 << 52, e - 1075)
+    };
+    let strip = |mut x: u64, by: u64| {
+        let mut k = 0;
+        while x != 0 && x % by == 0 {
+            x /= by;
+            k += 1;
+        }
+        (x, k)
+    };
+    let (m, m2) = strip(m, 2);
+    let (m, m5) = strip(m, 5);
+    let (d, d2) = strip(d, 2);
+    let (d, d5) = strip(d, 5);
+    m == d && m2 + q == d2 + p && m5 == d5 + p
 }
 
 /// The tools' `num(v)` for a float, "as the device writes them: whole, or
@@ -459,41 +694,20 @@ pub fn py_str(v: &Value) -> String {
         Value::Str(s) => s.clone(),
         _ => {
             let mut out = String::new();
-            repr(v, &mut out);
+            write_nested(v, &mut out, repr_scalar, repr_str);
             out
         }
     }
 }
 
-fn repr(v: &Value, out: &mut String) {
+fn repr_scalar(v: &Value, out: &mut String) {
     match v {
         Value::Null => out.push_str("None"),
         Value::Bool(b) => out.push_str(if *b { "True" } else { "False" }),
         Value::Int(t) => out.push_str(t),
         Value::Float(f) => out.push_str(&float_repr(*f)),
         Value::Str(s) => repr_str(s, out),
-        Value::List(items) => {
-            out.push('[');
-            for (i, x) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                repr(x, out);
-            }
-            out.push(']');
-        }
-        Value::Dict(items) => {
-            out.push('{');
-            for (i, (k, x)) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                repr_str(k, out);
-                out.push_str(": ");
-                repr(x, out);
-            }
-            out.push('}');
-        }
+        Value::List(_) | Value::Dict(_) => {}
     }
 }
 
@@ -547,30 +761,46 @@ fn printable(c: char) -> bool {
 /// dict equal item by item, NaN equal to nothing.
 pub fn py_eq(a: &Value, b: &Value) -> bool {
     use Value::*;
-    match (a, b) {
-        (Null, Null) => true,
-        (Str(x), Str(y)) => x == y,
-        (List(x), List(y)) => x.len() == y.len() && x.iter().zip(y).all(|(p, q)| py_eq(p, q)),
-        (Dict(x), Dict(y)) => {
-            x.len() == y.len()
-                && x.iter()
-                    .all(|(k, v)| get(y, k).is_some_and(|w| py_eq(v, w)))
-        }
-        _ => match (number(a), number(b)) {
-            (Some(Num::Int(x)), Some(Num::Int(y))) => x == y,
-            (Some(Num::Float(x)), Some(Num::Float(y))) => x == y,
-            (Some(Num::Int(i)), Some(Num::Float(f))) | (Some(Num::Float(f)), Some(Num::Int(i))) => {
-                // exactly, as python compares an int with a float
-                f.is_finite()
-                    && f.fract() == 0.0
-                    && (if f == 0.0 {
-                        "0".into()
-                    } else {
-                        format!("{f:.0}")
-                    }) == i
+    let mut pairs = vec![(a, b)];
+    while let Some(pair) = pairs.pop() {
+        match pair {
+            (Null, Null) => {}
+            (Str(x), Str(y)) if x == y => {}
+            (List(x), List(y)) if x.len() == y.len() => pairs.extend(x.iter().zip(y)),
+            (Dict(x), Dict(y)) if x.len() == y.len() => {
+                let mut index = HashMap::with_capacity(y.len());
+                for (k, w) in y {
+                    index.entry(k.as_str()).or_insert(w);
+                }
+                for (k, v) in x {
+                    match index.get(k.as_str()) {
+                        Some(w) => pairs.push((v, w)),
+                        None => return false,
+                    }
+                }
             }
-            _ => false,
-        },
+            (a, b) if numbers_equal(a, b) => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
+fn numbers_equal(a: &Value, b: &Value) -> bool {
+    match (number(a), number(b)) {
+        (Some(Num::Int(x)), Some(Num::Int(y))) => x == y,
+        (Some(Num::Float(x)), Some(Num::Float(y))) => x == y,
+        (Some(Num::Int(i)), Some(Num::Float(f))) | (Some(Num::Float(f)), Some(Num::Int(i))) => {
+            // exactly, as python compares an int with a float
+            f.is_finite()
+                && f.fract() == 0.0
+                && (if f == 0.0 {
+                    "0".into()
+                } else {
+                    format!("{f:.0}")
+                }) == i
+        }
+        _ => false,
     }
 }
 
@@ -619,6 +849,36 @@ mod tests {
     fn loads_keeps_a_repeated_keys_first_place_and_last_value() {
         let v = loads(br#"{"a": 1, "b": 2, "a": 3}"#, true).unwrap();
         assert_eq!(dumps(&v), r#"{"a": 3, "b": 2}"#);
+    }
+
+    /// 200,000 levels, on a test thread's 2 MB stack: reading, printing,
+    /// comparing, cloning and dropping never recurse.
+    #[test]
+    fn any_nesting_reads_without_running_out_of_stack() {
+        let n = 200_000;
+        for (open, close) in [("[", "]"), (r#"{"k": "#, "}")] {
+            let text = format!("{}1{}", open.repeat(n), close.repeat(n));
+            let v = loads(text.as_bytes(), true).expect("deep JSON reads");
+            assert_eq!(dumps(&v), text);
+            assert_eq!(format!("{v:?}"), text);
+            assert_eq!(py_str(&v).len(), py_str(&v).len());
+            let copy = v.clone();
+            assert!(copy == v && py_eq(&copy, &v));
+            drop(copy);
+            assert!(loads(&text.as_bytes()[..text.len() - 1], true).is_none());
+        }
+    }
+
+    #[test]
+    fn a_wide_object_reads_in_linear_time() {
+        let keys: Vec<String> = (0..200_000).map(|i| format!(r#""k{i}": {i}"#)).collect();
+        let text = format!("{{{}}}", keys.join(", "));
+        let start = std::time::Instant::now();
+        let v = loads(text.as_bytes(), true).unwrap();
+        assert!(py_eq(&v, &v.clone()));
+        let took = start.elapsed();
+        assert_eq!(dumps(&v), text);
+        assert!(took.as_secs() < 2, "200,000 keys took {took:?}");
     }
 
     #[test]
