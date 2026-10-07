@@ -167,3 +167,14 @@ in the current spec (Decided, Proposed, Open, Exists today).
   chapter keeps a "Left out, and why" table, now including what this cut
   removed, each with its one-line reason (usually: "cut on 7 Oct 2026 to
   narrow v1", or the founder's own words).
+
+## Later on 7 Oct 2026
+
+The founder settled six more things. They carry the label **Decided** in the spec.
+
+- **No commerce until the founder says so.** "commerce won't exist until I say it does." The app takes no money: no Pro, no Founding seats, no split packs, no store fee, no `tier` entitlement, and no plan bought in the browser. Pro, Founding and split packs were the iPhone app's plans; they stay there, and the desktop app neither sells nor reads them. Gate 1.4 stays open with no route.
+- **Galleries are made by uploading photos.** "lets just have people upload images for fashion gallery." Drop photos on a system and they become a gallery planet. An image editor "somewhere between photoshop and kidpics" comes after v1, "not yet".
+- **Plain export is WAV only for now.** "I really want .wwav and .swav to work but keep em out for now." MP3 and a plain MP4 wait.
+- **Heat's maths moves to the Rust core.** "heat math is fine thats actually better rust I trust more than typescript for this."
+- **The dates.** "heat 100% done by the end of today" (7 Oct), the app "80-90% done by this weekend" (11 Oct), and "a working version of wi-wwav by january" (2027).
+- **Syllabus import and the Claude-drafted weekly note** were left to the build ("sounds good on any direction u feel comfortable on this"). They stay out of Heat's first version; each can come back as one more MCP tool.

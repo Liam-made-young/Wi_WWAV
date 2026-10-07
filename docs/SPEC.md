@@ -3,7 +3,7 @@
 *One desktop app with three views: Heat, where you plan your time and keep a private profile with a simple public face; Space, where you live among other people's work as a galaxy; and the Console, where you make songs and films on one clock.*
 
 - **Working name:** Wi_WWAV, said "we wave".
-- **Date:** 6 October 2026. **Scope narrowed:** 7 October 2026, in conversation with the founder (`docs/SCOPE_CUT.md`): three views instead of four rooms, the walkable shop cut (commerce comes later, inside Space), Space and the Console trimmed to their core, and Claude reached through an MCP server.
+- **Date:** 6 October 2026. **Scope narrowed:** 7 October 2026, in conversation with the founder (`docs/SCOPE_CUT.md`): three views instead of four rooms, the walkable shop and the paid plans cut (commerce waits until the founder says it exists), Space and the Console trimmed to their core, and Claude reached through an MCP server.
 - **Status:** a description written before any code. Parts of it already exist in other WWAV products, and each of those parts says where.
 - **Platform:** Mac first, as a signed and notarized direct download. Windows comes later.
 
@@ -66,7 +66,7 @@ The founder's sketch draws four boxes and the lines between them. Three of the b
 | "souped up version of WWAV app v3", an "intergalactic 3D social media for music, film, writing & fashion" | Space, the social view | a universe you move through in real 3D; the player is the planet; the reply to a song is a fork | v3's planet player (`ios_v3/`); v4's galaxy (`wwav/`); v5's orbits and gallery planets (`ios_v4/`, `server/routes/v2/`) | Mi, Si, Ri, Gi as four kinds of world |
 | The "Mi-WWAV console": one timeline for audio and video, "the best parts of Premiere and Ableton smashed together" | Console, the creation view | a JUCE engine hosting VST3 and AU, MIDI through third-party instruments, local splits, and plain video cutting on the engine's clock | `prana/core`; MI-WWAV-OS's timeline and undo-journal designs (ideas, not code); WWAV Push (`vst_plugin/`) | Mi (Mi_pro_WWAV's software) and Si |
 
-The fourth box, "unquantized", a walkable store, is not a view (**Decided**). In the founder's words: "Eventually the space will hold commerce instead of having that be a 4th place." Selling comes later, inside Space, and nothing of it is designed yet (see 4).
+The fourth box, "unquantized", a walkable store, is not a view (**Decided**). In the founder's words: "Eventually the space will hold commerce instead of having that be a 4th place." Later that day the founder added: "commerce won't exist until I say it does" (**Decided**). When it does, it comes inside Space, and nothing of it is designed yet (see 4.13).
 
 Zi_WWAV (furniture) stays out, because the sketch names four media and nothing in the app makes a chair.
 
@@ -92,7 +92,7 @@ Heat ── connected profiles ── Space ── connected uploads ── Cons
 
 It is a direct download, because the Mac App Store's sandbox blocks plugin hosting (**Decided**).
 
-**A business**, in the founder's words: "I am creating technology for artists and selling it", "an artist first technology company". For now the money comes from hosting and cloud splits, never attention; selling work comes later, inside Space (see 9). "Wwav is about everybody" sets the floor: the free app is a whole product, and the performance target is a 2020 M1 MacBook Air.
+**A business**, in the founder's words: "I am creating technology for artists and selling it", "an artist first technology company". For now the app takes no money at all, because "commerce won't exist until I say it does" (**Decided**; see 9), and when it does, it will never sell attention. "Wwav is about everybody" sets the floor: the app is free and whole, and the performance target is a 2020 M1 MacBook Air.
 
 **Not yet public.** In the founder's words, it "is not going out for a while" (**Decided**). Privacy defaults stay conservative, and nothing here has to be ready for a public launch now.
 
@@ -147,6 +147,7 @@ You select OUTPUT and press Return with `.wwav` and `.swav` ticked. The sheet re
 |---|---|
 | A fourth view for selling (Unquantized) | "Eventually the space will hold commerce instead of having that be a 4th place." |
 | Connected selling and connected distribution | Commerce comes later, inside Space, and nothing of it is designed now. |
+| Paid plans in the app: Pro, Founding seats and split packs | "commerce won't exist until I say it does." They are the iPhone app's plans, and the desktop app neither sells nor reads them. Cut on 7 Oct 2026. |
 | Writing PRANA discs | "PRANA disc not ready yet, so definitely not writing software yet." |
 | Zi_WWAV (furniture) | The sketch names four media, and nothing in the app makes a chair. |
 
@@ -887,8 +888,8 @@ The undo journal, in `library.sqlite`, records who made each change (`you` or `c
 | Google sign-in, the Gmail restricted scope, Google verification and 7-day testing sign-ins | Claude reads mail through its own Gmail connector, and calendars come in as iCal addresses, so the app needs no Google account. |
 | Heat reading Gmail itself: its Brightspace query, School label and saved searches, message bodies, the reading pane, "Load images" | Mail shows only the threads Claude recorded, with their state. |
 | Heat's own calls to Claude: `/api/assist/:task`, a daily limit per account, consent sheets, the "Ask Claude to score" button | Wi_WWAV is an MCP server instead. Claude's own permission prompts ask before each tool call. |
-| Syllabus import by Claude | The app calls no model, and none of the eight tools writes a course. Type the course in. Cut on 7 Oct 2026 to narrow v1. |
-| A Claude-drafted weekly note | The same: no tool writes a note. Heat lays out the facts and you write it. |
+| Syllabus import by Claude | The app calls no model, and none of the eight tools writes a course, so a course is typed in. The founder left this call to the build (7 Oct 2026): it stays out of Heat's first version, and can come back later as one more tool that writes through the journal. |
+| A Claude-drafted weekly note | The same: no tool writes a note, and Heat lays out the facts for you to write it. It can come back the same way. |
 | A Claude tool that writes a score, marks a task done, or sets the Public switch | Claude estimates and drafts, never decides. Scores and privacy are yours. |
 | The "Finish payout setup so your shelf can open" task | Commerce comes later, inside Space. Cut on 7 Oct 2026 to narrow v1. |
 
@@ -1066,7 +1067,7 @@ Writing has no world today. Suns are already block documents, so a written work 
 - **Looking.** Drag to spin (0.006 rad per pt) with momentum. ← and → turn the next photo to face you, and Return blows it up. Esc puts it back.
 - **Lookbooks.** A lookbook is a system of gallery planets, one per look, with a sun for the season, materials and credits.
 
-**Open: where pages and galleries are made.** Space only shows them. Pages can be written in the suns' block editor (4.8), but nothing in the app makes a gallery. Recommendation: v1 shows galleries that already exist and makes none, and a gallery maker waits until fashion has a format of its own (see 6).
+**Making a gallery** (**Decided**). In the founder's words: "lets just have people upload images for fashion gallery." Publishing is a drop (2.7), so you drop photos on one of your systems and they become a gallery planet: up to 40 photos, v5's limit, spread evenly over the sphere in the order you chose them. The app changes no photo. Placing each photo by hand, as v5's pin mode does, waits for the image editor, which comes after v1 (10.1). Pages are written in the suns' block editor (4.8).
 
 Writing and gallery works have no Open in Console; the Console is for sound and picture.
 
@@ -1139,7 +1140,7 @@ WWAV's earlier apps had likes, follower counts, comments, push notifications and
 
 ### 4.13 Commerce, later
 
-**Decided.** In the founder's words: "Eventually the space will hold commerce instead of having that be a 4th place." Works in Space will one day carry a price and be bought where they are. Nothing of it is designed or built now: no price, no tag on a planet, no checkout and no payout. The walkable shop is gone. Until then the whole work plays in Space, and nothing in this chapter depends on it. What commerce would mean for the business is in 9.
+**Decided.** In the founder's words: "commerce won't exist until I say it does." When it does, it lives in Space rather than in a fourth place: "Eventually the space will hold commerce instead of having that be a 4th place." Works there would carry a price and be bought where they are. Nothing of it is designed or built now: no price, no tag on a planet, no checkout, no payout and no paid plan. The walkable shop is gone. The whole work plays in Space, and nothing in this chapter depends on commerce. Chapter 9 says what that leaves for the business.
 
 ### 4.14 Left out, and why
 
@@ -1328,7 +1329,7 @@ Only a Filter on the master fits `wrmx`'s `lpf` and `hpf`. A Filter on any track
 
 The clip becomes a stem group in place, roles set, with the original kept muted underneath as a collapsed "source" lane. Undo reads "Undo split into stems", and the export records `splitter: "demucs"`.
 
-**Open:** what a local split costs. v3 meters "splits" because the server pays Replicate; a local split costs the company nothing. *Recommendation:* local splits are free and unmetered, and the paid server split stays for phones.
+A local split is free, and nothing counts them, because the app takes no money (9.4). v3 meters "splits" because the server pays Replicate for each one; a local split costs the company nothing.
 
 ### 5.11 Video
 
@@ -1404,7 +1405,7 @@ The sheet says out loud everything that changes on the way out:
 
 **Open:** sessions run at 48 kHz for video while `.wwav` 0.1 is fixed at 44.1 kHz, 16-bit. *Recommendation:* keep 0.1 fixed and convert on export, saying so, and weigh a 48 kHz `.wwav` in 6, since PRANA reads 44.1 kHz only (6.7).
 
-**Open:** MP3 320 and a plain MP4. *Recommendation:* not in v1; a `.swav` already plays as an MP4.
+**Decided:** the plain export is WAV only for now. MP3 and a plain MP4 stay out, because `.wwav` and `.swav` are the two that have to work, and a `.swav` already plays as an MP4. In the founder's words: "I really want .wwav and .swav to work but keep em out for now".
 
 ### 5.14 Playback: every file comes apart
 
@@ -1492,6 +1493,7 @@ The status bar walks real stages, "Uploading Low Tide · part 3 of 27", then "Up
 | **Ask for feedback** | Cut on 7 Oct 2026 to narrow v1. Claude works only through the MCP server (see 2.11). |
 | The Purchases source in the browser | Commerce is later, inside Space (see 4.13). |
 | AAX | it serves Pro Tools only; VST3 and AU cover the rest |
+| MP3 and plain MP4 export | **Decided** on 7 Oct 2026: WAV is the plain export for now, and a `.swav` already plays as an MP4 (5.13). |
 | Surround and Atmos | a `.wwav` is stereo |
 | Video stems | "Si_WWAV will define film stems"; a `.swav` holds one picture |
 | 6-stem splitting | a `.wwav` holds four stems |
@@ -2276,7 +2278,6 @@ A public copy is written by the same push as any other change, and removed by th
 | `/api/heat/changes` | Heat sync, pulled with a cursor, pushed in batches; it carries public copies and their removal |
 | `/api/heat/public/:userId` | reading a person's public Heat items, for the public Heat view on their sun (4.8) |
 | `/desktop/latest.json` | the update manifest (8.10) |
-| Stripe webhook sets `tier` | `server/routes/subscription.js` sets `isPro`/`proExpiresAt` today and must set `tier` as well, so a plan bought in the browser is the plan the app reads (9.4) |
 | the web face (share pages) | share pages and public read routes on www.wi-wwav.com, because `WiPosts` serves one account today (below) |
 
 `/api/heat/public/:userId` returns the person's public copies and nothing else, in the order 3.15 gives: the Now making line, the project timelines (each with its `targetId`, so a project sun picks out its own), then the other public records by kind. It is open to anyone who can open the sun, as `/api/v2` reads are. It returns records, never a total, a count or a comparison (3.15).
@@ -2293,7 +2294,7 @@ Production doesn't run `sync({ alter: true })` for new tables, so each new model
 
 **The helper.** `wi-mcp` is a small Rust program shipped inside the app, in `Contents/Helpers/`. Claude Desktop and Claude Code start it as a child process and speak MCP to it over stdio. Settings → Claude shows the lines to paste into Claude's config, with the helper's path as it is now, so they stay right after the app updates or moves. It opens no port and makes no network call.
 
-**One tool call, one transaction** (**Proposed**). The helper links the same store code the app does, and the rules that Heat's tools depend on live there too: the heat algorithm, the estimate chain and Plan my day sit in the Rust core, and the web UI reaches them through commands. So Claude and the window never disagree about heat, and a rule such as "clamp 5–600" or "the same `source_id` twice makes one task" exists once. A call goes like this:
+**One tool call, one transaction** (**Proposed**). The helper links the same store code the app does, and the rules that Heat's tools depend on live there too. Heat's maths sits in the Rust core (**Decided**; in the founder's words, "heat math is fine thats actually better rust I trust more than typescript for this"): the heat algorithm, the estimate chain, grades and Plan my day, which the web UI reaches through commands. So Claude and the window never disagree about heat, and a rule such as "clamp 5–600" or "the same `source_id` twice makes one task" exists once. A call goes like this:
 
 1. Claude sends `tools/call` on stdin.
 2. The helper checks that the tool is switched on, then checks the arguments against 3.13's table.
@@ -2360,7 +2361,7 @@ A direct download, not the Mac App Store, whose sandbox blocks plugin hosting (*
 
 | Part | Licence | What it means here |
 |---|---|---|
-| JUCE 8 | AGPLv3 or commercial | Wi_WWAV is closed and takes money for Pro (9), so commercial; a free Starter tier applies under a revenue cap (check the cap at the version pinned). WWAV Push already uses JUCE 8.0.4 (**Exists today**) |
+| JUCE 8 | AGPLv3 or commercial | Wi_WWAV is closed, so not AGPL. It takes no money (9.4), so JUCE's free Starter licence applies while revenue stays under its cap (check the cap at the version pinned), and a paid licence after that. WWAV Push already uses JUCE 8.0.4 (**Exists today**) |
 | VST3 SDK | MIT from 3.8 (October 2025); confirm at the version pinned | the logo needs Steinberg's separate agreement, so the UI writes "VST3" in plain text |
 | Audio Units | Apple's SDK | no fee |
 | FFmpeg | LGPL 2.1 or later | built `--disable-gpl --disable-nonfree --enable-shared`, dylibs in `Contents/Frameworks`, no libx264, libx265 or fdk-aac, source and build script published. A user may swap the libraries if they re-sign them; the notes say how. |
@@ -2440,7 +2441,8 @@ CI measures what it can. The rest is measured by hand at each release and writte
 | Left out | Why |
 |---|---|
 | The 3D shop's engineering: the hall budget (1,000 shops), the screen quad that seated a film in its room, `/api/store/*`, and store receipts in `library.sqlite` | The walkable shop is cut. "Eventually the space will hold commerce instead of having that be a 4th place." Cut on 7 Oct 2026 to narrow v1. |
-| Purchases of works, Stripe Checkout for works and its web view in the app, Connect payouts, fashion listings, orders and tickets (`/api/purchase/*`, `/api/purchases/*`, `/api/connect/*`, `/api/fashion-listings`, `/api/orders`, `/api/events`) | Commerce is later, inside Space (4.13), and nothing of it is designed now. Cut on 7 Oct 2026 to narrow v1. Plans are still bought in the browser (9.4). |
+| Purchases of works, Stripe Checkout for works and its web view in the app, Connect payouts, fashion listings, orders and tickets (`/api/purchase/*`, `/api/purchases/*`, `/api/connect/*`, `/api/fashion-listings`, `/api/orders`, `/api/events`) | Commerce is later, inside Space (4.13), and nothing of it is designed now. Cut on 7 Oct 2026 to narrow v1. |
+| Buying plans: Stripe for Pro, Founding seats and split packs, the webhook setting `tier`, and an entitlement the app reads | "commerce won't exist until I say it does." The app takes no money and reads no plan. Cut on 7 Oct 2026. |
 | `/api/assist/:task`, its prompts and per-account limit, and the founder's Anthropic key on the server | Wi_WWAV is an MCP server instead (3.13). The app calls no model, and Claude's own permission prompts ask before each tool call. |
 | A Google OAuth client, the `gmail.readonly` scope, Google verification and 7-day testing sign-ins, and Google tokens in the Keychain | Claude reads mail through its own Gmail connector, and calendars come in as iCal addresses, so the app needs no Google account. |
 | A local network listener for MCP | Claude Desktop and Claude Code start the helper over stdio, so there is no port to defend. |
@@ -2454,7 +2456,7 @@ CI measures what it can. The rest is measured by hand at each release and writte
 
 ## 9. Business, community and the gates
 
-Wi_WWAV is a business. This chapter covers how it makes money, who it is for, and how each money-making part holds up against the founder's own written design philosophy, the four gates in `wi/GATES.md`. Everything here is **Proposed** unless it carries another label. Prices and fees that already run on the server are marked **Exists today**. Selling works is **later**, inside Space (**Decided**; see 4.13), so for now the money comes from hosting and cloud splits.
+Wi_WWAV is a business. This chapter covers why, who it is for, and how it holds up against the founder's own written design philosophy, the four gates in `wi/GATES.md`. Everything here is **Proposed** unless it carries another label. For now the app takes no money: "commerce won't exist until I say it does" (**Decided**, 7 Oct 2026). It has no price, no plan and no store, and nothing in this chapter plans one.
 
 ### 9.1 Why it is a business
 
@@ -2471,11 +2473,11 @@ The founder set the terms, in letters to Wi-WWAV and in the platform's first lin
 
 Those six lines become five commitments, each kept in code rather than copy:
 
-1. **The artist keeps the money and the masters.** When Space sells works, a digital sale pays the seller 90%; the server already works that way (**Exists today:** `server/routes/purchase.js`, `connect.js`), and nothing in the app sells yet. WWAV takes no rights in a work beyond hosting and delivering it. Distribution without a label in the middle is the rebellion.
+1. **The artist keeps the masters.** WWAV takes no rights in a work beyond hosting and delivering it. Distribution without a label in the middle is the rebellion. Nothing in the app sells; on mi-wwav.com a digital sale pays the seller 90% today (**Exists today:** `server/routes/purchase.js`, `connect.js`).
 2. **Leaving costs nothing.** Export and Export everything are free and work while you are signed out (see 2.9).
-3. **The price is a number everybody can reach.** The free app is a whole product: Heat, the Console with plugins, and a galaxy.
+3. **Everybody can reach it.** The app is free and whole: Heat, the Console with plugins, and a galaxy.
 4. **It does what a phone can't.** Hosting VST3 and AU plugins, cutting a film against four stems on one clock, and drawing a universe in real 3D need a computer (see 1.4). That is "irreplaceable by the iphone" for software; the device line in 9.2 is the hardware answer. A direct download with no Apple cut (**Decided**) is the founder's "taking another bite out of apple" (devlog, Sep 29).
-5. **Money comes from selling things, never from attention.** Every revenue line in 9.4 sells hosting, cloud splits, a seat, a device, an hour of someone's time or, later, a work. None of them sells a view. This is the app's hypothesis for gate 1.4 (9.6).
+5. **Money will come from selling things, never from attention.** When commerce comes, it sells a thing: a work, a device, hosting or an hour of someone's time. Nothing sells a view. This is the app's hypothesis for gate 1.4 (9.6).
 
 ### 9.2 The family model, applied
 
@@ -2498,7 +2500,7 @@ Zi_WWAV (furniture) is left out, because the sketch names four media and nothing
 
 The fourth clause, **makes discs**, waits: "PRANA disc not ready yet, so definitely not writing software yet" (see 1.7). Shipping the software first gives Mi_pro_WWAV users before it has a case.
 
-**The app does not sell the hardware,** and nothing in it is an advertisement. Two ways it would have are out: the disc round trip, because writing a PRANA's disc waits for the disc, and a drop page, because commerce is later (4.13). One stays: **founding members first.** A Founding seat (9.4) carries a reserved place in line for the device. It is not a discount on it.
+**The app does not sell the hardware,** and nothing in it is an advertisement. Two ways it would have are out: the disc round trip, because writing a PRANA's disc waits for the disc, and a drop page, because commerce is later (4.13).
 
 **Post 34's roadmap.** Each step is quoted from the post, beside the app's part in it:
 
@@ -2507,7 +2509,7 @@ The fourth clause, **makes discs**, waits: "PRANA disc not ready yet, so definit
 | "1. build beta v1" | Heat's WWAV space holds the milestones (its placeholder today reads "Beta v1 working"). |
 | "2. ^ use beta v1 to find cofounders" | Letters on a sun show the build (4.8). The published gates and left-out tables show the inside, which is gate 2.5's question: "Would you show the inside to someone you respect, who knows what they're looking at?" |
 | "3. build beta v2 with cofounders" | Testers' remixes come back as forks with lineage. Until PRANA discs can be written, those are remixes made in the Console. A survey can't give that test data. |
-| "4. build out a kickstarter campaign" | The campaign runs on Kickstarter, as the post says. A letter to Wi-WWAV and the Founding list point to it. |
+| "4. build out a kickstarter campaign" | The campaign runs on Kickstarter, as the post says, and a letter to Wi-WWAV points to it. |
 | "5. start selling preorders & manufacturing beta v3" | Heat holds the manufacturing timeline. Taking preorders in the app waits for commerce in Space. |
 
 Kickstarter adds a 5% platform fee on top of payment processing. The old question, Kickstarter or the store's own preorders, is closed for now, because the app has no store.
@@ -2519,65 +2521,31 @@ Kickstarter adds a 5% platform fee on top of payment processing. The old questio
 - **Letters, not posts.** Since the second post, every devlog post opens "Dear Wi-WWAV," and is signed "LMY". In the app, a letter is a page with a greeting and a sign-off, read-only on a sun (see 4.8). The app's own release notes are letters too, and open the same way. They appear on LMY's sun and in "Since you last looked", and are never pushed.
 - **Building in public.** The devlog is public, and Claude can read it through the `/mcp` connector (**Exists today**). The new repo publishes its `GATES.md` with fail criteria before results, as Wi did, and every chapter's "Left out, and why" table. That is what a future cofounder reads first.
 - **No audience, only people.** There are no followers to count. You add a galaxy, and its letters reach you when you look (see 4.10 and 4.11), the founder's included.
-- **Numbered first members.** A Founding member can show their number on their sun ("Founding #12"). It is off by default, because a badge that only some people can have works as status.
 
 ### 9.4 Money
 
-#### Revenue lines now, and the one that waits
+**Decided:** the app takes no money. In the founder's words: "commerce won't exist until I say it does." It has no plan, no price, no store and no fee, it reads no entitlement, and nothing in it asks anyone to pay. When commerce comes, it comes inside Space (4.13).
 
-| Line | What is sold | Price | WWAV keeps | Status |
-|---|---|---|---|---|
-| Store fee, later | works, once Space sells them (4.13) | set by the seller; nothing is designed | 10% of the total, included in the price | **Proposed**, later. The server's 10% **Exists today** (`purchase.js`) |
-| Pro | cloud splits and hosting room | one price list, **Open** below | all, less processing | exists in three versions |
-| Founding Member | Pro for life and a number from 1 to 500 (**Exists today**); first in line for the device (**Proposed**) | $199.99 once | all, less processing | **Exists today** on iOS (`foundingMember.js`; the client says $199.99, the `iap.js` header $249.99) |
-| Split packs | 50 cloud splits | $9.99 | all, less processing | **Exists today** on iOS |
-| Hardware | Mi-WWAV preorders | **Open** (below) | the margin | planned (post 34) |
-| Education | cohorts | $500 a seat, 12 seats | all, less processing | **Exists today**, out of date; the class systems it ran on are later |
+What already exists elsewhere stays where it is. The desktop app neither sells nor reads any of it:
 
-The store fee is not a revenue line yet. Nothing in the app sells a work until commerce returns, and no plan here counts on it. Pro, Founding and split packs are what pays for the server now.
-
-If all 500 Founding seats sell, they bring in $99,995 before fees, and that money arrives before the hardware does.
-
-#### Three price generations, one price list
-
-| Generation | Where | Prices |
+| What | Where | Exists today |
 |---|---|---|
-| Web PRO (v1) | Stripe, with the amount kept in an environment variable; CLAUDE.md | $11 a month with a 14-day trial. The header of `iap.js` and `APP_STORE_READINESS_PLAN.md` extend it to $11 / $99 / $249.99 / $12 |
-| iOS client | `ios_v3/…/Products.swift`, `MiWwav.storekit` | $7.99 a month, $69.99 a year, $199.99 Founding, $9.99 for 50 splits |
-| Ops doc | `MONETIZATION_SETUP.md` | $4.99 a month, $19.99 a year, 3-day trial |
+| Pro, Founding seats (1–500) and split packs | the iPhone app through Apple, and web PRO through Stripe | `ios_v3/…/Products.swift`, `server/routes/iap.js`, `subscription.js`, `foundingMember.js` |
+| A 10% platform fee on a sale | mi-wwav.com | `server/routes/purchase.js` |
+| Metered cloud splits | phones and the web, because the server pays Replicate for each one | `server/utils/tier.js`, `splits.js` |
+| Cohorts, 12 seats at $500 | mi-wwav.com | `cohort.js`, whose one date, July 1, 2026, has passed |
 
-`Users` also carries three entitlement fields at once: `isPro`/`proExpiresAt`, `tier` and `credits`. The desktop app reads only `tier`. Today only Apple verification (`server/routes/iap.js`) sets it. The Stripe webhook (`server/routes/subscription.js`) sets `isPro`/`proExpiresAt`, so it must be changed to set `tier` as well, which is new server work. A plan bought through Stripe in the browser is the same plan on the iPhone, and the iOS app still sells it through Apple. In the desktop app, buying a plan opens mi-wwav.com in the browser, as sign-in does (8.7).
+**Splits cost nothing here.** On a Mac, Demucs runs in a background worker (5.10; v3's dev server took 30–60 s a song on Apple Silicon), so nothing local is metered or counted.
 
-**Open: one desktop price list.** *Recommendation:*
-
-| Plan | Price | What it pays for |
-|---|---|---|
-| Wi_WWAV | free | Everything that runs on your computer: Heat and its MCP server; the Console with plugins and unmetered local splits; export. Also 10 GB of published work hosted in your galaxy (about 45 songs as `.wwav`) and 10 cloud splits for life |
-| Pro | $7.99 a month or $69.99 a year | What runs on WWAV's computers: 100 cloud splits a month from the iPhone or the web, and 100 GB of published work hosted |
-| Founding | $199.99 once, seats 1–500 | Pro for life, the number, and a reserved place in line for the device |
-| Split pack | $9.99 for 50 | Cloud splits that keep until you use them |
-
-The plan page states the rule behind this list as Pro's own description: "Pro pays for the parts of WWAV that run on our computers. What runs on yours is free."
-
-- **Storage cost.** At R2's list price of $0.015 per GB-month, a full Pro allowance costs $1.50 a month to store.
-- **Why $7.99.** It is the newest price in shipped code, so one number can hold on every platform. A $7.99 month through Stripe nets about $7.46 after the standard US card fee (2.9% + 30¢). On iOS, Apple keeps 15–30%.
-
-**Splits after local Demucs.** In v3 a split was the unit of currency, because each one costs a Replicate GPU run. On a Mac, Demucs runs in a background worker for free (see 5.10; v3's dev server took 30–60 s a song on Apple Silicon), so the desktop meters nothing local. Splits remain a unit only for cloud splitting, which phones and the web still need, and the quota in `server/utils/tier.js` and the reserve-and-refund transaction in `splits.js` stay as they are (**Exists today**).
-
-**Open: expiring packs.** Packs expire 90 days after purchase today. *Recommendation:* they keep until used. An expiry date is a timer that pushes use, which is gate 1.1's concern, and the money for a pack has already been paid.
-
-**Founding Member.** **Exists today:** the 500-seat counter is one server row behind a row lock, and a `foundingMemberNumber` never changes. The desktop sells the same seats through Stripe in the browser, against the same counter and 10-minute reservation. Checkout shows your number before you pay: "You'd be Founding #213." Nothing counts down the seats left. Once the last one goes, the plan page says what v3 says: "Program closed — all 500 slots claimed".
+**Open: hosting room.** Published work is stored on R2, at a list price of $0.015 per GB-month, so 10 GB costs 15¢ a month to keep. Nothing limits it while the app has one user. *Recommendation:* set a limit per account, with no price attached, before anyone else gets a copy, and say it in a letter.
 
 **Claude isn't sold.** The app calls no model at all. Claude runs in the person's own Claude (claude.ai, Claude Desktop or Claude Code) and reaches Wi_WWAV through MCP (see 2.11 and 3.13). There is no Anthropic key in the app, no daily limit and no credits, and what Claude costs is between the person and Claude. Ripple Creator's credits (15 for a chat, 40 for a strategy) stay with the old iOS app.
 
-**Education.** The conservatory is already written (**Exists today:** `education.js`): 4 courses, 42 lessons, 126 assignments and about 157 hours, with each lesson's three assignments tagged study → make → refine.
+**Education.** The conservatory is already written (**Exists today:** `education.js`): 4 courses, 42 lessons, 126 assignments and about 157 hours, with each lesson's three assignments tagged study → make → refine. Lessons are free, because they teach the tool and they are the shortest path to gate 4. Cohorts are sold on mi-wwav.com, not in the app, and running one as a class system in Space is later (see 10.1).
 
-- **Lessons.** Lessons are free, because they teach the tool and they are the shortest path to gate 4.
-- **Cohorts.** What is sold is a person's time: 12 seats at $500, refundable until the start (as `cohort.js` does). Running a cohort as a class system in Space is later (see 10.1), so for now this line stays as it is. `cohort.js` holds one date, July 1, 2026, which has passed, so it needs a date per cohort.
+#### Anti-luxury rules, for when commerce comes
 
-#### Anti-luxury pricing
-
-"teenage engineering only does one thing wrong in my opinion and its seriously wrong. There products are luxury items which is codename for inaccessible to poor ppl." (devlog, Sep 30). These rules make it checkable:
+"teenage engineering only does one thing wrong in my opinion and its seriously wrong. There products are luxury items which is codename for inaccessible to poor ppl." (devlog, Sep 30). These rules bind whatever is sold later, and make that checkable:
 
 - **Never gate leaving with your own work.** Export and Export everything are free and work while signed out (see 2.9).
 - **No feature works only with expensive gear:**
@@ -2585,13 +2553,11 @@ The plan page states the rule behind this list as Pro's own description: "Pro pa
   - A song can be finished with no third-party plugin: record audio, split it, cut it, and use the six built-in effects (5.9). Instruments are third-party only, so MIDI needs one (5.3).
   - The Console records from the built-in microphone.
   - Newest gives every work in Space as a list, on any machine (4.10).
-  - Performance targets a 2020 M1 MacBook Air, not a new Pro (8.14).
-- **Free is a whole product.** Someone who never pays can plan a term, finish a song and put it in Space.
-- **Every price is the whole price.** There is no "from $" and no fee added at checkout. When selling comes, the fee stays inside the price, as the server's line item says today: "(10% platform fee included)" (**Exists today**).
+  - Performance targets a 2020 M1 MacBook Air, not a new MacBook Pro (8.14).
+- **Free stays whole.** Someone who never pays can plan a term, finish a song and put it in Space.
+- **Every price is the whole price.** There is no "from $" and no fee added at checkout. A fee stays inside the price, as the server's line item says today: "(10% platform fee included)" (**Exists today**).
 - **Nothing paid for expires.**
-- **The fee is the same for everyone.** Pro buys storage and splits. It never buys a lower fee, better placement or more reach.
-
-**Open: the device's price.** The devlog names no price. Its one signal is "TE's best products are like 2k". *Recommendation:* put a price ceiling in the campaign plan before step 4 and announce it in a letter to Wi-WWAV, so "Wwav is about everybody" is a number before it is a campaign page.
+- **The fee is the same for everyone.** Paying never buys a lower fee, better placement or more reach.
 
 ### 9.5 School
 
@@ -2634,7 +2600,7 @@ Rule 2 says to write down what a fail looks like before testing. The new repo's 
 | 1.1 Healthier | anything stretches use past what the person came for: autoplay, a list without an end, notifications, badges, streak counters, "up next" | "Since you last looked", pull only (2.10); every list ends "That's everything." (4.10); focus rounds never start on their own (3.5); nothing plays without a press | open; conflicts below |
 | 1.2 Freer | any file can't leave as its exact bytes, or the whole account can't leave in one action | Export everything with ⌘⇧E, even when signed out (2.9) | open; testable at the first slice |
 | 1.3 Not addicted | anyone, owners included, is shown a count of other people's attention, or anything is ordered by engagement or sales | private saves; Add galaxy; newest first; the public Heat view shows records, never totals or comparisons (3.15) | open; read every API field, `/api/heat/public/:userId` included |
-| 1.4 Business | see the criterion proposed below | the revenue lines in 9.4; the store fee is later | open; no route until commerce returns |
+| 1.4 Business | written before the first price, once the founder says commerce exists | none yet: the app takes no money (9.4) | open; no route until commerce exists |
 | 2.1 Complexity | for any view's verb, steps after ≥ steps before, counted by doing them | Heat: *knowing what to do next*. Space: *hearing a song apart*. Console: *making a song that comes apart*, and *cutting a film and its four-stem score on one clock* | open; count at each view's first build |
 | 2.2 Flourishing | no positive answer after a month | *a term planned and kept, and a song finished that comes apart*; Heat's own records are the month of evidence | open |
 | 2.3 Freedom | Wi's (a)–(c), plus (d): a session or export needs WWAV's server to open | offline first (2.8); files play in `ffmpeg` and the pack tools; the local MCP helper needs no network (8.8) | open |
@@ -2648,11 +2614,7 @@ Rule 2 says to write down what a fail looks like before testing. The new repo's 
 | 3.5 Anti-entropy | what accumulates and what decays | lineage links and Heat's records accumulate; signed links and plugin compatibility decay | unscored |
 | 4 Mission | fails until it happens | the school stages (9.5) | fails |
 
-**A fail criterion for 1.4.** On the Wi wall, 1.4 stays open because no business runs on it. In the app it has no route yet. The criterion below counts from the first payment for a work, commerce is later (4.13), and nothing in the app takes such a payment. Until commerce returns, 1.4 stays open and is never marked passed. The wording is committed now, so that it can't bend to fit the numbers later:
-
-> Fails if, 12 months after Space takes its first payment for a work, the sales fee, Pro, Founding and split packs together don't cover the server's running costs (Heroku, Postgres, R2, Replicate, Apple's developer program); or if any revenue line depends on a count of attention.
-
-Hardware and education are left out of the sum on purpose: the platform has to carry itself.
+**Gate 1.4 has no route yet.** On the Wi wall, 1.4 stays open because no business runs on it, and the app is the same: it takes no money until the founder says commerce exists (9.4). Rule 2 still holds, so the gate's fail criterion is written and committed before the first price, not after the first sale.
 
 **Where the sketch and the gates disagree.** In each row, the Proposed default is the design that passes the gate, and each row is **Open**, with the recommendation shown. The last row is the exception: its switch is **Decided**, and its rule is **Proposed**.
 
@@ -2682,13 +2644,13 @@ Six rows left with the features they were about. "Walk around infinitely", the s
 | A paywall on export or on your own files | "Never gate leaving with your own work." |
 | DRM | A file has to play in tools that know nothing of WWAV (gate 2.3). |
 | The Mac App Store | Its sandbox blocks loading other developers' plugins, and Apple takes a cut of every purchase made inside it. |
-| Credits or any in-app currency | A currency between a person and their money hides what things cost, and it can be paid in attention. A split pack isn't one: it buys one service, cloud splits, at a dollar price, and keeps until used. |
-| A lower fee or better placement for Pro | The fee is the same for everyone, so paying never buys reach. |
+| Credits or any in-app currency | A currency between a person and their money hides what things cost, and it can be paid in attention. |
+| A lower fee or better placement for paying | When anything is sold, the fee is the same for everyone, so paying never buys reach. |
 | Purchases that expire | Money already paid shouldn't run out on a timer. |
 | Rights to your masters | WWAV hosts and delivers your work; taking your masters is what labels do, and WWAV exists against that. |
 | A device that needs the app | Mi-WWAV plays its discs (USB flash sticks in an acrylic case) without an account. The app is not a key to the device. |
 | Accounts under 13 | The birthdate gate keeps them out (2.14). Younger students with a teacher belong to class systems, which are later. |
-| Selling inside the app now: a walkable shop, the store fee as a revenue line, drops and preorders, and commissions through the store | "Eventually the space will hold commerce instead of having that be a 4th place." Commerce is later, inside Space (4.13). Cut on 7 Oct 2026 to narrow v1. |
+| Selling inside the app now: a walkable shop, paid plans (Pro, Founding seats, split packs), a store fee, drops and preorders, and commissions through the store | "commerce won't exist until I say it does." When it does, it comes inside Space (4.13). Cut on 7 Oct 2026 to narrow v1. |
 | Selling the hardware, or writing PRANA discs, from the app | "PRANA disc not ready yet, so definitely not writing software yet." |
 | Claude as a metered or sold feature | The app calls no model. Claude runs in the person's own Claude, through MCP, so there is nothing to meter or sell (2.11). |
 | Google verification and a Gmail stage in the school plan | Claude reads mail through its own Gmail connector, so the app never asks Google for it (3.10). |
@@ -2698,28 +2660,30 @@ Six rows left with the features they were about. "Walk around infinitely", the s
 
 ## 10. Roadmap, open decisions and glossary
 
-This chapter covers four things: the order things get built in, what the first two weeks must prove, every decision still open, and what the words in this document mean. The founder settled the build order and the estimates in conversation (**Decided**). The cut of 7 Oct 2026 changed what some stages hold, so an estimate that no longer matches its stage is marked **Proposed**. What each stage contains, and how each one is checked, is **Proposed**.
+This chapter covers four things: the order things get built in, what the first slice must prove, every decision still open, and what the words in this document mean. The founder settled the build order in conversation, and set the dates on 7 Oct 2026 (**Decided**). What each stage contains, and how each one is checked, is **Proposed**.
 
 ### 10.1 Build order
 
 The order follows the file. Every view reads and writes `.wwav` and `.swav`, so the format spine comes first. Each later stage works on its own if work stops there.
 
-| Stage | What exists at the end | Estimate |
+| Stage | What exists at the end | Target |
 |---|---|---|
-| 0. Thin slice | the seven items in 10.3, end to end, passing on a second Mac | 1–2 weeks (**Decided**) |
-| 1. Shell and library | the window, view switcher and Now strip; `~/Music/Wi_WWAV/` with import, reader verdicts, tags and pins; ⌘K, ⌘⇧N and labelled ⌘Z; sign-in through the browser; the upload queue; Export everything with its offline `index.html` (see 2); the Tauri updater with `/desktop/latest.json` (8.10; **Proposed**) | grows out of the slice, alongside stage 2; not estimated on its own |
-| 2. Heat, with the MCP server | Today with the time column, Plan my day and the Pomodoro timer; Tasks, Calendar, Grades, Habits and Mail; spaces; the Brightspace and other iCal feeds; the artifact's records imported with every id kept (see 3.16); quick capture, notes and the weekly review (see 3.14); `wi-mcp` with its eight tools and the journal's Claude labels (see 3.13 and 8.8). Heat records are kept on the Mac, and sync arrives with stage 5 (see 8.7) | about 1 week for Heat (**Decided**); about 1 week more for the MCP server (**Proposed**) |
-| 3. Console, audio | audio, instrument and stem-group tracks; VST3 and AU effects and instruments; MIDI and the piano roll; takes, one per pass; the four stem buses and the six built-in effects (see 5); the `.wwavsession` package with autosave and recovery (see 6.5); `.wwav` export; the upload queue sends exports to your library on mi-wwav.com | 2–4 months to finishing a song (**Decided**; the cut leaves less in this stage: no sampler, no comping, no Make a disc, and splitting has moved to stage 6) |
-| 4. Console, video | basic cutting on video tracks, proxies for 4K, the viewer on the engine's clock, `.swav` export (see 5.11) | about 1 month, overlapping stage 3 (**Proposed**; the founder's 1–2 months was set when video held grade, titles and generators too) |
-| 5. Space | the sky in three.js, the same on every machine; the planet player with level, mute and solo on the four moons, and ↑ Push; the four media to view; suns and letters, with the public Heat view and Heat sync; lineage and the family tree; Add, Add galaxy and the Saved shelf; the message door; Newest; "Since you last looked"; Open in Console (see 4); Push to Space (see 5.16); the web face and its share pages (8.7; **Proposed**); buying Pro or a Founding seat in the browser, with the Stripe webhook setting `tier` (9.4; **Proposed**) | 2–4 weeks (**Proposed**; the founder's estimate was set before real 3D, Heat sync and the public Heat view were added) |
-| 6. Demucs splitting | Split into stems (⌃⌘S) in a background worker: the htdemucs model, the stem group made in place, the CPU fallback and its warning (see 5.10) | about 1–2 weeks (**Proposed**) |
+| 0. Thin slice | the seven items in 10.3, end to end, passing on a second Mac | the Linux half by 11 Oct; all seven on a second Mac by January 2027 |
+| 1. Shell and library | the window, view switcher and Now strip; `~/Music/Wi_WWAV/` with import, reader verdicts, tags and pins; ⌘K, ⌘⇧N and labelled ⌘Z; sign-in through the browser; the upload queue; Export everything with its offline `index.html` (see 2); the Tauri updater with `/desktop/latest.json` (8.10; **Proposed**) | 7 Oct 2026, with Heat |
+| 2. Heat, with the MCP server | Today with the time column, Plan my day and the Pomodoro timer; Tasks, Calendar, Grades, Habits and Mail; spaces; the Brightspace and other iCal feeds; the artifact's records imported with every id kept (see 3.16); quick capture, notes and the weekly review (see 3.14); `wi-mcp` with its eight tools and the journal's Claude labels (see 3.13 and 8.8); Heat's maths in the Rust core (**Decided**; 8.8). Heat records are kept on the Mac, and sync arrives with stage 5 (see 8.7) | 100% by the end of 7 Oct 2026 (**Decided**) |
+| 3. Console, audio | audio, instrument and stem-group tracks; VST3 and AU effects and instruments; MIDI and the piano roll; takes, one per pass; the four stem buses and the six built-in effects (see 5); the `.wwavsession` package with autosave and recovery (see 6.5); `.wwav` export; the upload queue sends exports to your library on mi-wwav.com | 80–90% by 11 Oct 2026 |
+| 4. Console, video | basic cutting on video tracks, proxies for 4K, the viewer on the engine's clock, `.swav` export (see 5.11) | 80–90% by 11 Oct 2026 |
+| 5. Space | the sky in three.js, the same on every machine; the planet player with level, mute and solo on the four moons, and ↑ Push; the four media to view; suns and letters, with the public Heat view and Heat sync; lineage and the family tree; Add, Add galaxy and the Saved shelf; the message door; Newest; "Since you last looked"; Open in Console (see 4); Push to Space (see 5.16); the web face and its share pages (8.7; **Proposed**) | 80–90% by 11 Oct 2026 |
+| 6. Demucs splitting | Split into stems (⌃⌘S) in a background worker: the htdemucs model, the stem group made in place, the CPU fallback and its warning (see 5.10) | 80–90% by 11 Oct 2026 |
 | 7. Windows | the same app on WebView2, ASIO or WASAPI, VST3, DX12 and Authenticode (see 8.10) | 3–6 weeks after the Mac (**Decided**) |
 
-Worked most days, that is roughly 3–6 months to a v1 of three views (**Proposed**). It is the founder's **Decided** 4–8 months for four rooms, less the shop's 1–2 months. Stage 5 grows with real 3D, Heat sync and the public Heat view, so the top of the range is the likelier end. Two stages are new, the MCP server and splitting as its own stage; the cut took more out of the Console than they add, so the range stays.
+**The dates** (**Decided**). In the founder's words on 7 Oct 2026: "heat 100% done by the end of today", the app "80-90% done by this weekend", and "a working version of wi-wwav by january". So stages 1 and 2 finish on 7 Oct, stages 3 to 6 reach 80–90% by Sunday 11 Oct, and a working version follows by January 2027. Windows stays last.
+
+**What the weekend counts** (**Proposed**). A stage is 80–90% done when it is built and passes every check an agent can run on Linux (10.2). The rest needs a Mac, a second Mac or the founder: AU hosting, CoreAudio and CoreMIDI devices, VideoToolbox, signing and notarization, the 8-hour soak, and feel. That rest is what January is for.
 
 **Why this order.**
 
-- **Heat comes second** because it takes a week and gets used every day. Its records become the month of evidence gate 2.2 asks for. The MCP server goes with it, because the eight tools work on Heat's records and need no engine and no server (8.8).
+- **Heat comes second** because it is finished first, on 7 Oct, and gets used every day. Its records become the month of evidence gate 2.2 asks for. The MCP server goes with it, because the eight tools work on Heat's records and need no engine and no server (8.8).
 - **The Console comes third** because it is the longest and riskiest stage, and Space has nothing new to carry until it exports. Audio comes before video: a song is finished first, and a film is cut to it. A `.swav`'s sound is the mix (5.13).
 - **Space comes after the Console** because a planet is an export, and **Open in Console** needs a Console to open. The server routes Space needs already exist, and the public Heat view needs Heat's records.
 - **Splitting comes after** because a song can be made from recorded and imported audio without it, and it runs in its own background worker, apart from the audio engine (5.10).
@@ -2735,7 +2699,9 @@ Worked most days, that is roughly 3–6 months to a v1 of three views (**Propose
 
 **After v1.** These wait until the three views run, each for the reason its chapter gives:
 
-- commerce inside Space: works that carry a price and are bought where they are (4.13), and the sales fee in 9.4;
+- commerce, once the founder says it exists: works that carry a price and are bought where they are, inside Space (4.13);
+- an image editor, "somewhere between photoshop and kidpics" in the founder's words, which would also place a gallery's photos by hand (4.7);
+- MP3 and plain MP4 export (5.13);
 - school class systems: a class as a solar system, assignments and younger students (4.14, 9.5);
 - "Near you", which is cut for now (4.14);
 - writing PRANA discs, and bringing a PRANA's remixes home, once the disc exists (5.18);
@@ -2769,8 +2735,8 @@ An agent working alone can build and verify much of the app on Linux. Some check
 | Views | the web UI in Playwright against `mock-engine`; Heat's maths (heat, Plan my day, grades); Space's layout hashes; journal undo-all and redo-all | WKWebView behaviour; Keychain; Force Touch; Reduce Motion; 60 fps on the reference machine | gesture timings; Lucida or Inter; 17 or 19 pt at the founder's desk |
 | MCP | `wi-mcp` over stdio against a test library: every tool called, one journal entry per write, a repeated `source_id` making no second row, a tool switched off refused, 200 random kills, 1,000 interleaved writes with the app running (8.12) | the same suite nightly; Claude Desktop and Claude Code starting the helper from the app bundle, and the lines in Settings → Claude staying right after the app moves | whether Claude's estimates are worth accepting; how the tool descriptions read in a real conversation |
 | Public Heat view | a private record, grade or note never appears in `/api/heat/public/:userId`; a public record shows only its listed fields; switching back removes its copy; a Now making line disappears at its `clearsAt` with the Mac off; no response carries a count (8.12) | — | whether the view says enough and no more; which grades the founder is willing to show |
-| Server | multipart parts, Heat sync and its public copies, and `tier` set by both Apple's and Stripe's paths, against test Postgres and an R2 stand-in, as Wi's gates were run | — | prices, the sales fee |
-| Accounts | the iCal parser against a stored raw feed | — | the founder's Brightspace link; Stripe live keys; the Apple Developer account and its Developer ID |
+| Server | multipart parts, and Heat sync with its public copies, against test Postgres and an R2 stand-in, as Wi's gates were run | — | whether and when commerce exists |
+| Accounts | the iCal parser against a stored raw feed | — | the founder's Brightspace link; the Apple Developer account and its Developer ID |
 | Shipping | the universal build script | signing, hardened runtime, entitlements, notarization, and Gatekeeper on a second Mac | when anyone else gets a copy |
 | Gates | every fail criterion, written before testing | gate 2.4's measurements at 1024 × 680 and 1280 × 800 | gate 2.2's month of use; gate 4's question asked in person; every decision in 10.4 |
 
@@ -2834,40 +2800,34 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | 18 | Unpublishing a work others have forked | 4.12 | It leaves the sky. Earlier forks keep playing its stems, and their trees read "withdrawn by its maker". |
 | 19 | Writing's file format | 4.7, 6.11 | Markdown with `wmet` and `wlin` keys in its front matter (`ri: "0.1"`), until a page must carry its images in one file. `.rwav` stays a placeholder. |
 | 20 | Gi's pattern file | 6.11 | Name it (placeholder `.gwav`) when a Gi_cro_WWAV prototype cuts its first piece. |
-| 21 | Where pages and galleries are made | 4.7 | v1 shows galleries that already exist and makes none. A gallery maker waits until fashion has a format of its own. Pages are written in the suns' block editor. |
 
 #### Console and files
 
 | # | Decision | From | Recommendation |
 |---|---|---|---|
-| 22 | Metronome on for new sessions | 5.4, 7.7 | Off, so a recording starts as free as you played it. |
-| 23 | One process per plugin | 5.7, 8.3 | Not in v1. Log a month of engine crashes per plugin, then decide. |
-| 24 | What a local split costs | 5.10, 9.4 | Free and unmetered. The paid cloud split stays for phones and the web. |
-| 25 | A 48 kHz or 24-bit `.wwav` | 5.13, 6.7 | Keep 44.1 kHz, 16-bit for all of 0.x and convert on export, saying so. Decide both changes together for 1.0, once PRANA's hardware is measured. |
-| 26 | MP3 320 and a plain MP4 export | 5.13 | Not in v1. A `.swav` already plays as an MP4. |
-| 27 | Versions and identity | 5.16, 6.8 | Keep versions on the server under one `song_id`. Add an optional `version` to `wmet` and a `parent_version` to `wlin` in 0.2. |
-| 28 | Thin remixes | 6.9 | Thick files wherever a file leaves. Thin storage inside the library and R2, keyed by sha256. |
-| 29 | Film stems for Si_WWAV | 6.10 | Build them after one film has been cut in the Console and someone has asked to take a film apart. |
+| 21 | Metronome on for new sessions | 5.4, 7.7 | Off, so a recording starts as free as you played it. |
+| 22 | One process per plugin | 5.7, 8.3 | Not in v1. Log a month of engine crashes per plugin, then decide. |
+| 23 | A 48 kHz or 24-bit `.wwav` | 5.13, 6.7 | Keep 44.1 kHz, 16-bit for all of 0.x and convert on export, saying so. Decide both changes together for 1.0, once PRANA's hardware is measured. |
+| 24 | Versions and identity | 5.16, 6.8 | Keep versions on the server under one `song_id`. Add an optional `version` to `wmet` and a `parent_version` to `wlin` in 0.2. |
+| 25 | Thin remixes | 6.9 | Thick files wherever a file leaves. Thin storage inside the library and R2, keyed by sha256. |
+| 26 | Film stems for Si_WWAV | 6.10 | Build them after one film has been cut in the Console and someone has asked to take a film apart. |
 
 #### Engineering and shipping
 
 | # | Decision | From | Recommendation |
 |---|---|---|---|
-| 30 | `allow-unsigned-executable-memory` for copy-protected plugins | 8.10 | Add it only if a plugin in the test set fails without it. |
-| 31 | Intel-only plugins | 8.10 | Offer "Open the engine under Rosetta" per session, as a bridge. |
-| 32 | Minimum macOS | 8.10 | macOS 13. |
-| 33 | A self-hosted Mac mini CI runner | 8.12 | Add one once macOS runner minutes pass about $50 a month. |
-| 34 | The `formats/` submodule | 8.13 | A sparse checkout of Mi-WWAV now. Split the four folders out only if clone times start to hurt. |
+| 27 | `allow-unsigned-executable-memory` for copy-protected plugins | 8.10 | Add it only if a plugin in the test set fails without it. |
+| 28 | Intel-only plugins | 8.10 | Offer "Open the engine under Rosetta" per session, as a bridge. |
+| 29 | Minimum macOS | 8.10 | macOS 13. |
+| 30 | A self-hosted Mac mini CI runner | 8.12 | Add one once macOS runner minutes pass about $50 a month. |
+| 31 | The `formats/` submodule | 8.13 | A sparse checkout of Mi-WWAV now. Split the four folders out only if clone times start to hurt. |
 
 #### Business and school
 
 | # | Decision | From | Recommendation |
 |---|---|---|---|
-| 35 | One desktop price list | 9.4 | A free plan (all local features, 10 GB hosted, 10 cloud splits); Pro at $7.99 a month or $69.99 a year; Founding at $199.99 once, seats 1–500; a split pack at $9.99 for 50; one `tier` entitlement everywhere. |
-| 36 | Expiring split packs | 9.4 | Packs keep until used. |
-| 37 | The device's price | 9.4 | Write a price ceiling into the campaign plan before step 4, and announce it in a letter to Wi-WWAV. |
-| 38 | Money from the school | 9.5 | No-equity grants and competitions, leading with gate 4. Read the university's IP policy for student work first. |
-| 39 | A fail criterion for gate 1.4 | 9.6 | Adopt it: the gate fails if, 12 months after Space's first payment for a work, the sales fee, Pro, Founding and packs don't cover server running costs, or if any line depends on a count of attention. It has no route until commerce returns. |
+| 32 | Hosting room without a plan | 9.4 | A limit per account, with no price attached, set before anyone else gets a copy and said in a letter. |
+| 33 | Money from the school | 9.5 | No-equity grants and competitions, leading with gate 4. Read the university's IP policy for student work first. |
 
 ### 10.5 Glossary
 
@@ -2910,10 +2870,9 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | FERPA | The US law on education records; grades stay private by default | 3.15, 9.5 |
 | Fold rule, fold check | How N tracks become four stems, and the export test that the stems sum to the master | 5.3, 6.6 |
 | Fork | A work taken somewhere new, by anyone: a new id with a parent. Fork edges are facts, not claims | 4.9, 6.8 |
-| Founding Member | $199.99 once, seats 1–500: Pro for life, a fixed number, and a place in line for the device | 9.4 |
 | Galaxy | One person in Space: a bio sun and their solar systems | 4.2 |
 | Galaxy chip | A 28 pt miniature of your own galaxy in the title bar; it opens your galaxy, your public Heat view and Settings | 2.1 |
-| Gallery planet | A photo or fashion work: a lit sphere with up to 40 photos pinned on | 4.7 |
+| Gallery planet | A photo or fashion work: a lit sphere with up to 40 photos on it, made by dropping photos on a system | 4.7 |
 | Gates, the | The founder's written design audit (`wi/GATES.md`): 1 corruption, 2 good design, 3 great design (scored), 4 mission. Fail criteria are written before testing | 9.6 |
 | Generation | How many forks a work is from its root (`wlin.generation`) | 6.1 |
 | Get Info | Heat's inspector drawer for one record; it holds the Public switch | 3.1, 3.15 |
@@ -2950,7 +2909,6 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Pomodoro | Heat's focus timer: 25-minute rounds and 5-minute breaks, with 15 minutes every fourth break | 3.5 |
 | PRANA | Mi-WWAV Beta 1: a Teensy 4.1 stem player with four faders and a disc bay. Its C++ core runs the device, its simulator and the app's built-in effects | 5.9, 8.4 |
 | PRISMON | The portfolio's three.js engine, which already runs the three.js version Space uses | 4.5 |
-| Pro | The paid plan, which pays for what runs on WWAV's computers: cloud splits and hosting | 9.4 |
 | Profile view, social view, creation view | Heat, Space and Console, each named for what you do there | 1.1 |
 | Proxy | A half-resolution ProRes copy of footage over 1080p, used for editing | 5.11, 8.5 |
 | Public Heat view | What anyone sees when they open your bio sun: your Now making line, the timelines of linked projects, and any record you switched public. It never shows a count or a comparison | 2.4, 3.15 |
@@ -2971,7 +2929,7 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | `song_id`, `film_id` | 128-bit ids written as 32 hex characters; songs and films share one id space | 6.1 |
 | Space | The social view (⌘2), named after v4's first tab | 4 |
 | Spaces | User-defined filters that replace Heat's three fixed workspaces | 3.4 |
-| Split, split pack | A Demucs run. Local splits are free, cloud splits are metered, and a pack of 50 costs $9.99 | 5.10, 9.4 |
+| Split | A Demucs run. Local splits are free; the iPhone and the web meter cloud splits | 5.10, 9.4 |
 | Stem | One of a song's four parts, always in the order vocals, drums, other, bass | 6.1 |
 | Stem bus | One of the mixer's four buses; its output is that stem in the export | 6.6 |
 | Stem colours | PRANA's vocals `#D23C2A`, drums `#F0B90B`, other `#2E9A55`, bass `#1F4E9E`, the same everywhere | 7.3 |
@@ -2979,13 +2937,11 @@ This list holds every **Open** item in chapters 1–9, with duplicates merged. E
 | Stem lights | The four 8 pt lights in the Now strip and on a stem group's header, in PRANA's order and colours: filled is audible, a hollow ring is muted, a 2 pt outer ring is soloed | 2.2 |
 | Stem player | WWAV's instrument; in Wi_WWAV, your skin for it wraps the Now strip's planet when nothing is loaded | 2.4 |
 | Stem role | The stem a Console track folds into | 5.3 |
-| Stripe | Takes the payment for Pro, Founding seats and split packs, in the browser | 9.4 |
 | Sun | A page: a bio sun for a person, a project sun for a system | 4.8 |
 | Take | One recording pass over a loop range; one take plays at a time, and takes are never comped | 5.6 |
 | Tauri | The app framework (version 2): a Rust core, with the UI in the system web view | 8.1 |
 | "That's everything." | How every list ends | 2.10, 4.10 |
 | Thin remix | A remix stored without its own copy of the stems: "thick files, thin storage" | 6.9 |
-| Tier | The one entitlement field the desktop app reads | 9.4 |
 | Time block | A span of time in Today's time column, given to a task or a habit | 3.5 |
 | ULID | The time-sortable id that names every media file and session | 2.5 |
 | Undo journal | Every change as a labelled transaction, behind ⌘Z; a change Claude makes is labelled as Claude's | 2.7, 8.6 |
