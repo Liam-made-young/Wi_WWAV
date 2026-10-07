@@ -55,6 +55,8 @@ export interface Rig {
   client: HeatClient;
   /** The fake core's own line, for the calls the shell makes (history.undo). */
   call<T>(cmd: string, args?: Record<string, unknown>): Promise<T>;
+  /** Every call Heat has made, in order. */
+  calls: { cmd: string; args: Record<string, unknown> }[];
   seeded: Seeded;
   host: HTMLElement;
   view: RefObject<HeatHandle | null>;
@@ -82,12 +84,20 @@ function boot(options: Options) {
     fake.state.currentTaskId = seeded.currentTaskId;
     setEvents(fake, seeded.events);
   }
-  return { fake, transport, seeded, client: heatClient(transport) };
+  const calls: { cmd: string; args: Record<string, unknown> }[] = [];
+  const spy = {
+    ...transport,
+    call: <T,>(cmd: string, args: Record<string, unknown> = {}) => {
+      calls.push({ cmd, args });
+      return transport.call<T>(cmd, args);
+    },
+  };
+  return { fake, transport: spy, seeded, calls, client: heatClient(spy) };
 }
 
 /** Anything that reads Heat's snapshot (the shell's strip, ⌘⇧N), mounted on a seeded fake core. */
 export async function mountWith(children: ReactNode, options: Options = {}): Promise<Rig> {
-  const { fake, transport, seeded, client } = boot(options);
+  const { fake, transport, seeded, client, calls } = boot(options);
   const host = document.createElement('div');
   document.body.append(host);
   const root: Root = createRoot(host);
@@ -104,6 +114,7 @@ export async function mountWith(children: ReactNode, options: Options = {}): Pro
     fake,
     client,
     call: transport.call,
+    calls,
     seeded,
     host,
     view,
@@ -119,7 +130,7 @@ export async function mountWith(children: ReactNode, options: Options = {}): Pro
 
 /** Heat mounted on a seeded fake core, with its clock held still at `now` unless a test moves it. */
 export async function mountHeat(options: Options = {}): Promise<Rig> {
-  const { fake, transport, seeded, client } = boot(options);
+  const { fake, transport, seeded, client, calls } = boot(options);
   const host = document.createElement('div');
   document.body.append(host);
   const root: Root = createRoot(host);
@@ -142,6 +153,7 @@ export async function mountHeat(options: Options = {}): Promise<Rig> {
     fake,
     client,
     call: transport.call,
+    calls,
     seeded,
     host,
     view,

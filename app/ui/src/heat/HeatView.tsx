@@ -208,6 +208,9 @@ function Frame(p: FrameProps) {
   }, [p.open, frame, setTab, selectTask]);
 
   // The status bar names the tab's count and its one secondary act (2.1, 2.7).
+  // What a click or a key runs is read when it happens, not when the frame last drew.
+  const nowPlus = () => p.actsRef.current[tab]?.current.plus;
+  const nowSecondary = () => p.actsRef.current[tab]?.current.secondary;
   const secondaryName = secondary ? TAB_TABLE[tab].secondary : null;
   const count = acts?.count ?? null;
   const { onStatus } = p;
@@ -224,8 +227,12 @@ function Frame(p: FrameProps) {
       case 'tab':
         return setTab(cmd.tab);
       case 'new':
-        if (plus && !plus.disabled) plus.run();
-        else if (plus?.disabled) say(plus.disabled);
+        {
+          const now = nowPlus();
+          if (TAB_TABLE[tab].plus === null || !now) return;
+          if (now.disabled) say(now.disabled);
+          else now.run();
+        }
         return;
       case 'move':
         return tabKeys?.move?.(cmd.by);
@@ -308,7 +315,8 @@ function Frame(p: FrameProps) {
       if (selection.taskId || selection.blockId) frame.selectTask(null);
     },
     secondary() {
-      if (secondary) secondary.run();
+      const now = nowSecondary();
+      if (now && !now.hidden && !now.disabled) now.run();
     },
     getInfo() {
       if (selection.taskId || selection.blockId) focusInfo();
@@ -331,7 +339,7 @@ function Frame(p: FrameProps) {
             aria-label={TAB_TABLE[tab].plus!}
             title={`${TAB_TABLE[tab].plus} (N)`}
             disabled={!plus || !!plus.disabled}
-            onClick={() => plus?.run()}
+            onClick={() => nowPlus()?.run()}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <path d="M7 1.5v11M1.5 7h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

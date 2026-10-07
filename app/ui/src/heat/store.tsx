@@ -125,8 +125,14 @@ export function HeatProvider({ client, clock = Date.now, children }: Props) {
   const refetch = useCallback(async () => {
     const mine = ++latest.current;
     try {
+      // Calendar's window always takes in today, which Today and the strip draw from.
+      const today = dayKey(now(), zone.current);
       const r = wanted.current;
-      const s = await c.snapshot(dayKey(now(), zone.current), r?.from, r?.to);
+      const s = await c.snapshot(
+        today,
+        r ? (r.from < today ? r.from : today) : undefined,
+        r ? (r.to > today ? r.to : today) : undefined,
+      );
       if (mine !== latest.current) return;
       offset.current = s.now - clockRef.current();
       zone.current = s.zone;

@@ -6,11 +6,21 @@
 // 15m across 3 focus sessions.").
 
 import { useMemo } from 'react';
+import { shortMonthDay } from '../shared/time/format';
 import { type DayKey, minuteOfDay } from '../shared/time/zone';
 import type { Id, Snapshot, Task, TimeBlock } from './client';
 import { clock, copy, formatMinutes } from './fmt';
 import { useFrame } from './frame';
-import { blockLength, dropStart, movedStart, nextGap, resizedMinutes } from './today/gap';
+import {
+  blockLength,
+  COLUMN_END,
+  COLUMN_START,
+  dropStart,
+  movedStart,
+  nextGap,
+  resizedMinutes,
+  snap as snapMinute,
+} from './today/gap';
 import { useHeat } from './store';
 
 export type NewTask = Partial<Omit<Task, 'id'>> & { title: string; spaceId: Id };
@@ -136,9 +146,21 @@ export function useActions() {
         else say(to === 'upload' ? 'Marked for upload.' : `Made a ${to} from the capture.`);
       },
 
+      /** A task dropped on a Calendar day: that is when it will be worked on (the When column). */
       async schedule(taskId: Id, day: DayKey) {
         const t = idx.task.get(taskId);
-        if (t && t.scheduledDate !== day) await act(client.patch('task', taskId, { scheduledDate: day }));
+        if (!t || t.scheduledDate === day) return;
+        const r = await act(client.patch('task', taskId, { scheduledDate: day }));
+        if (r) say(`Scheduled ‘${t.title}’ for ${shortMonthDay(day)}.`);
+      },
+
+      /** A task dropped on a Calendar day's column at `minute` after midnight: a block as long as its estimate. */
+      async dropAt(taskId: Id, minute: number, day: DayKey) {
+        if (!idx.task.has(taskId)) return;
+        const minutes = lengthFor(taskId);
+        const start = Math.min(COLUMN_END - minutes, Math.max(COLUMN_START, snapMinute(minute)));
+        const r = await act(client.putBlock({ taskId, date: day, start, minutes }));
+        if (r) selectBlock(r.block.id);
       },
 
       async makeTask(fields: NewTask) {

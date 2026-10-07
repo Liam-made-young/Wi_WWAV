@@ -4,13 +4,13 @@
 // views never call it.
 
 import { clock } from '../../shared/time/format';
-import { dayKey, minuteOfDay } from '../../shared/time/zone';
+import { addDays, dayKey, minuteOfDay } from '../../shared/time/zone';
 import type { CalendarEvent, DayKey, FocusSession, HeatTimer, Id, Task, TimeBlock } from '../client';
 import { actualMin, estimateContext, estimateMin } from '../model/estimate';
 import { type FocusEffect, type FocusState, type FocusTarget, focusStep, initialFocus } from '../model/focus';
 import { byHeat, heatOf } from '../model/heat';
 import type * as M from '../model/records';
-import { nextOpenOccurrence, openTasks, recurs } from '../model/recurrence';
+import { nextOpenOccurrence, openTasks, recurs, taskOccurrences } from '../model/recurrence';
 import { acceptDraft, planMyDay, type PlanData, planSections, planSubtitle } from '../model/plan';
 import { COLUMN_END, COLUMN_START, busySpans, firstGap } from '../today/gap';
 import { type Fake, derive, refuse, register } from './core';
@@ -123,8 +123,19 @@ derive((snap, fake) => {
   snap.derived.status =
     synced === null ? 'Saved on this Mac' : `Saved on this Mac · Synced ${clock(minuteOfDay(synced, tz))}`;
 
-  // Calendar's recurring pills: each series' occurrences in the snapshot's window, from the record store.
-  snap.derived.occurrences = [];
+  // Calendar's recurring pills: each series' occurrences from 45 days back to 130 ahead of today.
+  const from = addDays(snap.date, -45);
+  const to = addDays(snap.date, 130);
+  const ticked = new Set(snap.records.taskOccurrence.map((o) => `${o.taskId}\u0000${o.date}`));
+  snap.derived.occurrences = data.tasks
+    .filter((t) => !t.done && recurs(t))
+    .flatMap((t) =>
+      taskOccurrences(t, tz, from, to).map((o) => ({
+        taskId: t.id,
+        date: o.date,
+        done: ticked.has(`${t.id}\u0000${o.date}`),
+      })),
+    );
 });
 
 // --- blocks ------------------------------------------------------------------

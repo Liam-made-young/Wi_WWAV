@@ -83,7 +83,7 @@ export function seed(now: number, tz: string): Seeded {
       difficulty: 1,
       estMin: 20,
       estBy: 'you',
-      rrule: 'FREQ=DAILY',
+      rrule: 'FREQ=WEEKLY;BYDAY=MO,WE,FR',
     }),
     task('t-verse', {
       spaceId: wwav.id,
