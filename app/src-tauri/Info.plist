@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into Wi_WWAV.app's Info.plist by Tauri's bundler. The document and
+  type keys here replace the ones Tauri writes from bundle.fileAssociations,
+  because a session must be a package (LSTypeIsPackage): one icon in Finder,
+  though it is a folder (docs/SPEC.md 6.5). Keep the two lists the same;
+  tests/config.rs checks that they are.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>WWAV song</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.mi-wwav.wwav</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>SWAV film</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.mi-wwav.swav</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Wi_WWAV session</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.mi-wwav.wwavsession</string>
+			</array>
+			<key>LSTypeIsPackage</key>
+			<true/>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.mi-wwav.wwav</string>
+			<key>UTTypeDescription</key>
+			<string>WWAV song</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.microsoft.waveform-audio</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>wwav</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>audio/x-wwav</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.mi-wwav.swav</string>
+			<key>UTTypeDescription</key>
+			<string>SWAV film</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.mpeg-4</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>swav</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>video/x-swav</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.mi-wwav.wwavsession</string>
+			<key>UTTypeDescription</key>
+			<string>Wi_WWAV session</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>wwavsession</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/x-wwavsession</string>
+			</dict>
+		</dict>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Wi_WWAV records camera takes in the Console when you ask it to.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Wi_WWAV records from your microphone and audio inputs when you arm a track in the Console.</string>
+</dict>
+</plist>

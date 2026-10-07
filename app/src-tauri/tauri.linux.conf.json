@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["deb"],
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/bin/wwav-engine": "helpers/wwav-engine",
+          "/usr/share/mime/packages/wi-wwav.xml": "linux/wi-wwav.xml"
+        }
+      }
+    }
+  }
+}
