@@ -1,8 +1,8 @@
 //! The web view is fenced (docs/SPEC.md 9.8): each window may call only the
-//! commands its capability lists, and the checkout window, which shows
-//! Stripe's page, may call none.
+//! commands its capability lists, and a window in no capability file, one
+//! that shows someone else's page, may call none.
 //!
-//! Fails if: the checkout window reaches the core at all; the settings
+//! Fails if: a window in no capability file reaches the core at all; the settings
 //! window reaches a command its capability doesn't list (it must never
 //! publish, buy or change clips); the main window can't reach every core
 //! command; or any window can drive the updater, which only quitting may
@@ -138,27 +138,27 @@ fn the_settings_window_reaches_only_what_settings_need() {
 }
 
 #[test]
-fn the_checkout_window_reaches_nothing() {
+fn a_window_in_no_capability_file_reaches_nothing() {
     let (app, core) = app();
-    let stripe = "https://checkout.stripe.com/c/pay/cs_test_a1";
-    let checkout = WebviewWindowBuilder::new(
+    let elsewhere = "https://example.org/someone-elses-page";
+    let remote = WebviewWindowBuilder::new(
         &app,
-        "checkout",
-        WebviewUrl::External(stripe.parse().unwrap()),
+        "remote",
+        WebviewUrl::External(elsewhere.parse().unwrap()),
     )
     .build()
     .unwrap();
-    for url in [stripe, LOCAL] {
+    for url in [elsewhere, LOCAL] {
         for cmd in ["app.hello", "account.status", "publish.drop"] {
             refused_by_acl(call(
-                &checkout,
+                &remote,
                 url,
                 "core",
                 json!({ "cmd": cmd, "args": {} }),
             ));
         }
         let listen = json!({ "event": "core", "target": { "kind": "Any" }, "handler": 1 });
-        refused_by_acl(call(&checkout, url, "plugin:event|listen", listen));
+        refused_by_acl(call(&remote, url, "plugin:event|listen", listen));
     }
     assert!(core.0.lock().unwrap().is_empty());
 }

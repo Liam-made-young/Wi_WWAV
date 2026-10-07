@@ -5,9 +5,11 @@
 //! router acts on them as on its own keys. The shell keeps three for itself:
 //! Open… (a native picker), Settings… (a window) and the macOS items.
 //!
-//! The Edit menu names the current room's undo: "Undo move clip", or
-//! "Can't undo a purchase." greyed out. It follows the core's `history`
-//! event, and the UI says which room is showing with `shell.room`.
+//! The Edit menu names the current view's undo: "Undo move clip", or
+//! "Can't undo a message." greyed out. It follows the core's `history`
+//! event, and the UI says which view is showing with `shell.room` (the
+//! views are Heat, Space and Console, on ⌘1–⌘3; the library drawer over any
+//! of them is `library`).
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -40,22 +42,22 @@ pub const EXPORT: Item = item(
     "Export everything…",
     Some("CmdOrCtrl+Shift+E"),
 );
-pub const DISC: Item = item("disc.make", "Make a disc…", None);
 pub const UNDO: Item = item("history.undo", "Undo", Some("CmdOrCtrl+Z"));
 pub const REDO: Item = item("history.redo", "Redo", Some("CmdOrCtrl+Shift+Z"));
 pub const LIBRARY: Item = item("library.toggle", "Library", Some("CmdOrCtrl+L"));
 pub const SETTINGS: Item = item("settings", "Settings…", Some("CmdOrCtrl+,"));
 
-/// The room segments, in the switcher's order (2.1).
-pub const ROOMS: [Item; 4] = [
+/// The view segments, in the switcher's order (2.1): Heat, the profile
+/// view; Space, the social view; the Console, the creation view.
+pub const ROOMS: [Item; 3] = [
     item("room.heat", "Heat", Some("CmdOrCtrl+1")),
     item("room.space", "Space", Some("CmdOrCtrl+2")),
     item("room.console", "Console", Some("CmdOrCtrl+3")),
-    item("room.unquantized", "Unquantized", Some("CmdOrCtrl+4")),
 ];
 
-/// The rooms the journal knows (9.6): the four, and the library drawer.
-const HISTORY_ROOMS: [&str; 5] = ["heat", "space", "console", "unquantized", "library"];
+/// What the journal scopes ⌘Z by (9.6): the three views, and the library
+/// drawer over any of them.
+const HISTORY_ROOMS: [&str; 4] = ["heat", "space", "console", "library"];
 
 /// What a click on an item does.
 #[derive(Debug, PartialEq, Eq)]
@@ -72,7 +74,7 @@ pub fn action(id: &str) -> Option<Action> {
     match id {
         "file.open" => Some(Action::OpenFiles),
         "settings" => Some(Action::Settings),
-        _ => [&NEW_SESSION, &EXPORT, &DISC, &UNDO, &REDO, &LIBRARY]
+        _ => [&NEW_SESSION, &EXPORT, &UNDO, &REDO, &LIBRARY]
             .into_iter()
             .chain(&ROOMS)
             .find(|i| i.id == id)
@@ -80,9 +82,9 @@ pub fn action(id: &str) -> Option<Action> {
     }
 }
 
-/// A room's undo and redo labels, as `history.get` and the `history` event
+/// A view's undo and redo labels, as `history.get` and the `history` event
 /// give them (docs/COMMANDS.md): ready ("Undo move clip"), or held by work
-/// that left the machine ("Can't undo a purchase.").
+/// that left the machine ("Can't undo a message.").
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 pub struct History {
     pub undo: Option<String>,
@@ -113,7 +115,7 @@ impl History {
     }
 }
 
-/// The room showing and the last labels heard for each room.
+/// The view showing and the last labels heard for each.
 pub struct EditState {
     room: String,
     history: HashMap<String, History>,
@@ -138,7 +140,6 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         add(&OPEN)?.boxed(),
         sep()?.boxed(),
         add(&EXPORT)?.boxed(),
-        add(&DISC)?.boxed(),
     ];
     // Elsewhere there is no app menu, so Settings… and Quit end File.
     if !cfg!(target_os = "macos") {
@@ -271,8 +272,18 @@ fn refs<R: Runtime>(items: &[Entry<R>]) -> Vec<&dyn IsMenuItem<R>> {
 
 /// Where a click goes.
 pub fn on_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
-    match action(event.id().as_ref()) {
-        Some(Action::Ui(action)) => bridge::emit(app, "menu", json!({ "action": action })),
+    let id = event.id().as_ref();
+    match action(id) {
+        Some(Action::Ui(action)) => {
+            bridge::emit(app, "menu", json!({ "action": action }));
+            // The View items are check items, which muda flips as one is
+            // chosen: ⌘1 in Heat would untick Heat, and ⌘2 would tick two.
+            // The tick follows the view the UI says is showing, never the
+            // click, so it goes back at once; `shell.room` moves it.
+            if ROOMS.iter().any(|r| r.id == id) {
+                refresh(app);
+            }
+        }
         Some(Action::OpenFiles) => crate::open::pick(app),
         Some(Action::Settings) => {
             if let Err(e) = crate::open_settings(app) {
@@ -283,14 +294,15 @@ pub fn on_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     }
 }
 
-/// `shell.room {room}`: the UI changed rooms. The View menu ticks it, and the
-/// Edit menu shows its undo, asking the core if it hasn't said yet.
+/// `shell.room {room}`: the UI changed views (or opened the library drawer).
+/// The View menu ticks it, and the Edit menu shows its undo, asking the core
+/// if it hasn't said yet.
 pub async fn show_room<R: Runtime>(app: &AppHandle<R>, args: &Value) -> Result<Value, CoreError> {
     let room = args["room"].as_str().unwrap_or_default().to_string();
     if !HISTORY_ROOMS.contains(&room.as_str()) {
         return Err(CoreError::new(
             "bad_args",
-            format!("There is no room called '{room}'."),
+            format!("There is no view called '{room}'."),
         ));
     }
     let known = {
@@ -313,6 +325,25 @@ pub async fn show_room<R: Runtime>(app: &AppHandle<R>, args: &Value) -> Result<V
     }
     refresh(app);
     Ok(json!({}))
+}
+
+/// At launch, once the core is open: the labels the journal kept for the view
+/// the app opens on, so the Edit menu names ⌘Z before anything changes (a
+/// label survives a relaunch, 2.7). A `history` event that came first wins.
+pub fn load_history<R: Runtime>(app: &AppHandle<R>) {
+    let state = app.state::<Mutex<EditState>>();
+    let room = state.lock().unwrap().room.clone();
+    let Ok(core) = app.state::<Bridge>().core() else {
+        return;
+    };
+    let Ok(got) = core.invoke("history.get", json!({ "room": room })) else {
+        return;
+    };
+    let Ok(history) = History::deserialize(&got) else {
+        return;
+    };
+    state.lock().unwrap().history.entry(room).or_insert(history);
+    refresh(app);
 }
 
 /// The core's `history` event: `{room, undo, redo, cant, cantRedo}`.
@@ -344,7 +375,7 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
             let _ = item.set_enabled(enabled);
         }
     }
-    // The library drawer opens over a room, so the tick stays on that room.
+    // The library drawer opens over a view, so the tick stays on that view.
     if state.room == "library" {
         return;
     }
@@ -415,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn the_rooms_are_on_cmd_1_to_4_in_the_switchers_order() {
+    fn the_views_are_on_cmd_1_to_3_in_the_switchers_order() {
         let got: Vec<_> = ROOMS.iter().map(|r| (r.title, r.keys.unwrap())).collect();
         assert_eq!(
             got,
@@ -423,8 +454,11 @@ mod tests {
                 ("Heat", "CmdOrCtrl+1"),
                 ("Space", "CmdOrCtrl+2"),
                 ("Console", "CmdOrCtrl+3"),
-                ("Unquantized", "CmdOrCtrl+4")
             ]
+        );
+        assert!(
+            !HISTORY_ROOMS.contains(&"unquantized") && action("room.unquantized").is_none(),
+            "there is no fourth view, and no Cmd+4"
         );
     }
 
@@ -437,7 +471,6 @@ mod tests {
             keys(&EXPORT),
             ("Export everything…", Some("CmdOrCtrl+Shift+E"))
         );
-        assert_eq!(keys(&DISC), ("Make a disc…", None));
         assert_eq!(keys(&UNDO), ("Undo", Some("CmdOrCtrl+Z")));
         assert_eq!(keys(&REDO), ("Redo", Some("CmdOrCtrl+Shift+Z")));
         assert_eq!(keys(&LIBRARY), ("Library", Some("CmdOrCtrl+L")));
@@ -559,7 +592,7 @@ mod tests {
         for room in &ROOMS {
             assert_eq!(action(room.id), Some(Action::Ui(room.id)));
         }
-        for i in [&NEW_SESSION, &EXPORT, &DISC, &UNDO, &REDO, &LIBRARY] {
+        for i in [&NEW_SESSION, &EXPORT, &UNDO, &REDO, &LIBRARY] {
             assert_eq!(action(i.id), Some(Action::Ui(i.id)), "{}", i.id);
         }
         assert_eq!(action(OPEN.id), Some(Action::OpenFiles));

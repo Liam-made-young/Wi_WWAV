@@ -1,5 +1,7 @@
-//! A reviewer's tests that expose findings in the shell. Each is ignored
-//! until its finding is fixed; the reason names it.
+//! A reviewer's tests of the View menu's ticks. They exposed findings in the
+//! shell (muda flips a check item as it is chosen, so ⌘1 in Heat unticked
+//! Heat and ⌘2 ticked two views), and ran ignored until the shell kept the
+//! tick to the view the UI says is showing. They run now.
 
 use std::sync::Arc;
 
@@ -65,7 +67,6 @@ fn choose(app: &App<MockRuntime>, id: &str) {
 /// ⌘1 in Heat (the UI has nothing to change, so it never sends
 /// `shell.room`): the View menu should still tick Heat.
 #[test]
-#[ignore = "review finding: View's room items are check items, which muda untoggles on ⌘1 in Heat, and the shell only re-ticks on shell.room"]
 fn choosing_the_room_already_showing_keeps_its_tick() {
     let app = app();
     assert_eq!(ticked(&app), ["Heat"]);
@@ -77,7 +78,6 @@ fn choosing_the_room_already_showing_keeps_its_tick() {
 /// (a sheet that keeps the room, a UI still loading): one room at most is
 /// ticked, never two.
 #[test]
-#[ignore = "review finding: muda ticks Space on ⌘2 while Heat stays ticked until the UI sends shell.room"]
 fn choosing_another_room_never_ticks_two() {
     let app = app();
     choose(&app, "room.space");

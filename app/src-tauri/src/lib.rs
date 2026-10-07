@@ -4,6 +4,7 @@
 
 mod bridge;
 mod core_link;
+mod fence;
 mod menu;
 mod open;
 mod paths;
@@ -12,6 +13,7 @@ mod review_tests;
 mod secrets;
 mod update;
 
+use std::path::Path;
 use std::sync::Mutex;
 
 use tauri::webview::PageLoadEvent;
@@ -35,10 +37,13 @@ pub fn run() {
     // Linux and Windows start a second copy to open a file; it hands the
     // file to this one and leaves, so one library has one engine.
     let builder =
-        Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            open::route(app, open::from_args(args));
+        Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            // Paths on the second launch's command line are relative to where
+            // that launch started, not to where this app did.
+            open::route(app, open::from_args_in(args, Path::new(&cwd)));
         }));
     let app = shell(builder)
+        .plugin(fence::plugin())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -79,6 +84,8 @@ pub fn start_core<R: Runtime>(app: &AppHandle<R>) {
     std::thread::spawn(move || {
         let core = core_link::open(&app);
         app.state::<Bridge>().set_core(core);
+        // The Edit menu names the undo the journal kept, before any change.
+        menu::load_history(&app);
     });
 }
 

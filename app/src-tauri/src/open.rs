@@ -127,6 +127,16 @@ pub fn from_args(args: impl IntoIterator<Item = String>) -> Vec<PathBuf> {
         .collect()
 }
 
+/// The same, for a second launch that handed its arguments to this app: a
+/// relative path means a file in the folder that launch started in (`cwd`),
+/// so `wi-wwav song.wwav` opens that song.
+pub fn from_args_in(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<PathBuf> {
+    from_args(args)
+        .into_iter()
+        .map(|p| if p.is_relative() { cwd.join(p) } else { p })
+        .collect()
+}
+
 fn focus_main<R: Runtime>(app: &AppHandle<R>) {
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.unminimize();
@@ -209,5 +219,20 @@ mod tests {
     fn the_command_line_gives_paths_but_not_the_program_or_flags() {
         let args = ["wi-wwav", "--flag", "/a/World Ending.wwav"].map(String::from);
         assert_eq!(from_args(args), [PathBuf::from("/a/World Ending.wwav")]);
+    }
+
+    /// A second launch (`cd ~/Music && wi-wwav song.wwav`) hands this app its
+    /// folder: a relative path is read there, an absolute one as it is.
+    #[test]
+    fn a_second_launchs_relative_paths_are_read_in_its_folder() {
+        let args = ["wi-wwav", "song.wwav", "/b/Low Tide.wwav", "../c/x.swav"].map(String::from);
+        assert_eq!(
+            from_args_in(args, Path::new("/home/me/Music")),
+            [
+                PathBuf::from("/home/me/Music/song.wwav"),
+                PathBuf::from("/b/Low Tide.wwav"),
+                PathBuf::from("/home/me/Music/../c/x.swav"),
+            ]
+        );
     }
 }

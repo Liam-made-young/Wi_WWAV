@@ -2,16 +2,18 @@
 //!
 //! There is one Tauri command, `core`, taking `{cmd, args}`. Each window's
 //! capability lists the `cmd`s it may send (docs/SPEC.md 9.8), so the
-//! settings window can't publish and the checkout window, which has no
-//! capability, can't call anything. The core's events go to the main window
-//! as one Tauri event, `core`, carrying `{event, payload}`, the shape the dev
-//! bridge pushes over its WebSocket. Meters go to a channel as raw bytes.
+//! settings window can't publish and a window in no capability file, such
+//! as one that shows someone else's page, can't call anything. The core's
+//! events go to the main window as one Tauri event, `core`, carrying
+//! `{event, payload}`, the shape the dev bridge pushes over its WebSocket.
+//! Meters go to a channel as raw bytes.
 //!
 //! Two `cmd`s are the shell's own rather than the core's:
 //!
 //! - `meters.listen {channel}` names the channel meters go to.
-//! - `shell.room {room}` says which room is showing, so the Edit menu can
-//!   name that room's undo (docs/SPEC.md 2.7).
+//! - `shell.room {room}` says which view is showing (`heat`, `space`,
+//!   `console`, or `library` for the drawer over them), so the Edit menu can
+//!   name that view's undo (docs/SPEC.md 2.7).
 
 use std::sync::{Arc, Condvar, Mutex};
 

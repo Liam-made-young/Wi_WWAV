@@ -1,12 +1,12 @@
-//! Reviewer's test (exposes a finding; ignored until fixed): after a
-//! relaunch, the Edit menu names the undo the journal kept (docs/SPEC.md
-//! 2.7: "Undo is ⌘Z everywhere ... and always labelled"; docs/PLAN.md F5: a
-//! label survives a relaunch).
+//! Reviewer's test: after a relaunch, the Edit menu names the undo the
+//! journal kept (docs/SPEC.md 2.7: "Undo is ⌘Z everywhere ... and always
+//! labelled"; docs/PLAN.md F5: a label survives a relaunch).
 //!
-//! The shell learns labels only from the core's `history` event (sent after
-//! a change) or from `shell.room` (sent by the UI when it changes rooms). At
-//! launch neither happens: the app opens on Heat, the shell's default, so the
-//! Edit menu reads a greyed "Undo" while Heat's journal holds "add task".
+//! The shell learns labels from the core's `history` event (sent after a
+//! change) or from `shell.room` (sent by the UI when it changes views). At
+//! launch neither happens, so once the core is open the shell asks for the
+//! labels of the view the app opens on, Heat: until it did, the Edit menu
+//! read a greyed "Undo" while Heat's journal held "add task".
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -30,7 +30,6 @@ fn edit_item(app: &App<MockRuntime>, id: &str) -> (String, bool) {
 }
 
 #[test]
-#[ignore = "review finding: at launch the Edit menu never asks the core for the current room's history, so a kept undo reads as a greyed 'Undo'"]
 fn after_a_relaunch_the_edit_menu_names_the_kept_undo() {
     let library = tempfile::tempdir().unwrap();
     let engine = library.path().join("no-engine");

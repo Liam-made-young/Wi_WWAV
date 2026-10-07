@@ -8,19 +8,23 @@ hosts it. What the web UI sees of the shell:
 |---|---|---|
 | Command | `invoke('core', {cmd, args})` → result, or `{code, message}` | Every cmd of `docs/COMMANDS.md`, as far as the window's capability allows |
 | Command | `core` `meters.listen {channel}` → `{}` | Meters arrive on that `Channel` as an `ArrayBuffer`, the newest entry, at most once a frame |
-| Command | `core` `shell.room {room}` → `{}` | The room now showing (`heat`, `space`, `console`, `unquantized`, `library`), so the Edit menu names its undo and View ticks it |
+| Command | `core` `shell.room {room}` → `{}` | The view now showing (`heat`, `space`, `console`, or `library` for the drawer over them), so the Edit menu names its undo and View ticks it. The View menu's tick follows this, never the click: choosing the view already showing, or one the UI declines, leaves the tick where it was |
 | Event | `listen('core', e => …)`, `e.payload` = `{event, payload}` | Every core event, the same shape the dev bridge pushes, only to the main window |
-| Event | `{event: "menu", payload: {action}}` | A menu item the UI acts on: `session.new`, `export.everything`, `disc.make`, `history.undo`, `history.redo`, `library.toggle`, `room.heat`, `room.space`, `room.console`, `room.unquantized` |
+| Event | `{event: "menu", payload: {action}}` | A menu item the UI acts on: `session.new`, `export.everything`, `history.undo`, `history.redo`, `library.toggle`, `room.heat`, `room.space`, `room.console` (⌘1–⌘3: there are three views, and no ⌘4) |
 | Event | `{event: "open", payload: {clips} \| {sessions} \| {error}}` | Files opened from outside: songs and films already imported through `library.import`, sessions as paths for the Console |
 | Event | `{event: "status", payload: {area: "update", sentence}}` | "Update ready · installs when you quit" |
 
 On Linux a menu's keys never reach the page (GTK hands Ctrl+1 to the menu
-first; the end-to-end check shows it), so the room keys arrive only as
+first; the end-to-end check shows it), so the view keys arrive only as
 `menu` events, and the UI must act on those as on its own keys. On macOS
 WKWebView offers ⌘1 to the page first, and one the page handles with
 `preventDefault` should not reach the menu as well; that is still to check
 on a Mac. The Undo item replaces the system's, so when a text field
 has focus the UI should treat `history.undo` as `document.execCommand('undo')`.
+
+On Linux and Windows a second launch (`wi-wwav song.wwav`, a file manager)
+hands its paths to the app that is open and leaves; a relative path is read
+in the folder the second launch started in.
 
 The settings window loads `index.html?window=settings`.
 
@@ -32,8 +36,12 @@ The settings window loads `index.html?window=settings`.
   and the system's open and save pickers (`plugin:dialog|open`, `save`).
 - `settings.json`: `app.hello`, `app.settings.*`, `account.*`, `engine.*`,
   `library.cleanup.*`, `library.trash.empty`, and the open picker.
-- A window in no file, like the checkout window that shows Stripe's page,
-  can call nothing. No window can drive the updater.
+- A window in no file, such as one that shows someone else's page, can call
+  nothing. No window can drive the updater.
+- No window can leave the app: a navigation to anything but the app's own
+  pages (`tauri://localhost`, or `tauri.localhost` on Windows; the Vite
+  server in a development build) is cancelled (`src/fence.rs`, 9.8: "no
+  remote scripts load").
 
 `build.rs` declares `core` in the app's manifest; without that, Tauri lets
 every local window call it.
