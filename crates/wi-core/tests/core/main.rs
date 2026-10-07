@@ -3,6 +3,8 @@
 
 mod account;
 mod common;
+mod export;
+mod heat;
 mod history;
 mod library;
 mod player;
