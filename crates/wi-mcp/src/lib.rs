@@ -20,7 +20,7 @@ pub const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-2
 
 pub const SERVER_NAME: &str = "wi-wwav";
 
-const INSTRUCTIONS: &str = "Learn, the planner in Wi_WWAV, on this Mac: tasks, the schedule, grades, focus time, habits, projects, notes, the inbox and school mail. Claude estimates and drafts; the person decides: nothing here marks anything done, enters a score, ticks a habit, deletes, or makes anything public. Restate only numbers these tools return.";
+const INSTRUCTIONS: &str = "Learn, the planner in Wi_WWAV, on this Mac: tasks, the schedule, grades, focus time, habits, projects, notes, the inbox and mail from each of the person's accounts. Claude estimates and drafts; the person decides: nothing here marks anything done, enters a score, ticks a habit, deletes, or makes anything public. Restate only numbers these tools return.";
 
 /// One plain sentence for Claude, returned with the error flag set.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -171,7 +171,7 @@ fn error(id: Value, code: i64, message: &str) -> Value {
 
 /// Checks arguments against one of [`tools::input_schema`]'s schemas: the
 /// subset they use (object, string, integer, enum, required, lengths,
-/// minimum and maximum, pattern, and closed properties). Says what is wrong
+/// minimum and maximum, pattern, a list's size, and closed properties). Says what is wrong
 /// in one sentence.
 pub fn check(schema: &Value, args: &Map<String, Value>) -> Result<(), String> {
     let props = schema.get("properties").and_then(Value::as_object).cloned().unwrap_or_default();
@@ -241,6 +241,23 @@ fn check_value(key: &str, schema: &Value, value: &Value) -> Result<(), String> {
             if let Some(max) = schema.get("maximum").and_then(Value::as_i64) {
                 if n > max {
                     return Err(format!("\"{key}\" must be at most {max}."));
+                }
+            }
+            Ok(())
+        }
+        // An array's own rules are the store's to check (its items are objects).
+        Some("array") => {
+            let Some(items) = value.as_array() else {
+                return Err(format!("\"{key}\" must be a list."));
+            };
+            if let Some(min) = schema.get("minItems").and_then(Value::as_u64) {
+                if (items.len() as u64) < min {
+                    return Err(format!("\"{key}\" can't be empty."));
+                }
+            }
+            if let Some(max) = schema.get("maxItems").and_then(Value::as_u64) {
+                if items.len() as u64 > max {
+                    return Err(format!("\"{key}\" holds more than {max}."));
                 }
             }
             Ok(())

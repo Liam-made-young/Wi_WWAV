@@ -625,7 +625,10 @@ fn the_school_sheet_is_kept_checked_and_its_link_goes_to_the_keychain() {
         shown["school"],
         json!({"name": "URI", "host": "brightspace.uri.edu", "codePattern": "^([A-Z]{3})\\s?(\\d{3})", "termStart": "2026-08-31", "termEnd": "2026-12-18", "icalSaved": true})
     );
-    assert!(!shown.to_string().contains(TOKEN), "the address is in the snapshot");
+    assert!(
+        !shown.to_string().contains(TOKEN),
+        "the address is in the snapshot"
+    );
     assert_eq!(sync_line(&core), "Synced 8:40 AM: 9 new tasks");
     // A pattern of the school's own picks the course out of the feed.
     ok(
@@ -681,4 +684,95 @@ fn s2_6_the_first_sync_after_moving_in_finds_the_moved_tasks_already_there() {
         assert!(all.iter().any(|t| t["id"] == id), "{id}");
     }
     assert_eq!(sync_line(&core), "Synced 8:40 AM: nothing new");
+}
+
+/// Mail accounts (3.10): the whole list is set at once, comes back with the
+/// snapshot, and holds nothing but addresses. Fails if a bad list is kept, or
+/// two accounts could be forwarded to one address and so not told apart.
+#[test]
+fn mail_accounts_are_set_whole_and_come_back_with_the_snapshot() {
+    let setup = Setup::new();
+    let core = heat_core_on(&setup, NOW, NO_SERVER);
+    assert_eq!(snap(&core, "2026-10-06")["mailAccounts"], json!([]));
+    let set = ok(
+        &core,
+        "heat.mail.accounts.set",
+        json!({"accounts": [
+            {"address": "Liam.Young@uri.edu", "name": "URI"},
+            {"address": "made.liamyoung@gmail.com", "via": "forward", "forwardTo": "liam.young+personal@uri.edu"}
+        ]}),
+    );
+    let kept = json!([
+        {"address": "liam.young@uri.edu", "name": "URI", "via": "connector"},
+        {"address": "made.liamyoung@gmail.com", "name": "made.liamyoung@gmail.com", "via": "forward", "forwardTo": "liam.young+personal@uri.edu"}
+    ]);
+    assert_eq!(set["accounts"], kept);
+    assert_eq!(snap(&core, "2026-10-06")["mailAccounts"], kept);
+    let bad = refused(
+        &core,
+        "heat.mail.accounts.set",
+        json!({"accounts": [{"address": "made.liamyoung@gmail.com", "via": "forward"}]}),
+    );
+    assert_eq!(
+        bad.1,
+        "Say where made.liamyoung@gmail.com is forwarded to, such as you+school@gmail.com."
+    );
+    assert_eq!(
+        snap(&core, "2026-10-06")["mailAccounts"],
+        kept,
+        "a refused list changes nothing"
+    );
+    assert_eq!(
+        ok(&core, "heat.mail.accounts.set", json!({"accounts": []}))["accounts"],
+        json!([])
+    );
+}
+
+/// Mail's text (3.10) is read through `heat.mail.text`, and stays on this
+/// Mac: an export holds none of it. Fails if a thread with nothing saved
+/// answers anything but null, or the text is in the exported records.
+#[test]
+fn mail_text_is_read_by_thread_and_left_out_of_an_export() {
+    let setup = Setup::new();
+    let core = heat_core_on(&setup, NOW, NO_SERVER);
+    snap(&core, "2026-10-06");
+    assert_eq!(
+        ok(&core, "heat.mail.text", json!({"threadId": "th-1"})),
+        json!({"messages": null})
+    );
+    {
+        let mut store = wi_store::Store::open(&setup.library()).unwrap();
+        let args = json!({"thread_id": "th-1", "subject": "Quiz", "from": "Prof", "received_at": "2026-10-06T08:00:00-04:00", "state": "nothing", "reason": "Nothing to do."});
+        let clock = wi_heat_store::Clock::system();
+        wi_heat_store::mcp::call(
+            &mut store,
+            &clock,
+            "record_mail_thread",
+            args.as_object().unwrap(),
+        )
+        .unwrap();
+        let text = json!({"thread_id": "th-1", "messages": [{"from": "Prof", "sent_at": "2026-10-06T08:00:00-04:00", "text": "The quiz is on Thursday. UNIQUE-MAIL-WORDS"}]});
+        wi_heat_store::mcp::call(
+            &mut store,
+            &clock,
+            "save_mail_text",
+            text.as_object().unwrap(),
+        )
+        .unwrap();
+    }
+    let read = ok(&core, "heat.mail.text", json!({"threadId": "th-1"}));
+    assert_eq!(
+        read["messages"][0]["text"],
+        "The quiz is on Thursday. UNIQUE-MAIL-WORDS"
+    );
+    assert_eq!(read["messages"][0]["from"], "Prof");
+
+    let out = setup.dir.path().join("export");
+    ok(&core, "export.everything", json!({"to": out}));
+    let exported = std::fs::read_to_string(out.join("heat.json")).unwrap();
+    assert!(exported.contains("Quiz"), "the thread's record is exported");
+    assert!(
+        !exported.contains("UNIQUE-MAIL-WORDS"),
+        "the mail's text is in the export"
+    );
 }

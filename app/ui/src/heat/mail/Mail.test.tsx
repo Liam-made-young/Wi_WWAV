@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mailTexts } from '../fake/settings';
 import { $, $$, button, click, mountHeat, press, type Rig, settle } from '../testkit';
 
 // docs/SPEC.md 3.10 and docs/PLAN.md S2.4. What a fail looks like: a thread
@@ -46,8 +47,10 @@ describe('Mail', () => {
     expect(text($(pane, '.heat-pane-from'))).toBe('Prof. Tanaka · 7:00 AM');
     expect(text($(pane, '.heat-pane-facts'))).toBe('CourseJPN 201StateTask made');
     expect(text($(pane, '.heat-mail-reason'))).toBe('The email moves the quiz, so the task’s due date matches.');
-    // Heat keeps no message body, and says so.
-    expect(text(pane)).toContain('The message itself stays in Gmail.');
+    // Before Claude has saved the thread's text, the reader says so and offers Gmail.
+    expect(text($(pane, '.heat-mail-reader'))).toBe(
+      'Claude hasn’t saved this thread’s text yet. Ask Claude to read your mail, or open it in Gmail.',
+    );
     await click(button(pane, 'Task: Grammar quiz 4'));
     expect($(rig, '[role="tab"][aria-selected="true"]')!.textContent).toBe('Tasks');
     expect($(rig, '.heat-info')).toBeTruthy();
@@ -167,5 +170,90 @@ describe('what Mail can’t do', () => {
     await click(button(panel(), 'Open in Gmail'));
     expect(rig.calls.filter((c) => /^heat\.(put|patch|delete|public)/.test(c.cmd))).toEqual([]);
     expect(rig.fake.journal).toEqual([]);
+  });
+
+  it('switches between accounts and reads in sections once Claude has sorted by priority', async () => {
+    await open();
+    // Before any account or priority, Mail is one list with no switcher.
+    expect($$(rig, '.heat-mail-account')).toEqual([]);
+    expect($$(panel(), '.heat-mail-section')).toEqual([]);
+
+    await rig.call('heat.mail.accounts.set', {
+      accounts: [
+        { address: 'liam.young@uri.edu', name: 'URI', via: 'forward', forwardTo: 'me+uri@gmail.com' },
+        { address: 'me@gmail.com', name: 'Personal', via: 'connector' },
+      ],
+    });
+    const [newest, middle, oldest] = [...rig.fake.store.mailThread.values()].sort((a, b) => b.receivedAt - a.receivedAt);
+    Object.assign(newest, { account: 'liam.young@uri.edu', priority: 'normal', category: 'school' });
+    Object.assign(middle, { account: 'liam.young@uri.edu', priority: 'urgent', category: 'school' });
+    Object.assign(oldest, { account: 'me@gmail.com', priority: 'high', category: 'money' });
+    rig.fake.emit(['mailThread']);
+    await settle();
+
+    // Most pressing first, whatever arrived last, each under its section.
+    expect($$(panel(), '.heat-mail-section').map((s) => text(s))).toEqual(['Urgent', 'High', 'Everything else']);
+    expect(rows().map((r) => r.querySelector('.heat-thread-subject')!.textContent)).toEqual([
+      middle.subject,
+      oldest.subject,
+      newest.subject,
+    ]);
+    expect(rows().map((r) => r.getAttribute('data-priority'))).toEqual(['urgent', 'high', null]);
+    expect(text(rows()[1])).toContain('Money');
+    const accounts = () => $$(rig, '.heat-mail-account').map((a) => text(a));
+    expect(accounts()).toEqual(['All accounts3', 'URI2', 'Personal1']);
+    // The states are still the sidebar's last four rows.
+    expect($$(rig, '.heat-sidebar .heat-side-row').map((r) => text(r)).slice(-4)[0]).toBe('All3');
+
+    await click($$(rig, '.heat-mail-account')[2]);
+    expect(rows().map((r) => r.querySelector('.heat-thread-subject')!.textContent)).toEqual([oldest.subject]);
+    expect($$(rig, '.heat-sidebar .heat-side-row').map((r) => text(r)).slice(-4)[0]).toBe('All1');
+    expect(text($(panel(), '.heat-pane-facts'))).toContain('PriorityHigh');
+    expect(text($(panel(), '.heat-pane-facts'))).toContain('Accountme@gmail.com');
+    await click($$(rig, '.heat-mail-account')[0]);
+    expect(rows()).toHaveLength(3);
+  });
+
+  it('reads a thread in the reader: each message as plain text, with links and quotes, and no HTML', async () => {
+    await open();
+    const first = [...rig.fake.store.mailThread.values()].sort((a, b) => b.receivedAt - a.receivedAt)[0];
+    const texts = new Map([
+      [
+        first.gmailThreadId,
+        [
+          { id: 'm1', from: 'Liam Young <liam.young@uri.edu>', sentAt: first.receivedAt - 3_600_000, text: 'Could the quiz move?' },
+          {
+            id: 'm2',
+            from: 'Prof. Tanaka <tanaka@uri.edu>',
+            to: 'liam.young@uri.edu',
+            sentAt: first.receivedAt,
+            text: 'Yes.\nIt is Thursday now.\n\nSee https://brightspace.uri.edu/d2l/home.\n\n> Could the quiz move?\n\n<img src=x onerror=alert(1)>',
+          },
+        ],
+      ],
+    ]);
+    mailTexts.set(rig.fake, texts);
+    rig.fake.emit(['mailThread']);
+    await settle();
+
+    const messages = $$(panel(), '.heat-mail-message');
+    expect(messages.map((m) => text($(m, '.heat-mail-message-from')))).toEqual(['Liam Young', 'Prof. Tanaka']);
+    expect(text($(messages[1], '.heat-mail-message-to'))).toBe('To liam.young@uri.edu');
+    const body = $(messages[1], '.heat-mail-text')!;
+    expect([...body.children].map((c) => c.tagName)).toEqual(['P', 'P', 'BLOCKQUOTE', 'P']);
+    expect(body.children[0].querySelectorAll('br')).toHaveLength(1);
+    expect(text(body.children[2])).toBe('Could the quiz move?');
+    // An address is a link that opens in the browser, without the sentence's full stop.
+    const link = $(body, 'a.heat-mail-address')!;
+    expect(link.textContent).toBe('https://brightspace.uri.edu/d2l/home');
+    await click(link);
+    expect(window.open).toHaveBeenCalledWith('https://brightspace.uri.edu/d2l/home', expect.anything(), expect.anything());
+    // Markup in a message is its words, never an element.
+    expect(body.querySelector('img')).toBeNull();
+    expect(text(body.children[3])).toBe('<img src=x onerror=alert(1)>');
+    // Another thread has none saved yet.
+    await click(rows()[1]);
+    await settle();
+    expect(text($(panel(), '.heat-mail-reader'))).toContain('Claude hasn’t saved this thread’s text yet.');
   });
 });

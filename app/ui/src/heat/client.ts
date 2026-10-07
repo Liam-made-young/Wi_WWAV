@@ -178,6 +178,29 @@ export interface MailThread {
   reason: string;
   taskId?: Id;
   recordedBy: 'claude';
+  /** The mail account it is from: an address in `Snapshot.mailAccounts`. */
+  account?: string;
+  /** How pressing Claude found it. None reads as normal. */
+  priority?: 'urgent' | 'high' | 'normal' | 'low';
+  category?: 'school' | 'work' | 'money' | 'people' | 'updates' | 'promotions' | 'other';
+}
+
+/** One message of a thread as Claude saved it for Mail's reader: plain text, kept on this Mac. */
+export interface MailMessage {
+  id?: string;
+  from: string;
+  to?: string;
+  sentAt: number;
+  text: string;
+}
+
+/** A mail account Claude reads (docs/SPEC.md 3.10). Learn holds no password for it. */
+export interface MailAccount {
+  address: string;
+  name: string;
+  /** `connector`: the mailbox Claude's Gmail connector reads. `forward`: forwarded into it. */
+  via: 'connector' | 'forward';
+  forwardTo?: string;
 }
 
 export interface Calendar {
@@ -318,6 +341,8 @@ export interface Snapshot {
   events: CalendarEvent[];
   /** The School sheet as saved, or null before one is; beyond docs/HEAT.md. */
   school?: School | null;
+  /** The mail accounts, for Mail's switcher; beyond docs/HEAT.md. */
+  mailAccounts?: MailAccount[];
   derived: {
     tasks: Record<Id, TaskDerived>;
     today: {
@@ -426,6 +451,10 @@ export function heatClient(t: Transport = real) {
     reviewComplete: (weekStart: DayKey, note: string) => c<{ note: Note } & Undo>('heat.review.complete', { weekStart, note }),
     importArtifact: (json: unknown) => c<{ counts: Record<string, number> } & Undo>('heat.import', { json }),
 
+    mail: {
+      /** A thread's saved text, by Gmail's thread id; null before Claude has saved it. */
+      text: (threadId: string) => c<{ messages: MailMessage[] | null }>('heat.mail.text', { threadId }),
+    },
     calendars: {
       add: (name: string, kind: Calendar['kind'], url: string) => c<{ calendar: Calendar }>('heat.calendars.add', { name, kind, url }),
       remove: (id: Id) => c<Record<string, never>>('heat.calendars.remove', { id }),

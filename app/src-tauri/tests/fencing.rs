@@ -118,6 +118,7 @@ fn the_settings_window_reaches_only_what_settings_need() {
         "heat.patch",
         "heat.delete",
         "heat.school.set",
+        "heat.mail.accounts.set",
         "heat.calendars.add",
         "heat.calendars.remove",
         "heat.calendars.sync",

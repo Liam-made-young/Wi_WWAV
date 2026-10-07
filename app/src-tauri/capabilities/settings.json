@@ -18,6 +18,7 @@
         { "cmd": "heat.patch" },
         { "cmd": "heat.delete" },
         { "cmd": "heat.school.set" },
+        { "cmd": "heat.mail.accounts.set" },
         { "cmd": "heat.calendars.*" },
         { "cmd": "heat.claude.*" },
         { "cmd": "heat.public.set" },

@@ -4,13 +4,35 @@
 // goes to the Keychain and never comes back: a calendar keeps a reference,
 // and the school only says whether a link is saved.
 
-import type { Calendar, Id, School } from '../client';
+import type { Calendar, Id, MailAccount, MailMessage, School } from '../client';
 import { derive, type Fake, refuse, register } from './core';
 
 const schools = new WeakMap<Fake, School>();
 
+const mailAccounts = new WeakMap<Fake, MailAccount[]>();
+
 derive((snap, fake) => {
   snap.school = schools.get(fake) ?? null;
+  snap.mailAccounts = mailAccounts.get(fake) ?? [];
+});
+
+register('heat.mail.accounts.set', (args, fake) => {
+  const list = (Array.isArray(args.accounts) ? args.accounts : []) as Partial<MailAccount>[];
+  const kept: MailAccount[] = [];
+  for (const a of list) {
+    const address = String(a.address ?? '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) refuse('A mail account needs its address, such as name@school.edu.');
+    if (kept.some((k) => k.address === address)) refuse(`${address} is in the list twice.`);
+    const name = String(a.name ?? '').trim() || address;
+    if (a.via === 'forward') {
+      const forwardTo = String(a.forwardTo ?? '').trim().toLowerCase();
+      if (!forwardTo.includes('@')) refuse(`Say where ${address} is forwarded to, such as you+school@gmail.com.`);
+      kept.push({ address, name, via: 'forward', forwardTo });
+    } else kept.push({ address, name, via: 'connector' });
+  }
+  mailAccounts.set(fake, kept);
+  fake.emit([]);
+  return { accounts: kept };
 });
 
 register('heat.school.set', (args, fake) => {
@@ -69,3 +91,10 @@ register('heat.calendars.remove', (args, fake) => {
   fake.write('delete calendar', ['calendar'], () => fake.store.calendar.delete(id));
   return {};
 });
+
+/** The text Claude saved for each thread, by Gmail's thread id. A test puts it here. */
+export const mailTexts = new WeakMap<Fake, Map<string, MailMessage[]>>();
+
+register('heat.mail.text', (args, fake) => ({
+  messages: mailTexts.get(fake)?.get(String(args.threadId)) ?? null,
+}));

@@ -135,3 +135,87 @@
   border-left: var(--desk-select-bar) solid var(--desk-highlight);
   background: var(--desk-stripe);
 }
+
+/* The list's sections once Claude has sorted by priority, and the mark on a
+   pressing thread: a shape beside the sender, never colour alone, since the
+   section's name says it too. */
+.heat-mail-section {
+  margin: 0;
+  padding: var(--space-s1) var(--space-s3);
+  font-size: var(--type-desk-small);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-thread[data-priority] .heat-thread-from::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-s2);
+  content: '';
+  border-radius: 50%;
+  background: var(--heat-warm);
+}
+
+.heat-thread[data-priority='urgent'] .heat-thread-from::before {
+  background: var(--heat-hot);
+}
+
+/* The reader: each message's own words on the well, in a measure made for
+   reading, with nothing of the sender's styling. */
+.heat-mail-reader {
+  margin-top: var(--space-s3);
+  padding-top: var(--space-s3);
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+.heat-mail-message {
+  max-width: 68ch;
+  margin-bottom: var(--space-s4);
+}
+
+.heat-mail-message-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-s3);
+}
+
+.heat-mail-message-from {
+  font-weight: bold;
+}
+
+.heat-mail-message-to {
+  margin: 0;
+  font-size: var(--type-desk-small);
+}
+
+.heat-mail-text {
+  margin-top: var(--space-s2);
+  padding: var(--space-s3) var(--space-s4);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: text;
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+}
+
+.heat-mail-text p,
+.heat-mail-quote {
+  margin: 0 0 var(--space-s3);
+}
+
+.heat-mail-text > :last-child {
+  margin-bottom: 0;
+}
+
+.heat-mail-quote {
+  padding-left: var(--space-s3);
+  color: var(--desk-ink2);
+  border-left: 2px solid var(--desk-deck-edge);
+}
+
+.heat-mail-address {
+  color: inherit;
+  text-decoration: underline;
+}

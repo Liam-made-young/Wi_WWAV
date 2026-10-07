@@ -411,14 +411,14 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
 
     // Every record, by kind, each with its Public switch (3.14). What isn't a
     // record is left out: the timer, the settings, and what other calendars'
-    // feeds held. The calendars' addresses are in the Keychain, not here (3.11).
+    // feeds held. The calendars' addresses are in the Keychain, not here (3.11),
+    // and the text of your mail stays in Gmail and on this Mac (3.10).
     let kinds =
         i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")?;
     let mut records = Map::new();
-    for kind in kinds
-        .iter()
-        .filter(|k| !["heatState", "heatSetting", "calendarEvent"].contains(&k.as_str()))
-    {
+    for kind in kinds.iter().filter(|k| {
+        !["heatState", "heatSetting", "calendarEvent", "mailText"].contains(&k.as_str())
+    }) {
         let docs = i.store().docs(kind)?;
         let switch = [
             "task",

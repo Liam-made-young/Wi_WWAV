@@ -1,20 +1,22 @@
-// Mail (docs/SPEC.md 3.10): the school threads Claude has recorded, and
-// nothing more. Heat reads no Gmail and keeps no message body, so there is
-// nothing to render and no remote images to block. A 320 px thread list and a
-// pane for the one selected; the sidebar holds All and the three states with
-// counts. Each thread has one action bar: Open in Gmail (the tab's secondary
+// Mail (docs/SPEC.md 3.10): the threads Claude has recorded from each of
+// your mail accounts, sorted by how pressing it found them, and each read in a reader view (Reader.tsx). Learn reads no Gmail itself: the
+// text is what Claude saved, plain, so there is no HTML and no remote image
+// to block. A 320 px thread list and a
+// pane for the one selected; the sidebar switches between accounts, then
+// holds All and the three states with counts. Each thread has one action bar: Open in Gmail (the tab's secondary
 // act) and Make a task (T). Mail has no reply, send or delete: Gmail already
 // does those, and Wi_WWAV never touches your mailbox.
 
-import { useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clockAt, shortMonthDay } from '../../shared/time/format';
 import { dayKey } from '../../shared/time/zone';
-import type { Id, MailThread } from '../client';
+import type { Id, MailAccount, MailThread } from '../client';
 import { openExternal } from '../external';
 import { copy, plural } from '../fmt';
 import { useFrame, useSelection, useSheets, useSidebarSlot, useSpaceFilter, useTabActs, useTabKeys } from '../frame';
 import { useHeat } from '../store';
+import { Reader } from './Reader';
 import './mail.css';
 
 type Filter = 'all' | MailThread['state'];
@@ -29,6 +31,25 @@ const WORD = { grade: copy.mail.gradePosted, task: copy.mail.taskMade, nothing: 
 
 const senderOf = (from: string) => from.replace(/<.*>/, '').trim() || from;
 
+type Priority = NonNullable<MailThread['priority']>;
+/** The list's sections, most pressing first. "Everything else" is normal and low. */
+const SECTIONS: { id: 'urgent' | 'high' | 'rest'; label: string }[] = [
+  { id: 'urgent', label: 'Urgent' },
+  { id: 'high', label: 'High' },
+  { id: 'rest', label: 'Everything else' },
+];
+const PRIORITY: Record<Priority, string> = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' };
+const CATEGORY: Record<NonNullable<MailThread['category']>, string> = {
+  school: 'School',
+  work: 'Work',
+  money: 'Money',
+  people: 'People',
+  updates: 'Updates',
+  promotions: 'Promotions',
+  other: 'Other',
+};
+const sectionOf = (m: MailThread) => (m.priority === 'urgent' || m.priority === 'high' ? m.priority : 'rest');
+
 export function Mail() {
   const { snap, idx, tz, date } = useHeat();
   const { spaceId } = useSpaceFilter();
@@ -37,36 +58,61 @@ export function Mail() {
   const { newTask } = useSheets();
   const slot = useSidebarSlot();
   const [state, setState] = useState<Filter>('all');
+  const [account, setAccount] = useState<string | null>(null);
   const [picked, setPicked] = useState<Id | null>(null);
   const [filter, setFilter] = useState('');
   const filterField = useRef<HTMLInputElement>(null);
 
-  // A thread belongs to its task's space; a thread with none is school mail, which is Classes' kind of work.
+  // A thread belongs to its task's space; one with no task is school mail, which is Classes' kind of
+  // work, unless Claude sorted it into another category.
   const inSpace = (m: MailThread) => {
     if (!spaceId) return true;
     const task = m.taskId ? idx.task.get(m.taskId) : undefined;
-    return task ? task.spaceId === spaceId : idx.space.get(spaceId)?.groupKind === 'course';
+    if (task) return task.spaceId === spaceId;
+    return idx.space.get(spaceId)?.groupKind === 'course' && (!m.category || m.category === 'school');
   };
   // Newest first, as the Mail widget has it.
-  const here = useMemo(
+  const inSpaceNow = useMemo(
     () => [...(snap?.records.mailThread ?? [])].filter(inSpace).sort((a, b) => b.receivedAt - a.receivedAt),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [snap, spaceId, idx],
   );
+  // The switcher: the accounts from Settings → Learn, then any address a thread carries that
+  // has since left the list, so no thread is ever out of reach.
+  const accounts = useMemo(() => {
+    const listed: MailAccount[] = snap?.mailAccounts ?? [];
+    const stray = [...new Set(inSpaceNow.map((m) => m.account).filter((a): a is string => !!a))]
+      .filter((a) => !listed.some((l) => l.address === a))
+      .map((a): MailAccount => ({ address: a, name: a, via: 'connector' }));
+    return [...listed, ...stray];
+  }, [snap, inSpaceNow]);
+  const picking = account !== null && accounts.some((a) => a.address === account) ? account : null;
+  const here = picking ? inSpaceNow.filter((m) => m.account === picking) : inSpaceNow;
   const needle = filter.trim().toLowerCase();
-  const threads = here.filter(
+  const matching = here.filter(
     (m) =>
       (state === 'all' || m.state === state) &&
-      (!needle || `${m.subject} ${m.from} ${m.course ?? ''}`.toLowerCase().includes(needle)),
+      (!needle || `${m.subject} ${m.from} ${m.course ?? ''} ${m.category ?? ''}`.toLowerCase().includes(needle)),
   );
+  // Once Claude has marked anything urgent or high, the list reads in sections, most pressing
+  // first and newest first inside each. Until then it is one list, as before.
+  const sorted = matching.some((m) => sectionOf(m) !== 'rest');
+  const threads = sorted ? SECTIONS.flatMap((s) => matching.filter((m) => sectionOf(m) === s.id)) : matching;
   const current = threads.find((m) => m.id === picked) ?? threads[0] ?? null;
 
-  const openInGmail = () => current && openExternal(copy.mailUi.gmailUrl(current.gmailThreadId));
+  // Every thread lives in the one mailbox Claude's connector reads, forwarded or not, so that is
+  // the mailbox Gmail is asked to open. With no accounts set up, it is the browser's first one.
+  const mailbox = snap?.mailAccounts?.find((a) => a.via === 'connector')?.address;
+  const gmailUrl = (threadId: string) =>
+    mailbox
+      ? `https://mail.google.com/mail/?authuser=${encodeURIComponent(mailbox)}#all/${threadId}`
+      : copy.mailUi.gmailUrl(threadId);
+  const openInGmail = () => current && openExternal(gmailUrl(current.gmailThreadId));
   const makeTask = () =>
     current &&
     newTask({
       title: current.subject,
-      notes: `${copy.mail.fromMail} ${copy.mailUi.gmailUrl(current.gmailThreadId)}`,
+      notes: `${copy.mail.fromMail} ${gmailUrl(current.gmailThreadId)}`,
       ...(spaceId ? { spaceId } : {}),
     });
 
@@ -106,6 +152,29 @@ export function Mail() {
       {slot &&
         createPortal(
           <>
+            {accounts.length > 0 && (
+              <>
+                <h2 className="heat-side-heading" data-text="secondary">
+                  Accounts
+                </h2>
+                {[{ address: null as string | null, name: 'All accounts' }, ...accounts].map((a) => (
+                  <button
+                    key={a.address ?? 'all'}
+                    type="button"
+                    className="heat-side-row heat-mail-account"
+                    data-dense
+                    title={a.address ?? undefined}
+                    aria-current={picking === a.address ? 'true' : undefined}
+                    onClick={() => setAccount(a.address)}
+                  >
+                    <span className="heat-side-name">{a.name}</span>
+                    <span className="heat-side-count" data-text="secondary">
+                      {a.address ? inSpaceNow.filter((m) => m.account === a.address).length : inSpaceNow.length}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
             <h2 className="heat-side-heading" data-text="secondary">
               {copy.widgets.mail}
             </h2>
@@ -140,17 +209,25 @@ export function Mail() {
         />
       </header>
       {here.length === 0 ? (
-        <p className="heat-empty">{copy.mailUi.empty}</p>
+        <p className="heat-empty">
+          {picking ? `Nothing recorded from ${picking} yet. Ask Claude to read it.` : copy.mailUi.empty}
+        </p>
       ) : (
         <div className="heat-mail-body">
           <div role="listbox" aria-label="Threads" className="heat-threads">
             {threads.length === 0 && <p className="heat-empty">{copy.status.empty}</p>}
-            {threads.map((m) => (
+            {threads.map((m, n) => (
+              <Fragment key={m.id}>
+                {sorted && (n === 0 || sectionOf(threads[n - 1]) !== sectionOf(m)) && (
+                  <p className="heat-mail-section" role="presentation" data-text="secondary">
+                    {SECTIONS.find((s) => s.id === sectionOf(m))!.label}
+                  </p>
+                )}
               <div
-                key={m.id}
                 role="option"
                 className="heat-thread"
                 data-dense
+                data-priority={sectionOf(m) === 'rest' ? undefined : m.priority}
                 aria-selected={current?.id === m.id}
                 tabIndex={-1}
                 onClick={() => setPicked(m.id)}
@@ -160,9 +237,11 @@ export function Mail() {
                 <span className="heat-thread-subject">{m.subject}</span>
                 <span className="heat-thread-chips">
                   {m.course && <span className="heat-tag">{m.course}</span>}
+                  {m.category && m.category !== 'school' && <span className="heat-tag">{CATEGORY[m.category]}</span>}
                   <span className="heat-tag">{WORD[m.state]}</span>
                 </span>
               </div>
+              </Fragment>
             ))}
           </div>
           {current && (
@@ -182,6 +261,24 @@ export function Mail() {
                   <dt data-text="secondary">State</dt>
                   <dd>{WORD[current.state]}</dd>
                 </div>
+                {current.priority && (
+                  <div>
+                    <dt data-text="secondary">Priority</dt>
+                    <dd>{PRIORITY[current.priority]}</dd>
+                  </div>
+                )}
+                {current.category && (
+                  <div>
+                    <dt data-text="secondary">About</dt>
+                    <dd>{CATEGORY[current.category]}</dd>
+                  </div>
+                )}
+                {current.account && (
+                  <div>
+                    <dt data-text="secondary">Account</dt>
+                    <dd>{current.account}</dd>
+                  </div>
+                )}
               </dl>
               <p className="heat-pane-reason-label" data-text="secondary">
                 {copy.mailUi.claudeReason}
@@ -192,9 +289,6 @@ export function Mail() {
                 onTask={(id) => (setTab('tasks'), selectTask(id))}
                 onGrades={() => setTab('grades')}
               />
-              <p className="why" data-text="secondary">
-                {copy.mailUi.noBody}
-              </p>
               <div className="heat-pane-acts">
                 <button type="button" className="gel" onClick={openInGmail} title="Opens the thread in Gmail (⇧Return)">
                   {copy.mail.openInGmail}
@@ -203,6 +297,7 @@ export function Mail() {
                   {copy.mail.makeTask}
                 </button>
               </div>
+              <Reader key={current.gmailThreadId} threadId={current.gmailThreadId} onOpenInGmail={openInGmail} />
             </section>
           )}
         </div>

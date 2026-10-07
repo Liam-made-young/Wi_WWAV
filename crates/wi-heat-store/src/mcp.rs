@@ -1,7 +1,8 @@
 //! The store side of the MCP tools (docs/SPEC.md 3.13): one function per
 //! tool, each one transaction by Claude, with the tool's name and Claude's
 //! reason on the journal entry. The first eight are the mail and planning
-//! tools; the ten after them read the rest of the view and draft into it. The helper has already checked the
+//! tools; the ten after them read the rest of the view and draft into it;
+//! the last two read the mail accounts and what is recorded from each. The helper has already checked the
 //! arguments against the tool's schema; the rules that need the library
 //! (clamps, dedupe, ids that must exist) live here.
 
@@ -11,11 +12,11 @@ use wi_store::{Actor, Store};
 
 use crate::derive::{self, World};
 use crate::{
-    all, change, kind, num, one, parse_instant, put, refused, round, schema, Clock, Result,
+    all, change, kind, mail, num, one, parse_instant, put, refused, round, schema, Clock, Result,
 };
 
 /// The tools, in 3.13's order.
-pub const TOOLS: [&str; 18] = [
+pub const TOOLS: [&str; 21] = [
     "list_tasks",
     "add_task",
     "update_task",
@@ -34,6 +35,9 @@ pub const TOOLS: [&str; 18] = [
     "add_note",
     "list_inbox",
     "add_capture",
+    "list_mail_accounts",
+    "list_mail",
+    "save_mail_text",
 ];
 
 /// The most days `get_schedule` reads at once.
@@ -77,6 +81,16 @@ pub fn call(
         "add_note" => add_note(store, clock, args),
         "list_inbox" => list_inbox(store),
         "add_capture" => add_capture(store, clock, args),
+        "list_mail_accounts" => list_mail_accounts(store),
+        "list_mail" => list_mail(store, clock, args),
+        "save_mail_text" => mail::save_text(
+            store,
+            clock,
+            text(args, "thread_id").unwrap_or_default(),
+            args.get("messages")
+                .and_then(Value::as_array)
+                .map_or(&[][..], Vec::as_slice),
+        ),
         _ => refused(format!("There's no tool called {tool}.")),
     }
 }
@@ -405,6 +419,22 @@ pub fn record_mail_thread(store: &mut Store, args: &Map<String, Value>) -> Resul
     thread["receivedAt"] = num(received);
     thread["state"] = json!(text(args, "state").unwrap_or("nothing"));
     thread["reason"] = json!(text(args, "reason").unwrap_or_default());
+    // Which mailbox it is from, how pressing it is and what it is about.
+    // A thread read again keeps what it had unless Claude says otherwise.
+    let accounts = mail::accounts(store)?;
+    if let Some(account) = mail::account_for(text(args, "account"), &accounts)? {
+        if text(args, "account").is_some() || thread.get("account").is_none() {
+            thread["account"] = json!(account);
+        }
+    }
+    match text(args, "priority") {
+        Some(p) => thread["priority"] = json!(p),
+        None if thread.get("priority").is_none() => thread["priority"] = json!("normal"),
+        None => {}
+    }
+    if let Some(category) = text(args, "category") {
+        thread["category"] = json!(category);
+    }
     if let Some(course) = text(args, "course") {
         thread["course"] = json!(course);
     }
@@ -905,4 +935,89 @@ pub fn add_capture(store: &mut Store, clock: &Clock, args: &Map<String, Value>) 
         .count()
         + 1;
     Ok(json!({"capture": capture, "in_inbox": waiting, "undo_label": undo}))
+}
+
+/// `list_mail_accounts`: the accounts whose mail Claude reads, the Gmail
+/// search that finds each one's mail, and how many threads are recorded
+/// from each. Read only.
+pub fn list_mail_accounts(store: &Store) -> Result<Value> {
+    let accounts = mail::accounts(store)?;
+    let threads = all(store, kind::MAIL)?;
+    let list: Vec<Value> = accounts
+        .iter()
+        .map(|a| {
+            let at = a["address"].as_str().unwrap_or_default();
+            let forwarded = a["forwardTo"].as_str();
+            json!({
+                "address": at,
+                "name": a["name"],
+                "arrives": match forwarded {
+                    Some(to) => format!("forwarded to {to}, in the mailbox your Gmail tools read"),
+                    None => "in the mailbox your Gmail tools read".to_string(),
+                },
+                "gmail_query": mail::gmail_query(a, &accounts),
+                "recorded": threads.iter().filter(|t| t["account"].as_str() == Some(at)).count(),
+            })
+        })
+        .collect();
+    let mut out = json!({
+        "accounts": list,
+        "priorities": mail::PRIORITIES,
+        "categories": mail::CATEGORIES,
+    });
+    if accounts.is_empty() {
+        out["note"] = json!("No mail account is set up yet. Mail can still be recorded with no account. The person adds accounts in Settings → Learn.");
+    }
+    Ok(out)
+}
+
+/// `list_mail`: the threads recorded so far, newest first, so Claude can see
+/// what it has been through and how it sorted it. Read only.
+pub fn list_mail(store: &Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
+    let account = text(args, "account").map(mail::address);
+    let limit = whole(args, "limit").unwrap_or(50).clamp(1, 200) as usize;
+    let since = text(args, "since").map(parse_instant).transpose()?;
+    let is = |t: &Value, field: &str, want: Option<&str>| {
+        want.map_or(true, |w| t[field].as_str() == Some(w))
+    };
+    let mut threads: Vec<Value> = all(store, kind::MAIL)?
+        .into_iter()
+        .filter(|t| is(t, "account", account.as_deref()))
+        .filter(|t| is(t, "state", text(args, "state")))
+        .filter(|t| is(t, "category", text(args, "category")))
+        .filter(|t| match text(args, "priority") {
+            Some(p) => t["priority"].as_str().unwrap_or("normal") == p,
+            None => true,
+        })
+        .filter(|t| since.map_or(true, |s| t["receivedAt"].as_f64().unwrap_or(0.0) >= s))
+        .collect();
+    threads.sort_by(|a, b| {
+        b["receivedAt"]
+            .as_f64()
+            .partial_cmp(&a["receivedAt"].as_f64())
+            .unwrap()
+    });
+    let total = threads.len();
+    let saved = mail::with_text(store)?;
+    let threads: Vec<Value> = threads
+        .iter()
+        .take(limit)
+        .map(|t| {
+            json!({
+                "thread_id": t["gmailThreadId"],
+                "account": t["account"],
+                "subject": t["subject"],
+                "from": t["from"],
+                "received_at": clock.iso(t["receivedAt"].as_f64().unwrap_or(0.0)),
+                "course": t["course"],
+                "state": t["state"],
+                "priority": t["priority"].as_str().unwrap_or("normal"),
+                "category": t["category"],
+                "reason": t["reason"],
+                "task_id": t["taskId"],
+                "has_text": t["gmailThreadId"].as_str().is_some_and(|id| saved.iter().any(|s| s == id)),
+            })
+        })
+        .collect();
+    Ok(json!({"threads": threads, "recorded": total}))
 }

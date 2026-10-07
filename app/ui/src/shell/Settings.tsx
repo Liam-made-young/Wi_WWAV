@@ -7,6 +7,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { call } from '../bridge';
 import { ClaudePane } from './ClaudePane';
 import { SHORTCUTS } from './keys';
+import { MailAccounts } from './MailAccounts';
 import { NotYet } from './NotYet';
 import { SchoolSheet } from './SchoolSheet';
 import { keys } from './platform';
@@ -233,6 +234,7 @@ function HeatPane({ settings, onPatch }: { settings: SettingsValue; onPatch: Pro
         </select>
       </Row>
       <SchoolSheet />
+      <MailAccounts />
     </>
   );
 }

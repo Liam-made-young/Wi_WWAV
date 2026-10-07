@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
-description = "Wi_WWAV's MCP server: Learn's eighteen tools over stdio (docs/SPEC.md 3.13, 8.8)"
+description = "Wi_WWAV's MCP server: Learn's twenty-one tools over stdio (docs/SPEC.md 3.13, 8.8)"
 
 [[bin]]
 name = "wi-mcp"

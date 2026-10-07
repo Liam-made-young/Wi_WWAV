@@ -132,7 +132,7 @@ fn claude_entries(root: &Path) -> Vec<wi_store::EntryInfo> {
 fn every_tool_answers_and_each_write_is_one_entry_by_claude() {
     let (_dir, root) = seeded();
     let mut h = Helper::start(&root);
-    assert_eq!(h.tools().len(), 18);
+    assert_eq!(h.tools().len(), 21);
 
     let before = dump(&root);
     let listed = h.call("list_tasks", json!({})).unwrap();
@@ -289,6 +289,111 @@ fn the_reads_change_nothing_and_the_drafts_are_marked_as_claudes() {
     assert_eq!(claude_entries(&root).len(), 4, "one entry for each of the four records");
 }
 
+/// Two accounts in one mailbox: each has a search that finds its mail and no
+/// other's, a thread is recorded under its account with a priority and a
+/// category, and a thread read again keeps them unless Claude says otherwise.
+#[test]
+fn mail_is_recorded_per_account_with_a_priority_and_a_category() {
+    let (_dir, root) = seeded();
+    let mut h = Helper::start(&root);
+    let none = h.call("list_mail_accounts", json!({})).unwrap();
+    assert_eq!(none["accounts"], json!([]));
+    assert!(none["note"].as_str().unwrap().contains("Settings → Learn"));
+    // With no accounts, a thread is still recorded, under whatever it names.
+    let thread = |id: &str, extra: Value| {
+        let mut t = json!({"thread_id": id, "subject": format!("Subject {id}"), "from": "A <a@uri.edu>", "received_at": "2026-10-07T09:00:00-04:00", "state": "nothing", "reason": "Nothing to do."});
+        for (k, v) in extra.as_object().unwrap() {
+            t[k] = v.clone();
+        }
+        t
+    };
+    assert_eq!(h.call("record_mail_thread", thread("th-0", json!({}))).unwrap()["thread"]["priority"], "normal");
+
+    {
+        let mut store = Store::open(&root).unwrap();
+        let bad = |list: Value| wi_heat_store::mail::set_accounts(&mut Store::open(&root).unwrap(), list.as_array().unwrap()).unwrap_err().to_string();
+        assert_eq!(bad(json!([{"address": "nope"}])), "A mail account needs its address, such as name@school.edu.");
+        assert_eq!(bad(json!([{"address": "a@uri.edu", "via": "forward"}])), "Say where a@uri.edu is forwarded to, such as you+school@gmail.com.");
+        assert_eq!(bad(json!([{"address": "a@uri.edu"}, {"address": "A@URI.edu"}])), "a@uri.edu is in the list twice.");
+        assert!(bad(json!([{"address": "a@uri.edu", "via": "forward", "forwardTo": "me+x@gmail.com"}, {"address": "b@uri.edu", "via": "forward", "forwardTo": "me+x@gmail.com"}])).starts_with("Two accounts are forwarded to me+x@gmail.com"));
+        wi_heat_store::mail::set_accounts(&mut store, json!([
+            {"address": "Liam.Young@uri.edu", "name": "URI", "via": "forward", "forwardTo": "made.liamyoung+uri@gmail.com"},
+            {"address": "made.liamyoung@gmail.com", "name": "Personal"}
+        ]).as_array().unwrap()).unwrap();
+    }
+    let listed = h.call("list_mail_accounts", json!({})).unwrap();
+    assert!(listed.get("note").is_none());
+    assert_eq!(listed["accounts"][0]["address"], "liam.young@uri.edu");
+    assert_eq!(listed["accounts"][0]["gmail_query"], "deliveredto:made.liamyoung+uri@gmail.com");
+    assert_eq!(listed["accounts"][1]["gmail_query"], "-deliveredto:made.liamyoung+uri@gmail.com");
+    assert_eq!(listed["accounts"][1]["name"], "Personal");
+    assert_eq!(listed["priorities"], json!(["urgent", "high", "normal", "low"]));
+
+    let before = claude_entries(&root).len();
+    let urgent = h.call("record_mail_thread", thread("th-1", json!({"account": "LIAM.YOUNG@uri.edu", "priority": "urgent", "category": "school", "course": "JPN 201", "reason": "The quiz is due tonight."}))).unwrap();
+    assert_eq!(urgent["thread"]["account"], "liam.young@uri.edu");
+    assert_eq!(urgent["thread"]["priority"], "urgent");
+    assert_eq!(urgent["thread"]["category"], "school");
+    h.call("record_mail_thread", thread("th-2", json!({"account": "made.liamyoung@gmail.com", "priority": "low", "category": "promotions"}))).unwrap();
+    assert_eq!(claude_entries(&root).len(), before + 2);
+    assert_eq!(
+        h.call("record_mail_thread", thread("th-3", json!({"account": "someone@else.com"}))).unwrap_err(),
+        "someone@else.com isn't one of the mail accounts in Settings → Learn. They are: liam.young@uri.edu, made.liamyoung@gmail.com."
+    );
+    // With two accounts and none named, the thread has no account rather than a guessed one.
+    assert!(h.call("record_mail_thread", thread("th-4", json!({}))).unwrap()["thread"].get("account").is_none());
+    // Read again with only a new state: the account, priority and category stay.
+    let again = h.call("record_mail_thread", thread("th-1", json!({"state": "task", "reason": "It asks for the quiz."}))).unwrap();
+    assert_eq!(again["created"], false);
+    assert_eq!((again["thread"]["account"].clone(), again["thread"]["priority"].clone(), again["thread"]["category"].clone()), (json!("liam.young@uri.edu"), json!("urgent"), json!("school")));
+
+    let counted = h.call("list_mail_accounts", json!({})).unwrap();
+    assert_eq!((counted["accounts"][0]["recorded"].clone(), counted["accounts"][1]["recorded"].clone()), (json!(1), json!(1)));
+    let uri = h.call("list_mail", json!({"account": "liam.young@uri.edu"})).unwrap();
+    assert_eq!(uri["recorded"], 1);
+    assert_eq!(uri["threads"][0]["thread_id"], "th-1");
+    assert_eq!(uri["threads"][0]["state"], "task");
+    assert!(uri["threads"][0]["received_at"].as_str().unwrap().starts_with("2026-10-07T"));
+    assert_eq!(h.call("list_mail", json!({"priority": "urgent"})).unwrap()["recorded"], 1);
+    assert_eq!(h.call("list_mail", json!({"priority": "normal"})).unwrap()["recorded"], 2, "a thread with no priority reads as normal");
+    assert_eq!(h.call("list_mail", json!({"category": "promotions"})).unwrap()["threads"][0]["thread_id"], "th-2");
+    assert_eq!(h.call("list_mail", json!({})).unwrap()["recorded"], 4);
+    assert_eq!(h.call("list_mail", json!({"since": "2026-10-08T00:00:00-04:00"})).unwrap()["recorded"], 0);
+    let store = Store::open(&root).unwrap();
+    assert!(!store.docs("mailThread").unwrap().iter().any(|d| d.json.get("body").is_some()));
+    drop(store);
+
+    // The text of a thread, for Mail's reader: saved whole, outside the journal, and replaced when saved again.
+    let entries = claude_entries(&root).len();
+    let msg = |at: &str, text: &str| json!({"from": "Prof. Collis <ncollis@uri.edu>", "sent_at": at, "text": text});
+    assert_eq!(
+        h.call("save_mail_text", json!({"thread_id": "th-none", "messages": [msg("2026-10-07T09:00:00-04:00", "x")]})).unwrap_err(),
+        "Record the thread with record_mail_thread first, then save its text."
+    );
+    assert_eq!(h.call("list_mail", json!({"account": "liam.young@uri.edu"})).unwrap()["threads"][0]["has_text"], false);
+    let saved = h.call("save_mail_text", json!({"thread_id": "th-1", "messages": [
+        msg("2026-10-07T12:00:00-04:00", "Second.\r\n\r\nSee https://brightspace.uri.edu/d2l/home\n"),
+        msg("2026-10-07T09:00:00-04:00", "\n\nFirst.  "),
+    ]})).unwrap();
+    assert_eq!(saved, json!({"thread_id": "th-1", "messages": 2, "characters": 55}));
+    let doc = wi_heat_store::mail::text_of(&Store::open(&root).unwrap(), "th-1").unwrap().unwrap();
+    let texts: Vec<_> = doc["messages"].as_array().unwrap().iter().map(|m| m["text"].as_str().unwrap().to_string()).collect();
+    assert_eq!(texts, ["First.", "Second.\n\nSee https://brightspace.uri.edu/d2l/home"], "oldest first, trimmed, with its paragraphs");
+    assert_eq!(h.call("list_mail", json!({"account": "liam.young@uri.edu"})).unwrap()["threads"][0]["has_text"], true);
+    h.call("save_mail_text", json!({"thread_id": "th-1", "messages": [msg("2026-10-07T09:00:00-04:00", "Only this now.")]})).unwrap();
+    let doc = wi_heat_store::mail::text_of(&Store::open(&root).unwrap(), "th-1").unwrap().unwrap();
+    assert_eq!(doc["messages"].as_array().unwrap().len(), 1);
+    assert_eq!(claude_entries(&root).len(), entries, "the mail's text is no journal entry");
+    for (bad, why) in [
+        (json!([{"from": "f", "sent_at": "2026-10-07T09:00:00Z", "text": "   "}]), "Message 1 has no text."),
+        (json!([{"from": "f", "sent_at": "2026-10-07T09:00:00Z", "text": "x", "html": "<b>x</b>"}]), "A message takes no \"html\"."),
+        (json!([{"from": "", "sent_at": "2026-10-07T09:00:00Z", "text": "x"}]), "Message 1 needs its sender, in 300 characters or fewer."),
+        (json!(["Dear Liam"]), "Message 1 must be an object."),
+    ] {
+        assert_eq!(h.call("save_mail_text", json!({"thread_id": "th-1", "messages": bad})).unwrap_err(), why);
+    }
+}
+
 #[test]
 fn the_same_source_never_makes_a_second_row() {
     let (_dir, root) = seeded();
@@ -347,7 +452,7 @@ fn with_no_library_every_call_says_to_open_the_app_and_nothing_is_made() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("Wi_WWAV");
     let mut h = Helper::start(&root);
-    assert_eq!(h.tools().len(), 18);
+    assert_eq!(h.tools().len(), 21);
     assert_eq!(h.call("list_tasks", json!({})).unwrap_err(), "No Wi_WWAV library yet. Open the app once.");
     assert!(!root.exists(), "the helper never makes a library");
 }

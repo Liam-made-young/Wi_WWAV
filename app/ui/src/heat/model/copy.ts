@@ -393,6 +393,5 @@ export const mailUi = {
   claudeReason: 'Claude’s reason',
   made: 'What it made',
   openGrades: 'Open Grades',
-  noBody: 'Learn keeps only the subject, the sender, the time and Claude’s reason. The message itself stays in Gmail.',
   gmailUrl: (threadId: string) => `https://mail.google.com/mail/u/0/#all/${threadId}`,
 };

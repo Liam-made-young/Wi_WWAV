@@ -72,12 +72,13 @@ export function ClaudePane({ ask = call }: { ask?: typeof call }) {
           </div>
           <div className="setting">
             <p className="setting-label" data-text="secondary">
-              School mail
+              Mail
             </p>
             <p>
               Wi_WWAV never reads your mail. Claude reads it with its own Gmail connector, then records each thread in
-              Mail. Ask Claude “Read my school mail”, or pick the prompt <code>school_mail</code> that Wi_WWAV offers:
-              in Claude Code it is <code>/mcp__wi-wwav__school_mail</code>.
+              Mail under its account, sorted by how pressing it is. Ask Claude “Read my mail”, or pick the prompt{' '}
+              <code>read_mail</code> that Wi_WWAV offers: in Claude Code it is <code>/mcp__wi-wwav__read_mail</code>.
+              Your accounts are in Settings → Learn.
             </p>
           </div>
           <div className="setting">

@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use serde_json::{json, Map, Value};
 use wi_heat_store::snapshot::Window;
-use wi_heat_store::{feed, ops, snapshot, timer, Outcome};
+use wi_heat_store::{feed, mail, ops, snapshot, timer, Outcome};
 use wi_store::{DocChange, Store};
 
 use crate::args::Args;
@@ -99,6 +99,8 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
                 .iter()
                 .any(|c| c["kind"] == "brightspace"));
             snap["school"] = school;
+            // The mail accounts for Mail's switcher and Settings → Learn (3.10).
+            snap["mailAccounts"] = Value::Array(mail::accounts(&store).map_err(core_error)?);
             Ok(snap)
         }
         "heat.whatItWouldTake" => {
@@ -240,6 +242,30 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
         "heat.calendars.remove" => calendars::remove(i, a),
         "heat.calendars.sync" => calendars::sync(i, a),
         "heat.school.set" => calendars::set_school(i, a),
+        // `heat.mail.accounts.set {accounts: [{address, name?, via, forwardTo?}]}`:
+        // the whole list. Not journaled: it is a setting.
+        // `heat.mail.text {threadId}`: a thread's saved messages for Mail's
+        // reader, or `{messages: null}` before Claude has saved them.
+        "heat.mail.text" => {
+            open_heat(i)?;
+            let saved = mail::text_of(&i.store(), a.str("threadId")?).map_err(core_error)?;
+            Ok(match saved {
+                Some(doc) => json!({"messages": doc["messages"], "savedAt": doc["savedAt"]}),
+                None => json!({"messages": null}),
+            })
+        }
+        "heat.mail.accounts.set" => {
+            open_heat(i)?;
+            let list = a
+                .object()
+                .get("accounts")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let kept = mail::set_accounts(&mut i.store(), &list).map_err(core_error)?;
+            wrote_outside(i, &["heatSetting"]);
+            Ok(json!({ "accounts": kept }))
+        }
 
         // ----- Settings → Claude -----
         "heat.claude.get" => claude::get(i),

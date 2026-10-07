@@ -17,6 +17,7 @@
 
 mod derive;
 pub mod feed;
+pub mod mail;
 pub mod mcp;
 pub mod ops;
 mod schema;
@@ -47,6 +48,9 @@ pub mod kind {
     pub const COURSE: &str = "course";
     pub const GRADE: &str = "grade";
     pub const MAIL: &str = "mailThread";
+    /// A thread's messages as plain text, for Mail's reader. Kept on this
+    /// Mac only: outside the journal, never synced, never exported.
+    pub const MAIL_TEXT: &str = "mailText";
     pub const CALENDAR: &str = "calendar";
     pub const CAPTURE: &str = "capture";
     pub const DAILY_NOTE: &str = "dailyNote";

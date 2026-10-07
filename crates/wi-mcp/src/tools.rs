@@ -1,7 +1,8 @@
 //! The tools of docs/SPEC.md 3.13: names, what Claude is told about each,
 //! and the JSON Schema its arguments are checked against. The first eight
 //! are the mail and planning tools; the ten after them read the rest of the
-//! view and draft into it, under the same rule. The schemas
+//! view and draft into it, under the same rule; the last two read the mail
+//! accounts and what is recorded from each. The schemas
 //! are the door (8.8): every one closes `additionalProperties`, so no call
 //! can carry `done`, a score or `public`.
 
@@ -11,7 +12,7 @@ use serde_json::{json, Value};
 pub const WRITE_PREAMBLE: &str = "Estimates and drafts. Never decides: the person accepts, edits or undoes every change.\nNever invent metrics: only restate numbers this app returned.";
 
 /// Tool names, in the order 3.13's table gives them.
-pub const NAMES: [&str; 18] = [
+pub const NAMES: [&str; 21] = [
     "list_tasks",
     "add_task",
     "update_task",
@@ -30,6 +31,9 @@ pub const NAMES: [&str; 18] = [
     "add_note",
     "list_inbox",
     "add_capture",
+    "list_mail_accounts",
+    "list_mail",
+    "save_mail_text",
 ];
 
 /// What changing a tool leaves in the journal: `Undo ` + this.
@@ -50,7 +54,7 @@ pub fn undo_label(tool: &str) -> Option<&'static str> {
 
 /// The pure reads: they write nothing at all.
 pub fn is_pure_read(tool: &str) -> bool {
-    matches!(tool, "list_tasks" | "get_grades" | "get_schedule" | "list_habits" | "list_projects" | "get_notes" | "list_inbox")
+    matches!(tool, "list_tasks" | "get_grades" | "get_schedule" | "list_habits" | "list_projects" | "get_notes" | "list_inbox" | "list_mail_accounts" | "list_mail")
 }
 
 /// Changes nothing the journal keeps. `plan_day` and `draft_block` write only
@@ -164,9 +168,48 @@ pub fn input_schema(tool: &str) -> Value {
                 "state": {"type": "string", "enum": ["grade", "task", "nothing"],
                           "description": "grade: a grade was posted. task: it asks for something, and a task was made. nothing: nothing to do."},
                 "task_id": text(100, "The task made from it, if any."),
+                "account": text(254, "The mail account it belongs to, as list_mail_accounts gives its address. Default: the only account, if there is one."),
+                "priority": {"type": "string", "enum": ["urgent", "high", "normal", "low"],
+                             "description": "urgent: the person must act today or tomorrow. high: they must act this week, or a person is waiting on them. normal: worth knowing, nothing to do. low: bulk mail, promotions, automatic notices. Default normal."},
+                "category": {"type": "string", "enum": ["school", "work", "money", "people", "updates", "promotions", "other"],
+                             "description": "What it is about. school: courses, grades, the university. work: jobs, internships, clients. money: bills, aid, payments. people: a person writing to them. updates: accounts, bookings, receipts. promotions: marketing."},
                 "reason": reason()
             }),
             &["thread_id", "subject", "from", "received_at", "state", "reason"],
+        ),
+        "list_mail_accounts" => object(json!({}), &[]),
+        "save_mail_text" => object(
+            json!({
+                "thread_id": text(200, "Gmail's thread id, as recorded with record_mail_thread."),
+                "messages": {
+                    "type": "array", "minItems": 1, "maxItems": 50,
+                    "description": "Every message of the thread, oldest first.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "message_id": {"type": "string", "maxLength": 200, "description": "Gmail's message id."},
+                            "from": {"type": "string", "minLength": 1, "maxLength": 300, "description": "The sender, as the mail names them."},
+                            "to": {"type": "string", "maxLength": 1000, "description": "Who it was sent to."},
+                            "sent_at": instant("When it was sent"),
+                            "text": {"type": "string", "minLength": 1, "maxLength": 100000, "description": "The message's own words as plain text, with its paragraphs and line breaks. No HTML. Leave out the quoted earlier messages, tracking pixels' alt text and unsubscribe footers. Keep links as plain addresses. Never summarise, shorten or reword."}
+                        },
+                        "required": ["from", "sent_at", "text"],
+                        "additionalProperties": false
+                    }
+                }
+            }),
+            &["thread_id", "messages"],
+        ),
+        "list_mail" => object(
+            json!({
+                "account": text(254, "Only this account's threads: its address."),
+                "state": {"type": "string", "enum": ["grade", "task", "nothing"], "description": "Only threads in this state."},
+                "priority": {"type": "string", "enum": ["urgent", "high", "normal", "low"], "description": "Only threads of this priority."},
+                "category": {"type": "string", "enum": ["school", "work", "money", "people", "updates", "promotions", "other"], "description": "Only threads in this category."},
+                "since": instant("Only threads received at or after this"),
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "description": "At most this many, newest first. Default 50."}
+            }),
+            &[],
         ),
         "get_schedule" => object(
             json!({
@@ -249,7 +292,10 @@ fn summary(tool: &str) -> &'static str {
         "get_grades" => "Reads the term's courses, their categories and weights, every graded item, and Learn's own percentages and letter. Read only.",
         "add_pending_grade" => "Adds a pending grade from a grade notice: no score, which only the person types. A grade for the same course and item is not made twice.",
         "log_focus" => "Logs minutes the person spent on a task, as a focus record. The minutes add to the task's time taken.",
-        "record_mail_thread" => "Records a school mail thread for Learn's Mail tab: subject, sender, time, course, and what was done with it. Never the message body. The same thread_id again updates its state and reason and leaves one row.",
+        "record_mail_thread" => "Records a mail thread for Learn's Mail tab: which account it is from, subject, sender, time, how pressing it is, what it is about, and what was done with it. Never the message body. The same thread_id again updates the row and leaves one.",
+        "list_mail_accounts" => "Reads the mail accounts the person set up, with the Gmail search that finds each account's mail and no other's, how many threads are recorded from each, and the priorities and categories to sort into. Read only. Call it before reading mail.",
+        "list_mail" => "Reads the threads already recorded, newest first, with their account, priority, category and state, and whether each has its text saved. Read only. Use it to see what has been through and to answer what needs the person's attention.",
+        "save_mail_text" => "Saves a thread's messages as plain text so the person can read them in Learn's Mail, which shows them in a reader view. The thread must be recorded first. The text is the mail's own words, never a summary. It stays on this Mac: it is not synced or exported. Saving a thread again replaces what was saved. Not an undo step.",
         "get_schedule" => "Reads what the time column and Calendar show between two days: the blocks already planned, calendar events, open tasks due, and drafts waiting to be accepted. Read only. Read it before draft_block, to find a free time.",
         "draft_block" => "Drafts one block for a task at a time you name, for when the person asks for a specific time rather than Learn's own rule. The block is a draft the person accepts or clears; this changes nothing. A time already held by a block, a draft or a calendar event is refused. A second draft for the same task and day replaces the first.",
         "list_habits" => "Reads the person's habits: whether each is ticked today, and its record line as Learn words it. Read only. Only the person ticks a habit; there is no tool that does.",
@@ -293,6 +339,9 @@ fn title(tool: &str) -> &'static str {
         "add_note" => "Add a note",
         "list_inbox" => "Read the inbox",
         "add_capture" => "Add to the inbox",
+        "list_mail_accounts" => "List mail accounts",
+        "list_mail" => "List recorded mail",
+        "save_mail_text" => "Save a thread's text",
         _ => "",
     }
 }

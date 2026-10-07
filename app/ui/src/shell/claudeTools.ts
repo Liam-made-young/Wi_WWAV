@@ -10,7 +10,7 @@ export const CLAUDE_TOOLS: readonly { name: string; does: string }[] = [
   { name: 'get_grades', does: 'reads courses and grades' },
   { name: 'add_pending_grade', does: 'records a grade notice with no score, linked to Brightspace' },
   { name: 'log_focus', does: 'logs a focus session on a task' },
-  { name: 'record_mail_thread', does: 'records a school thread Claude read, with its state' },
+  { name: 'record_mail_thread', does: 'records a thread Claude read: its account, priority and state' },
   { name: 'get_schedule', does: 'reads blocks, calendar events, tasks due and waiting drafts' },
   { name: 'draft_block', does: 'drafts one block at a time you asked for, for you to accept' },
   { name: 'list_habits', does: 'reads your habits and whether today is ticked' },
@@ -21,4 +21,7 @@ export const CLAUDE_TOOLS: readonly { name: string; does: string }[] = [
   { name: 'add_note', does: 'adds a note, marked as Claude’s' },
   { name: 'list_inbox', does: 'reads the captures waiting in the inbox' },
   { name: 'add_capture', does: 'drops a line in the inbox for you to triage' },
+  { name: 'list_mail_accounts', does: 'reads your mail accounts and how to find each one’s mail' },
+  { name: 'list_mail', does: 'reads the threads already recorded, with how they were sorted' },
+  { name: 'save_mail_text', does: 'saves a thread’s text on this Mac, for Mail’s reader' },
 ];
