@@ -13,6 +13,7 @@ regex = "1"
 serde.workspace = true
 serde_json.workspace = true
 wwav-ids.workspace = true
+wwav-tokens.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
