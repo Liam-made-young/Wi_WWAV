@@ -1,0 +1,1342 @@
+/* The shell: the case, the rooms inside it, and what opens over them
+   (docs/SPEC.md 2, 8). Every colour, size and duration is a token from
+   design/tokens.json through styles/tokens.css; this file only arranges
+   them. */
+
+:root {
+  /* The gloss on a gel's upper half, hard-broken at 45/55% (8.2). Lighter
+     on light metal than on dark, where a bright gloss would wash out the
+     label. */
+  --gloss: color-mix(in srgb, var(--desk-select-ink) 50%, transparent);
+  --text-size: var(--type-desk-body);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance='light']) {
+    --gloss: color-mix(in srgb, var(--desk-select-ink) 6%, transparent);
+  }
+}
+
+:root[data-appearance='dark'] {
+  --gloss: color-mix(in srgb, var(--desk-select-ink) 6%, transparent);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--desk-well);
+  color: var(--desk-ink);
+  font-family: var(--type-desk-family);
+  font-size: var(--type-desk-body);
+  line-height: var(--type-desk-line-height);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--desk-focus-width) solid var(--desk-focus);
+  outline-offset: -1px;
+}
+
+.register-night :focus-visible,
+.register-interior :focus-visible {
+  outline: var(--night-focus-width) solid currentColor;
+}
+
+/* ---- The case ------------------------------------------------------------- */
+
+.case {
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr) 22px;
+  height: 100vh;
+  min-width: 1024px;
+  min-height: 680px;
+}
+
+/* Brushed metal: 1 px light and dark lines over a radial highlight from
+   the one light, upper left (8.2, 8.3). */
+.case-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s3);
+  height: 52px;
+  padding-right: var(--space-s3);
+  overflow: hidden;
+  color: var(--desk-ink);
+  background:
+    radial-gradient(
+      120% 160% at calc(var(--light-sun-x) * 100%) 0%,
+      color-mix(in srgb, var(--desk-select-ink) 28%, transparent),
+      transparent 70%
+    ),
+    repeating-linear-gradient(90deg, transparent 0 2px, color-mix(in srgb, var(--desk-ink) 3%, transparent) 2px 3px),
+    linear-gradient(var(--desk-case-metal));
+  box-shadow: inset 0 1px 0 var(--gloss);
+  border-bottom: 1px solid var(--desk-deck-edge);
+  user-select: none;
+}
+
+.traffic {
+  flex: none;
+  width: 78px;
+  height: 100%;
+}
+
+.case-gap {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+}
+
+/* A gel: the control is a 44 pt target, the pill drawn inside it. */
+.segment,
+.gel,
+.search-pill,
+.magnifier,
+.astronaut-chip {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background: none;
+  cursor: default;
+}
+
+.segment::before,
+.gel::before,
+.search-pill::before,
+.magnifier::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border: 1px solid var(--desk-deck-edge);
+}
+
+.segment::before,
+.gel::before {
+  background: linear-gradient(var(--gloss) 0 45%, transparent 55%), linear-gradient(var(--desk-case-metal));
+}
+
+.segment:active::before,
+.gel:active:not(:disabled)::before {
+  filter: brightness(var(--desk-gel-press));
+  transition: filter var(--motion-press);
+}
+
+.switcher {
+  display: flex;
+  flex: none;
+}
+
+.segment {
+  width: 76px;
+  height: 44px;
+  padding: 0;
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink);
+}
+
+.segment::before {
+  inset: 9px 0;
+  border-left-width: 0;
+}
+
+.segment:first-child::before {
+  border-left-width: 1px;
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.segment:last-child::before {
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+/* The selected segment wears the deepened blue gel, so its white label
+   holds 5.0:1 (8.2). */
+.segment[aria-selected='true'] {
+  color: var(--desk-select-ink);
+}
+
+.segment[aria-selected='true']::before {
+  background: linear-gradient(var(--desk-gel-selected));
+  border-color: var(--desk-select);
+}
+
+.search-pill {
+  display: flex;
+  flex: 0 1 180px;
+  align-items: center;
+  gap: var(--space-s2);
+  min-width: 120px;
+  height: 44px;
+  padding: 0 var(--space-s3);
+  color: var(--desk-ink2);
+}
+
+.search-pill::before {
+  inset: 10px 0;
+  border-radius: var(--radius-pill);
+  background: var(--desk-well);
+}
+
+.search-word {
+  flex: 1;
+  text-align: left;
+}
+
+.search-keys {
+  font-size: var(--type-desk-small);
+}
+
+.magnifier {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--desk-ink2);
+}
+
+.magnifier::before {
+  inset: 8px;
+  border-radius: 50%;
+  background: var(--desk-well);
+}
+
+.astronaut-chip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--desk-ink);
+}
+
+.portrait-helmet {
+  fill: var(--desk-well);
+  stroke: var(--desk-ink);
+  stroke-width: 1;
+}
+
+.portrait-visor {
+  fill: var(--night-ground);
+}
+
+.portrait-glint {
+  fill: var(--night-star);
+}
+
+.case-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  height: 22px;
+  padding: 0 var(--space-s3);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+  background: linear-gradient(var(--desk-case-metal));
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+.status-left,
+.status-right {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- The Now strip (2.2) --------------------------------------------------- */
+
+.strip {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--radius-chip);
+  color: var(--desk-lcd-ink);
+  background: linear-gradient(var(--desk-lcd-ground));
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--desk-lcd-ink) 30%, transparent),
+    0 1px 0 var(--gloss);
+}
+
+.strip-half {
+  position: absolute;
+  top: 0;
+  height: 44px;
+}
+
+.strip-task {
+  left: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: inherit;
+}
+
+.strip-line1,
+.strip-line2 {
+  position: absolute;
+  left: var(--space-s2);
+  right: var(--space-s2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.strip-line1 {
+  top: 0;
+  height: 19px;
+  font-size: var(--type-desk-body);
+  line-height: 19px;
+}
+
+.strip-line2 {
+  top: 20.5px;
+  height: 16px;
+  font-size: var(--type-desk-small);
+  line-height: 16px;
+  color: var(--desk-lcd-dim);
+}
+
+.strip-track .strip-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strip-time,
+.strip-dmg {
+  font-family: var(--type-mono-family);
+}
+
+.strip-time {
+  right: var(--space-s2);
+  padding-left: var(--space-s1);
+}
+
+.strip-dmg {
+  text-transform: uppercase;
+}
+
+/* An etched line: a dark hairline with the light's highlight beside it. */
+.strip-divider {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: color-mix(in srgb, var(--desk-lcd-ink) 35%, transparent);
+  box-shadow: 1px 0 0 var(--gloss);
+}
+
+.strip-meter {
+  position: absolute;
+  left: var(--space-s2);
+  right: var(--space-s2);
+  top: 39px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--desk-lcd-ink) 14%, transparent);
+  pointer-events: none;
+}
+
+.strip-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.strip-heat[data-level='cool'] {
+  background: var(--heat-cool);
+}
+
+.strip-heat[data-level='warm'] {
+  background: var(--heat-warm);
+}
+
+.strip-heat[data-level='hot'] {
+  background: var(--heat-hot);
+}
+
+.strip-heat[data-level='overdue'] {
+  background: var(--heat-overdue);
+}
+
+.strip-playhead {
+  width: 0;
+  background: var(--desk-lcd-ink);
+}
+
+.strip-expand {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* A planet: a three-stop lit sphere in its key colour, lit from the upper
+   left, its rim in the key's glow (8.2, 8.3). */
+.planet {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at calc(var(--light-sun-x) * 100%) calc(var(--light-sun-y) * 100%),
+    var(--glow),
+    var(--key) 55%,
+    color-mix(in srgb, var(--key) 65%, var(--night-deep))
+  );
+  box-shadow: 0 0 0 1px currentColor;
+}
+
+.planet-large {
+  width: 96px;
+  height: 96px;
+  box-shadow: 0 0 0 2px var(--glow);
+}
+
+.stem-light {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--desk-lcd-ink);
+}
+
+.stem-light svg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* In the strip each light sits on line 2, its square the strip's height. */
+.strip .stem-light svg {
+  top: 28.5px;
+}
+
+/* ---- The rooms (2.3) ------------------------------------------------------- */
+
+.room-area {
+  position: relative;
+  overflow: hidden;
+}
+
+.rooms {
+  position: absolute;
+  inset: 0;
+}
+
+/* A room change is a 140 ms cross-fade; a room that isn't current stays
+   built, hidden, with its scroll and text intact. */
+.room {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  opacity: 0;
+  visibility: hidden;
+  font-size: var(--text-size);
+  transition:
+    opacity var(--motion-beat) var(--motion-rest),
+    visibility 0s linear var(--motion-beat);
+}
+
+.room[data-current='true'] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--motion-beat) var(--motion-rest),
+    visibility 0s;
+}
+
+/* Under Reduce Motion a room change is a cut (2.1). */
+:root[data-reduce-motion='true'] .room {
+  transition: none;
+}
+
+.register-desk {
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  font-family: var(--type-desk-family);
+}
+
+.register-night {
+  color: var(--night-ink);
+  background: var(--night-ground);
+  font-family: var(--type-text-family);
+}
+
+.register-interior {
+  color: var(--room-ink);
+  background: linear-gradient(var(--room-field-ground));
+  font-family: var(--type-text-family);
+}
+
+/* The Console's chrome is deck metal, with a pinstripe every 4 px that
+   reads as texture, never as stripes (8.2). */
+.room[data-room='console'] {
+  color: var(--desk-deck-ink);
+  background:
+    repeating-linear-gradient(
+      transparent 0 calc(var(--desk-pinstripe-every) - 1px),
+      var(--desk-deck-pinstripe) calc(var(--desk-pinstripe-every) - 1px) var(--desk-pinstripe-every)
+    ),
+    linear-gradient(var(--desk-deck-metal));
+}
+
+.room-empty {
+  padding: var(--space-s6);
+}
+
+.room-empty p {
+  margin: 0;
+}
+
+.heat-heading {
+  margin: 0 0 var(--space-s3);
+  font-size: var(--type-desk-title);
+}
+
+.room[data-room='heat'] .room-empty p {
+  color: var(--desk-ink2);
+}
+
+.night-line {
+  color: var(--night-ink-70);
+  font-size: var(--type-text-body);
+}
+
+/* The Game Boy inside: a DMG screen behind glass, the same in light and dark. */
+.dmg-screen {
+  display: inline-block;
+  padding: var(--space-s3) var(--space-s4);
+  border-radius: var(--radius-chip);
+  color: var(--screen-glow);
+  background: var(--screen-dmg-dark);
+  box-shadow: inset 0 0 0 2px var(--screen-dmg-deep);
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-body);
+  text-transform: uppercase;
+}
+
+/* Light is never a ground for text in the shop: words are printed on paper. */
+.paper-tag {
+  display: inline-block;
+  padding: var(--space-s2) var(--space-s3);
+  border: var(--room-hairline) solid var(--room-ink);
+  color: var(--room-ink);
+  background: var(--room-paper);
+  font-family: var(--type-sign-family);
+  font-size: var(--type-sign-max);
+}
+
+/* ---- Sheets over the rooms ------------------------------------------------- */
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: var(--desk-backdrop);
+}
+
+.backdrop[data-overlay='menu'] {
+  background: transparent;
+}
+
+.sheet {
+  position: absolute;
+  z-index: 40;
+  font-size: var(--text-size);
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-sheet) var(--radius-sheet);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--desk-ink) 30%, transparent);
+  animation: sheet-drop var(--motion-fade) var(--motion-sheet);
+}
+
+/* Sheets drop from the title bar; under Reduce Motion every move is a
+   beat-long cross-fade (8.6). */
+@keyframes sheet-drop {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+:root[data-reduce-motion='true'] .sheet,
+:root[data-reduce-motion='true'] .drawer {
+  animation: fade-in var(--motion-beat) linear;
+}
+
+.sheet p {
+  margin: 0 0 var(--space-s2);
+}
+
+.sheet-title {
+  margin: 0 0 var(--space-s2);
+  font-size: var(--type-desk-large);
+}
+
+.gel {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-s4);
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink);
+}
+
+.gel::before {
+  inset: 8px 0;
+  border-radius: var(--radius-pill);
+}
+
+.gel.plain::before {
+  background: none;
+  border-color: transparent;
+}
+
+/* Disabled is a shape, not a fade: no gloss and a dashed edge, with the
+   sentence beside it saying why (8.10). */
+.gel:disabled::before {
+  background: linear-gradient(var(--desk-case-metal));
+  border-style: dashed;
+}
+
+input:not([type='checkbox'], [type='radio'], [type='range']),
+select,
+textarea {
+  min-height: 28px;
+  padding: var(--space-s1) var(--space-s2);
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+}
+
+::placeholder {
+  color: var(--desk-ink3);
+  opacity: 1;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-s1);
+  margin-bottom: var(--space-s2);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  min-height: 24px;
+}
+
+.check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+input,
+select {
+  accent-color: var(--desk-highlight);
+}
+
+input[type='range'] {
+  height: 24px;
+  margin: 0;
+}
+
+.why {
+  color: var(--desk-ink2);
+  font-size: var(--type-desk-small);
+}
+
+/* ⌘K */
+.palette {
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  width: 560px;
+  max-height: calc(100% - var(--space-s6));
+  padding: var(--space-s2) 0 0;
+}
+
+.palette-input {
+  margin: 0 var(--space-s2) var(--space-s2);
+  font-size: var(--type-desk-large);
+}
+
+.palette-results {
+  flex: 1;
+  overflow: auto;
+}
+
+.palette-group {
+  padding: var(--space-s2) var(--space-s3) var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-source-list-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.palette-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  min-height: 32px;
+  padding: 0 var(--space-s3);
+}
+
+.palette-row[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.palette-hint {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.palette-row[aria-selected='true'] .palette-hint {
+  color: var(--desk-select-ink);
+}
+
+.palette-empty {
+  padding: var(--space-s3);
+  color: var(--desk-ink2);
+}
+
+.palette-foot {
+  margin: 0;
+  padding: var(--space-s1) var(--space-s3);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+/* ⌘⇧N: 420 × 160 pt. */
+.capture {
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 420px;
+  height: 160px;
+  padding: var(--space-s2) var(--space-s3);
+}
+
+.capture p {
+  margin: 0;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.capture-field {
+  resize: none;
+  margin: var(--space-s1) 0;
+}
+
+/* ⌘L: 280 pt over any room. */
+.drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  font-size: var(--text-size);
+  background: var(--desk-source-list-ground);
+  border-right: 1px solid var(--desk-deck-edge);
+  box-shadow: 2px 0 12px color-mix(in srgb, var(--desk-ink) 25%, transparent);
+  animation: slide-in var(--motion-fade) var(--motion-sheet);
+}
+
+.drawer-filter {
+  margin: var(--space-s2);
+}
+
+.sources {
+  flex: 0 1 auto;
+  overflow: auto;
+  padding-bottom: var(--space-s2);
+}
+
+.source-heading,
+.info-heading,
+.setting-label {
+  margin: var(--space-s3) var(--space-s3) var(--space-s1);
+  font-size: var(--type-desk-small);
+  font-weight: normal;
+  color: var(--desk-source-list-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.source-row {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  padding: 2px var(--space-s3);
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--desk-ink);
+}
+
+.source-row[aria-current='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.pins {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-s1);
+  padding: 0 var(--space-s2);
+}
+
+.pin {
+  height: 44px;
+  overflow: hidden;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+  color: var(--desk-ink);
+  background: var(--desk-well);
+}
+
+.pin:disabled {
+  border-style: dashed;
+}
+
+.swatches {
+  display: flex;
+  gap: var(--space-s2);
+  padding: var(--space-s1) var(--space-s3);
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--desk-ink);
+  border-radius: 50%;
+}
+
+.swatch[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--desk-well),
+    0 0 0 4px var(--desk-ink);
+}
+
+[data-colour='red'] {
+  background: var(--label-red);
+}
+
+[data-colour='orange'] {
+  background: var(--label-orange);
+}
+
+[data-colour='yellow'] {
+  background: var(--label-yellow);
+}
+
+[data-colour='green'] {
+  background: var(--label-green);
+}
+
+[data-colour='blue'] {
+  background: var(--label-blue);
+}
+
+[data-colour='purple'] {
+  background: var(--label-purple);
+}
+
+.drawer-note,
+.drawer-said {
+  margin: 0;
+  padding: var(--space-s2) var(--space-s3);
+  background: var(--desk-well);
+  border-block: 1px solid var(--desk-deck-edge);
+}
+
+.drawer-note p {
+  margin: 0 0 var(--space-s1);
+}
+
+.note-actions,
+.setting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.clips {
+  flex: 1 0 160px;
+  overflow: auto;
+  background: var(--desk-well);
+}
+
+.clip-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-s2);
+  align-items: center;
+  min-height: 40px;
+  padding: var(--space-s1) var(--space-s3);
+}
+
+.clip-row:nth-child(even) {
+  background: var(--desk-stripe);
+}
+
+.clip-row[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+/* The keyboard's row: ↑ ↓ move it, ⇧Return adds it to the selection. */
+.clip-row[data-cursor='true'] {
+  outline: var(--desk-focus-width) solid var(--desk-focus);
+  outline-offset: calc(-1 * var(--desk-focus-width));
+}
+
+.clip-colour {
+  grid-row: span 2;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--desk-ink);
+  border-radius: 50%;
+}
+
+.clip-title,
+.clip-verdict {
+  grid-column: 2;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.clip-verdict {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.clip-row[aria-selected='true'] .clip-verdict {
+  color: var(--desk-select-ink);
+}
+
+.clips-empty {
+  margin: 0;
+  padding: var(--space-s3);
+  color: var(--desk-ink2);
+}
+
+.bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s1);
+  padding: var(--space-s1) var(--space-s2);
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+.bulk form {
+  flex: 1 0 100%;
+}
+
+.bulk-tag {
+  width: 100%;
+}
+
+.bulk .swatches {
+  padding: 0;
+}
+
+/* Get Info, beside the drawer. */
+.info {
+  top: 0;
+  bottom: 0;
+  left: 280px;
+  z-index: 21;
+  width: 320px;
+  padding: var(--space-s3);
+  overflow: auto;
+  border-radius: 0;
+  animation-name: fade-in;
+}
+
+.info-title {
+  display: grid;
+  gap: var(--space-s1);
+}
+
+.info-title span {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.info-verdict {
+  margin: var(--space-s2) 0;
+  font-weight: bold;
+}
+
+.info-refusal {
+  color: var(--desk-ink);
+  padding: var(--space-s1) var(--space-s2);
+  border-left: var(--desk-select-bar) solid var(--heat-hot);
+}
+
+.info-facts {
+  display: grid;
+  gap: var(--space-s1);
+  margin: 0;
+}
+
+.info-facts div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--space-s2);
+}
+
+.info-facts dt {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.info-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.info-heading {
+  margin-left: 0;
+}
+
+.info-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s1);
+  align-items: center;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding-left: var(--space-s2);
+  border-radius: var(--radius-chip);
+  background: var(--desk-stripe);
+}
+
+.tag-remove {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.info .swatches {
+  padding-left: 0;
+}
+
+.info-chunks {
+  width: 100%;
+  margin-top: var(--space-s3);
+  border-collapse: collapse;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-small);
+}
+
+.info-chunks th {
+  text-align: left;
+  font-weight: normal;
+  color: var(--desk-ink2);
+}
+
+.info-chunks td,
+.info-chunks th {
+  padding: 2px var(--space-s1) 2px 0;
+  vertical-align: top;
+}
+
+/* The player, expanded: a sheet from the title bar. */
+.player-sheet {
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-s4);
+  width: 520px;
+  padding: var(--space-s4);
+}
+
+.player-words p {
+  margin: 0;
+}
+
+.player-title {
+  font-size: var(--type-desk-title);
+}
+
+.player-time {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-body);
+  color: var(--desk-ink2);
+}
+
+.player-stems {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-s2);
+}
+
+.player-stems .stem-light {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  color: var(--desk-ink);
+}
+
+/* Settings: a preferences window with an icon toolbar. */
+.settings {
+  top: var(--space-s3);
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  width: 780px;
+  max-height: calc(100% - var(--space-s5));
+  border-top: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-sheet);
+}
+
+.settings-toolbar {
+  display: flex;
+  flex: none;
+  padding: var(--space-s1);
+  background: linear-gradient(var(--desk-case-metal));
+  border-bottom: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+}
+
+.settings-tab {
+  display: grid;
+  flex: 1;
+  justify-items: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--space-s1);
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: none;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+}
+
+.settings-tab[aria-selected='true'] {
+  box-shadow: inset 0 0 0 1px var(--desk-deck-edge);
+  background: color-mix(in srgb, var(--desk-ink) 8%, transparent);
+}
+
+.settings-icon {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: 50%;
+  background: linear-gradient(var(--gloss) 0 45%, transparent 55%), linear-gradient(var(--desk-case-metal));
+}
+
+.settings-tab[aria-selected='true'] .settings-icon {
+  background: linear-gradient(var(--desk-gel-selected));
+}
+
+.settings-pane {
+  overflow: auto;
+  padding: var(--space-s2) var(--space-s4) var(--space-s4);
+}
+
+.setting {
+  margin-bottom: var(--space-s3);
+}
+
+.setting .setting-label {
+  margin-left: 0;
+}
+
+.setting p {
+  margin: 0 0 var(--space-s1);
+}
+
+.path {
+  font-family: var(--type-mono-family);
+  overflow-wrap: anywhere;
+}
+
+.radios {
+  display: flex;
+  gap: var(--space-s4);
+}
+
+.shortcuts {
+  border-collapse: collapse;
+}
+
+.shortcuts td {
+  padding: 2px var(--space-s3) 2px 0;
+  vertical-align: top;
+}
+
+.shortcuts td:last-child {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.shortcut-keys {
+  font-family: var(--type-mono-family);
+  white-space: nowrap;
+}
+
+/* Export everything and first launch: cards in the middle of the room. */
+.export {
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  width: 480px;
+  padding: var(--space-s4);
+}
+
+.first {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+}
+
+.first-card {
+  width: 520px;
+  padding: var(--space-s5);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-card);
+  background: var(--desk-well);
+}
+
+.first-card p {
+  margin: 0 0 var(--space-s2);
+}
+
+.first-step {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.first-summary {
+  font-weight: bold;
+}
+
+/* The astronaut chip's menu. */
+.chip-menu {
+  position: absolute;
+  top: var(--space-s1);
+  right: var(--space-s2);
+  z-index: 50;
+  width: 220px;
+  padding: var(--space-s1) 0;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-sheet);
+  background: var(--desk-well);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--desk-ink) 30%, transparent);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: var(--space-s1) var(--space-s4);
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--desk-ink);
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+}
+
+/* Toasts hold for 2.6 s (8.6). */
+.toast {
+  position: absolute;
+  bottom: var(--space-s3);
+  left: 50%;
+  translate: -50% 0;
+  z-index: 60;
+  margin: 0;
+  padding: var(--space-s1) var(--space-s4);
+  border-radius: var(--radius-pill);
+  color: var(--desk-well);
+  background: var(--desk-ink);
+  animation: fade-in var(--motion-beat) linear;
+}
