@@ -119,9 +119,9 @@ export function Mail() {
     if (task) return task.spaceId === spaceId;
     return idx.space.get(spaceId)?.groupKind === 'course' && (!m.category || m.category === 'school');
   };
-  // Newest first, as the Mail widget has it.
+  // Newest first: the same list the Mail widget reads (store.tsx).
   const inSpaceNow = useMemo(
-    () => [...(snap?.records.mailThread ?? [])].filter(inSpace).sort((a, b) => b.receivedAt - a.receivedAt),
+    () => idx.mail.filter(inSpace),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [snap, spaceId, idx],
   );

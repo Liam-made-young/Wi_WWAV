@@ -109,7 +109,7 @@ pub fn input_schema(tool: &str) -> Value {
                 "title": text(200, "The task, as the person would write it."),
                 "space": text(100, "A space's name or id. Default: the person's first space."),
                 "type": text(60, "The task's type, such as Homework or Reading; one of the space's types."),
-                "course": text(40, "A course code, such as JPN 201."),
+                "course": text(40, "A course code, such as JPN 201, for a task that is schoolwork. A code Learn doesn't hold yet makes the course, to be filled in from its syllabus. Leave it out for work and personal tasks."),
                 "due": instant("When it's due"),
                 "notes": {"type": "string", "maxLength": 4000, "description": "Plain text. Notes from mail start \"From mail:\"."},
                 "source_id": text(200, "Where it came from, such as a Gmail message id. The same source_id never makes a second task."),
