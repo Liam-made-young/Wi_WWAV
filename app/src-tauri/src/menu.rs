@@ -82,31 +82,35 @@ pub fn action(id: &str) -> Option<Action> {
 }
 
 /// A room's undo and redo labels, as `history.get` and the `history` event
-/// give them (docs/COMMANDS.md).
+/// give them (docs/COMMANDS.md): ready ("Undo move clip"), or held by work
+/// that left the machine ("Can't undo a purchase.").
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 pub struct History {
     pub undo: Option<String>,
     pub redo: Option<String>,
     pub cant: Option<String>,
+    #[serde(rename = "cantRedo")]
+    pub cant_redo: Option<String>,
 }
 
 /// An item's title and whether it can be chosen.
 pub type Title = (String, bool);
 
 impl History {
-    /// The Undo and Redo items' titles. Work that left the machine wins:
-    /// the newest act is what ⌘Z would reach, and it can't be undone.
+    /// The Undo and Redo items' titles. A held one wins: what ⌘Z would
+    /// reach is work that left the machine, and it can't be undone.
     pub fn titles(&self) -> (Title, Title) {
-        let undo = match (&self.cant, &self.undo) {
-            (Some(cant), _) => (cant.clone(), false),
-            (None, Some(undo)) => (undo.clone(), true),
-            (None, None) => (UNDO.title.to_string(), false),
-        };
-        let redo = match &self.redo {
-            Some(redo) => (redo.clone(), true),
-            None => (REDO.title.to_string(), false),
-        };
-        (undo, redo)
+        fn title(held: &Option<String>, ready: &Option<String>, plain: &str) -> Title {
+            match (held, ready) {
+                (Some(held), _) => (held.clone(), false),
+                (None, Some(ready)) => (ready.clone(), true),
+                (None, None) => (plain.to_string(), false),
+            }
+        }
+        (
+            title(&self.cant, &self.undo, UNDO.title),
+            title(&self.cant_redo, &self.redo, REDO.title),
+        )
     }
 }
 
@@ -377,6 +381,7 @@ mod tests {
             undo: undo.map(Into::into),
             redo: redo.map(Into::into),
             cant: cant.map(Into::into),
+            cant_redo: None,
         }
     }
 
@@ -393,6 +398,16 @@ mod tests {
         let ((undo, on), _) =
             h(Some("Undo move clip"), None, Some("Can't undo a purchase.")).titles();
         assert_eq!((undo.as_str(), on), ("Can't undo a purchase.", false));
+    }
+
+    #[test]
+    fn a_held_redo_is_grey_and_says_why() {
+        let held = History {
+            cant_redo: Some("Can't redo a publish.".into()),
+            ..History::default()
+        };
+        let (_, (redo, on)) = held.titles();
+        assert_eq!((redo.as_str(), on), ("Can't redo a publish.", false));
     }
 
     #[test]
@@ -498,8 +513,8 @@ mod tests {
             let heat =
                 json!({ "room": "heat", "undo": "Undo mark done", "redo": null, "cant": null });
             let space = json!({ "room": "space", "undo": null, "redo": null, "cant": "Can't undo a publish. Unpublish 'World Ending'…" });
-            crate::forward_event(app.handle(), "history", heat);
-            crate::forward_event(app.handle(), "history", space);
+            crate::bridge::forward_event(app.handle(), "history", heat);
+            crate::bridge::forward_event(app.handle(), "history", space);
             assert_eq!(
                 item(&app, UNDO.id),
                 ("Undo mark done".into(), true),
@@ -527,7 +542,7 @@ mod tests {
         #[test]
         fn the_library_drawer_keeps_the_rooms_tick() {
             let app = app();
-            crate::forward_event(
+            crate::bridge::forward_event(
                 app.handle(),
                 "history",
                 json!({ "room": "library", "undo": "Undo tag clip" }),

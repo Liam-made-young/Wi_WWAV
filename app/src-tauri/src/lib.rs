@@ -14,12 +14,9 @@ use std::sync::Mutex;
 
 use tauri::{AppHandle, Builder, Manager, RunEvent, Runtime, WebviewWindowBuilder};
 
-pub use bridge::{forward_event, forward_meters, Allow, Bridge, Core, CoreError};
-pub use menu::{History, CREDITS, ROOMS};
-pub use open::EXTENSIONS;
-pub use paths::engine_beside;
+pub use bridge::{Bridge, Core, CoreError};
+pub use menu::build as build_menu;
 pub use secrets::{KeyringStore, NO_STORE, SERVICE};
-pub use update::READY;
 
 /// The shell's state and its one command, without the plugins and menus that
 /// need a real window system. The tests build this on Tauri's mock runtime.
@@ -39,16 +36,12 @@ pub fn run() {
         }));
     let app = shell(builder)
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .menu(menu::build)
         .on_menu_event(menu::on_event)
         .setup(|app| {
-            let handle = app.handle().clone();
-            // The window draws while the core opens (the 1.5 s budget, 9.13).
-            std::thread::spawn(move || {
-                let core = core_link::open(&handle);
-                handle.state::<Bridge>().set_core(core);
-            });
+            start_core(app.handle());
             open::route(app.handle(), open::from_args(std::env::args()));
             update::watch(app.handle());
             Ok(())
@@ -62,8 +55,21 @@ pub fn run() {
         RunEvent::Opened { urls } => {
             open::route(app, urls.iter().filter_map(|u| u.to_file_path().ok()))
         }
-        RunEvent::Exit => update::install_on_quit(app),
+        RunEvent::Exit => {
+            app.state::<Bridge>().close();
+            update::install_on_quit(app);
+        }
         _ => {}
+    });
+}
+
+/// Opens the core on a thread of its own, so the window draws while it
+/// opens (the 1.5 s budget, 9.13); commands wait for it.
+pub fn start_core<R: Runtime>(app: &AppHandle<R>) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let core = core_link::open(&app);
+        app.state::<Bridge>().set_core(core);
     });
 }
 

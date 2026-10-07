@@ -15,7 +15,7 @@
 
 use std::sync::{Arc, Condvar, Mutex};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use tauri::ipc::{Channel, CommandScope, InvokeResponseBody, JavaScriptChannelId};
 use tauri::{AppHandle, Emitter, Manager, Runtime, Webview};
@@ -30,20 +30,7 @@ pub trait Core: Send + Sync + 'static {
 }
 
 /// An error as the UI sees it: a word to branch on and a sentence to show.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CoreError {
-    pub code: String,
-    pub message: String,
-}
-
-impl CoreError {
-    pub fn new(code: &str, message: impl Into<String>) -> Self {
-        Self {
-            code: code.into(),
-            message: message.into(),
-        }
-    }
-}
+pub use wi_core::CoreError;
 
 /// One entry of a window's allowlist in its capability file: a `cmd`, an
 /// area (`app.settings.*`) or everything (`*`).
@@ -88,6 +75,15 @@ impl Bridge {
     pub fn set_core(&self, core: Result<Arc<dyn Core>, CoreError>) {
         *self.core.lock().unwrap() = Some(core);
         self.opened.notify_all();
+    }
+
+    /// Lets the core go as the app quits, so it stops the engine and its
+    /// workers finish; a command still arriving is told the app is closing.
+    pub fn close(&self) {
+        let closing = CoreError::new("closing", "Wi_WWAV is closing.");
+        let core = self.core.lock().unwrap().replace(Err(closing));
+        self.opened.notify_all();
+        drop(core);
     }
 
     /// The core, waiting for it to open.
