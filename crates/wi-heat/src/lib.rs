@@ -11,9 +11,15 @@
 //!   field (2.8, 9.7).
 //! - [`assist`] is the client side of `/api/assist/:task`: consent, bodies,
 //!   answers, failures and the one retry (2.11, 3.12).
+//! - [`model`] is Heat's own maths, ported from `app/ui/src/heat/model`: the
+//!   records, heat, estimates, grades, Plan my day, the focus timer, habits,
+//!   recurrence, the calendar, the weekly review's facts, spaces and moving in
+//!   (3.1 to 3.16). Plain functions over plain structs; time comes in as a
+//!   parameter and nothing here reads the clock.
 
 pub mod assist;
 pub mod brightspace;
 pub mod ical;
 pub mod mail;
+pub mod model;
 pub mod sync;
