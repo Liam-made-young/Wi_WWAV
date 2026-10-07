@@ -17,6 +17,8 @@
 //   actions room.heat, room.space, room.console and room.unquantized.
 // - Ctrl+1 to Ctrl+4 don't change which room the switcher shows, whether
 //   they come through the menu or straight to the page.
+// - A song the app was opened with (as a file manager opens it: a path on
+//   the command line) doesn't come into the library through the core.
 // The cold start to the first paint is printed for information: the 1.5 s
 // budget is measured on the reference Mac (docs/SPEC.md 9.13).
 
@@ -30,6 +32,7 @@ import { WebDriver } from './webdriver.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const ROOMS = ['Heat', 'Space', 'Console', 'Unquantized'];
+const SONG = join(ROOT, 'tests/corpus/original.wwav');
 const argApp = process.argv.indexOf('--app');
 const app = resolve(argApp > 0 ? process.argv[argApp + 1] : join(ROOT, 'target/debug/wi-wwav'));
 
@@ -97,6 +100,11 @@ const CURRENT_ROOM = `
   const shown = [...document.querySelectorAll('button, [role]')].some((e) => names.includes(e.textContent.trim()));
   return { chosen, shown };`;
 
+// Calls the core from the page, as the web UI's bridge does.
+const CALL = `
+  const [cmd, args, done] = arguments;
+  window.__TAURI_INTERNALS__.invoke('core', { cmd, args }).then(done, (error) => done({ error }));`;
+
 // Collects the shell's events in the page, as @tauri-apps/api's listen() does.
 const LISTEN = `
   const done = arguments[arguments.length - 1];
@@ -120,7 +128,7 @@ async function main() {
 
   const launched = Date.now();
   const shown = windowShown(DISPLAY);
-  await wd.newSession({ 'tauri:options': { application: app } });
+  await wd.newSession({ 'tauri:options': { application: app, args: [SONG] } });
   try {
     await until('the page to load', () => wd.run('return document.readyState === "complete"'));
     // The paint entry can land a moment after load.
@@ -139,6 +147,13 @@ async function main() {
     const times = [`window shown ${ms(await shown)}`, `UI loaded ${ms(page.origin + page.loaded)}`];
     if (paint !== undefined) times.push(`first contentful paint ${ms(page.origin + paint)}`);
     console.log(`info  cold start: ${times.join(', ')} (Linux, ${app.includes('/debug/') ? 'a debug build' : 'a release build'}; information only: the 1.5 s budget is for the reference Mac)`);
+
+    const library = await until('the opened song in the library', async () => {
+      const got = await wd.runAsync(CALL, ['library.list', {}]);
+      return got.clips?.length ? got : undefined;
+    }, 10000).catch((e) => ({ error: e.message, clips: [] }));
+    const clip = library.clips[0];
+    check(library.clips.length === 1 && clip.verdict === '4 stems, and the master', 'a song opened with the app comes into the library', clip ? `${clip.title}: ${clip.verdict}` : JSON.stringify(library.error));
 
     const rect = await wd.rect();
     check(rect.width === 1280 && rect.height === 800, 'it opens at 1280 × 800', `${rect.width} × ${rect.height}`);
