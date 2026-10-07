@@ -7,6 +7,7 @@
 import { addDays, atMinute, type DayKey, dayKey } from '../../shared/time/zone';
 import type { CalendarEvent, Id, Kind, Records, Task } from '../client';
 import { defaultSpaces } from '../model/spaces';
+import { ulidAt } from '../ulid';
 
 export type Seed = Partial<{ [K in Kind]: Records[K][] }>;
 
@@ -59,7 +60,7 @@ export function seed(now: number, tz: string): Seeded {
       difficulty: 2,
       estMin: 45,
       estBy: 'claude',
-      estReason: 'It read the title, the notes and your past averages.',
+      estReason: 'A one-page worksheet.',
       source: 'ical',
     }),
     task('t-pset5', {
@@ -96,7 +97,7 @@ export function seed(now: number, tz: string): Seeded {
       estBy: 'you',
       notes: 'Vocals sit too far back after the bridge.',
     }),
-    task('t-pcbs', {
+    task(ulidAt(now - 18 * 3_600_000, 'PCBQ000000000000'), {
       spaceId: wwav.id,
       title: 'Order PCBs',
       type: 'Hardware',
@@ -104,7 +105,7 @@ export function seed(now: number, tz: string): Seeded {
       difficulty: 2,
       estMin: 30,
       estBy: 'claude',
-      estReason: 'It read the title, the notes and your past averages.',
+      estReason: 'A single order, like the last one.',
       source: 'claude',
       claudeReason: 'The board house’s Oct 6 email says the quote expires Oct 13.',
       notes: 'From mail: https://mail.google.com/mail/u/0/#inbox/example',

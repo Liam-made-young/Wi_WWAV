@@ -73,8 +73,7 @@ interface Options {
   open?: { id: string; n: number } | null;
 }
 
-/** Heat mounted on a seeded fake core, with its clock held still at `now` unless a test moves it. */
-export async function mountHeat(options: Options = {}): Promise<Rig> {
+function boot(options: Options) {
   setViewport(options.width ?? 1280);
   const now = options.now ?? MORNING;
   const seeded = seed(now, NY);
@@ -83,7 +82,44 @@ export async function mountHeat(options: Options = {}): Promise<Rig> {
     fake.state.currentTaskId = seeded.currentTaskId;
     setEvents(fake, seeded.events);
   }
-  const client = heatClient(transport);
+  return { fake, transport, seeded, client: heatClient(transport) };
+}
+
+/** Anything that reads Heat's snapshot (the shell's strip, ⌘⇧N), mounted on a seeded fake core. */
+export async function mountWith(children: ReactNode, options: Options = {}): Promise<Rig> {
+  const { fake, transport, seeded, client } = boot(options);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root: Root = createRoot(host);
+  const view = createRef<HeatHandle>();
+  const opens = { settings: 0 };
+  const ui = (
+    <HeatProvider client={client} clock={() => fake.now}>
+      {children}
+    </HeatProvider>
+  );
+  act(() => root.render(ui));
+  await settle();
+  return {
+    fake,
+    client,
+    call: transport.call,
+    seeded,
+    host,
+    view,
+    status: () => ({ count: null, act: null }),
+    opens,
+    rerender: (next) => act(() => root.render(next ?? ui)),
+    unmount() {
+      act(() => root.unmount());
+      host.remove();
+    },
+  };
+}
+
+/** Heat mounted on a seeded fake core, with its clock held still at `now` unless a test moves it. */
+export async function mountHeat(options: Options = {}): Promise<Rig> {
+  const { fake, transport, seeded, client } = boot(options);
   const host = document.createElement('div');
   document.body.append(host);
   const root: Root = createRoot(host);
@@ -174,6 +210,7 @@ export async function type(el: Element | null | undefined, value: string) {
         : HTMLInputElement.prototype;
   const set = Object.getOwnPropertyDescriptor(proto, 'value')!.set!;
   await act(async () => {
+    (el as HTMLElement).focus();
     set.call(el, value);
     el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
   });

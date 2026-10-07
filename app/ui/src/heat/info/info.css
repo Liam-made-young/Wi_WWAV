@@ -1,0 +1,111 @@
+/* Get Info (docs/SPEC.md 3.5): a 290 px well over the right column, fields
+   in two columns, hints in secondary text, and the Public switch last. */
+
+.heat-info {
+  position: relative;
+  padding-top: var(--space-s2);
+}
+
+.heat-info-close {
+  position: absolute;
+  top: var(--space-s1);
+  right: var(--space-s1);
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--type-desk-large);
+  color: var(--desk-ink);
+}
+
+.heat-info > .heat-field:first-of-type input {
+  padding-right: 28px;
+  font-size: var(--type-desk-large);
+  font-weight: bold;
+}
+
+.heat-info-name {
+  margin: 0 28px var(--space-s1) 0;
+  font-size: var(--type-desk-large);
+  font-weight: bold;
+}
+
+.heat-info-heat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  margin: var(--space-s2) 0 var(--space-s1);
+}
+
+.heat-source-line {
+  margin: 0 0 var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+/* Claude's reason is the sentence it gave, set apart as a quotation. */
+.heat-reason {
+  margin: 0 0 var(--space-s2);
+  padding: var(--space-s1) var(--space-s2);
+  border-left: var(--desk-select-bar) solid var(--desk-highlight);
+  background: var(--desk-stripe);
+  font-size: var(--type-desk-small);
+}
+
+.heat-fields {
+  display: grid;
+  gap: var(--space-s1);
+  margin: var(--space-s2) 0;
+}
+
+.heat-field {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-field span {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-field input,
+.heat-field select,
+.heat-field textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.heat-field-wide {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.heat-field-wide textarea {
+  resize: vertical;
+}
+
+.heat-hint {
+  margin: 0 0 var(--space-s1);
+  padding-left: 82px;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-info > .heat-hint {
+  padding-left: 0;
+}
+
+.heat-switch {
+  margin-top: var(--space-s2);
+}
+
+.heat-info-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s1);
+  margin-top: var(--space-s3);
+}
