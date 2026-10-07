@@ -1,0 +1,6 @@
+# The engine's C++ reads like PRANA's core: Google style, 120 columns.
+BasedOnStyle: Google
+ColumnLimit: 120
+DerivePointerAlignment: false
+PointerAlignment: Left
+IncludeBlocks: Preserve
