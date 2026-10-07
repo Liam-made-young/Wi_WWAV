@@ -84,10 +84,10 @@ bool AudioEngine::open(const std::string& name, int rate, int block, std::string
     setup.bufferSize = block;
     setup.useDefaultInputChannels = false;
     setup.useDefaultOutputChannels = true;
-    devices_.setCurrentAudioDeviceType(type, true);
-    juce::String e = juceStarted_ ? devices_.setAudioDeviceSetup(setup, true)
-                                  : devices_.initialise(0, 2, nullptr, false, {}, &setup);
-    juceStarted_ = true;
+    // A new type opens its own default device first; ours replaces it. The
+    // manager needs no initialise(): it already wants no inputs and two outputs.
+    if (devices_.getCurrentAudioDeviceType() != type) devices_.setCurrentAudioDeviceType(type, true);
+    juce::String e = devices_.setAudioDeviceSetup(setup, true);
     juce::AudioIODevice* d = devices_.getCurrentAudioDevice();
     if (e.isEmpty() && d == nullptr) e = "it didn't open";
     if (e.isNotEmpty()) {

@@ -98,7 +98,6 @@ class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Tim
   DeviceInfo device_;
   bool running_ = false;  // the worker's view: a device is calling back
   bool juceDevice_ = false;
-  bool juceStarted_ = false;
   std::thread null_;
   std::atomic<bool> nullStop_{false};
 
