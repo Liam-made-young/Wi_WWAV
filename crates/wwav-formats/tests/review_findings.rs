@@ -256,3 +256,28 @@ fn unpack_then_pack_keeps_a_title_from_the_folder() {
     let (first, again) = rust_round_trip(&dir, &folder);
     assert!(first == again, "{}", first_difference(&first, &again));
 }
+
+/// Finding: `wwav unpack` and `wwav pack` don't check whether what they
+/// write is what they read (swav pack and unpack, master_only and wrap_wav
+/// now do). Unpacking a .wwav named master.wav into its own folder
+/// truncates it to the 44-byte head before reading the master, and fails
+/// with "failed to fill whole buffer" after the song is gone; a hard link
+/// to it loses the song too. wwav_pack.py loses it the same way.
+#[test]
+#[ignore = "review finding: wwav unpack and pack write over their input (pack.rs has no not_same)"]
+fn unpack_never_writes_over_its_input() {
+    let dir = tmp("review-over");
+    let song = dir.join("master.wav");
+    std::fs::copy(corpus().join("original.wwav"), &song).unwrap();
+    let before = std::fs::read(&song).unwrap();
+    let o = wwav(&["unpack", s(&song), "-o", s(&dir)]);
+    let after = std::fs::read(&song).unwrap();
+    assert!(
+        after == before,
+        "exit {:?}, {}; the .wwav went from {} to {} bytes",
+        o.status.code(),
+        String::from_utf8_lossy(&o.stderr).trim(),
+        before.len(),
+        after.len()
+    );
+}
