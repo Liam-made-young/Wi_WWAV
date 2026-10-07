@@ -140,6 +140,9 @@ void Server::acceptLoop() {
       helloDone_ = false;
     }
     serve(fd, conn);
+    // Shut it first: a writer stuck on a client that stopped reading then
+    // fails at once and lets go of writing_.
+    shutdown(fd, SHUT_RDWR);
     {
       std::lock_guard<std::mutex> writing(writing_);
       std::lock_guard<std::mutex> lock(mutex_);
@@ -156,7 +159,7 @@ void Server::serve(int fd, uint64_t conn) {
   for (;;) {
     uint8_t head[4];
     if (!readFull(fd, head, 4)) return;
-    const uint32_t n = head[0] | head[1] << 8 | head[2] << 16 | (uint32_t)head[3] << 24;
+    const uint32_t n = (uint32_t)head[0] | (uint32_t)head[1] << 8 | (uint32_t)head[2] << 16 | (uint32_t)head[3] << 24;
     if (n == 0 || n > kMaxFrame) {
       fprintf(stderr, "wwav-engine: closing the connection: a frame of %u bytes\n", n);
       return;

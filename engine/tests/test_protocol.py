@@ -18,7 +18,7 @@ import struct
 import time
 import unittest
 
-from wwav_client import MAX_FRAME, Engine, EngineError, Shm
+from wwav_client import MAX_FRAME, Client, Engine, EngineError, Shm
 
 
 class Protocol(unittest.TestCase):
@@ -135,6 +135,28 @@ class Protocol(unittest.TestCase):
         self.assertTrue(c.closed())
         c.close()
         self.engine.connect().call("ping")
+
+    def test_a_client_that_stops_reading_cant_wedge_the_socket(self):
+        a = self.engine.connect()
+        # Thousands of quick errors whose answers a never reads, until the engine's writes block...
+        flood = b"".join(struct.pack("<I", len(m)) + m for m in (
+            json.dumps({"id": i, "op": "param.set", "args": {"node": "master", "param": "gain_db", "value": 0}})
+            .encode() for i in range(2, 20002)))
+        a.sock.setblocking(False)
+        sent = 0
+        deadline = time.monotonic() + 5
+        while sent < len(flood) and time.monotonic() < deadline:
+            try:
+                sent += a.sock.send(flood[sent:])
+            except BlockingIOError:
+                time.sleep(0.01)
+        a.sock.setblocking(True)
+        time.sleep(0.3)
+        # ...then a bad frame: the engine drops a, and the next client is served.
+        a.sock.sendall(struct.pack("<I", 0))
+        b = Client(self.engine.sock_path)
+        self.engine.clients.append(b)
+        self.assertEqual(b.call("hello", {"protocol": 1, "client": "next"}, timeout=2)["protocol"], 1)
 
     def test_utf8_round_trips(self):
         c = self.engine.connect(hello=False)
