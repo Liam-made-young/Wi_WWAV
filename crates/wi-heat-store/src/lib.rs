@@ -55,6 +55,11 @@ pub mod kind {
     /// A thread's messages as plain text, for Mail's reader. Kept on this
     /// Mac only: outside the journal, never synced, never exported.
     pub const MAIL_TEXT: &str = "mailText";
+    /// A thread's place in the mailbox: unread, archived. This Mac only.
+    pub const MAIL_STATE: &str = "mailState";
+    /// Something to do in the mailbox, waiting for Claude to do it: a mail
+    /// to send, a thread to archive or mark. This Mac only.
+    pub const MAIL_ACTION: &str = "mailAction";
     pub const CALENDAR: &str = "calendar";
     pub const CAPTURE: &str = "capture";
     pub const DAILY_NOTE: &str = "dailyNote";

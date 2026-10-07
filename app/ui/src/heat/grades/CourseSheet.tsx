@@ -158,11 +158,15 @@ export function CourseSheet({ course, onClose }: { course?: Course; onClose(): v
       if (!made) return setBusy(false);
       termId = made.record.id;
     }
+    // The sheet has no field for how many of a category's lowest scores are dropped: what a
+    // syllabus set stays as it is.
+    const dropped = (id?: Id) => course?.categories.find((c) => c.id === id)?.dropLowest;
     const categories: GradeCategory[] = form.categories.map((r) => ({
       id: r.id ?? newCategoryId(),
       name: r.name.trim(),
       weight: Number(r.weight) || 0,
       keywords: words(r.keywords),
+      ...(dropped(r.id) ? { dropLowest: dropped(r.id) } : {}),
     }));
     // A type's category is kept by name, and only while the course still has a category of that name.
     const types: TypeDef[] = form.types.map((t) => ({

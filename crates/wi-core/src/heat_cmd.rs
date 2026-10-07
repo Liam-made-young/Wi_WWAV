@@ -102,6 +102,8 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             snap["school"] = school;
             // The mail accounts for Mail's switcher and Settings → Learn (3.10).
             snap["mailAccounts"] = Value::Array(mail::accounts(&store).map_err(core_error)?);
+            drop(store);
+            crate::mail_cmd::for_snapshot(i, &mut snap)?;
             Ok(snap)
         }
         "heat.whatItWouldTake" => {
@@ -253,6 +255,18 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             Ok(match saved {
                 Some(doc) => json!({"messages": doc["messages"], "savedAt": doc["savedAt"]}),
                 None => json!({"messages": null}),
+            })
+        }
+        // The rest of Mail (send, reply, archive, mark, search, the outbox, sync)
+        // is mail_cmd.rs's.
+        c if c.starts_with("heat.mail.")
+            && !matches!(c, "heat.mail.accounts.set" | "heat.mail.text") =>
+        {
+            crate::mail_cmd::call(i, c, a).unwrap_or_else(|| {
+                Err(CoreError::new(
+                    "unknown_command",
+                    format!("Mail has no command called {c}."),
+                ))
             })
         }
         "heat.mail.accounts.set" => {

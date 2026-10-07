@@ -219,3 +219,98 @@
   color: inherit;
   text-decoration: underline;
 }
+
+/* The client's controls: write, sort and search in the head; the line that
+   says how mail is kept in step; an unread thread in bold. */
+.heat-mail-tools,
+.heat-mail-sync,
+.heat-mail-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-mail-sync {
+  justify-content: space-between;
+  padding: var(--space-s1) var(--space-s4);
+  font-size: var(--type-desk-small);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-mail-sync [role='status'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.heat-thread[data-unread] .heat-thread-subject {
+  font-weight: bold;
+}
+
+.heat-thread:not([data-unread]) .heat-thread-from {
+  font-weight: normal;
+}
+
+.heat-mail-writing {
+  padding: var(--space-s3) var(--space-s4);
+  overflow-y: auto;
+}
+
+.heat-compose {
+  display: grid;
+  gap: var(--space-s2);
+  max-width: 68ch;
+  margin-top: var(--space-s3);
+}
+
+.heat-compose-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-compose input,
+.heat-compose-body {
+  min-height: 24px;
+  padding: var(--space-s1) var(--space-s2);
+  font: inherit;
+  color: inherit;
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+}
+
+.heat-compose-body {
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.heat-outbox {
+  padding: var(--space-s3) var(--space-s4);
+  overflow-y: auto;
+}
+
+.heat-outbox-row {
+  max-width: 68ch;
+  margin-bottom: var(--space-s3);
+  padding-bottom: var(--space-s3);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-outbox-what,
+.heat-outbox-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-outbox-subject {
+  font-weight: bold;
+}
+
+.heat-outbox-body {
+  margin: var(--space-s2) 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

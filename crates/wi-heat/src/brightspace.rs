@@ -223,16 +223,36 @@ pub fn feed_items(events: &[Event], school: &School, types: &[TypeRule]) -> Vec<
     items
 }
 
+/// A title with a space put between a word and the number run on to it:
+/// "lab4" reads "lab 4", as a syllabus would write it.
+fn spaced(title: &str) -> String {
+    let mut out = String::with_capacity(title.len() + 2);
+    let mut after_letter = false;
+    for c in title.chars() {
+        if after_letter && c.is_ascii_digit() {
+            out.push(' ');
+        }
+        after_letter = c.is_alphabetic();
+        out.push(c);
+    }
+    out
+}
+
 /// True when the titles share at least 60% of their words, counted against
-/// the longer title, with " - Due" set aside.
+/// the longer title, with " - Due" set aside. "lab4" and "Lab 4" are one
+/// title: a number run on to a word is read apart from it when the titles
+/// don't meet as written.
 pub fn same_title(a: &str, b: &str) -> bool {
     let set = |t: &str| -> BTreeSet<String> {
         let t = t.trim_end();
         words(t.strip_suffix(DUE_SUFFIX).unwrap_or(t)).collect()
     };
-    let (a, b) = (set(a), set(b));
-    let shared = a.intersection(&b).count();
-    shared > 0 && shared * 10 >= a.len().max(b.len()) * 6
+    let meet = |a: &str, b: &str| {
+        let (a, b) = (set(a), set(b));
+        let shared = a.intersection(&b).count();
+        shared > 0 && shared * 10 >= a.len().max(b.len()) * 6
+    };
+    meet(a, b) || meet(&spaced(a), &spaced(b))
 }
 
 /// What the feed sync needs to know of a task: one made from the feed, or
@@ -465,6 +485,14 @@ mod tests {
             "Other",
             "a phrase keeps its order"
         );
+    }
+
+    #[test]
+    fn a_number_run_on_to_a_word_is_still_the_same_title() {
+        assert!(same_title("lab4", "Lab 4"));
+        assert!(!same_title("lab4", "lab5"));
+        assert!(!same_title("Homework 3", "Homework 4"));
+        assert!(same_title("Kanji quiz 3 - Due", "Kanji Quiz 3"));
     }
 
     #[test]

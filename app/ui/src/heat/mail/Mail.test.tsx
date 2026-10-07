@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mailTexts } from '../fake/settings';
-import { $, $$, button, click, mountHeat, press, type Rig, settle } from '../testkit';
+import { mailboxOf, mailTexts } from '../fake/settings';
+import { $, $$, button, click, mountHeat, press, type Rig, settle, type } from '../testkit';
 
 // docs/SPEC.md 3.10 and docs/PLAN.md S2.4. What a fail looks like: a thread
 // without its sender, time, subject, course chip and state chip; a pane
 // without Claude's reason and a link to what it made; Open in Gmail opening
 // anything but mail.google.com/mail/u/0/#all/<threadId>; Make a task not
 // opening the task sheet with the subject and "From mail:"; Mail that can
-// reply, send or delete; no sentence for an empty Mail.
+// delete; a reply that isn't in the outbox word for word; a sort that puts a
+// thread in the wrong section; no sentence for an empty Mail.
 
 let rig: Rig;
 afterEach(() => {
@@ -136,17 +137,152 @@ describe('Open in Gmail and Make a task', () => {
 });
 
 describe('what Mail can’t do', () => {
-  // Gmail already replies, sends and deletes, and Wi_WWAV never touches the mailbox.
-  it('has no reply, send or delete, anywhere in the tab', async () => {
+  // Mail answers, files and searches; it still never deletes.
+  it('has no delete, trash or spam, anywhere in the tab', async () => {
     await open();
     const names = $$(panel(), 'button, a, [role="button"], [role="menuitem"]').map((el) =>
       (el.getAttribute('aria-label') ?? el.textContent ?? '').trim(),
     );
-    expect(names.length).toBeGreaterThan(2);
-    for (const name of names) expect(name).not.toMatch(/reply|send|delete|trash|archive|forward|compose|spam|remove/i);
-    expect($(panel(), 'textarea, [contenteditable]')).toBeNull();
-    // And no "+": there is nothing for Mail to add.
-    expect($(rig, '.heat-plus')).toBeNull();
+    expect(names).toEqual(expect.arrayContaining(['Compose', 'Reply', 'Archive', 'Mark unread', 'Open in Gmail', 'Make a task']));
+    for (const name of names) expect(name).not.toMatch(/delete|trash|spam|remove/i);
+  });
+
+  it('writes a reply and a new mail into the outbox, word for word', async () => {
+    await open();
+    const top = [...rig.fake.store.mailThread.values()].sort((a, b) => b.receivedAt - a.receivedAt)[0];
+    await click(button(panel(), 'Reply'));
+    const form = $(panel(), '.heat-compose')!;
+    expect(form.getAttribute('aria-label')).toBe(`Reply to ${top.subject}`);
+    expect(button(form, 'Send')!.hasAttribute('disabled')).toBe(true);
+    await type($(form, 'textarea'), 'Thank you, せんせい.\nLiam');
+    await click(button(form, 'Send'));
+    await settle();
+    expect($(panel(), '.heat-compose')).toBeNull();
+    expect(text($(panel(), '.heat-mail-sync [role="status"]'))).toBe('Reply is in the outbox, on its way.');
+    expect(mailboxOf(rig.fake).actions).toMatchObject([
+      { kind: 'reply', threadId: top.gmailThreadId, body: 'Thank you, せんせい.\nLiam', status: 'queued' },
+    ]);
+
+    await click(button(panel(), 'Compose'));
+    const fresh = $(panel(), '.heat-compose')!;
+    expect(fresh.getAttribute('aria-label')).toBe('New mail');
+    await type($(fresh, '[aria-label="Subject"]'), 'Lab 6');
+    await type($(fresh, 'textarea'), 'When is it due?');
+    await click(button(fresh, 'Send'));
+    await settle();
+    // The core's own sentence, and what was written stays to be fixed.
+    expect(text($(fresh, '[role="alert"]'))).toBe('Say who the mail is to.');
+    expect(($(fresh, 'textarea') as HTMLTextAreaElement).value).toBe('When is it due?');
+    await type($(fresh, '[aria-label="To"]'), 'ta@uri.edu');
+    await click(button(fresh, 'Send'));
+    await settle();
+    expect(mailboxOf(rig.fake).actions[1]).toMatchObject({ kind: 'send', to: 'ta@uri.edu', subject: 'Lab 6', body: 'When is it due?' });
+
+    // The outbox lists both, newest first, and one can be thrown away before it goes.
+    const boxes = () => $$(rig, '.heat-mail-box').map((b) => text(b));
+    expect(boxes()).toEqual(['Inbox3', 'Unread0', 'Archived0', 'Outbox2']);
+    await click($$(rig, '.heat-mail-box')[3]);
+    await settle();
+    const out = $$(panel(), '.heat-outbox-row');
+    expect(out.map((r) => text($(r, '.heat-outbox-subject')))).toEqual(['Lab 6', top.subject]);
+    expect(text(out[0])).toContain('Waiting');
+    await click(button(out[0], 'Discard Lab 6'));
+    await settle();
+    expect(mailboxOf(rig.fake).actions.map((a) => a.kind)).toEqual(['reply']);
+    expect($$(panel(), '.heat-outbox-row')).toHaveLength(1);
+  });
+
+  it('archives, marks unread and reads a thread by choosing it', async () => {
+    await open();
+    const [a, b] = [...rig.fake.store.mailThread.values()].sort((x, y) => y.receivedAt - x.receivedAt);
+    const boxes = () => $$(rig, '.heat-mail-box').map((x) => text(x));
+    await click(button(panel(), 'Mark unread'));
+    await settle();
+    expect(rows()[0].hasAttribute('data-unread')).toBe(true);
+    expect(boxes()).toEqual(['Inbox3', 'Unread1', 'Archived0', 'Outbox1']);
+    expect(button(panel(), 'Mark read')).toBeTruthy();
+    // Choosing another thread and coming back reads it.
+    await click(rows()[1]);
+    await click(rows()[0]);
+    await settle();
+    expect(rows()[0].hasAttribute('data-unread')).toBe(false);
+    expect(rig.calls.filter((c) => c.cmd === 'heat.mail.mark').map((c) => c.args)).toEqual([
+      { threadId: a.gmailThreadId, unread: true },
+      { threadId: a.gmailThreadId, unread: false },
+    ]);
+
+    await click(button(panel(), 'Archive'));
+    await settle();
+    expect(rows().map((r) => text($(r, '.heat-thread-subject')))).not.toContain(a.subject);
+    expect(boxes().slice(0, 3)).toEqual(['Inbox2', 'Unread0', 'Archived1']);
+    await click($$(rig, '.heat-mail-box')[2]);
+    expect(rows().map((r) => text($(r, '.heat-thread-subject')))).toEqual([a.subject]);
+    await click(button(panel(), 'Move to the inbox'));
+    await settle();
+    expect(rows()).toHaveLength(0);
+    await click($$(rig, '.heat-mail-box')[0]);
+    expect(rows()).toHaveLength(3);
+    // E and U do the same from the keyboard.
+    await click(rows()[1]);
+    await press(rig, 'e');
+    await settle();
+    expect(rows().map((r) => text($(r, '.heat-thread-subject')))).not.toContain(b.subject);
+  });
+
+  it('sorts by priority, date, unread or tag', async () => {
+    await open();
+    const [newest, middle, oldest] = [...rig.fake.store.mailThread.values()].sort((a, b) => b.receivedAt - a.receivedAt);
+    Object.assign(newest, { priority: 'low', category: 'promotions' });
+    Object.assign(middle, { priority: 'urgent', category: 'school' });
+    Object.assign(oldest, { priority: 'normal' });
+    mailboxOf(rig.fake).places.set(oldest.gmailThreadId, { unread: true, archived: false });
+    rig.fake.emit(['mailThread']);
+    await settle();
+    const subjects = () => rows().map((r) => text($(r, '.heat-thread-subject')));
+    const heads = () => $$(panel(), '.heat-mail-section').map((h) => text(h));
+    const sortBy = async (value: string) => {
+      const select = $(panel(), 'select[aria-label="Sort the threads"]') as unknown as HTMLSelectElement;
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await settle();
+    };
+    expect(heads()).toEqual(['Urgent', 'Everything else']);
+    expect(subjects()).toEqual([middle.subject, newest.subject, oldest.subject]);
+    await sortBy('date');
+    expect(heads()).toEqual([]);
+    expect(subjects()).toEqual([newest.subject, middle.subject, oldest.subject]);
+    await sortBy('unread');
+    expect(heads()).toEqual(['Unread', 'Read']);
+    expect(subjects()).toEqual([oldest.subject, newest.subject, middle.subject]);
+    await sortBy('tag');
+    expect(heads()).toEqual(['School', 'Promotions', 'No tag']);
+    expect(subjects()).toEqual([middle.subject, newest.subject, oldest.subject]);
+  });
+
+  it('searches inside the saved text, not only what a row shows', async () => {
+    await open();
+    const [, , oldest] = [...rig.fake.store.mailThread.values()].sort((a, b) => b.receivedAt - a.receivedAt);
+    mailTexts.set(rig.fake, new Map([[oldest.gmailThreadId, [{ from: 'Registrar', sentAt: oldest.receivedAt, text: 'Offices close for the long weekend.' }]]]));
+    await type($(panel(), 'input[type="search"]'), 'long weekend');
+    await settle();
+    expect(rows().map((r) => text($(r, '.heat-thread-subject')))).toEqual([oldest.subject]);
+    await type($(panel(), 'input[type="search"]'), 'nothing like it');
+    await settle();
+    expect(rows()).toHaveLength(0);
+  });
+
+  it('says how mail is kept in step, reads it when asked, and can stop reading on its own', async () => {
+    await open();
+    const line = () => text($(panel(), '.heat-mail-sync [role="status"]'));
+    expect(line()).toBe('Mail hasn’t been read from here yet.');
+    await click(button(panel(), 'Read mail now'));
+    await settle();
+    expect(line()).toBe('Mail read 10:00 AM: nothing new');
+    const own = $(panel(), '.heat-mail-sync input[type="checkbox"]') as HTMLInputElement;
+    expect(own.checked).toBe(true);
+    await click(own);
+    await settle();
+    expect(mailboxOf(rig.fake).background).toBe(false);
   });
 
   it('does nothing on ⌫ or Delete, even with a task selected in another tab', async () => {

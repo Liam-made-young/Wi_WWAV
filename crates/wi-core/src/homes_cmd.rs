@@ -261,7 +261,9 @@ fn score(i: &Inner, all: bool) -> Result<usize, CoreError> {
 /// one for tasks a sync just brought. True if anything was done.
 fn work(i: &Inner) -> bool {
     let mut did = false;
-    for draft in homes::drafts_to_read(&i.store()).unwrap_or_default() {
+    // Read first, then let go of the library: reading a draft takes it again.
+    let waiting = homes::drafts_to_read(&i.store()).unwrap_or_default();
+    for draft in waiting {
         if i.closing() {
             return did;
         }

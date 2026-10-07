@@ -5551,6 +5551,7 @@ dependencies = [
  "ureq",
  "wi-heat",
  "wi-heat-store",
+ "wi-mcp",
  "wi-store",
  "wwav-formats",
  "wwav-ids",

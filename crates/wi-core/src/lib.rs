@@ -32,6 +32,7 @@ mod heat_cmd;
 mod history;
 mod kv;
 mod library;
+mod mail_cmd;
 mod net;
 mod player;
 mod settings;
@@ -214,6 +215,8 @@ pub(crate) struct Inner {
     /// The Claude Code command line, when the config names one.
     claude: Option<PathBuf>,
     auto_score: bool,
+    /// What Mail's worker has been asked for, and what it is doing.
+    mail: mail_cmd::Mailbox,
     /// The journal entries this process made, so the watcher tells the views
     /// only about other processes' (the MCP helper's).
     own: Mutex<BTreeSet<String>>,
@@ -334,6 +337,7 @@ impl Core {
             helper: config.helper.clone(),
             claude: config.claude.clone(),
             auto_score: config.auto_score,
+            mail: mail_cmd::Mailbox::default(),
             own: Mutex::new(BTreeSet::new()),
             fixed_now: Mutex::new(config.now),
             uploads: Mutex::new(upload::Status::default()),
@@ -350,6 +354,7 @@ impl Core {
             watch::start(&inner),
             calendars::start(&inner),
             homes_cmd::start(&inner),
+            mail_cmd::start(&inner, config.background_mail),
         ];
         Ok(Core { inner, workers })
     }

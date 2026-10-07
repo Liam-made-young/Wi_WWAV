@@ -50,6 +50,8 @@ pub fn open<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<dyn Core>, CoreError> 
     config.sign_in_url = paths::sign_in();
     // Tasks a sync brings that no type matches are estimated by Claude, once each.
     config.auto_score = true;
+    // The app reads mail on its own while it is open (3.10); a test's core doesn't.
+    config.background_mail = true;
     let core = wi_core::Core::open(&paths::library(app.path().audio_dir().ok()), config)?;
 
     let (events, meters) = (core.events(), core.meters());

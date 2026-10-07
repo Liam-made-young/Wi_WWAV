@@ -417,7 +417,16 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
         i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")?;
     let mut records = Map::new();
     for kind in kinds.iter().filter(|k| {
-        !["heatState", "heatSetting", "calendarEvent", "mailText", "syllabusDraft"].contains(&k.as_str())
+        ![
+            "heatState",
+            "heatSetting",
+            "calendarEvent",
+            "mailText",
+            "mailState",
+            "mailAction",
+            "syllabusDraft",
+        ]
+        .contains(&k.as_str())
     }) {
         let docs = i.store().docs(kind)?;
         let switch = [

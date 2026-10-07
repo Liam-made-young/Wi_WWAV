@@ -8,6 +8,7 @@ use serde_json::{json, Map, Value};
 
 pub const SCHOOL_MAIL: &str = "school_mail";
 pub const READ_MAIL: &str = "read_mail";
+pub const SEND_MAIL: &str = "send_mail";
 
 /// How far back school mail is read: a week unless the person says.
 pub const DAYS: (i64, i64, i64) = (1, 7, 60);
@@ -43,11 +44,22 @@ pub fn list() -> Value {
             "description": "How many days back to read, 1 to 60. Default 7.",
             "required": false
         }]
+    }, {
+        "name": SEND_MAIL,
+        "title": "Send what is in the outbox",
+        "description": "Does what is waiting in Learn's outbox, in Gmail: sends the mails and replies exactly as written, and archives or marks the threads asked for.",
+        "arguments": []
     }])
 }
 
 /// `prompts/get`: the job in words, or one sentence for why not.
 pub fn get(name: &str, args: &Map<String, Value>, school: &School) -> Result<Value, String> {
+    if name == SEND_MAIL {
+        return Ok(json!({
+            "description": "Do what is waiting in Learn's outbox",
+            "messages": [{"role": "user", "content": {"type": "text", "text": send_mail()}}]
+        }));
+    }
     if name != SCHOOL_MAIL && name != READ_MAIL {
         return Err(format!("Unknown prompt: {name}"));
     }
@@ -109,7 +121,8 @@ When you finish, tell me in a few lines how many threads you read and what you m
     )
 }
 
-fn read_mail(days: i64, account: Option<&str>) -> String {
+/// The read job, in words, for one account or every one.
+pub fn read_mail(days: i64, account: Option<&str>) -> String {
     let which = match account {
         Some(a) => format!("Read only the account {a}."),
         None => "Read every account it lists.".to_string(),
@@ -121,17 +134,35 @@ Learn never reads mail itself. You read it with your Gmail tools, then record wh
 
 1. Call list_mail_accounts. {which} Each account comes with a gmail_query that finds its mail and no other account's. If it lists no accounts, read the mailbox your Gmail tools reach and leave account out when you record.
 2. Call list_tasks with status \"all\", get_grades, and list_mail with since set to {days} days ago, so you know the courses, the tasks and what you have already recorded.
-3. For each account, search Gmail with: newer_than:{days}d, then the account's gmail_query. Read each thread you haven't recorded, oldest first.
+3. For each account, search Gmail with: newer_than:{days}d, then the account's gmail_query. Read each thread you haven't recorded, or whose newest message is later than the received_at you recorded, oldest first. Skip the rest: they cost nothing to leave. Do at most 20 threads in one run, the newest first; what is left waits for the next run.
 4. Sort each thread:
    - priority. urgent: I must act today or tomorrow. high: I must act this week, or a person is waiting on me. normal: worth knowing, nothing to do. low: bulk mail, promotions, automatic notices.
    - category: school, work, money, people, updates, promotions or other.
    - state. grade: a grade or feedback was posted; call add_pending_grade with the course code, the item as the notice names it, posted_at, the Brightspace address as link if the mail gives one, and mail_thread_id. There is no score argument: only I type a score. task: it asks me to do something; call add_task with a title as I would write it, the course code if it is school, due only if the mail states a time (never guess one), notes that start \"From mail:\" and say in a line or two what is asked, source_id set to the Gmail message id, and mail_thread_id. nothing: nothing to do.
-5. Call record_mail_thread for every thread you read, whatever you decided: thread_id, account, subject, from, received_at, priority, category, state, the course code if it is about one of my courses, task_id if you made a task, and a one-sentence reason that says why it has that priority.
-6. Then call save_mail_text for the thread, so I can read it in Learn: every message, oldest first, each with from, sent_at and text. The text is the mail's own words as plain text, with its paragraphs. Leave out quoted earlier messages and unsubscribe footers, keep links as plain addresses, and never summarise or reword. Also do this for any thread list_mail shows with has_text false.
+5. Call record_mail_thread for every thread you read, whatever you decided: thread_id, account, subject, from, received_at, priority, category, state, unread (true if Gmail shows any of its messages unread), the course code if it is about one of my courses, task_id if you made a task, and a one-sentence reason that says why it has that priority.
+6. Then call save_mail_text for the thread, so I can read it in Learn: every message, oldest first, each with from, sent_at and text. The text is the mail's own words as plain text, with its paragraphs. Leave out quoted earlier messages and unsubscribe footers, keep links as plain addresses, and never summarise or reword. If you have done fewer than 20 threads, also do this for threads list_mail shows with has_text false, the most pressing first, until you reach 20.
 7. If a course code isn't one get_grades returned, leave course out rather than guess. Don't make a task for promotions or automatic notices.
 
 Reading the same mail twice is safe: the same source_id, the same course and item, or the same thread_id never makes a second row. Don't mark anything done, don't change a due date, and don't reply to, archive, label or delete any mail.
 
 When you finish, tell me per account how many threads you read, then list the urgent and high ones with what each needs from me. I can undo each change in Learn with \u{2318}Z."
     )
+}
+
+/// The outbox job, in words. It names no tool that reads mail: a run given
+/// only this job's tools can send what the person wrote and nothing else.
+pub fn send_mail() -> String {
+    "Do what is waiting in the outbox of Learn, the planner in Wi_WWAV. I wrote these in Learn's Mail; you carry them out in Gmail with your Gmail tools, exactly as written.
+
+1. Call list_mail_outbox. If it is empty, say so and stop.
+2. Do each action in order, oldest first:
+   - send: send a new mail to `to` (and `cc` if given) with `subject` and `body`.
+   - reply: reply in the thread `thread_id` with `body`. Reply to the sender of its latest message unless `to` names someone else; add `cc` if given.
+   - archive: remove the INBOX label from the thread. unarchive: put the INBOX label back.
+   - markRead: remove the UNREAD label from the thread. markUnread: add it.
+3. The body is mine. Send it character for character: don't correct it, shorten it, translate it, add a greeting or a signature, or put anything before or after it. If `account` is given and your Gmail tools can send from that address, send from it; otherwise send from the mailbox you are signed in to.
+4. Straight after each one, call finish_mail_action with its id and result \"done\", or \"failed\" with one sentence saying why. Never do an action twice, and never do anything that isn't in the outbox.
+
+Don't read, search or open any other mail for this job. When you finish, say in one line how many were done and how many failed."
+        .to_string()
 }

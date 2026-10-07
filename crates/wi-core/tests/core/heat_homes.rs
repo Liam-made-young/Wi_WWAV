@@ -293,7 +293,7 @@ fn a_syllabus_is_previewed_then_accepted_in_one_entry_that_one_undo_takes_back()
     assert_eq!(draft["newTasks"][0]["estMin"], 150);
     assert_eq!(
         draft["dateChanges"],
-        json!([{"taskId": lab4["id"], "title": "lab4", "from": ny("2026-10-16 23:59"), "to": ny("2026-10-23 23:59")}])
+        json!([{"taskId": lab4["id"], "title": "lab4", "from": ny("2026-10-16 23:59") as i64, "to": ny("2026-10-23 23:59") as i64}])
     );
     // A type the syllabus gives no minutes takes them from the default of that name; one nothing names gets the catch-all's.
     let types = draft["types"].as_array().unwrap();
@@ -338,7 +338,7 @@ fn a_syllabus_is_previewed_then_accepted_in_one_entry_that_one_undo_takes_back()
     let final_exam = by(&made, "title", "Final exam");
     assert_eq!(
         (final_exam["due"].clone(), final_exam["courseId"].clone(), final_exam["source"].clone(), final_exam["claudeReason"].clone()),
-        (json!(ny("2026-12-14 08:00")), json!(id), json!("claude"), json!("From the syllabus, ELE209_syllabus.pdf."))
+        (json!(ny("2026-12-14 08:00") as i64), json!(id), json!("claude"), json!("From the syllabus, ELE209_syllabus.pdf."))
     );
 
     // One ⌘Z, and all of it is gone: weights, types, tasks, dates, the grade's category.

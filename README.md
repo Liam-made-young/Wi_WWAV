@@ -57,7 +57,7 @@ The window opens on Learn. Your library is made at `~/Music/Wi_WWAV/` the first 
 
 **Calendars.** Settings → Learn (⌘,) takes your Brightspace calendar link and any other calendar's iCal address. Each is kept in the Keychain. In Brightspace: Calendar → Subscribe, and copy the link.
 
-**Mail.** The app never reads Gmail and holds no password. Add your addresses in Settings → Learn → Mail accounts: one is the mailbox Claude's Gmail connector is signed in to, and any other is forwarded into it at a plus address. Then ask Claude "Read my mail", or run the `read_mail` prompt the helper offers (`/mcp__wi-wwav__read_mail` in Claude Code). Each thread shows in Mail under its account, most pressing first.
+**Mail.** The app holds no password for any mailbox. It runs your own Claude Code (`claude`, signed in, with its Gmail connector on) to read mail every half hour while it is open and to send what you write. Add your addresses in Settings → Learn → Mail accounts: one is the mailbox Claude's Gmail connector is signed in to, and any other is forwarded into it at a plus address. In Mail you can read a thread, reply, compose, archive, mark unread, search and sort; "Read mail now" reads at once, and the Outbox shows what is waiting or failed.
 
 **Claude.** Build the helper once, from the `Wi_WWAV` folder in a second terminal:
 
