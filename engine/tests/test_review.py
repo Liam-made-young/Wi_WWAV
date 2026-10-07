@@ -160,7 +160,7 @@ class Mute(unittest.TestCase):
         bigger = stem_session(path, frames)
         for i in range(8):
             for t in stem_session(path, frames)["tracks"]:
-                t["id"] = t["id"][:-2] + f"{i:02d}"
+                t["id"] = t["id"][:-2] + f"{i + 1:02d}"
                 bigger["tracks"].append(t)
         c.send({"id": 100, "op": "session.load", "args": {"graph": bigger, "off": []}})
         sent = time.monotonic()
@@ -170,8 +170,8 @@ class Mute(unittest.TestCase):
             if e["used"] >= 9 and e["slots"][e["used"] - 5][0] == 0.0:  # bus:vocals, in either graph
                 break
         took = time.monotonic() - sent
-        c.response(100, timeout=30)
-        c.response(101, timeout=30)
+        self.assertTrue(c.response(100, timeout=30)["ok"])
+        self.assertTrue(c.response(101, timeout=30)["ok"])
         self.assertLess(took, 0.010, f"the mute was heard {took * 1000:.0f} ms after it was sent")
 
 
