@@ -1,10 +1,12 @@
 # Wi_WWAV
 
-One desktop app, said "we wave", with four rooms: **Heat** plans your time,
-**Space** holds people and their work as a galaxy, the **Console** makes songs
-and films on one clock, and **Unquantized** is a shop you walk through. Every
-room reads and writes the same two files: a song is a `.wwav` and a film is a
-`.swav` (`docs/SPEC.md` chapter 6).
+One desktop app, said "we wave", with three views: **Heat** plans your time
+and keeps a private profile with a simple public face, **Space** holds people
+and their work as a galaxy, and the **Console** makes songs and films on one
+clock. Every view reads and writes the same two files: a song is a `.wwav` and
+a film is a `.swav` (`docs/SPEC.md` chapter 6). The app calls no model and
+takes no money: Claude reaches Heat through an MCP server, and commerce comes
+later, inside Space (`docs/SCOPE_CUT.md`).
 
 - `docs/SPEC.md` is the design, written before any code.
 - `docs/GATES.md` holds the founder's four gates, with fail criteria written first.

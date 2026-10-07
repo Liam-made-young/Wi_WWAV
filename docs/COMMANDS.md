@@ -5,8 +5,8 @@ calls travel two ways:
 
 - **In the app**, through one Tauri command, `core`, which takes
   `{cmd, args}` and returns the result or an error. Each window may call only
-  the commands its capability lists (`docs/SPEC.md` 9.8); the checkout window
-  calls none.
+  the commands its capability lists (`docs/SPEC.md` 9.8); a window in no
+  capability file, such as one that showed someone else's page, calls none.
 - **In development and tests**, through `wi-devbridge`, a WebSocket server
   that hosts the same core, so Playwright drives the real core (with
   `mock-engine` and `tools/mock-server` behind it) from Chromium.
@@ -23,13 +23,20 @@ calls travel two ways:
   branch on, `message` a sentence it can show as is ("A solar system holds 21
   worlds. Start another one.").
 - Every mutation takes a `label` and runs in one journal transaction in the
-  current room, so ⌘Z can name it ("Undo mark done"). The core never asks
-  "Are you sure?": undo replaces it (8.10).
+  current view, so ⌘Z can name it ("Undo mark done"). The core never asks
+  "Are you sure?": undo replaces it (8.10). A view is Heat, Space or the
+  Console (`heat`, `space`, `console`: there are three, and no fourth), or
+  `library` for the drawer over them. The commands still call it `room`
+  (`{room}`), the journal's own name for where a change was made; the spec's
+  word is view (docs/DECISIONS.md).
 - Events are `{event, payload}`. Meters are not events: they arrive once per
   frame as raw bytes on their own channel (`meters`), the newest meter entry
   of `docs/ENGINE.md` 4.4.
 - Nothing the UI shows as a count of other people's attention exists in any
   result (gate 1.3).
+- The app calls no model. Claude reaches Heat through an MCP server, so there
+  is no command that asks Claude for anything, no Claude switch in the
+  settings and no key (docs/SPEC.md 2.11).
 
 ## Commands
 
@@ -45,17 +52,23 @@ calls travel two ways:
 
 | cmd | args | result |
 |---|---|---|
-| `history.get` | `{room}` | `{undo: "Undo move clip" \| null, redo: "Redo move clip" \| null, cant: "Can't undo a purchase." \| null}` |
+| `history.get` | `{room}` | `{undo: "Undo move clip" \| null, redo: "Redo move clip" \| null, cant: "Can't undo a message." \| null}` |
 | `history.undo` | `{room}` | `{label: "move clip"}` or error `nothing_to_undo` ("Nothing to undo.") |
 | `history.redo` | `{room}` | `{label}` or error `nothing_to_redo` |
 
-`room` is `heat`, `space`, `console`, `unquantized` or `library`. After any
-change the core sends `history` with the new labels for that room.
+`room` is `heat`, `space`, `console` or `library` (anything else is
+`bad_args`: "There is no view called 'kitchen'."). After any change the core
+sends `history` with the new labels for every view. Changes that arrive from
+the person's other devices are journaled where no view's ⌘Z acts, so a sync
+never takes the redo they have waiting; an undo that would put back a record
+such a change touched is held, and says it "changed on another device since".
 
-### records (journaled documents for the rooms)
+### records (journaled documents for the views)
 
-Heat's records (3.15) and the other rooms' local records are documents of a
-`kind` with an `id`, kept in `library.sqlite` and journaled.
+Heat's records (3.15) are documents of a `kind` with an `id`, kept in
+`library.sqlite` and journaled. They sync with the account whichever view
+wrote them (a milestone planned from Space is Heat's as much as one planned
+in Heat), except grades, which stay on the Mac.
 
 | cmd | args | result |
 |---|---|---|
@@ -84,6 +97,11 @@ Event `records` `{kinds: [...]}` after any change, so views refetch.
 | `library.trash.empty` | — | `{deleted}` |
 
 `Clip` is `{id, kind, title, artist, bpm, key, duration, colour, tags, pinned, verdict, published, sha256, bytes, created}`.
+`verdict` is the reader's sentence, word for word: `wwav_pack.py info`'s for a
+`.wwav` or a plain WAV ("the master only: no wmet and wlin, so a plain WAV",
+or "not listed: the master isn't 44.1 kHz 16-bit stereo PCM"), `swav_pack.py
+info`'s for a film. Other plain audio, which the reference can't read, says
+"Plain audio comes in as master only." The import summary says it too.
 
 ### player (2.3): the one listening player
 
@@ -95,6 +113,10 @@ Event `records` `{kinds: [...]}` after any change, so views refetch.
 | `player.stem` | `{stem, level? , mute?, solo?}` | `{state}` |
 
 `state` is `{clip, title, key, bpm, playing, position, duration, stems: [{stem, level, mute, solo}], pausedFor: null \| "console" \| "film"}`.
+A song runs at its own sample rate (44.1 kHz for a `.wwav`, a plain WAV's own),
+and the engine's device follows it: `position` and `duration` are in seconds of
+that song, and `engine.status`'s `sampleRate` changes when a song at another
+rate loads.
 Events: `player` with the state on every change; `clock` ten times a second
 with `{sample, hostTimeNs, rate, state}` (the shared-memory clock, for the UI
 to extrapolate the cursor).
@@ -124,8 +146,17 @@ or results.
 
 | cmd | args | result |
 |---|---|---|
-| `publish.drop` | `{clip, target: {kind: "system" \| "shelf", id}, terms?, label}` | `{queued}` |
+| `publish.drop` | `{clip, target: {kind: "system", id}, label}` | `{queued}`, or error `already_placed` |
 | `publish.queue` | — | `{waiting: [...], sentence}` |
+
+A drop tags the clip with its system and sets `published_at`. The worker
+uploads it, publishes it and puts it in the system, and a placement the server
+refused for a moment is retried like an upload. A song is one world, so a drop
+onto a second system is refused at once with `already_placed` ("'Low Tide' is
+already a world in another system. A song is one world, so it can't be in
+two."). Dropping a work again also starts a new attempt after a refusal, and a
+relaunch does too. `waiting` counts works still to go up and works that are up
+but not yet in their system.
 
 Events: `status` `{area: "upload", sentence: "Uploading World Ending · part 14 of 27"}`.
 ⌘Z clears `published_at` while the upload is queued; after the server has it
@@ -143,5 +174,21 @@ Event `status` `{area: "sync" \| "save" \| "upload" \| "room", sentence}` drives
 the status bar: "Saved on this Mac", "Synced 3:41 PM", "Offline. 2 works wait
 to go up; they leave when you're back."
 
-Rooms add their own areas (`heat.*`, `space.*`, `console.*`, `store.*`) under
-the same conventions, each listed here when it is built.
+The views add their own areas (`heat.*`, `space.*`, `console.*`) under the
+same conventions, each listed here when it is built.
+
+## What the shell adds
+
+The Tauri app (`app/src-tauri/README.md`) answers two more commands of its own
+through the same `core` command, and sends two more events. The dev bridge has
+none of them: a browser has no menus.
+
+| cmd | args | result |
+|---|---|---|
+| `meters.listen` | `{channel}` | `{}`: meters arrive on that channel, as raw bytes |
+| `shell.room` | `{room}` | `{}`: the view now showing (`heat`, `space`, `console`, or `library`), so the Edit menu names its undo and View ticks it |
+
+Events `menu` `{action}` (`room.heat`, `room.space`, `room.console` on
+⌘1–⌘3, `history.undo`, `history.redo`, `library.toggle`, `export.everything`,
+`session.new`) and `open` `{clips} \| {sessions} \| {error}` (files opened from
+outside).

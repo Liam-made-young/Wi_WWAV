@@ -1,6 +1,6 @@
 [package]
 name = "wi-wwav"
-description = "Wi_WWAV: one desktop app with four rooms"
+description = "Wi_WWAV: one desktop app with three views"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
