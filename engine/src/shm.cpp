@@ -89,7 +89,6 @@ std::string SharedRegion::open(const std::string& name) {
 
 void SharedRegion::writeHeader(uint32_t rate, uint32_t block, uint64_t pid, uint64_t startNs) {
   wwav_shm_header* h = &shm_->header;
-  memcpy(h->magic, WWAV_SHM_MAGIC, 4);
   put(&h->layout, WWAV_SHM_LAYOUT);
   put(&h->sample_rate, rate);
   put(&h->block_size, block);
@@ -99,7 +98,10 @@ void SharedRegion::writeHeader(uint32_t rate, uint32_t block, uint64_t pid, uint
   put(&h->input_bytes, WWAV_SHM_INPUT_BYTES);
   put(&h->engine_pid, pid);
   put(&h->engine_start_ns, startNs);
+  // The magic goes in last, as the app's mirror writes it: a reader that
+  // sees it in a fresh region sees the fields too.
   __atomic_thread_fence(__ATOMIC_RELEASE);
+  for (int i = 0; i < 4; i++) put(&h->magic[i], WWAV_SHM_MAGIC[i]);
 }
 
 void SharedRegion::setFormat(uint32_t rate, uint32_t block) {
@@ -110,6 +112,14 @@ void SharedRegion::setFormat(uint32_t rate, uint32_t block) {
 void SharedRegion::crumb(uint64_t node) {
   put(&shm_->crumb.crumb, node);
   __atomic_fetch_add(&shm_->crumb.crumb_seq, 1, __ATOMIC_RELEASE);
+}
+
+wwav_shm_meter_entry* SharedRegion::meterEntry() {
+  // This entry is the oldest in the ring, and a reader may be copying it. A
+  // reader that sees any of what this block writes into it must also see
+  // meter_write reach this entry, so it knows to throw its copy away.
+  __atomic_thread_fence(__ATOMIC_RELEASE);
+  return &shm_->ring[meterWrite_ % WWAV_METER_RING];
 }
 
 void SharedRegion::publishMeters() {

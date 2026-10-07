@@ -55,7 +55,7 @@ class SharedRegion final : public CrumbSink {
   void clock(const ClockState& s) { writeClock(&shm_->clock, s); }
   void crumb(uint64_t node) override;
   // The meter entry this block fills, then publishes as the newest.
-  wwav_shm_meter_entry* meterEntry() { return &shm_->ring[meterWrite_ % WWAV_METER_RING]; }
+  wwav_shm_meter_entry* meterEntry();
   void publishMeters();
 
  private:

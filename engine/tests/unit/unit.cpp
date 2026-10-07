@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -211,6 +212,70 @@ static void clockRecoversFromAWriterKilledMidWrite() {
   CHECK(clock.seq % 2 == 0);
   CHECK(clock.seq > 41);
   CHECK(readClock(&clock).samplePos == 99);
+}
+
+// The meter ring as the app reads it (crates/wwav-wire, Region::newest_meters):
+// the newest entry, copied, then kept only if meter_write shows the writer
+// hadn't come round the ring to it meanwhile. Every copy kept must be one
+// whole block's entry. On x86 stores are never reordered, so this fails only
+// if the engine publishes an entry before it is complete or in the wrong
+// place; the ordering for arm64 is the fences in shm.cpp.
+static void meterRingNeverTearsForALappedReader() {
+  const std::string name = "/wwav-unit-" + std::to_string(getpid());
+  int fd = shm_open(name.c_str(), O_RDWR | O_CREAT | O_EXCL, 0600);
+  if (fd < 0 || ftruncate(fd, WWAV_SHM_TOTAL_BYTES) != 0) abort();
+  void* view = mmap(nullptr, WWAV_SHM_TOTAL_BYTES, PROT_READ, MAP_SHARED, fd, 0);
+  close(fd);
+  SharedRegion region;
+  const std::string opened = region.open(name);
+  shm_unlink(name.c_str());
+  CHECK(opened.empty() && view != MAP_FAILED);
+  if (!opened.empty() || view == MAP_FAILED) return;
+  const wwav_shm* shm = static_cast<const wwav_shm*>(view);
+
+  const uint32_t used = 9;
+  std::atomic<bool> stop{false};
+  std::thread writer([&] {
+    for (uint32_t k = 1; !stop.load(std::memory_order_relaxed); k = k % 1000000 + 1) {
+      wwav_shm_meter_entry* e = region.meterEntry();
+      e->callback = k;
+      e->slots_used = used;
+      for (uint32_t s = 0; s < used; s++) e->slots[s] = wwav_shm_meter_slot{(float)k, (float)k, (float)k, (float)k};
+      region.publishMeters();
+    }
+  });
+  uint64_t kept = 0, lapped = 0, torn = 0;
+  auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(300);
+  while (std::chrono::steady_clock::now() < until) {
+    const uint64_t n = __atomic_load_n(&shm->meters.meter_write, __ATOMIC_ACQUIRE);
+    if (n == 0) continue;
+    const wwav_shm_meter_entry* e = &shm->ring[(n - 1) % WWAV_METER_RING];
+    const uint64_t callback = __atomic_load_n(&e->callback, __ATOMIC_RELAXED);
+    const uint32_t slots = __atomic_load_n(&e->slots_used, __ATOMIC_RELAXED);
+    bool whole = slots == used;
+    for (uint32_t s = 0; s < used; s++) {
+      float v[4];
+      __atomic_load(&e->slots[s].peak_l, &v[0], __ATOMIC_RELAXED);
+      __atomic_load(&e->slots[s].peak_r, &v[1], __ATOMIC_RELAXED);
+      __atomic_load(&e->slots[s].rms_l, &v[2], __ATOMIC_RELAXED);
+      __atomic_load(&e->slots[s].rms_r, &v[3], __ATOMIC_RELAXED);
+      for (float x : v) whole = whole && x == (float)callback;
+    }
+    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+    if (__atomic_load_n(&shm->meters.meter_write, __ATOMIC_RELAXED) >= n - 1 + WWAV_METER_RING) {
+      lapped++;
+      continue;
+    }
+    kept++;
+    if (!whole || callback != (n - 1) % 1000000 + 1) torn++;
+  }
+  stop = true;
+  writer.join();
+  munmap(view, WWAV_SHM_TOTAL_BYTES);
+  printf("  %llu entries kept, %llu lapped, %llu torn\n", (unsigned long long)kept, (unsigned long long)lapped,
+         (unsigned long long)torn);
+  CHECK(torn == 0);
+  CHECK(kept > 10000);
 }
 
 // ---- the command queue -----------------------------------------------------------
@@ -605,6 +670,7 @@ int main() {
   } tests[] = {
       {"seqlock never tears", seqlockNeverTears},
       {"clock recovers from a writer killed mid-write", clockRecoversFromAWriterKilledMidWrite},
+      {"meter ring never tears for a lapped reader", meterRingNeverTearsForALappedReader},
       {"spsc keeps order", spscKeepsOrder},
       {"crumbs are standard FNV-1a 64", crumbsAreStandardFnv1a64},
       {"gains are exact where they must be", gainsAreExactWhereTheyMustBe},
