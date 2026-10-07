@@ -47,6 +47,7 @@ import { checkOff, finishWithTime, focusLcd, focusStep, focusStrip, initialFocus
 import { taskHalf, type LcdData } from './lcd';
 import { dayLayout, dueAtEndOfDay, monthGrid, page, unscheduledTray, weekDays, type CalendarData } from './calendar';
 import { factLines, lastWeekFacts, type ReviewData } from './review';
+import { importArtifact, parseHeatExport, type HeatExport } from './importArtifact';
 import {
   addHabit,
   doneRecord,
@@ -740,12 +741,12 @@ function ruleText(r: Rng): string {
   const parts: string[] = [];
   const freq = r.pick(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'daily', 'Weekly', 'HOURLY', 'SECONDLY', '', 'DAILY ']);
   if (r.chance(0.95)) parts.push(`FREQ=${freq}`);
-  if (r.chance(0.35)) parts.push(`INTERVAL=${r.pick(['1', '2', '3', '5', '12', '0', '-1', 'x', '', '007', '2.5', '99999', '1e2', '٣'])}`);
+  if (r.chance(0.35)) parts.push(`${r.pick(['INTERVAL', 'INTERVAL', 'interval', 'ınterval', 'İNTERVAL'])}=${r.pick(['1', '2', '3', '5', '12', '0', '-1', 'x', '', '007', '2.5', '99999', '1e2', '٣'])}`);
   if (r.chance(0.3)) parts.push(`BYDAY=${r.pick(['MO', 'TU,TH', 'MO,TU,WE,TH,FR', 'SA,SU', 'su,mo', 'MO,MO,TU', '2TU', 'XX', '', 'TU,'])}`);
   if (r.chance(0.25)) parts.push(`BYMONTHDAY=${r.pick(['1', '15', '31', '-1', '1,15', '1,-1', '0', '32', '-32', 'x', '', '5,', '07', '-0'])}`);
   if (r.chance(0.2)) parts.push(`COUNT=${r.pick(['1', '3', '6', '10', '0', '-2', 'x', '2.5', '012'])}`);
   if (r.chance(0.2)) {
-    parts.push(`UNTIL=${r.pick(['20261031', '20261008T035900Z', '20271231T235959Z', '20260101', '2026103', '20261031T0359Z', '20261031T035900', 'x', '', '20261331', '00500101', '20261031t035900z'])}`);
+    parts.push(`UNTIL=${r.pick(['20261031', '20261008T035900Z', '20271231T235959Z', '20260101', '2026103', '20261031T0359Z', '20261031T035900', 'x', '', '20261331', '00500101', '20261031t035900z', '00500101T035900Z', '19991231T235959Z', '20260229T000000Z'])}`);
   }
   if (r.chance(0.08)) parts.push(r.pick(['WKST=SU', 'BYSETPOS=1', 'BYMONTH=3', 'X-FOO=1', '', 'FREQ']));
   for (let i = parts.length - 1; i > 0; i--) {
@@ -755,7 +756,7 @@ function ruleText(r: Rng): string {
   let text = parts.join(r.chance(0.97) ? ';' : ';;');
   if (r.chance(0.1)) text = `RRULE:${text}`;
   if (r.chance(0.04)) text = `rrule:${text}`;
-  if (r.chance(0.05)) text = ` ${text} `;
+  if (r.chance(0.05)) text = `${r.pick([' ', '\u00a0', '\ufeff', '\u0085', '\t', '\u2003'])}${text}${r.pick([' ', '\u00a0', '\ufeff', '\u0085', '\n'])}`;
   if (r.chance(0.03)) text = `${text};`;
   return text;
 }
@@ -1270,6 +1271,139 @@ function reviewVectors(): void {
   }, ({ facts }) => factLines(facts));
 }
 
+
+// --- importArtifact -------------------------------------------------------------------------------
+
+const COURSE_CODES = ['JPN 201', 'MTH 142', 'HIS 101', 'jpn  201', ' MTH142 ', 'Écrire 1'];
+
+/** An instant the export might hold: usually valid, now and then a wrong one. */
+function exportInstant(r: Rng, bad = 0.04): string {
+  if (r.chance(bad)) return isoLike(r);
+  const ms = Date.UTC(2026, 9, 6, 12, 40) + r.int(-20 * 86_400_000, 60 * 86_400_000);
+  const offset = r.pick(['Z', 'Z', '-04:00', '+05:30']);
+  const d = new Date(ms).toISOString();
+  return offset === 'Z' ? d : d.replace('Z', offset);
+}
+
+function genExport(r: Rng, bad = 0.04): Record<string, unknown> {
+  const spaceDefs = [
+    { key: 'classes', name: 'Classes', groupLabel: 'Course', types: ['Homework', 'Quiz', 'Other'], persona: 'a student' },
+    { key: 'wwav', name: 'WWAV', groupLabel: 'Milestone', types: ['Hardware', 'Other'], persona: 'a founder' },
+    { key: 'personal', name: 'personal', groupLabel: 'Area', types: ['Errand', 'Other'], persona: 'a person' },
+    { key: 'lab', name: 'Lab Notebook', groupLabel: r.pick(['Thing', 'Course', 'Milestone', '']), types: [], persona: '' },
+    { key: 'extra', name: 'Extra', groupLabel: 'Area', types: ['x'], persona: 'p' },
+  ];
+  const workspaces = r.sample(spaceDefs, r.int(1, 4));
+  const keys = workspaces.map((w) => w.key);
+  const codes = r.sample(COURSE_CODES, r.int(0, 3));
+  const categoryNames = ['Quizzes', 'Exit tickets', 'Labs'];
+  const courses = codes.map((code, i) => ({
+    code: i % 2 === 0 ? code : code.toUpperCase(),
+    name: r.pick(['Intermediate Japanese', 'Calculus', '']),
+    categories: Array.from({ length: r.int(0, 3) }, (_, k) => ({ name: categoryNames[k], weight: r.pick([40, 60, 25, 12.5]), keywords: r.sample(['quiz', 'kanji', 'exit ticket', ''], r.int(0, 3)) })),
+    ...(r.chance(0.3) ? { scale: [{ letter: 'A', min: 90 }, { letter: 'F', min: 0 }] } : {}),
+    ...(r.chance(0.4) ? { sticky: r.pick(['Office hours Tue 2 PM', '']) } : {}),
+  }));
+  const milestones = Array.from({ length: r.int(0, 3) }, (_, i) => ({ id: `ms-${i}`, workspace: r.pick(keys), title: r.pick(['Enclosure v2', 'Firmware 1.0']), date: r.pick(['2026-10-20', '2026-11-01', '2026-99-99']), done: r.chance(0.3), order: r.int(0, 4) }));
+  const groupNames = [...codes, 'Enclosure v2', 'Firmware 1.0', 'Car', 'Apartment', 'MTH 142', 'mth 142'];
+  const tasks = Array.from({ length: r.int(0, 4) }, (_, i) => ({
+    id: r.pick([`t-${i}`, `em-${i}abc`, `5h3k${i}_20261008T035900Z`]),
+    workspace: r.pick(keys),
+    title: r.pick(['Grammar quiz 4', 'Read chapter 3', 'Route the PCB']),
+    group: r.chance(0.3) ? null : r.pick(groupNames),
+    type: r.pick(['Quiz', 'Reading', 'Hardware', 'Errand']),
+    due: r.chance(0.3) ? null : exportInstant(r, bad),
+    difficulty: r.weighted<number>([[6, r.int(1, 5)], [1, r.pick([1.5, 4.9, 2.5])]]),
+    estMin: r.chance(0.5) ? null : r.pick([0, 15, 45, 120, 7.5]),
+    actualMin: r.chance(0.6) ? null : r.pick([0, 30, 75]),
+    notes: r.pick(['', 'From mail: …']),
+    done: r.chance(0.3),
+    doneAt: r.chance(0.7) ? null : exportInstant(r, bad),
+    source: r.pick(['manual', 'calendar', 'gmail']),
+  }));
+  const grades = Array.from({ length: r.int(0, 4) }, (_, i) => ({
+    id: r.pick([`gr-${i}`, `gp-${i}ff`, `own-${i}`]),
+    course: r.pick([...codes, ...COURSE_CODES]),
+    title: r.pick(['Kanji quiz 6', 'Exit Ticket 12']),
+    category: r.chance(0.3) ? null : r.pick(categoryNames),
+    score: r.chance(0.2) ? null : r.pick([18, 0, 7.5]),
+    outOf: r.pick([20, 10, 100, 0]),
+    dropped: r.chance(0.1),
+    pending: r.chance(0.2),
+    ...(r.chance(0.3) ? { link: r.pick(['https://brightspace.uri.edu/d2l/home', '']) } : {}),
+  }));
+  return {
+    format: 'heat-export',
+    version: 1,
+    exportedAt: '2026-10-06T12:40:00.000Z',
+    timeZone: 'America/New_York',
+    workspaces,
+    tasks,
+    milestones,
+    habits: Array.from({ length: r.int(0, 2) }, (_, i) => ({ id: `hb-${i}`, title: 'Practise kanji', log: Object.fromEntries(Array.from({ length: r.int(0, 4) }, (_, k) => [addDays('2026-10-06', -k), true])) })),
+    term: r.pick(['Fall 2026', 'fall  2026', 'Spring 2027']),
+    courses,
+    grades,
+    processedMailIds: Array.from({ length: r.int(0, 3) }, (_, i) => `18f2${i}`),
+    lastSyncAt: r.chance(0.3) ? null : exportInstant(r, bad),
+  };
+}
+
+/** One thing in a valid export made wrong, or optional made absent. */
+function spoil(r: Rng, x: Record<string, unknown>): Record<string, unknown> {
+  const y = JSON.parse(JSON.stringify(x)) as Record<string, any>;
+  const pickRow = (list: string): Record<string, any> | null => (y[list].length > 0 ? r.pick(y[list] as Record<string, any>[]) : null);
+  const wrong = r.pick([123, 'x', null, true, [], {}, -1, 2.5, '2026-10-06T12:40:00Z', 'next Wednesday', 0]);
+  switch (r.int(0, 15)) {
+    case 0: y.version = r.pick([0, 1.5, '1', 2, 3, null, 1.0, 1e3, 'x']); break;
+    case 1: delete y[r.pick(['format', 'version', 'exportedAt', 'timeZone', 'workspaces', 'tasks', 'milestones', 'habits', 'term', 'courses', 'grades', 'processedMailIds', 'lastSyncAt'])]; break;
+    case 2: y[r.pick(['exportedAt', 'timeZone', 'term', 'lastSyncAt', 'workspaces', 'tasks', 'processedMailIds'])] = wrong; break;
+    case 3: { const t = pickRow('tasks'); if (t) t[r.pick(['id', 'workspace', 'title', 'group', 'type', 'due', 'difficulty', 'estMin', 'actualMin', 'notes', 'done', 'doneAt', 'source'])] = wrong; break; }
+    case 4: { const t = pickRow('tasks'); if (t) t.difficulty = r.pick([0, 1, 5, 5.0001, 0.9999, -1, 6, 'x']); break; }
+    case 5: { const t = pickRow('tasks'); if (t) t.due = isoLike(r); break; }
+    case 6: y[r.pick(['tasks', 'milestones', 'habits', 'courses', 'grades'])] = [null]; break;
+    case 7: y[r.pick(['tasks', 'milestones', 'habits', 'courses', 'grades'])] = [r.pick([[], 'x', 5])]; break;
+    case 8: { const m = pickRow('milestones'); if (m) m[r.pick(['id', 'workspace', 'title', 'date', 'done', 'order'])] = wrong; break; }
+    case 9: { const h = pickRow('habits'); if (h) h.log = r.pick([{ yesterday: true }, { '2026-10-05': false }, { '2026-10-05': 1 }, [], null, { '2026-1-5': true }]); break; }
+    case 10: { const c = pickRow('courses'); if (c) c[r.pick(['code', 'name', 'categories', 'scale', 'sticky'])] = wrong; break; }
+    case 11: { const c = pickRow('courses'); if (c && c.categories.length > 0) c.categories[0][r.pick(['name', 'weight', 'keywords'])] = wrong; break; }
+    case 12: { const g = pickRow('grades'); if (g) g[r.pick(['id', 'course', 'title', 'category', 'score', 'outOf', 'dropped', 'pending', 'link'])] = wrong; break; }
+    case 13: y.processedMailIds = r.pick([[42], ['a', 1], 'x', null]); break;
+    case 14: { const w = pickRow('workspaces'); if (w) w[r.pick(['key', 'name', 'groupLabel', 'types', 'persona'])] = wrong; break; }
+    default: y.format = r.pick(['heat', 'Heat-Export', '', null]); break;
+  }
+  return y;
+}
+
+function importVectors(): void {
+  add('importArtifact', 'parseHeatExport', 700, (r) => ({
+    json: r.weighted<() => unknown>([
+      [4, () => genExport(r)],
+      [6, () => spoil(r, genExport(r))],
+      [1, () => r.pick([null, 5, 'x', [], {}, { tasks: [] }, { format: 'heat-export' }])],
+    ])(),
+  }), ({ json }) => parseHeatExport(json));
+  // importArtifact takes an export parseHeatExport accepted, so every instant in it is one that reads.
+  add('importArtifact', 'importArtifact', 300, (r) => {
+    const dump = genExport(r, 0);
+    const existing: Record<string, unknown> = {};
+    if (r.chance(0.4)) {
+      let n = 0;
+      existing.spaces = defaultSpaces(() => `space-${++n}`);
+    }
+    if (r.chance(0.4)) existing.terms = [{ id: 'term-1', name: r.pick(['Fall 2026', ' fall 2026', 'Spring 2027']) }];
+    if (r.chance(0.4)) {
+      existing.courses = (dump.courses as { code: string }[])
+        .filter(() => r.chance(0.6))
+        .map((c, i) => ({ id: `course-${i}`, termId: r.pick(['term-1', 'term-9']), code: r.pick([c.code, c.code.toLowerCase(), 'ZZZ 1']), name: 'x', categories: [{ id: `cat-${i}`, name: 'Quizzes', weight: 10, keywords: [] }], notes: '' }));
+    }
+    return { dump, existing, idPrefix: 'new' };
+  }, ({ dump, existing, idPrefix }) => {
+    let n = 0;
+    return importArtifact(dump as unknown as HeatExport, existing, () => `${idPrefix}-${++n}`);
+  });
+}
+
 // --- Entry -------------------------------------------------------------------------------
 
 describe.skipIf(!ENABLED)('writing the cross-check vectors', () => {
@@ -1288,6 +1422,7 @@ describe.skipIf(!ENABLED)('writing the cross-check vectors', () => {
     lcdVectors();
     calendarVectors();
     reviewVectors();
+    importVectors();
     await write();
   }, 600_000);
 });

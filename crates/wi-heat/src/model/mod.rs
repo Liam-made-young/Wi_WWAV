@@ -29,6 +29,7 @@ pub mod format;
 pub mod grades;
 pub mod habits;
 pub mod heat;
+pub mod import_artifact;
 pub mod js;
 pub mod lcd;
 pub mod plan;

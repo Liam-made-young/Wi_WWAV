@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use wi_heat::model::calendar::{CalendarData, CalendarMode};
 use wi_heat::model::focus::{FocusEvent, FocusSettings, FocusState};
+use wi_heat::model::import_artifact::{Existing, HeatExport};
 use wi_heat::model::lcd::LcdData;
 use wi_heat::model::plan::{BlockTarget, Draft, PlanData, PlanOptions};
 use wi_heat::model::records::{
@@ -24,8 +25,8 @@ use wi_heat::model::records::{
 use wi_heat::model::review::{ReviewData, WeekFacts};
 use wi_heat::model::spaces::SidebarData;
 use wi_heat::model::{
-    calendar, estimate, focus, format, grades, habits, heat, js, lcd, plan, recurrence, review,
-    spaces, zone,
+    calendar, estimate, focus, format, grades, habits, heat, import_artifact, js, lcd, plan,
+    recurrence, review, spaces, zone,
 };
 
 mod vectors {
@@ -743,6 +744,26 @@ fn review_vectors() {
                 &tz(i),
             )),
             "factLines" => out(review::fact_lines(&arg::<WeekFacts>(i, "facts"))),
+            _ => return None,
+        })
+    });
+}
+
+// --- importArtifact ----------------------------------------------------------------------------------------------------------
+
+#[test]
+fn import_artifact_vectors() {
+    check_module("importArtifact", |name, i| {
+        Some(match name {
+            "parseHeatExport" => match import_artifact::parse_heat_export(&i["json"]) {
+                Ok(export) => out(export),
+                Err(refusal) => out(refusal),
+            },
+            "importArtifact" => out(import_artifact::import_artifact(
+                &arg::<HeatExport>(i, "dump"),
+                &arg::<Existing>(i, "existing"),
+                &mut ids(i),
+            )),
             _ => return None,
         })
     });
