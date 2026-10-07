@@ -154,10 +154,11 @@ pub struct SmartFolder {
 }
 
 /// Turns what was typed into an FTS5 query: every word must match from its
-/// start, and nothing typed is ever query syntax.
+/// start, and nothing typed is ever query syntax. A NUL (from a paste) would
+/// end the query string early, so it separates words like a space.
 pub(crate) fn fts_query(text: &str) -> Option<String> {
     let words: Vec<String> = text
-        .split_whitespace()
+        .split(|c: char| c.is_whitespace() || c == '\0')
         .filter(|w| w.chars().any(char::is_alphanumeric))
         .map(|w| format!("\"{}\"*", w.replace('"', "\"\"")))
         .collect();
@@ -332,6 +333,10 @@ impl Txn<'_> {
             slots.remove(slot);
             slots.push(None);
             self.set_slots(slots)?;
+            // Undoing this puts the pin back, naming the row, so it leans on
+            // the row as `pin` does: a later delete of it is undone first.
+            let (tbl, id) = pin.row();
+            self.lean_on(tbl, id)?;
         }
         Ok(())
     }
