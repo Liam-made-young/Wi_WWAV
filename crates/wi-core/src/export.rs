@@ -101,7 +101,13 @@ fn pretty(v: &Value) -> String {
 fn note_name(title: &str, taken: &mut BTreeSet<String>) -> String {
     let clean: String = title
         .chars()
-        .map(|c| if "/\\:*?\"<>|".contains(c) || c.is_control() { '-' } else { c })
+        .map(|c| {
+            if "/\\:*?\"<>|".contains(c) || c.is_control() {
+                '-'
+            } else {
+                c
+            }
+        })
         .collect();
     let base = match clean.trim() {
         "" => "Untitled".to_string(),
@@ -139,13 +145,19 @@ fn str_of<'a>(v: &'a Value, keys: &[&str]) -> &'a str {
 /// The CSS custom properties the page uses, from the design tokens
 /// (docs/SPEC.md 8.11): the night register, as Space and the player wear it.
 fn token_css() -> String {
-    use wwav_tokens::{night, radius, r#type, stem};
+    use wwav_tokens::{night, r#type, radius, stem};
     let rgb = |c: Color| format!("rgb({} {} {})", c.r, c.g, c.b);
     let ink = night::INK;
     let step = |a: f32| format!("rgb({} {} {} / {a})", ink.r, ink.g, ink.b);
     let family = |f: &[&str]| {
         f.iter()
-            .map(|n| if n.contains(' ') { format!("\"{n}\"") } else { n.to_string() })
+            .map(|n| {
+                if n.contains(' ') {
+                    format!("\"{n}\"")
+                } else {
+                    n.to_string()
+                }
+            })
             .collect::<Vec<_>>()
             .join(", ")
     };
@@ -188,16 +200,32 @@ fn galaxy(i: &Inner) -> Value {
     let fetched = (|| -> Option<Value> {
         let mine = i.net.api("GET", "/api/v2/galaxies/mine", None).ok()?;
         let slug = mine["data"]["galaxy"]["slug"].as_str()?.to_string();
-        let whole = i.net.api("GET", &format!("/api/v2/galaxies/{slug}"), None).ok()?;
-        let sun = i.net.api("GET", &format!("/api/v2/galaxies/{slug}/sun"), None).ok();
+        let whole = i
+            .net
+            .api("GET", &format!("/api/v2/galaxies/{slug}"), None)
+            .ok()?;
+        let sun = i
+            .net
+            .api("GET", &format!("/api/v2/galaxies/{slug}/sun"), None)
+            .ok();
         let mut systems = Vec::new();
         for s in whole["data"]["systems"].as_array().into_iter().flatten() {
-            let Some(sys) = s["slug"].as_str() else { continue };
-            if let Ok(v) = i.net.api("GET", &format!("/api/v2/galaxies/{slug}/systems/{sys}"), None) {
+            let Some(sys) = s["slug"].as_str() else {
+                continue;
+            };
+            if let Ok(v) = i.net.api(
+                "GET",
+                &format!("/api/v2/galaxies/{slug}/systems/{sys}"),
+                None,
+            ) {
                 let id = v["data"]["system"]["id"].clone();
                 let links = i
                     .net
-                    .api("GET", &format!("/api/v2/lineage-links?type=system&id={id}"), None)
+                    .api(
+                        "GET",
+                        &format!("/api/v2/lineage-links?type=system&id={id}"),
+                        None,
+                    )
                     .map(|l| l["data"]["links"].clone())
                     .unwrap_or(Value::Null);
                 systems.push(json!({"system": v["data"], "links": links}));
@@ -234,7 +262,10 @@ pub(crate) fn everything(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     if folder.exists() && fs::read_dir(&folder)?.next().is_some() {
         return Err(CoreError::new(
             "not_empty",
-            format!("'{}' already holds files. Choose an empty folder.", folder.display()),
+            format!(
+                "'{}' already holds files. Choose an empty folder.",
+                folder.display()
+            ),
         ));
     }
     fs::create_dir_all(&folder)?;
@@ -255,12 +286,18 @@ pub(crate) fn everything(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     } else {
         format!(
             "Exported, but {} changed on disk since it came in: {}.",
-            if mismatched.len() == 1 { "1 file has" } else { "some files have" },
+            if mismatched.len() == 1 {
+                "1 file has"
+            } else {
+                "some files have"
+            },
             mismatched.join(", ")
         )
     };
     i.bus.status("export", &sentence);
-    Ok(json!({"path": to, "files": count.files, "bytes": count.bytes, "mismatched": mismatched, "sentence": sentence}))
+    Ok(
+        json!({"path": to, "files": count.files, "bytes": count.bytes, "mismatched": mismatched, "sentence": sentence}),
+    )
 }
 
 fn zip_folder(folder: &Path, out: &Path) -> io::Result<()> {
@@ -276,9 +313,15 @@ fn zip_folder(folder: &Path, out: &Path) -> io::Result<()> {
         let mut entries: Vec<_> = fs::read_dir(&dir)?.filter_map(Result::ok).collect();
         entries.sort_by_key(|e| e.file_name());
         for e in entries {
-            let rel = e.path().strip_prefix(folder).map_err(io::Error::other)?.to_string_lossy().replace('\\', "/");
+            let rel = e
+                .path()
+                .strip_prefix(folder)
+                .map_err(io::Error::other)?
+                .to_string_lossy()
+                .replace('\\', "/");
             if e.file_type()?.is_dir() {
-                z.add_directory(format!("{rel}/"), opts).map_err(io::Error::other)?;
+                z.add_directory(format!("{rel}/"), opts)
+                    .map_err(io::Error::other)?;
                 todo.push(e.path());
             } else {
                 z.start_file(rel, opts).map_err(io::Error::other)?;
@@ -295,7 +338,12 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
     let mut mismatched = Vec::new();
     let (clips, purchases, sequences, root) = {
         let store = i.store();
-        (store.clips()?, store.purchases()?, store.sequences()?, store.root().to_path_buf())
+        (
+            store.clips()?,
+            store.purchases()?,
+            store.sequences()?,
+            store.root().to_path_buf(),
+        )
     };
     let bought: BTreeMap<String, &wi_store::Purchase> =
         purchases.iter().map(|p| (p.clip_id.clone(), p)).collect();
@@ -319,7 +367,11 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
         } else {
             name
         };
-        let folder = if bought.contains_key(&c.id) { "purchases" } else { "media" };
+        let folder = if bought.contains_key(&c.id) {
+            "purchases"
+        } else {
+            "media"
+        };
         let rel = format!("{folder}/{name}");
         i.bus.emit(
             "export",
@@ -363,7 +415,10 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
             _ => {}
         }
     }
-    count.write(&out.join("manifest.json"), &pretty(&json!({"files": manifest})))?;
+    count.write(
+        &out.join("manifest.json"),
+        &pretty(&json!({"files": manifest})),
+    )?;
     count.write(&out.join("receipts.json"), &pretty(&json!(receipts)))?;
     fs::create_dir_all(out.join("purchases"))?;
     fs::create_dir_all(out.join("sessions"))?;
@@ -375,11 +430,15 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
     }
 
     // Every record, by kind.
-    let kinds = i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")?;
+    let kinds =
+        i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")?;
     let mut records = Map::new();
     for kind in &kinds {
         let docs = i.store().docs(kind)?;
-        records.insert(kind.clone(), json!(docs.into_iter().map(|d| d.json).collect::<Vec<_>>()));
+        records.insert(
+            kind.clone(),
+            json!(docs.into_iter().map(|d| d.json).collect::<Vec<_>>()),
+        );
     }
     let exported = jiff::Timestamp::now().to_string();
     count.write(
@@ -438,10 +497,16 @@ fn write_notes(
     let tasks = of("task");
     let mut names: BTreeMap<String, String> = BTreeMap::new();
     for s in &spaces {
-        names.insert(str_of(s, &["id"]).to_string(), note_name(str_of(s, &["name"]), &mut taken));
+        names.insert(
+            str_of(s, &["id"]).to_string(),
+            note_name(str_of(s, &["name"]), &mut taken),
+        );
     }
     for p in &projects {
-        names.insert(str_of(p, &["id"]).to_string(), note_name(str_of(p, &["title"]), &mut taken));
+        names.insert(
+            str_of(p, &["id"]).to_string(),
+            note_name(str_of(p, &["title"]), &mut taken),
+        );
     }
     for s in &spaces {
         let id = str_of(s, &["id"]);
@@ -453,23 +518,35 @@ fn write_notes(
     }
     for p in &projects {
         let id = str_of(p, &["id"]);
-        let space = names.get(str_of(p, &["spaceId"])).map(|n| format!("[[{n}]]"));
+        let space = names
+            .get(str_of(p, &["spaceId"]))
+            .map(|n| format!("[[{n}]]"));
         let mut text = frontmatter(&[
             ("id", json!(id)),
             ("status", p["status"].clone()),
             ("targetDate", p["targetDate"].clone()),
             ("space", json!(space)),
         ]);
-        let mine: Vec<&&Value> = milestones.iter().filter(|m| str_of(m, &["projectId"]) == id).collect();
+        let mine: Vec<&&Value> = milestones
+            .iter()
+            .filter(|m| str_of(m, &["projectId"]) == id)
+            .collect();
         if !mine.is_empty() {
             text += "## Milestones\n\n";
             for m in mine {
                 let done = if m["done"] == json!(true) { "x" } else { " " };
-                text += &format!("- [{done}] {} ({})\n", str_of(m, &["title"]), str_of(m, &["date"]));
+                text += &format!(
+                    "- [{done}] {} ({})\n",
+                    str_of(m, &["title"]),
+                    str_of(m, &["date"])
+                );
             }
             text += "\n";
         }
-        let open: Vec<&&Value> = tasks.iter().filter(|t| str_of(t, &["projectId"]) == id).collect();
+        let open: Vec<&&Value> = tasks
+            .iter()
+            .filter(|t| str_of(t, &["projectId"]) == id)
+            .collect();
         if !open.is_empty() {
             text += "## Tasks\n\n";
             for t in open {

@@ -175,6 +175,8 @@ pub(crate) struct Inner {
     net: net::Net,
     uploads: Mutex<upload::Status>,
     opener: Opener,
+    /// One sign-in at a time: the browser may only be asked once.
+    signing_in: Mutex<()>,
     closing: AtomicBool,
     /// Wakes the background workers: something to upload or sync, or closing.
     wake: (Mutex<u64>, Condvar),
@@ -252,6 +254,7 @@ impl Core {
             net,
             uploads: Mutex::new(upload::Status::default()),
             opener: config.opener,
+            signing_in: Mutex::new(()),
             closing: AtomicBool::new(false),
             wake: (Mutex::new(0), Condvar::new()),
         });
@@ -283,6 +286,7 @@ impl Core {
             "library.inspect" => library::inspect(&a),
             "library.import" => library::import(i, &a),
             "library.tag" => library::tag(i, &a),
+            "library.rename" => library::rename(i, &a),
             "library.colour" => library::colour(i, &a),
             "library.pin" => library::pin(i, &a),
             "library.smart.save" => library::smart_save(i, &a),

@@ -28,7 +28,10 @@ pub(crate) enum Fail {
     /// No connection at all.
     Offline,
     /// The server answered, with an error status.
-    Status { status: u16, body: Value },
+    Status {
+        status: u16,
+        body: Value,
+    },
     SignedOut,
 }
 
@@ -40,7 +43,11 @@ impl Fail {
             Fail::SignedOut => "Sign in to mi-wwav.com first.".to_string(),
             Fail::Status { status, body } => body
                 .get("error")
-                .and_then(|e| e.as_str().map(String::from).or_else(|| e.get("message")?.as_str().map(String::from)))
+                .and_then(|e| {
+                    e.as_str()
+                        .map(String::from)
+                        .or_else(|| e.get("message")?.as_str().map(String::from))
+                })
                 .or_else(|| body.as_str().map(String::from))
                 .unwrap_or_else(|| format!("mi-wwav.com answered {status}.")),
         }
@@ -55,9 +62,10 @@ impl Fail {
 
     pub fn code(&self) -> Option<&str> {
         match self {
-            Fail::Status { body, .. } => body.get("code").and_then(Value::as_str).or_else(|| {
-                body.get("error")?.get("code")?.as_str()
-            }),
+            Fail::Status { body, .. } => body
+                .get("code")
+                .and_then(Value::as_str)
+                .or_else(|| body.get("error")?.get("code")?.as_str()),
             _ => None,
         }
     }
@@ -143,10 +151,11 @@ impl Net {
     }
 
     pub fn save_tokens(&self, t: &Tokens) -> Result<(), CoreError> {
-        let text = serde_json::to_string(t).map_err(|e| CoreError::new("keychain", e.to_string()))?;
-        self.secrets
-            .set(TOKENS, &text)
-            .map_err(|e| CoreError::new("keychain", format!("The keychain refused the sign-in: {e}")))
+        let text =
+            serde_json::to_string(t).map_err(|e| CoreError::new("keychain", e.to_string()))?;
+        self.secrets.set(TOKENS, &text).map_err(|e| {
+            CoreError::new("keychain", format!("The keychain refused the sign-in: {e}"))
+        })
     }
 
     pub fn forget(&self) -> Result<(), CoreError> {
@@ -189,7 +198,13 @@ impl Net {
     }
 
     /// A request that must succeed (2xx): any other answer is a [`Fail`].
-    pub fn expect(&self, method: &str, path: &str, body: Body, token: Option<&str>) -> Result<Reply, Fail> {
+    pub fn expect(
+        &self,
+        method: &str,
+        path: &str,
+        body: Body,
+        token: Option<&str>,
+    ) -> Result<Reply, Fail> {
         let r = self.send(method, path, body, token)?;
         if (200..300).contains(&r.status) {
             Ok(r)
@@ -262,14 +277,17 @@ impl Net {
 
 /// An expired token: a 401, or the server's 403 "Invalid Token" (#69).
 fn stale(status: u16, body: &Value) -> bool {
-    status == 401 || (status == 403 && body.get("error").and_then(Value::as_str) == Some("Invalid Token"))
+    status == 401
+        || (status == 403 && body.get("error").and_then(Value::as_str) == Some("Invalid Token"))
 }
 
 /// A query string's value, percent-encoded (RFC 3986 unreserved kept).
 pub(crate) fn encode(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => (b as char).to_string(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                (b as char).to_string()
+            }
             _ => format!("%{b:02X}"),
         })
         .collect()
@@ -305,7 +323,14 @@ mod tests {
 
     #[test]
     fn query_values_round_trip() {
-        for s in ["http://127.0.0.1:5000/callback", "a b+c", "ü/?&=#", "", "%", "%4"] {
+        for s in [
+            "http://127.0.0.1:5000/callback",
+            "a b+c",
+            "ü/?&=#",
+            "",
+            "%",
+            "%4",
+        ] {
             assert_eq!(decode(&encode(s)), s, "{s}");
         }
         assert_eq!(decode("a+b%20c"), "a b c");

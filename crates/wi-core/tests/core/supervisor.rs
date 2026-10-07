@@ -11,7 +11,6 @@
 //! - the crumb doesn't name the device that was running, or a plugin that
 //!   crashed three times in ten minutes can be turned on again.
 
-
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
@@ -74,7 +73,10 @@ fn the_app_does_not_wait_on_the_engine() {
     let slow = setup.dir.path().join("slow-engine");
     std::fs::write(
         &slow,
-        format!("#!/bin/sh\nsleep 1\nexec '{}' \"$@\"\n", mock_engine().display()),
+        format!(
+            "#!/bin/sh\nsleep 1\nexec '{}' \"$@\"\n",
+            mock_engine().display()
+        ),
     )
     .unwrap();
     let mut p = std::fs::metadata(&slow).unwrap().permissions();
@@ -82,14 +84,27 @@ fn the_app_does_not_wait_on_the_engine() {
     std::fs::set_permissions(&slow, p).unwrap();
 
     let began = Instant::now();
-    let core = Core::open(&setup.library(), setup.config_with(&slow, NO_SERVER, no_browser())).unwrap();
+    let core = Core::open(
+        &setup.library(),
+        setup.config_with(&slow, NO_SERVER, no_browser()),
+    )
+    .unwrap();
     let opened = began.elapsed();
-    assert!(opened < Duration::from_millis(500), "Core::open took {opened:?}");
-    assert_eq!(core.invoke("engine.status", json!({})).unwrap()["state"], "starting");
+    assert!(
+        opened < Duration::from_millis(500),
+        "Core::open took {opened:?}"
+    );
+    assert_eq!(
+        core.invoke("engine.status", json!({})).unwrap()["state"],
+        "starting"
+    );
     // The library answers while the engine starts.
     import(&core, &[&corpus("original.wwav")]);
     core.engine().wait_running(T).unwrap();
-    assert_eq!(core.invoke("engine.status", json!({})).unwrap()["state"], "running");
+    assert_eq!(
+        core.invoke("engine.status", json!({})).unwrap()["state"],
+        "running"
+    );
 }
 
 #[test]
@@ -114,7 +129,10 @@ fn kill_9_mid_playback_is_back_stopped_at_the_same_playhead() {
 
     // Stopped, at the playhead the dead engine's clock last showed.
     let playhead = back.payload["playhead"].as_i64().unwrap();
-    assert!(eventually(T, || core.engine().clock().is_some_and(|c| c.callbacks > 2)));
+    assert!(eventually(T, || core
+        .engine()
+        .clock()
+        .is_some_and(|c| c.callbacks > 2)));
     let after = core.engine().clock().unwrap();
     assert_eq!(after.state, STATE_STOPPED);
     assert_eq!(after.sample_pos, playhead);
@@ -144,8 +162,12 @@ fn two_hundred_kills_in_playback_and_render() {
     let rate = core.engine().rate().unwrap();
     core.engine().load(keys_session(rate), 0).unwrap();
     // Let the plugin report its state once, as it does on every stop.
-    core.engine().call("transport.play", Value::Null, T).unwrap();
-    core.engine().call("transport.stop", Value::Null, T).unwrap();
+    core.engine()
+        .call("transport.play", Value::Null, T)
+        .unwrap();
+    core.engine()
+        .call("transport.stop", Value::Null, T)
+        .unwrap();
     std::thread::sleep(Duration::from_millis(100));
     let hash = core.engine().session_hash().unwrap();
     let render_dir = setup.dir.path().join("render");
@@ -167,7 +189,10 @@ fn two_hundred_kills_in_playback_and_render() {
         let (back, t) = if n % 2 == 1 {
             // A render waits on the engine; the kill lands somewhere in it.
             std::thread::scope(|s| {
-                let call = s.spawn(|| core.engine().call("render", render.clone(), Duration::from_secs(60)));
+                let call = s.spawn(|| {
+                    core.engine()
+                        .call("render", render.clone(), Duration::from_secs(60))
+                });
                 std::thread::sleep(wait);
                 let back = kill_and_wait(pid);
                 if call.join().unwrap().is_err() {
@@ -176,25 +201,38 @@ fn two_hundred_kills_in_playback_and_render() {
                 back
             })
         } else {
-            core.engine().call("transport.play", Value::Null, T).unwrap();
+            core.engine()
+                .call("transport.play", Value::Null, T)
+                .unwrap();
             std::thread::sleep(wait);
             kill_and_wait(pid)
         };
         took.push(t);
         assert!(t < Duration::from_secs(2), "kill {n} back after {t:?}");
         assert!(back.payload["playhead"].as_i64().unwrap() >= 0);
-        assert!(eventually(T, || core.engine().clock().is_some_and(|c| c.callbacks > 1)));
-        assert_eq!(core.engine().clock().unwrap().state, STATE_STOPPED, "kill {n} left it running");
-        assert_eq!(core.engine().session_hash().unwrap(), hash, "kill {n} changed the session");
-        assert!(core.invoke("app.hello", json!({})).is_ok(), "the core went down at kill {n}");
+        assert!(eventually(T, || core
+            .engine()
+            .clock()
+            .is_some_and(|c| c.callbacks > 1)));
+        assert_eq!(
+            core.engine().clock().unwrap().state,
+            STATE_STOPPED,
+            "kill {n} left it running"
+        );
+        assert_eq!(
+            core.engine().session_hash().unwrap(),
+            hash,
+            "kill {n} changed the session"
+        );
+        assert!(
+            core.invoke("app.hello", json!({})).is_ok(),
+            "the core went down at kill {n}"
+        );
     }
     took.sort();
     eprintln!(
         "200 kills ({} mid-render): back after max {:?}, p50 {:?}, p99 {:?}",
-        in_render,
-        took[199],
-        took[100],
-        took[197]
+        in_render, took[199], took[100], took[197]
     );
     assert!(in_render > 50, "only {in_render} kills landed mid-render");
     // The session the engine renders after all that is the one before it.
@@ -225,7 +263,10 @@ fn a_hang_in_the_audio_thread_is_seen_by_the_clock() {
     );
     let found = hung.elapsed();
     // 500 ms of stalled clock, checked ten times a second.
-    assert!(found >= Duration::from_millis(450) && found < Duration::from_millis(900), "{found:?}");
+    assert!(
+        found >= Duration::from_millis(450) && found < Duration::from_millis(900),
+        "{found:?}"
+    );
     wait_event(&events, "engine.back", T);
     assert_ne!(core.engine().pid().unwrap(), pid);
     assert_eq!(core.engine().phase(), Phase::Running);
@@ -244,7 +285,10 @@ fn a_hang_in_the_message_thread_is_seen_by_the_ping() {
     wait_event(&events, "engine.stopped", T);
     let found = hung.elapsed();
     // The next ping (within 1 s) goes unanswered for 1 s.
-    assert!(found >= Duration::from_millis(900) && found < Duration::from_millis(2300), "{found:?}");
+    assert!(
+        found >= Duration::from_millis(900) && found < Duration::from_millis(2300),
+        "{found:?}"
+    );
     wait_event(&events, "engine.back", T);
     assert_ne!(core.engine().pid().unwrap(), pid);
 }
@@ -257,7 +301,9 @@ fn the_crumb_names_the_device_and_it_comes_back_off() {
     running(&core);
     let rate = core.engine().rate().unwrap();
     core.engine().load(keys_session(rate), 0).unwrap();
-    core.engine().call("transport.play", Value::Null, T).unwrap();
+    core.engine()
+        .call("transport.play", Value::Null, T)
+        .unwrap();
     core.engine()
         .call("debug.crumb", json!({"node": TAPE}), T)
         .unwrap();
@@ -346,11 +392,18 @@ fn a_missing_engine_says_so_and_the_library_still_works() {
     let setup = Setup::new();
     let core = Core::open(
         &setup.library(),
-        setup.config_with(&setup.dir.path().join("no-such-engine"), NO_SERVER, no_browser()),
+        setup.config_with(
+            &setup.dir.path().join("no-such-engine"),
+            NO_SERVER,
+            no_browser(),
+        ),
     )
     .unwrap();
     let err = core.engine().wait_running(T).unwrap_err();
     assert_eq!(err.code, "engine_stopped");
-    assert_eq!(core.invoke("engine.status", json!({})).unwrap()["state"], "stopped");
+    assert_eq!(
+        core.invoke("engine.status", json!({})).unwrap()["state"],
+        "stopped"
+    );
     import(&core, &[&corpus("original.wwav")]);
 }

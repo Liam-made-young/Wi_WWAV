@@ -59,8 +59,7 @@ pub(crate) fn records_changed(i: &Inner, kinds: Vec<String>) {
 }
 
 fn all_kinds(i: &Inner) -> Vec<String> {
-    i.kv
-        .query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")
+    i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")
         .unwrap_or_default()
 }
 
@@ -153,7 +152,10 @@ pub(crate) fn records_get(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     let (kind, id) = (a.str("kind")?, a.str("id")?);
     match i.store().doc(kind, id)? {
         Some(d) => Ok(json!({"record": record_json(&d.key, &d.json)})),
-        None => Err(CoreError::new("not_found", "That record isn't here any more.")),
+        None => Err(CoreError::new(
+            "not_found",
+            "That record isn't here any more.",
+        )),
     }
 }
 
@@ -194,7 +196,10 @@ fn read_ops(i: &Inner, a: &Args) -> Result<Vec<Op>, CoreError> {
             }
             ("patch", Some(v)) => {
                 let Some(Value::Object(mut whole)) = before else {
-                    return Err(CoreError::new("not_found", "That record isn't here any more."));
+                    return Err(CoreError::new(
+                        "not_found",
+                        "That record isn't here any more.",
+                    ));
                 };
                 for (k, x) in v {
                     whole.insert(k.clone(), x.clone());

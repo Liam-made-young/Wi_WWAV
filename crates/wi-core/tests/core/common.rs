@@ -13,7 +13,10 @@ use serde_json::{json, Value};
 use wi_core::{Config, Core, Event, MemorySecrets, Opener, SecretStore};
 
 pub fn workspace() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap()
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap()
 }
 
 /// target/<profile>/, where this test binary's own deps/ folder sits.
@@ -126,7 +129,11 @@ pub fn ok(core: &Core, cmd: &str, args: Value) -> Value {
 /// Imports `files` into the library and returns their clip ids.
 pub fn import(core: &Core, files: &[&Path]) -> Vec<String> {
     let paths: Vec<String> = files.iter().map(|p| p.display().to_string()).collect();
-    let r = ok(core, "library.import", json!({"paths": paths, "label": "import"}));
+    let r = ok(
+        core,
+        "library.import",
+        json!({"paths": paths, "label": "import"}),
+    );
     r["clips"]
         .as_array()
         .unwrap()
@@ -139,29 +146,48 @@ pub fn import(core: &Core, files: &[&Path]) -> Vec<String> {
 pub struct MockServer {
     child: Child,
     pub url: String,
+    /// The side door of `mock_counts.mjs`, when started with counts.
+    pub counts: Option<String>,
+}
+
+fn address(line: &str) -> String {
+    let url = line.trim().rsplit(' ').next().unwrap_or("").to_string();
+    assert!(url.starts_with("http://"), "unexpected line: {line}");
+    url
 }
 
 impl MockServer {
     pub fn start() -> MockServer {
+        MockServer::spawn(
+            &workspace().join("tools/mock-server/server.js"),
+            &["--port", "0"],
+            false,
+        )
+    }
+
+    /// The mock with a side door that counts each part's sends.
+    pub fn start_counting() -> MockServer {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/core/mock_counts.mjs");
+        MockServer::spawn(&script, &[], true)
+    }
+
+    fn spawn(script: &Path, args: &[&str], counts: bool) -> MockServer {
         let mut child = Command::new("node")
-            .arg(workspace().join("tools/mock-server/server.js"))
-            .args(["--port", "0"])
+            .arg(script)
+            .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
             .expect("node runs the mock server");
-        let mut line = String::new();
-        BufReader::new(child.stdout.take().unwrap())
-            .read_line(&mut line)
-            .unwrap();
-        let url = line
-            .trim()
-            .rsplit(' ')
-            .next()
-            .expect("the mock prints its address")
-            .to_string();
-        assert!(url.starts_with("http://"), "unexpected line: {line}");
-        MockServer { child, url }
+        let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
+        let url = address(&lines.next().unwrap().unwrap());
+        let counts = counts.then(|| address(&lines.next().unwrap().unwrap()));
+        MockServer { child, url, counts }
+    }
+
+    pub fn counted(&self) -> Value {
+        let url = self.counts.as_ref().expect("started with counts");
+        serde_json::from_str(&ureq::get(url).call().unwrap().into_string().unwrap()).unwrap()
     }
 
     pub fn call(&self, method: &str, path: &str, body: Option<Value>) -> (u16, Value) {
@@ -177,7 +203,10 @@ impl MockServer {
         };
         let status = resp.status();
         let text = resp.into_string().unwrap_or_default();
-        (status, serde_json::from_str(&text).unwrap_or(Value::String(text)))
+        (
+            status,
+            serde_json::from_str(&text).unwrap_or(Value::String(text)),
+        )
     }
 
     pub fn state(&self) -> Value {
@@ -193,7 +222,12 @@ impl MockServer {
             let base = base.clone();
             std::thread::spawn(move || {
                 let agent = ureq::AgentBuilder::new().redirects(0).build();
-                let page = agent.get(&url).call().map_err(|e| e.to_string())?.into_string().unwrap();
+                let page = agent
+                    .get(&url)
+                    .call()
+                    .map_err(|e| e.to_string())?
+                    .into_string()
+                    .unwrap();
                 let request = page
                     .split("name=\"request\" value=\"")
                     .nth(1)
@@ -202,8 +236,11 @@ impl MockServer {
                     .to_string();
                 let answer = match agent
                     .post(&format!("{base}/oauth/desktop/login"))
-                    .send_form(&[("request", &request), ("email", email), ("password", password)])
-                {
+                    .send_form(&[
+                        ("request", &request),
+                        ("email", email),
+                        ("password", password),
+                    ]) {
                     Ok(r) => r,
                     Err(ureq::Error::Status(_, r)) => r,
                     Err(e) => return Err(e.to_string()),
@@ -228,7 +265,10 @@ impl Drop for MockServer {
 pub fn sign_in(setup: &Setup, server: &MockServer) -> Core {
     let core = Core::open(
         &setup.library(),
-        setup.config(&server.url, server.browser("lmy@mi-wwav.com", "WeWave-lmy1")),
+        setup.config(
+            &server.url,
+            server.browser("lmy@mi-wwav.com", "WeWave-lmy1"),
+        ),
     )
     .unwrap();
     ok(&core, "account.signIn", json!({}));

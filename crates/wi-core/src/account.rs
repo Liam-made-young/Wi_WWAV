@@ -7,7 +7,6 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -23,8 +22,6 @@ pub const CLIENT_ID: &str = "wi-wwav-desktop";
 /// How long the browser has to hand the sign-in back.
 const WAIT: Duration = Duration::from_secs(300);
 const ACCOUNT: &str = "account";
-
-static SIGNING_IN: Mutex<()> = Mutex::new(());
 
 fn random(n: usize) -> String {
     let mut bytes = vec![0u8; n];
@@ -78,9 +75,8 @@ fn answer(stream: &mut TcpStream) -> std::io::Result<Vec<(String, String)>> {
 }
 
 fn reply(stream: &mut TcpStream, sentence: &str) {
-    let page = format!(
-        "<!doctype html><meta charset=\"utf-8\"><title>Wi_WWAV</title><p>{sentence}</p>"
-    );
+    let page =
+        format!("<!doctype html><meta charset=\"utf-8\"><title>Wi_WWAV</title><p>{sentence}</p>");
     let _ = write!(
         stream,
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n{page}",
@@ -89,7 +85,10 @@ fn reply(stream: &mut TcpStream, sentence: &str) {
 }
 
 /// Waits for the browser to come back to the loopback address.
-fn wait_for_answer(i: &Inner, listener: &TcpListener) -> Result<(TcpStream, Vec<(String, String)>), CoreError> {
+fn wait_for_answer(
+    i: &Inner,
+    listener: &TcpListener,
+) -> Result<(TcpStream, Vec<(String, String)>), CoreError> {
     listener.set_nonblocking(true)?;
     let deadline = Instant::now() + WAIT;
     loop {
@@ -119,7 +118,7 @@ fn wait_for_answer(i: &Inner, listener: &TcpListener) -> Result<(TcpStream, Vec<
 }
 
 pub(crate) fn sign_in(i: &Inner) -> Result<Value, CoreError> {
-    let Ok(_one) = SIGNING_IN.try_lock() else {
+    let Ok(_one) = i.signing_in.try_lock() else {
         return Err(CoreError::new(
             "signing_in",
             "A sign-in is already open in your browser.",
@@ -128,19 +127,33 @@ pub(crate) fn sign_in(i: &Inner) -> Result<Value, CoreError> {
     let (verifier, challenge) = pkce_pair();
     let state = random(16);
     let listener = TcpListener::bind("127.0.0.1:0")?;
-    let redirect = format!("http://127.0.0.1:{}/callback", listener.local_addr()?.port());
+    let redirect = format!(
+        "http://127.0.0.1:{}/callback",
+        listener.local_addr()?.port()
+    );
     let url = format!(
         "{}/oauth/desktop/authorize?response_type=code&client_id={CLIENT_ID}&redirect_uri={}&code_challenge={challenge}&code_challenge_method=S256&state={state}",
         i.net.base(),
         encode(&redirect),
     );
     (i.opener)(&url).map_err(|e| {
-        CoreError::new("no_browser", format!("Wi_WWAV couldn't open your browser: {e}"))
+        CoreError::new(
+            "no_browser",
+            format!("Wi_WWAV couldn't open your browser: {e}"),
+        )
     })?;
     let (mut stream, query) = wait_for_answer(i, &listener)?;
-    let get = |k: &str| query.iter().find(|(key, _)| key == k).map(|(_, v)| v.as_str());
+    let get = |k: &str| {
+        query
+            .iter()
+            .find(|(key, _)| key == k)
+            .map(|(_, v)| v.as_str())
+    };
     if get("state") != Some(state.as_str()) {
-        reply(&mut stream, "This sign-in didn't come from Wi_WWAV, so it was ignored.");
+        reply(
+            &mut stream,
+            "This sign-in didn't come from Wi_WWAV, so it was ignored.",
+        );
         return Err(CoreError::new(
             "state_mismatch",
             "That sign-in didn't come from this window, so Wi_WWAV ignored it. Try again.",
@@ -148,11 +161,20 @@ pub(crate) fn sign_in(i: &Inner) -> Result<Value, CoreError> {
     }
     if get("error").is_some() {
         reply(&mut stream, "Sign-in cancelled. You can close this tab.");
-        return Err(CoreError::new("sign_in_cancelled", "Sign-in was cancelled."));
+        return Err(CoreError::new(
+            "sign_in_cancelled",
+            "Sign-in was cancelled.",
+        ));
     }
     let Some(code) = get("code").map(String::from) else {
-        reply(&mut stream, "Something went wrong. Try signing in again from Wi_WWAV.");
-        return Err(CoreError::new("sign_in_failed", "The browser came back without a sign-in."));
+        reply(
+            &mut stream,
+            "Something went wrong. Try signing in again from Wi_WWAV.",
+        );
+        return Err(CoreError::new(
+            "sign_in_failed",
+            "The browser came back without a sign-in.",
+        ));
     };
     let form = [
         ("grant_type", "authorization_code"),
@@ -162,10 +184,16 @@ pub(crate) fn sign_in(i: &Inner) -> Result<Value, CoreError> {
         ("client_id", CLIENT_ID),
         ("state", state.as_str()),
     ];
-    let tokens = match i.net.expect("POST", "/oauth/desktop/token", Body::Form(&form), None) {
+    let tokens = match i
+        .net
+        .expect("POST", "/oauth/desktop/token", Body::Form(&form), None)
+    {
         Ok(r) => r.body,
         Err(e) => {
-            reply(&mut stream, "Signing in didn't work. Try again from Wi_WWAV.");
+            reply(
+                &mut stream,
+                "Signing in didn't work. Try again from Wi_WWAV.",
+            );
             return Err(e.into());
         }
     };
@@ -173,14 +201,23 @@ pub(crate) fn sign_in(i: &Inner) -> Result<Value, CoreError> {
         tokens.get("access_token").and_then(Value::as_str),
         tokens.get("refresh_token").and_then(Value::as_str),
     ) else {
-        reply(&mut stream, "Signing in didn't work. Try again from Wi_WWAV.");
-        return Err(CoreError::new("sign_in_failed", "mi-wwav.com answered without a token."));
+        reply(
+            &mut stream,
+            "Signing in didn't work. Try again from Wi_WWAV.",
+        );
+        return Err(CoreError::new(
+            "sign_in_failed",
+            "mi-wwav.com answered without a token.",
+        ));
     };
     i.net.save_tokens(&Tokens {
         access: access.to_string(),
         refresh: refresh.to_string(),
     })?;
-    reply(&mut stream, "Signed in. You can close this tab and go back to Wi_WWAV.");
+    reply(
+        &mut stream,
+        "Signed in. You can close this tab and go back to Wi_WWAV.",
+    );
     drop(stream);
     let username = refresh_profile(i)?;
     i.poke();
@@ -198,7 +235,10 @@ pub(crate) fn refresh_profile(i: &Inner) -> Result<Value, CoreError> {
     };
     let username = me["username"].clone();
     i.kv.set(ACCOUNT, &json!({"username": username, "galaxy": galaxy}))?;
-    i.bus.emit("account", json!({"signedIn": true, "username": username, "galaxy": galaxy}));
+    i.bus.emit(
+        "account",
+        json!({"signedIn": true, "username": username, "galaxy": galaxy}),
+    );
     Ok(username)
 }
 
