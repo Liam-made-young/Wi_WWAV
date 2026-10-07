@@ -13,6 +13,7 @@ import {
   atMinute,
   type DayKey,
   daysInMonth,
+  daysBetween,
   dayKey,
   keyOf,
   keyParts,
@@ -169,18 +170,41 @@ function matches(rule: Rule, start: DayKey, day: DayKey): boolean {
   return byMonthDay.some((md) => (md > 0 ? md === d : last + md + 1 === d));
 }
 
-/** Every occurrence of the series, in order, until COUNT, UNTIL or the horizon. */
-function* expand(rule: Rule, start: { day: DayKey; minute: number }, tz: string): Generator<Occurrence> {
+// The period to start walking from. Without COUNT nothing before `from`
+// can matter, so a long-running series skips straight to the period that
+// holds it; with COUNT every occurrence from the start has to be counted.
+function firstPeriod(rule: Rule, start: DayKey, from: DayKey): number {
+  if (rule.count !== undefined || from <= start) return 0;
+  const s = keyParts(start);
+  const f = keyParts(from);
+  const periods = {
+    DAILY: daysBetween(start, from),
+    WEEKLY: Math.floor(daysBetween(addDays(start, -((weekdayOf(start) + 6) % 7)), from) / 7),
+    MONTHLY: (f.year - s.year) * 12 + (f.month - s.month),
+    YEARLY: f.year - s.year,
+  }[rule.freq];
+  return Math.floor(periods / rule.interval);
+}
+
+/**
+ * The series' dates, in order, until COUNT, UNTIL or the horizon. Only dates:
+ * turning a wall clock into an instant is the costly step, so it is done
+ * only for the occurrences a caller keeps, and for the one day an UNTIL
+ * instant can cut either way.
+ */
+function* seriesDays(rule: Rule, start: { day: DayKey; minute: number }, tz: string, from: DayKey): Generator<DayKey> {
   const end = addDays(start.day, HORIZON_DAYS);
+  const until = rule.until;
+  const lastDay = until === undefined ? null : 'day' in until ? until.day : dayKey(until.instant, tz);
   let emitted = 0;
-  for (let k = 0; ; k++) {
+  for (let k = firstPeriod(rule, start.day, from); ; k++) {
     const days = periodDays(rule, start.day, k);
     if (days.length > 0 && days[0] > end) return;
     for (const date of days) {
       if (date < start.day || !matches(rule, start.day, date)) continue;
-      const at = atMinute(date, start.minute, tz);
-      if (rule.until && ('day' in rule.until ? date > rule.until.day : at > rule.until.instant)) return;
-      yield { date, at };
+      if (lastDay !== null && date > lastDay) return;
+      if (date === lastDay && until && 'instant' in until && atMinute(date, start.minute, tz) > until.instant) return;
+      yield date;
       emitted += 1;
       if (rule.count !== undefined && emitted >= rule.count) return;
     }
@@ -196,9 +220,9 @@ export function occurrencesBetween(
   to: DayKey,
 ): Occurrence[] {
   const out: Occurrence[] = [];
-  for (const o of expand(rule, start, tz)) {
-    if (o.date > to) break;
-    if (o.date >= from) out.push(o);
+  for (const date of seriesDays(rule, start, tz, from)) {
+    if (date > to) break;
+    if (date >= from) out.push({ date, at: atMinute(date, start.minute, tz) });
   }
   return out;
 }
@@ -213,7 +237,7 @@ export function seriesStart(task: Task, tz: string): { day: DayKey; minute: numb
 /** A recurring task's occurrences in [from, to]; empty for a task without a readable rule. */
 export function taskOccurrences(task: Task, tz: string, from: DayKey, to: DayKey): Occurrence[] {
   const rule = task.rrule ? parseRule(task.rrule) : null;
-  const start = seriesStart(task, tz);
+  const start = rule && seriesStart(task, tz);
   return rule && start ? occurrencesBetween(rule, start, tz, from, to) : [];
 }
 
@@ -230,12 +254,12 @@ export function nextOpenOccurrence(
   tz: string,
 ): Occurrence | null {
   const rule = task.rrule ? parseRule(task.rrule) : null;
-  const start = seriesStart(task, tz);
+  const start = rule && seriesStart(task, tz);
   if (!rule || !start) return null;
   const today = dayKey(now, tz);
   const done = new Set(occurrences.filter((o) => o.taskId === task.id).map((o) => o.date));
-  for (const o of expand(rule, start, tz)) {
-    if (o.date >= today && !done.has(o.date)) return o;
+  for (const date of seriesDays(rule, start, tz, today)) {
+    if (date >= today && !done.has(date)) return { date, at: atMinute(date, start.minute, tz) };
   }
   return null;
 }

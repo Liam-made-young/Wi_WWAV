@@ -290,3 +290,36 @@ describe('openTasks', () => {
     expect(open[1].due).toBe(ny('2026-10-09 23:59'));
   });
 });
+
+describe('a window far from the start', () => {
+  it('gives exactly what walking the whole series from its start gives', () => {
+    const rules = [
+      'FREQ=DAILY;INTERVAL=3',
+      'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH',
+      'FREQ=WEEKLY;INTERVAL=3',
+      'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+      'FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=31',
+      'FREQ=MONTHLY;BYMONTHDAY=-1',
+      'FREQ=MONTHLY;INTERVAL=5',
+      'FREQ=YEARLY;INTERVAL=4',
+      'FREQ=YEARLY;BYMONTHDAY=15',
+      'FREQ=DAILY;INTERVAL=2;UNTIL=20290301',
+    ];
+    const starts = ['2019-01-31', '2020-02-29', '2023-06-13'];
+    const windows: [string, string][] = [
+      ['2026-10-01', '2026-11-15'],
+      ['2028-02-01', '2028-03-31'],
+      ['2029-02-20', '2029-03-10'],
+    ];
+    for (const text of rules) {
+      const rule = parseRule(text)!;
+      for (const day of starts) {
+        const start = { day, minute: 9 * 60 };
+        for (const [from, to] of windows) {
+          const walked = occurrencesBetween(rule, start, NY, day, to).filter((o) => o.date >= from);
+          expect(occurrencesBetween(rule, start, NY, from, to), `${text} from ${day}, ${from}..${to}`).toEqual(walked);
+        }
+      }
+    }
+  });
+});
