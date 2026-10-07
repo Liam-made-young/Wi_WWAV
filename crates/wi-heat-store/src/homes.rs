@@ -302,7 +302,10 @@ pub(crate) fn inherit(m: &mut Map<String, Value>, ctx: &Ctx, first: bool, force:
     // estimate that is there is the person's, and so is a difficulty that
     // isn't the old default of 3.
     if text(m, "estBy").is_empty() {
-        let has = m.get("estMin").and_then(Value::as_f64).is_some_and(|x| x > 0.0);
+        let has = m
+            .get("estMin")
+            .and_then(Value::as_f64)
+            .is_some_and(|x| x > 0.0);
         m.insert("estBy".into(), json!(if has { "you" } else { "default" }));
     }
     if text(m, "difficultyBy").is_empty() {
@@ -342,7 +345,11 @@ pub(crate) fn inherit(m: &mut Map<String, Value>, ctx: &Ctx, first: bool, force:
 
     let kind_of = text(m, "type").to_string();
     let fill = types::fill(&kind_of, &title, &levels);
-    let made = if fill.from.is_some() { "type" } else { "default" };
+    let made = if fill.from.is_some() {
+        "type"
+    } else {
+        "default"
+    };
     if force || matches!(text(m, "estBy"), "type" | "default") {
         let home = match (text(m, "courseId"), text(m, "projectId")) {
             ("", "") => None,
@@ -427,15 +434,29 @@ pub(crate) fn mail_sightings(school: &School, thread: &Value) -> Vec<Sighting> {
     let mut out = Vec::new();
     let subject = thread["subject"].as_str().unwrap_or("");
     if let Some(o) = offering_in(&school.course_pattern, subject).filter(|o| o.is_whole()) {
-        out.push(Sighting { code: o.code, name: o.name, term: o.term, sure: true });
+        out.push(Sighting {
+            code: o.code,
+            name: o.name,
+            term: o.term,
+            sure: true,
+        });
     }
     // Claude's word makes a course only for mail it sorted as school, or left unsorted.
     let school_mail = matches!(thread["category"].as_str(), None | Some("school"));
-    if let Some(code) = thread["course"].as_str().map(str::trim).filter(|c| !c.is_empty()) {
+    if let Some(code) = thread["course"]
+        .as_str()
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+    {
         let found = offering_in(&school.course_pattern, &code.to_uppercase());
         // What Claude wrote has to be a code and nothing else.
         if let Some(o) = found.filter(|o| squash(&o.code) == squash(code)) {
-            out.push(Sighting { code: o.code, name: None, term: None, sure: school_mail });
+            out.push(Sighting {
+                code: o.code,
+                name: None,
+                term: None,
+                sure: school_mail,
+            });
         }
     }
     out
@@ -481,13 +502,18 @@ fn term_for(world: &World, made: &mut Vec<Value>, clock: &Clock, name: Option<&s
             (None, None) => term_name(&clock.today()),
         },
     };
-    if let Some(t) = world.terms.iter().find(|t| t.name.trim().eq_ignore_ascii_case(&name)) {
+    if let Some(t) = world
+        .terms
+        .iter()
+        .find(|t| t.name.trim().eq_ignore_ascii_case(&name))
+    {
         return t.id.clone();
     }
-    if let Some(t) = made
-        .iter()
-        .find(|t| t["name"].as_str().is_some_and(|n| n.eq_ignore_ascii_case(&name)))
-    {
+    if let Some(t) = made.iter().find(|t| {
+        t["name"]
+            .as_str()
+            .is_some_and(|n| n.eq_ignore_ascii_case(&name))
+    }) {
         return t["id"].as_str().unwrap_or_default().to_string();
     }
     let id = ulid();
@@ -557,15 +583,25 @@ fn sightings_in(world: &World, ctx: &Ctx) -> Vec<Sighting> {
     }
     for e in &world.events {
         if let Some(o) = offering_in(pattern, &e.title).filter(|o| o.is_whole()) {
-            out.push(Sighting { code: o.code, name: o.name, term: o.term, sure: true });
+            out.push(Sighting {
+                code: o.code,
+                name: o.name,
+                term: o.term,
+                sure: true,
+            });
         }
     }
     for t in &world.tasks {
         let group = t.group.as_deref().unwrap_or("").trim();
-        if let Some(o) = offering_in(pattern, group)
-            .filter(|o| o.is_whole() || squash(&o.code) == squash(group))
+        if let Some(o) =
+            offering_in(pattern, group).filter(|o| o.is_whole() || squash(&o.code) == squash(group))
         {
-            out.push(Sighting { code: o.code, name: o.name, term: o.term, sure: true });
+            out.push(Sighting {
+                code: o.code,
+                name: o.name,
+                term: o.term,
+                sure: true,
+            });
         }
     }
     out
@@ -650,7 +686,11 @@ pub(crate) fn after_home_write(
     old: Option<&Value>,
     new: &Value,
 ) -> Vec<(&'static str, Value)> {
-    let field = if k == kind::SPACE { "typeDefs" } else { "types" };
+    let field = if k == kind::SPACE {
+        "typeDefs"
+    } else {
+        "types"
+    };
     let changed = |f: &str| old.map_or(new.get(f).is_some(), |o| o.get(f) != new.get(f));
     let id = new["id"].as_str().unwrap_or_default();
     let mut out: Vec<(&'static str, Value)> = Vec::new();
@@ -764,7 +804,12 @@ pub fn reapply(
 ) -> Result<Outcome> {
     let world = World::load(store)?;
     let ctx = Ctx::load(&world);
-    let named = |k: &str| scope.get(k).and_then(Value::as_str).filter(|s| !s.is_empty());
+    let named = |k: &str| {
+        scope
+            .get(k)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+    };
     let (one_task, course, project, space) = (
         named("taskId"),
         named("courseId"),
@@ -877,7 +922,10 @@ pub fn mark_asked(store: &mut Store, clock: &Clock, ids: &[String]) -> Result<()
         .and_then(|v| v.as_object().cloned())
         .unwrap_or_default();
     // Tasks asked about long ago are asked again anyway: forget them.
-    asked.retain(|_, at| at.as_f64().is_some_and(|at| clock.now_ms - at < ASK_AGAIN_MS));
+    asked.retain(|_, at| {
+        at.as_f64()
+            .is_some_and(|at| clock.now_ms - at < ASK_AGAIN_MS)
+    });
     for id in ids {
         asked.insert(id.clone(), num(clock.now_ms));
     }
@@ -1085,7 +1133,12 @@ fn plan(world: &World, ctx: &Ctx, clock: &Clock, draft: &Value) -> Result<Plan> 
         Some(c) => c,
         None => {
             let code = code.clone().unwrap_or_default();
-            let term = term_for(world, &mut made_terms, clock, syllabus.course.term.as_deref());
+            let term = term_for(
+                world,
+                &mut made_terms,
+                clock,
+                syllabus.course.term.as_deref(),
+            );
             json!({"id": ulid(), "termId": term, "code": code, "name": code, "categories": [], "notes": "", "public": false})
         }
     };
@@ -1094,7 +1147,11 @@ fn plan(world: &World, ctx: &Ctx, clock: &Clock, draft: &Value) -> Result<Plan> 
         .iter()
         .find(|t| course["termId"] == json!(t.id))
         .map(|t| t.name.clone())
-        .or_else(|| made_terms.first().and_then(|t| t["name"].as_str().map(str::to_string)))
+        .or_else(|| {
+            made_terms
+                .first()
+                .and_then(|t| t["name"].as_str().map(str::to_string))
+        })
         .unwrap_or_default();
     if let Some(name) = &syllabus.course.name {
         course["name"] = json!(name);
@@ -1107,7 +1164,9 @@ fn plan(world: &World, ctx: &Ctx, clock: &Clock, draft: &Value) -> Result<Plan> 
     if !syllabus.weights.is_empty() {
         let old: Vec<Value> = course["categories"].as_array().cloned().unwrap_or_default();
         let same = |c: &Value, name: &str| {
-            c["name"].as_str().is_some_and(|n| n.trim().eq_ignore_ascii_case(name))
+            c["name"]
+                .as_str()
+                .is_some_and(|n| n.trim().eq_ignore_ascii_case(name))
         };
         let mut categories: Vec<Value> = syllabus
             .weights
@@ -1197,7 +1256,11 @@ fn plan(world: &World, ctx: &Ctx, clock: &Clock, draft: &Value) -> Result<Plan> 
     let mut new_tasks: Vec<Value> = Vec::new();
     let course_code = course["code"].as_str().unwrap_or_default().to_string();
     for item in &syllabus.items {
-        let Some(due) = item.due.as_deref().and_then(|d| rules::due_ms(d, &clock.zone)) else {
+        let Some(due) = item
+            .due
+            .as_deref()
+            .and_then(|d| rules::due_ms(d, &clock.zone))
+        else {
             continue;
         };
         let known = mine
@@ -1207,7 +1270,9 @@ fn plan(world: &World, ctx: &Ctx, clock: &Clock, draft: &Value) -> Result<Plan> 
             .min_by_key(|i| world.tasks[*i].done);
         if let Some(i) = known {
             let t = &world.tasks[i];
-            let same_day = t.due.is_some_and(|d| clock.date_of(d) == clock.date_of(due));
+            let same_day = t
+                .due
+                .is_some_and(|d| clock.date_of(d) == clock.date_of(due));
             if !t.done && world.raw_tasks[i]["source"] != "ical" && !same_day {
                 moved.insert(i, (t.due, due));
             }
@@ -1219,7 +1284,10 @@ fn plan(world: &World, ctx: &Ctx, clock: &Clock, draft: &Value) -> Result<Plan> 
                 format!("{}|{}", squash(&course_code), item.title.to_lowercase()).as_bytes()
             )
         );
-        let seen = world.raw_tasks.iter().any(|t| t["sourceId"] == json!(source_id))
+        let seen = world
+            .raw_tasks
+            .iter()
+            .any(|t| t["sourceId"] == json!(source_id))
             || new_tasks.iter().any(|t| t["sourceId"] == json!(source_id));
         if seen || due < clock.now_ms - PAST_MS {
             continue;
@@ -1308,8 +1376,13 @@ fn view(world: &World, clock: &Clock, draft: &Value) -> Result<Value> {
         })
         .collect();
     let weights = &p.syllabus.weights;
-    out["courseId"] = if p.is_new { Value::Null } else { p.course["id"].clone() };
-    out["course"] = json!({"code": code, "name": name, "term": p.term_name, "label": label, "isNew": p.is_new});
+    out["courseId"] = if p.is_new {
+        Value::Null
+    } else {
+        p.course["id"].clone()
+    };
+    out["course"] =
+        json!({"code": code, "name": name, "term": p.term_name, "label": label, "isNew": p.is_new});
     out["weights"] = weights
         .iter()
         .map(|w| json!({"category": w.category, "percent": num(w.percent), "dropLowest": w.drop_lowest.map_or(Value::Null, num)}))

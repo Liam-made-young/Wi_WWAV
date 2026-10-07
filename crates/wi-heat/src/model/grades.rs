@@ -75,7 +75,9 @@ pub fn category_pct(category_id: &str, grades: &[Grade]) -> Option<f64> {
 /// score over what it was out of, and one item always stays: a category with
 /// two quizzes that drops two still counts its better one.
 pub fn category_pct_of(category: &GradeCategory, grades: &[Grade]) -> Option<f64> {
-    let drop = category.drop_lowest.map_or(0, |n| js::max2(0.0, n.floor()) as usize);
+    let drop = category
+        .drop_lowest
+        .map_or(0, |n| js::max2(0.0, n.floor()) as usize);
     if drop == 0 {
         return category_pct(&category.id, grades);
     }

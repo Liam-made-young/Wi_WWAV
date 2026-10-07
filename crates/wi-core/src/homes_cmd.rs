@@ -173,7 +173,9 @@ pub(crate) fn tidy_once(i: &Inner) -> Result<(), CoreError> {
 /// A PDF's text, page by page. A PDF this crate can't walk is an error, not a
 /// crash: it has been known to panic on odd files.
 fn pdf_text(path: &Path) -> Result<(String, usize), String> {
-    let size = std::fs::metadata(path).map_err(|_| NOT_A_PDF.to_string())?.len();
+    let size = std::fs::metadata(path)
+        .map_err(|_| NOT_A_PDF.to_string())?
+        .len();
     if size > PDF_MAX_BYTES {
         return Err("That PDF is too large to be a syllabus. Drop the syllabus by itself.".into());
     }

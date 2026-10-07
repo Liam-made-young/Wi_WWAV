@@ -370,7 +370,6 @@ pub(crate) fn course_view(world: &World, course: &Course) -> Value {
     })
 }
 
-
 /// A task's measured minutes: its focus sessions plus Get Info's "Took".
 pub(crate) fn actual_min(world: &World, task_id: &str) -> f64 {
     world

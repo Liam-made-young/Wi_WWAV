@@ -221,10 +221,17 @@ pub fn add_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
         Some(code) => match world.course(code) {
             Ok(c) => Some(c.id.clone()),
             Err(e) => {
-                let sighting = wi_heat::homes::offering_in(&school.course_pattern, &code.to_uppercase())
-                    .filter(|o| wi_heat::homes::squash(&o.code) == wi_heat::homes::squash(code))
-                    .map(|o| Sighting { code: o.code, name: None, term: None, sure: true });
-                found = homes::courses_from(&world, clock, &sighting.into_iter().collect::<Vec<_>>());
+                let sighting =
+                    wi_heat::homes::offering_in(&school.course_pattern, &code.to_uppercase())
+                        .filter(|o| wi_heat::homes::squash(&o.code) == wi_heat::homes::squash(code))
+                        .map(|o| Sighting {
+                            code: o.code,
+                            name: None,
+                            term: None,
+                            sure: true,
+                        });
+                found =
+                    homes::courses_from(&world, clock, &sighting.into_iter().collect::<Vec<_>>());
                 match found.id_of(&world, code) {
                     Some(id) => Some(id),
                     // What Claude passed isn't a course code: said, when it was asked for by name.

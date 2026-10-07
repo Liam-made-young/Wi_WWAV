@@ -243,7 +243,9 @@ pub fn apply_brightspace(
             TaskSource::Calendar => None,
             // From a syllabus: the same deadline, once Brightspace posts it.
             TaskSource::Claude
-                if t.source_id.as_deref().is_some_and(|s| s.starts_with("syl-")) =>
+                if t.source_id
+                    .as_deref()
+                    .is_some_and(|s| s.starts_with("syl-")) =>
             {
                 None
             }
@@ -365,7 +367,11 @@ pub fn apply_brightspace(
         .as_object()
         .cloned()
         .unwrap_or_default();
-        if let Some(id) = item.course.as_ref().and_then(|code| found.id_of(&world, code)) {
+        if let Some(id) = item
+            .course
+            .as_ref()
+            .and_then(|code| found.id_of(&world, code))
+        {
             task.insert("courseId".into(), json!(id));
         }
         homes::inherit(&mut task, &ctx, true, false);

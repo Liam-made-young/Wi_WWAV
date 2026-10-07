@@ -299,7 +299,10 @@ fn a_block_snaps_to_fifteen_minutes_and_is_moved_and_removed_with_its_words() {
         records(&snap(&core, "2026-10-07"), "task")[0]["estMin"],
         task["estMin"]
     );
-    assert_eq!((task["estMin"].clone(), task["estBy"].clone()), (json!(120), json!("type")));
+    assert_eq!(
+        (task["estMin"].clone(), task["estBy"].clone()),
+        (json!(120), json!("type"))
+    );
     let gone = ok(
         &core,
         "heat.delete",
@@ -766,7 +769,13 @@ fn s2_4_tasks_are_edited_checked_off_and_deleted_with_what_belongs_to_them() {
             task["estBy"].as_str(),
             task["difficultyBy"].as_str()
         ),
-        (Some("Quiz"), Some("rule"), Some(20.0), Some("type"), Some("type"))
+        (
+            Some("Quiz"),
+            Some("rule"),
+            Some(20.0),
+            Some("type"),
+            Some("type")
+        )
     );
     assert_eq!(
         refused(

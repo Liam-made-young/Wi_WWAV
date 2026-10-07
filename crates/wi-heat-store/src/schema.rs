@@ -478,7 +478,9 @@ fn type_defs(m: &mut Map<String, Value>, field: &str) -> Result<()> {
             v => match v.as_f64().filter(|n| n.is_finite()) {
                 Some(n) => d.insert(
                     "estMin".into(),
-                    num(n.round().clamp(crate::mcp::MINUTES.0, crate::mcp::MINUTES.1)),
+                    num(n
+                        .round()
+                        .clamp(crate::mcp::MINUTES.0, crate::mcp::MINUTES.1)),
                 ),
                 None => return refused("A task type's minutes are a number."),
             },
@@ -667,7 +669,12 @@ fn task(
         || cleared
         || (moved(m, "title") && text(m, "typeBy") == "rule");
     if follows {
-        crate::homes::inherit(m, &crate::homes::Ctx::load(world), existing.is_none(), false);
+        crate::homes::inherit(
+            m,
+            &crate::homes::Ctx::load(world),
+            existing.is_none(),
+            false,
+        );
     }
     if !m.contains_key("type") {
         m.insert("type".into(), json!(wi_heat::model::types::OTHER));

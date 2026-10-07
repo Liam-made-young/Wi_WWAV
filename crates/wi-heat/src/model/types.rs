@@ -48,7 +48,14 @@ const DEFAULTS: [(&str, f64, f64, &[&str]); 11] = [
         "Homework",
         90.0,
         3.0,
-        &["homework", "hw", "assignment", "problem set", "pset", "exercises"],
+        &[
+            "homework",
+            "hw",
+            "assignment",
+            "problem set",
+            "pset",
+            "exercises",
+        ],
     ),
     (
         "Project",
@@ -72,13 +79,29 @@ const DEFAULTS: [(&str, f64, f64, &[&str]); 11] = [
         "Admin",
         20.0,
         1.0,
-        &["form", "forms", "paperwork", "register", "registration", "renew", "sign up"],
+        &[
+            "form",
+            "forms",
+            "paperwork",
+            "register",
+            "registration",
+            "renew",
+            "sign up",
+        ],
     ),
     (
         "Creative session",
         120.0,
         3.0,
-        &["session", "mix", "mixing", "recording", "songwriting", "sketch", "studio"],
+        &[
+            "session",
+            "mix",
+            "mixing",
+            "recording",
+            "songwriting",
+            "sketch",
+            "studio",
+        ],
     ),
     (OTHER, 45.0, 2.0, &[]),
 ];
@@ -372,7 +395,11 @@ mod tests {
         assert_eq!(name("Pick up the PCB order"), Some("Errand"));
         assert_eq!(name("Renew passport"), Some("Admin"));
         assert_eq!(name("Mix the second verse"), Some("Creative session"));
-        assert_eq!(name("Syllabus check"), None, "\"lab\" inside a word doesn't count");
+        assert_eq!(
+            name("Syllabus check"),
+            None,
+            "\"lab\" inside a word doesn't count"
+        );
         assert_eq!(name("Asynchronous Task (1%)  = October 12th class"), None);
     }
 
@@ -384,7 +411,10 @@ mod tests {
             def("Lab", &["lab"], Some(120.0), Some(3.0)),
         ];
         assert_eq!(match_title("Lab quiz 2", &defs).unwrap().name, "Lab quiz");
-        assert_eq!(match_title("Quiz on lab safety", &defs).unwrap().name, "Quiz");
+        assert_eq!(
+            match_title("Quiz on lab safety", &defs).unwrap().name,
+            "Quiz"
+        );
     }
 
     #[test]
@@ -398,27 +428,54 @@ mod tests {
             global: &global,
         };
         let lab = fill("Lab", "lab3", &levels);
-        assert_eq!((lab.est_min, lab.difficulty, lab.from), (180.0, 4.0, Some(Level::Course)));
+        assert_eq!(
+            (lab.est_min, lab.difficulty, lab.from),
+            (180.0, 4.0, Some(Level::Course))
+        );
         // The space's quiz gives the minutes; its difficulty comes from the default of that name.
         let quiz = fill("Quiz", "Quiz 2", &levels);
-        assert_eq!((quiz.est_min, quiz.difficulty, quiz.from), (30.0, 2.0, Some(Level::Space)));
+        assert_eq!(
+            (quiz.est_min, quiz.difficulty, quiz.from),
+            (30.0, 2.0, Some(Level::Space))
+        );
         let hw = fill("Homework", "Homework 3", &levels);
-        assert_eq!((hw.est_min, hw.difficulty, hw.from), (90.0, 3.0, Some(Level::Global)));
+        assert_eq!(
+            (hw.est_min, hw.difficulty, hw.from),
+            (90.0, 3.0, Some(Level::Global))
+        );
         // No home at all: the same task still gets the default.
-        let bare = Levels { home: None, space: &[], global: &global };
-        assert_eq!(fill("Errand", "Update device for URI Wi-Fi", &bare).est_min, 30.0);
+        let bare = Levels {
+            home: None,
+            space: &[],
+            global: &global,
+        };
+        assert_eq!(
+            fill("Errand", "Update device for URI Wi-Fi", &bare).est_min,
+            30.0
+        );
     }
 
     #[test]
     fn a_type_no_level_defines_is_read_from_the_title_then_left_to_claude() {
         let global = defaults();
-        let levels = Levels { home: None, space: &[], global: &global };
+        let levels = Levels {
+            home: None,
+            space: &[],
+            global: &global,
+        };
         // "Music" is a word of the WWAV space; the title says what kind of work it is.
         let mix = fill("Music", "Mix the second verse", &levels);
         assert_eq!((mix.est_min, mix.from), (120.0, Some(Level::Global)));
         let unknown = fill("Reading", "Reading response 3", &levels);
-        assert_eq!((unknown.est_min, unknown.difficulty, unknown.from), (45.0, 2.0, None));
-        assert_eq!(fill("Other", "Quiz 4", &levels).from, None, "Other is never a match");
+        assert_eq!(
+            (unknown.est_min, unknown.difficulty, unknown.from),
+            (45.0, 2.0, None)
+        );
+        assert_eq!(
+            fill("Other", "Quiz 4", &levels).from,
+            None,
+            "Other is never a match"
+        );
     }
 
     #[test]
@@ -428,23 +485,35 @@ mod tests {
             def("Labs", &["lab"], None, None),
             def("Recitation", &["recitation"], None, None),
         ];
-        let levels = Levels { home: Some((Level::Course, &course)), space: &[], global: &global };
+        let levels = Levels {
+            home: Some((Level::Course, &course)),
+            space: &[],
+            global: &global,
+        };
         let lab = fill("Labs", "lab3", &levels);
-        assert_eq!((lab.est_min, lab.difficulty, lab.from), (120.0, 3.0, Some(Level::Course)));
+        assert_eq!(
+            (lab.est_min, lab.difficulty, lab.from),
+            (120.0, 3.0, Some(Level::Course))
+        );
         let rec = fill("Recitation", "Recitation 4", &levels);
-        assert_eq!((rec.est_min, rec.from), (45.0, None), "nothing anywhere says how long");
+        assert_eq!(
+            (rec.est_min, rec.from),
+            (45.0, None),
+            "nothing anywhere says how long"
+        );
     }
 
     #[test]
     fn the_ratio_falls_back_from_home_to_space_to_type() {
-        let s = |home: Option<&str>, space: &str, kind: &str, base: f64, actual: f64, at: f64| Sample {
-            home: home.map(String::from),
-            space_id: space.into(),
-            kind: kind.into(),
-            base_min: base,
-            actual_min: actual,
-            done_at: at,
-        };
+        let s =
+            |home: Option<&str>, space: &str, kind: &str, base: f64, actual: f64, at: f64| Sample {
+                home: home.map(String::from),
+                space_id: space.into(),
+                kind: kind.into(),
+                base_min: base,
+                actual_min: actual,
+                done_at: at,
+            };
         let samples = vec![
             s(Some("c:jpn"), "classes", "quiz", 20.0, 40.0, 1.0),
             s(Some("c:jpn"), "classes", "quiz", 20.0, 40.0, 2.0),
@@ -456,7 +525,11 @@ mod tests {
         let space = ratio(&samples, Some("c:ele"), "classes", "quiz");
         assert!((space - (2.0 + 2.0 + 1.0) / 3.0).abs() < 1e-9);
         assert!((ratio(&samples, None, "wwav", "quiz") - 5.0 / 3.0).abs() < 1e-9);
-        assert_eq!(ratio(&samples, None, "personal", "errand"), 1.0, "one sample moves nothing");
+        assert_eq!(
+            ratio(&samples, None, "personal", "errand"),
+            1.0,
+            "one sample moves nothing"
+        );
         assert_eq!(ratio(&samples, None, "personal", "lab"), 1.0);
     }
 
@@ -473,10 +546,24 @@ mod tests {
             })
             .collect();
         // Older than the eight: it no longer counts.
-        samples.push(Sample { home: None, space_id: "s".into(), kind: "lab".into(), base_min: 100.0, actual_min: 400.0, done_at: 1.0 });
+        samples.push(Sample {
+            home: None,
+            space_id: "s".into(),
+            kind: "lab".into(),
+            base_min: 100.0,
+            actual_min: 400.0,
+            done_at: 1.0,
+        });
         assert_eq!(ratio(&samples, None, "s", "lab"), 1.0);
         let wild: Vec<Sample> = (0..2)
-            .map(|i| Sample { home: None, space_id: "s".into(), kind: "quiz".into(), base_min: 10.0, actual_min: 900.0, done_at: i as f64 })
+            .map(|i| Sample {
+                home: None,
+                space_id: "s".into(),
+                kind: "quiz".into(),
+                base_min: 10.0,
+                actual_min: 900.0,
+                done_at: i as f64,
+            })
             .collect();
         assert_eq!(ratio(&wild, None, "s", "quiz"), 3.0);
         assert_eq!(tidy_minutes(20.0 * 1.6), 30.0);
