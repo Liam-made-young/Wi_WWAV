@@ -170,6 +170,7 @@ async function tour(base, c, state) {
     body: { device: 'mac-a', changes: [{ kind: 'task', id: 't', field: 'title', value: 'Quiz', seq: 1 }] },
   });
   await c('GET', '/api/heat/changes?cursor=0', { token: lmy });
+  await c('GET', '/api/heat/public/1');
   await c('GET', '/desktop/latest.json');
 
   // Taking it all back: the world leaves its system, the work is
