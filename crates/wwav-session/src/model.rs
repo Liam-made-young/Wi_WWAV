@@ -59,6 +59,14 @@ macro_rules! str_enum {
 }
 
 str_enum!(
+    /// What a Sequence is (5.12). MI-WWAV-OS had `mix` and `edit`; the
+    /// Console's one kind holds both.
+    SequenceKind {
+        Session = "session",
+    }
+);
+
+str_enum!(
     /// 5.3's track kinds.
     TrackKind {
         Audio = "audio",
@@ -111,6 +119,7 @@ pub struct Session {
     pub wwavsession: String,
     /// A ULID, which also names the package.
     pub id: String,
+    pub kind: SequenceKind,
     pub title: String,
     /// "A minor"; null until known, never guessed.
     pub key: Option<String>,
@@ -135,6 +144,7 @@ impl Default for Session {
         Session {
             wwavsession: VERSION.into(),
             id: String::new(),
+            kind: SequenceKind::Session,
             title: String::new(),
             key: None,
             sample_rate: 48_000,
@@ -229,6 +239,8 @@ pub struct Track {
     pub name: String,
     /// The stem bus it folds into; null for video, titles and generators.
     pub role: Option<Role>,
+    /// The level in dB, written `gain` as 5.12 names it.
+    #[serde(rename = "gain")]
     pub gain_db: f64,
     /// −1 hard left to 1 hard right.
     pub pan: f64,
@@ -281,6 +293,8 @@ pub struct Sends {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Master {
+    /// In dB, written `gain` like a track's.
+    #[serde(rename = "gain")]
     pub gain_db: f64,
     pub devices: Vec<Device>,
     #[serde(flatten)]
@@ -352,7 +366,8 @@ pub struct PluginState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Automation {
-    /// "gain_db", "pan", "send.reverb", or `<device id>.<param>`.
+    /// The engine parameter it drives (`docs/ENGINE.md` 3.4): "gain_db",
+    /// "pan", "send.reverb", or `<device id>.<param>`.
     pub param: String,
     pub points: Vec<AutomationPoint>,
     #[serde(flatten)]
@@ -404,6 +419,8 @@ impl Event {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct EventParams {
+    /// In dB, written `gain` as 5.12 names it.
+    #[serde(rename = "gain")]
     pub gain_db: f64,
     pub pan: f64,
     pub time: TimeMode,

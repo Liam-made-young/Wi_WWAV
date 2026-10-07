@@ -10,7 +10,7 @@ use std::path::Path;
 use common::{sample_session, FakeClock, MIDI_CLIP, T0};
 use wwav_session::model::Device;
 use wwav_session::{
-    copying_sentence, folder_name, older_version_sentence, Autosaver, Link, Package,
+    copying_sentence, folder_name, older_version_sentence, Autosaver, Link, Package, NAME_CHARS,
 };
 
 const MINUTE: u64 = 60_000;
@@ -44,6 +44,51 @@ fn a_package_missing_a_folder_gets_it_back_on_open() {
     fs::remove_dir(dir.join("cache")).unwrap();
     Package::open(&dir, FakeClock::at(T0)).unwrap();
     assert!(dir.join("cache").is_dir());
+}
+
+#[test]
+fn a_package_is_open_in_one_place_and_a_second_open_is_refused_in_words() {
+    // Fails if: two Package values hold one package (two windows sharing a
+    // journal and a session.json), or closing one doesn't let it open again.
+    let tmp = tempfile::tempdir().unwrap();
+    let pkg = Package::create(tmp.path(), sample_session(0), FakeClock::at(T0)).unwrap();
+    let dir = pkg.dir().to_path_buf();
+    let second = Package::open(&dir, FakeClock::at(T0));
+    assert_eq!(
+        second.err().map(|e| e.to_string()).as_deref(),
+        Some("This session is already open in another window.")
+    );
+    drop(pkg);
+    Package::open(&dir, FakeClock::at(T0)).unwrap();
+}
+
+#[test]
+#[cfg(unix)]
+fn closing_and_opening_again_while_processes_start_is_not_refused() {
+    // A process being started holds a copy of every open file until it
+    // runs its program, the lock file too. Fails if a package closed and
+    // opened again at that moment (the app starting its engine) is refused.
+    let tmp = tempfile::tempdir().unwrap();
+    let pkg = Package::create(tmp.path(), sample_session(0), FakeClock::at(T0)).unwrap();
+    let dir = pkg.dir().to_path_buf();
+    drop(pkg);
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let spawners: Vec<_> = (0..4)
+        .map(|_| {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    let _ = std::process::Command::new("true").status();
+                }
+            })
+        })
+        .collect();
+    let opened = (0..300).try_for_each(|_| Package::open(&dir, FakeClock::at(T0)).map(drop));
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    for s in spawners {
+        s.join().unwrap();
+    }
+    opened.unwrap();
 }
 
 #[test]
@@ -429,6 +474,74 @@ fn titles_become_folder_names_as_pranas_disc_writer_does() {
     assert_eq!(folder_name("tab\there\nnewline"), "tab here newline");
     assert_eq!(folder_name("???"), "Untitled");
     assert_eq!(folder_name(""), "Untitled");
+    // Cut to 39 characters as the disc does, then trimmed.
+    assert_eq!(NAME_CHARS, 39);
+    assert_eq!(folder_name(&"a".repeat(50)), "a".repeat(39));
+    assert_eq!(
+        folder_name(&format!("{} tail", "b".repeat(38))),
+        "b".repeat(38)
+    );
+    assert_eq!(folder_name(&"夜".repeat(80)), "夜".repeat(39));
+}
+
+#[test]
+fn send_refuses_a_folder_inside_the_package_before_writing_anything() {
+    // Fails if: Send writes its zip inside the package, where the zip is
+    // one of the files it zips and grows until the disk is full. A folder
+    // named like the .part file is put there first, so a missing refusal
+    // fails at once instead of filling the disk.
+    let tmp = tempfile::tempdir().unwrap();
+    let mut pkg = Package::create(tmp.path(), sample_session(0), FakeClock::at(T0)).unwrap();
+    let renders = pkg.dir().join("renders");
+    fs::create_dir(renders.join("Low Tide.wwavsession.zip.part")).unwrap();
+    for inside in [pkg.dir().to_path_buf(), renders.clone()] {
+        let err = pkg.send(&inside).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "A session can't be sent into its own folder. Choose a folder outside it."
+        );
+    }
+    assert!(!renders.join("Low Tide.wwavsession.zip").exists());
+}
+
+#[test]
+fn a_send_that_fails_leaves_no_part_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut pkg = Package::create(
+        &tmp.path().join("sessions"),
+        sample_session(0),
+        FakeClock::at(T0),
+    )
+    .unwrap();
+    let out = tmp.path().join("out");
+    // The zip's name is taken by a folder that isn't empty: the rename at
+    // the end fails.
+    fs::create_dir_all(out.join("Low Tide.wwavsession.zip/x")).unwrap();
+    assert!(pkg.send(&out).is_err());
+    assert!(!out.join("Low Tide.wwavsession.zip.part").exists());
+}
+
+#[test]
+fn an_import_a_crash_stopped_leaves_nothing_that_is_trusted() {
+    // Fails if: media gets its name before it is whole, or a leftover
+    // temporary file from a stopped import stays in media/ after the next.
+    let tmp = tempfile::tempdir().unwrap();
+    let pkg = Package::create(tmp.path(), sample_session(0), FakeClock::at(T0)).unwrap();
+    let src = tmp.path().join("01JC5Q8V3M2T7R9X4K6W0YHZNB.wav");
+    fs::write(&src, vec![5u8; 50_000]).unwrap();
+    let media = pkg.dir().join("media");
+    fs::write(media.join("01JC5Q8V3M2T7R9X4K6W0YHZNB.wav.tmp"), b"part").unwrap();
+    let got = pkg.import_media(&src).unwrap();
+    assert_ne!(got.link, Link::Present);
+    assert_eq!(
+        fs::read(pkg.dir().join(&got.file)).unwrap(),
+        vec![5u8; 50_000]
+    );
+    let names: Vec<String> = fs::read_dir(&media)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, vec!["01JC5Q8V3M2T7R9X4K6W0YHZNB.wav".to_string()]);
 }
 
 #[test]

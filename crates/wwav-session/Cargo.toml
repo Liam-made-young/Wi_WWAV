@@ -2,7 +2,8 @@
 name = "wwav-session"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+# std's File::try_lock (1.89) holds a package open in one place.
+rust-version = "1.89"
 license.workspace = true
 publish.workspace = true
 description = "The .wwavsession package: session.json, its undo journal, autosave and Send session (docs/SPEC.md 6.5)"

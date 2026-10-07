@@ -10,21 +10,33 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, DateTime, ZipWriter};
 
-use crate::{fsx, Package, Result};
+use crate::{fsx, Error, Package, Result};
 
 impl Package {
     /// Saves, then writes `<dest_dir>/<Title>.wwavsession.zip` holding the
     /// package as a `<Title>.wwavsession/` folder: everything but `cache/`,
-    /// which is rebuilt where it lands. Returns the zip's path.
+    /// which is rebuilt where it lands. Returns the zip's path. A folder
+    /// inside the package is refused: the zip would be one of the files it
+    /// holds, and never end.
     pub fn send(&mut self, dest_dir: &Path) -> Result<PathBuf> {
+        if fs::canonicalize(dest_dir)?.starts_with(fs::canonicalize(self.dir())?) {
+            return Err(Error::SendInside);
+        }
         self.save()?;
         let name = format!("{}.wwavsession", folder_name(&self.session().title));
         let out = dest_dir.join(format!("{name}.zip"));
         let part = dest_dir.join(format!("{name}.zip.part"));
-        let mut zip = ZipWriter::new(File::create(&part)?);
-        add_folder(&mut zip, self.dir(), &name, true)?;
-        zip.finish()?.sync_all()?;
-        fs::rename(&part, &out)?;
+        let written = (|| {
+            let mut zip = ZipWriter::new(File::create(&part)?);
+            add_folder(&mut zip, self.dir(), &name, true)?;
+            zip.finish()?.sync_all()?;
+            fs::rename(&part, &out)?;
+            Ok(())
+        })();
+        if let Err(e) = written {
+            let _ = fs::remove_file(&part);
+            return Err(e);
+        }
         fsx::sync_dir(dest_dir)?;
         Ok(out)
     }
@@ -88,10 +100,18 @@ fn civil_from_days(z: i64) -> (i64, u8, u8) {
     (yoe + era * 400 + i64::from(m <= 2), m, d)
 }
 
+/// The most characters a title keeps as a name, as on PRANA's disc. With
+/// ".wwavsession.zip.part" after it, a name stays well inside the 255
+/// bytes a file name may have, and paths inside the package inside
+/// Windows' 260-character default.
+pub const NAME_CHARS: usize = 39;
+
 /// A title as a file or folder name: `\ / : * ? " < > |` and control
-/// characters become spaces, runs of spaces become one, and the ends are
-/// trimmed, as PRANA's disc writer does (`prana/web/src/sim/wwavdisc.js`).
-/// Unlike the disc, which only shows ASCII, letters in any script are kept.
+/// characters become spaces, runs of spaces become one, the ends are
+/// trimmed, and the name is cut to 39 characters, as PRANA's disc writer
+/// does (`prana/web/src/sim/wwavdisc.js`). Unlike the disc, which only
+/// shows ASCII, letters in any script are kept; an empty title is
+/// "Untitled", the disc's own word for a song without a title.
 pub fn folder_name(title: &str) -> String {
     let spaced: String = title
         .chars()
@@ -104,10 +124,10 @@ pub fn folder_name(title: &str) -> String {
         })
         .collect();
     let name = spaced.split_whitespace().collect::<Vec<_>>().join(" ");
-    if name.is_empty() {
-        "Untitled".into()
-    } else {
-        name
+    let name: String = name.chars().take(NAME_CHARS).collect();
+    match name.trim_end() {
+        "" => "Untitled".into(),
+        cut => cut.to_string(),
     }
 }
 

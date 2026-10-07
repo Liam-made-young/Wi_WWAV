@@ -54,7 +54,12 @@ impl Package {
         };
         let bytes = fs::metadata(src)?.len();
         let dst = self.dir().join(&file);
-        let link = if dst.exists() {
+        // Every way in below gives the media its name only once it is
+        // whole, so a file of the right size under the name is the media.
+        // One of another size is not (left by an older version, or by
+        // hand), and is replaced.
+        let present = fs::metadata(&dst).is_ok_and(|m| m.is_file() && m.len() == bytes);
+        let link = if present {
             Link::Present
         } else {
             let link = link(src, &dst)?;
@@ -79,20 +84,27 @@ impl Package {
     }
 }
 
+/// Makes `dst` the cheapest correct way, under another name first: a clone
+/// or a copy takes time, and a crash must never leave part of a file under
+/// the media's name.
 fn link(src: &Path, dst: &Path) -> io::Result<Link> {
-    if reflink_copy::reflink(src, dst).is_ok() {
-        return Ok(Link::Clone);
-    }
-    if fs::hard_link(src, dst).is_ok() {
-        return Ok(Link::HardLink);
-    }
-    // A copy takes time, so it is made under another name: a crash never
-    // leaves half a file under the media's name.
     let tmp = fsx::tmp_path(dst);
-    fs::copy(src, &tmp)?;
+    // Left by an import a crash stopped.
+    match fs::remove_file(&tmp) {
+        Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
+        _ => {}
+    }
+    let link = if reflink_copy::reflink(src, &tmp).is_ok() {
+        Link::Clone
+    } else if fs::hard_link(src, &tmp).is_ok() {
+        Link::HardLink
+    } else {
+        fs::copy(src, &tmp)?;
+        Link::Copy
+    };
     File::open(&tmp)?.sync_all()?;
     fs::rename(&tmp, dst)?;
-    Ok(Link::Copy)
+    Ok(link)
 }
 
 /// "Copying 1.4 GB of media into the session."

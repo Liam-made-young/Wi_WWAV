@@ -160,6 +160,16 @@ impl Rng {
     }
 }
 
+/// The temporary file a save writes before its rename, if one is there:
+/// `session.json.<ULID>.tmp`.
+fn staged_file(dir: &Path) -> Option<PathBuf> {
+    fs::read_dir(dir).unwrap().find_map(|e| {
+        let path = e.unwrap().path();
+        let name = path.file_name()?.to_str()?;
+        (name.starts_with("session.json.") && name.ends_with(".tmp")).then_some(path)
+    })
+}
+
 /// session.json parses, and its sha256 is a state the journal recorded
 /// (a "start" or "save" line), so it is whole and not some other bytes.
 fn assert_whole(dir: &Path) {
@@ -270,14 +280,11 @@ fn a_kill_in_the_rename_window_leaves_the_old_session_json() {
 
     // The old file, whole; the new one never took its name.
     assert_eq!(fs::read(dir.join("session.json")).unwrap(), old);
-    assert!(dir.join("session.json.tmp").exists());
+    assert!(staged_file(&dir).is_some());
     assert_whole(&dir);
 
     let (pkg, opened) = Package::open(&dir, clock.clone()).unwrap();
-    assert!(
-        !dir.join("session.json.tmp").exists(),
-        "open clears the leftover"
-    );
+    assert!(staged_file(&dir).is_none(), "open clears the leftover");
     let recovered = opened.recovered.expect("the twelve notes come back");
     assert_eq!(recovered.changes, 12);
     assert_eq!(pkg.session().midi[MIDI_CLIP].len(), 10 + 12);
@@ -299,7 +306,6 @@ fn a_kill_mid_write_leaves_session_json_whole() {
     let pkg = Package::create(tmp.path(), session, clock.clone()).unwrap();
     let dir = pkg.dir().to_path_buf();
     drop(pkg);
-    let new_file = dir.join("session.json.tmp");
 
     let mut at = 0u64;
     let mut caught_mid_write = 0;
@@ -309,7 +315,7 @@ fn a_kill_mid_write_leaves_session_json_whole() {
         }
         let whole = fs::metadata(dir.join("session.json")).unwrap().len();
         let writing = || {
-            fs::metadata(&new_file).is_ok_and(|m| m.len() > 0)
+            staged_file(&dir).is_some_and(|f| fs::metadata(f).is_ok_and(|m| m.len() > 0))
                 || fs::metadata(dir.join("session.json")).is_ok_and(|m| m.len() < whole)
         };
         let (kid, lines) = spawn(&dir, "big", at);
@@ -329,7 +335,7 @@ fn a_kill_mid_write_leaves_session_json_whole() {
         }
         assert_whole(&dir);
         // Count the rounds whose new file was cut off part way.
-        if let Ok(bytes) = fs::read(&new_file) {
+        if let Some(Ok(bytes)) = staged_file(&dir).map(fs::read) {
             if serde_json::from_slice::<serde_json::Value>(&bytes).is_err() {
                 caught_mid_write += 1;
             }

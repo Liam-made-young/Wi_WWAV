@@ -4,7 +4,8 @@
 //! (`docs/SPEC.md` 6.5).
 //!
 //! The order is [`KEY_ORDER`] and nowhere else: the writer reorders every
-//! object by it, whatever order its keys were made or read in.
+//! object by it, whatever order its keys were made or read in. Zero has one
+//! form: -0.0 is written 0.0.
 
 use serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer};
 use serde_json::Value;
@@ -26,6 +27,7 @@ pub const KEY_ORDER: &[(&str, &[&str])] = &[
         &[
             "wwavsession",
             "id",
+            "kind",
             "title",
             "key",
             "sample_rate",
@@ -48,7 +50,7 @@ pub const KEY_ORDER: &[(&str, &[&str])] = &[
             "kind",
             "name",
             "role",
-            "gain_db",
+            "gain",
             "pan",
             "mute",
             "solo",
@@ -78,7 +80,7 @@ pub const KEY_ORDER: &[(&str, &[&str])] = &[
     (
         "/tracks/*/events/*/params",
         &[
-            "gain_db",
+            "gain",
             "pan",
             "time",
             "transpose",
@@ -87,7 +89,7 @@ pub const KEY_ORDER: &[(&str, &[&str])] = &[
             "grade",
         ],
     ),
-    ("/master", &["gain_db", "devices"]),
+    ("/master", &["gain", "devices"]),
     ("/master/devices/*", DEVICE),
     ("/master/devices/*/state", STATE),
     (
@@ -183,6 +185,10 @@ impl Serialize for Ordered<'_> {
                 }
                 out.end()
             }
+            // One zero: -0.0 and 0.0 are the same number to `==`, to the
+            // journal and to every reader, so they are written alike (as
+            // JSON.stringify and RFC 8785 write them).
+            Value::Number(n) if n.is_f64() && n.as_f64() == Some(0.0) => s.serialize_f64(0.0),
             leaf => leaf.serialize(s),
         }
     }
@@ -237,7 +243,7 @@ mod tests {
         track.role = Some(Role::Other);
         track.devices.push(device.clone());
         track.automation.push(Automation {
-            param: "gain_db".into(),
+            param: "pan".into(),
             points: vec![AutomationPoint::default()],
             ..Automation::default()
         });
@@ -337,6 +343,19 @@ mod tests {
     }
 
     #[test]
+    fn zero_is_written_one_way() {
+        let doc = json!({"tracks": [{"pan": -0.0, "gain": 0.0}], "x": [-0.0, -1.5, 0]});
+        let text = String::from_utf8(to_bytes(&doc)).unwrap();
+        assert!(!text.contains("-0.0"), "{text}");
+        assert!(text.contains("-1.5"));
+        assert!(text.contains("\"pan\": 0.0"));
+        assert!(
+            text.contains("\n    0\n"),
+            "an integer zero stays an integer"
+        );
+    }
+
+    #[test]
     fn a_new_session_is_written_like_this() {
         let mut s = Session::new("Low Tide");
         s.id = "01JC5Q8V3M2T7R9X4K6W0YHZNB".into();
@@ -354,6 +373,7 @@ mod tests {
             r#"{
   "wwavsession": "0.1",
   "id": "01JC5Q8V3M2T7R9X4K6W0YHZNB",
+  "kind": "session",
   "title": "Low Tide",
   "key": null,
   "sample_rate": 48000,
@@ -376,7 +396,7 @@ mod tests {
       "kind": "audio",
       "name": "",
       "role": "vocals",
-      "gain_db": 0.0,
+      "gain": 0.0,
       "pan": 0.0,
       "mute": false,
       "solo": false,
@@ -393,7 +413,7 @@ mod tests {
           "clip_out_ms": 0,
           "at_ms": 1500,
           "params": {
-            "gain_db": 0.0,
+            "gain": 0.0,
             "pan": 0.0,
             "time": "as_played",
             "transpose": 0.0,
@@ -405,7 +425,7 @@ mod tests {
     }
   ],
   "master": {
-    "gain_db": 0.0,
+    "gain": 0.0,
     "devices": []
   },
   "midi": {},

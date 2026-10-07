@@ -30,7 +30,6 @@ fn mirror_pans(pkg: &mut Package) {
 }
 
 #[test]
-#[ignore = "finding: diff compares with Value ==, where -0.0 == 0.0 (F6.1)"]
 fn negative_zero_edit_save_undo_save_gives_the_first_bytes() {
     // F6.1 as the builder tests it (edit, save, undo, save gives the first
     // bytes), with an edit that also turns a 0.0 into -0.0. The diff
@@ -59,7 +58,6 @@ fn negative_zero_edit_save_undo_save_gives_the_first_bytes() {
 }
 
 #[test]
-#[ignore = "finding: diff compares with Value ==, where -0.0 == 0.0 (F6.3)"]
 fn negative_zero_edit_reopens_as_it_was_before_the_kill() {
     // F6.3's own check (the reopened session equals, byte for byte, the
     // session the process held) fails for the same reason: the journal
@@ -84,7 +82,6 @@ fn negative_zero_edit_reopens_as_it_was_before_the_kill() {
 }
 
 #[test]
-#[ignore = "finding: a save the file already holds writes no save line, so open \"recovers\" undone edits"]
 fn a_clean_save_and_quit_reports_nothing_recovered() {
     // 6.5: "On open, newer journal entries are replayed: 'Recovered 14
     // changes from 21:12.'" After a save and a clean quit there are none,
@@ -120,7 +117,6 @@ fn a_clean_save_and_quit_reports_nothing_recovered() {
 }
 
 #[test]
-#[ignore = "finding: a failed append poisons the journal and open drops every unsaved change (F6.3)"]
 fn a_journal_line_cut_off_mid_session_does_not_cost_the_unsaved_changes() {
     // Stand-in for an append that failed part way (ENOSPC or EFBIG after a
     // short write: write_all returns Err with part of the line on disk).
@@ -162,7 +158,6 @@ fn a_journal_line_cut_off_mid_session_does_not_cost_the_unsaved_changes() {
 }
 
 #[test]
-#[ignore = "finding: a failed append poisons the journal, so save, quit and reopen loses the undo label (F6.2)"]
 fn after_a_failed_append_save_quit_and_reopen_keeps_the_undo_label() {
     // F6.2 after the same failed append: everything is saved, the app quits
     // cleanly, and reopening still changes the Edit menu, because open
@@ -245,7 +240,6 @@ fn review_child() {
 }
 
 #[test]
-#[ignore = "finding: a failed append poisons the journal and open drops every unsaved change (F6.3)"]
 #[cfg(target_os = "linux")]
 fn a_failed_append_then_more_edits_loses_every_unsaved_change() {
     // A real failed append: the child's file size limit (RLIMIT_FSIZE, set
@@ -333,7 +327,6 @@ fn a_failed_append_then_more_edits_loses_every_unsaved_change() {
 }
 
 #[test]
-#[ignore = "finding: folder_name never shortens a title, so Send fails with ENAMETOOLONG"]
 fn a_long_title_can_still_be_sent() {
     // PRANA's disc writer (whose sanitising 6.5 points to) cuts the name to
     // 39 characters; folder_name doesn't cut at all, so a long title makes
@@ -350,7 +343,7 @@ fn a_long_title_can_still_be_sent() {
 }
 
 #[test]
-#[ignore = "finding: integers past u64 in unknown keys are rewritten as f64"]
+#[ignore = "not fixed: session.json's numbers are I-JSON (docs/DECISIONS.md, 2026-10-07)"]
 fn an_unknown_key_keeps_a_large_integer() {
     // Unknown keys must survive a load/save round trip. serde_json without
     // arbitrary_precision reads an integer past u64 as an f64, so the first
@@ -380,7 +373,6 @@ fn an_unknown_key_keeps_a_large_integer() {
 }
 
 #[test]
-#[ignore = "finding: import_media trusts any file at the media name as Present"]
 fn a_leftover_empty_file_under_the_media_name_is_not_present_media() {
     // On Linux, reflink-copy creates the destination under its final name
     // (create_new), then tries FICLONE, then removes it on failure; on a
@@ -407,7 +399,6 @@ fn a_leftover_empty_file_under_the_media_name_is_not_present_media() {
 }
 
 #[test]
-#[ignore = "finding: one journal line with an unknown op resets the whole history"]
 fn a_journal_from_a_newer_app_keeps_its_unsaved_changes() {
     // The model keeps a newer app's unknown keys and words, but the
     // journal's `op` is a closed enum: one line with an op this version
@@ -435,7 +426,6 @@ fn a_journal_from_a_newer_app_keeps_its_unsaved_changes() {
 }
 
 #[test]
-#[ignore = "finding: the model names 5.12's gain gain_db"]
 fn the_spec_shaped_track_gain_is_read() {
     // 5.12 and the brief name a track's and an event's level `gain`; the
     // model reads and writes `gain_db`, so a session.json written to the
@@ -449,13 +439,16 @@ fn the_spec_shaped_track_gain_is_read() {
 }
 
 #[test]
-#[ignore = "finding: Send into the package's own folder zips its own .part until the disk is full; needs WWAV_SMALL_FS"]
 fn sending_into_the_package_itself_finishes() {
     // On Windows a session is a plain folder, so the Send dialog can point
     // at it. The zip's .part file is then one of the files being zipped:
     // reading it while the writer appends to it never reaches the end, and
     // the zip grows until the disk is full. Only run on a small filesystem
     // (WWAV_SMALL_FS, e.g. a 2 MB tmpfs), where it ends in ENOSPC.
+    //
+    // Fixed by refusing a folder inside the package before writing
+    // anything; package.rs has a check of the refusal that can't fill a
+    // disk if it regresses.
     let Ok(small) = env::var("WWAV_SMALL_FS") else {
         eprintln!("WWAV_SMALL_FS not set; skipped");
         return;
@@ -469,16 +462,14 @@ fn sending_into_the_package_itself_finishes() {
         .filter_map(|e| e.ok())
         .find(|e| e.file_name().to_string_lossy().ends_with(".zip.part"))
         .map(|e| e.metadata().unwrap().len());
-    assert!(
-        sent.is_ok(),
-        "Send session into its own folder: {} (zip.part left at {:?} bytes)",
-        sent.unwrap_err(),
-        part
+    assert_eq!(part, None, "a .part was left behind");
+    assert_eq!(
+        sent.unwrap_err().to_string(),
+        "A session can't be sent into its own folder. Choose a folder outside it."
     );
 }
 
 #[test]
-#[ignore = "finding: no lock, so two open packages corrupt one journal"]
 fn a_session_opened_twice_keeps_both_windows_changes() {
     // Nothing stops a package being opened by two Package values (two
     // windows, or the app and a helper). Both append to one journal; when
@@ -508,7 +499,10 @@ fn a_session_opened_twice_keeps_both_windows_changes() {
 }
 
 #[test]
-#[ignore = "a measurement, run in release: cargo test --release --test review edit_latency -- --ignored --nocapture"]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "timed, so run in release: cargo test --release -p wwav-session --test review edit_latency"
+)]
 fn edit_latency_on_a_large_session() {
     let tmp = tempfile::tempdir().unwrap();
     let mut s = sample_session(50_000);
@@ -538,10 +532,14 @@ fn edit_latency_on_a_large_session() {
         per_edit,
         undo
     );
+    // Writing the whole session as JSON took 237-305 ms an edit and an undo
+    // 159-649 ms here; part by part it is a few ms, with the fsync.
+    let budget = std::time::Duration::from_millis(50);
+    assert!(per_edit < budget, "one-number edit took {per_edit:?}");
+    assert!(undo < budget, "undo took {undo:?}");
 }
 
 #[test]
-#[ignore = "finding: a session.json restored to an older save is replayed over"]
 fn an_older_session_json_restored_from_git_opens_as_restored() {
     // 6.5 keeps sessions in git ("diffs line by line"), and the package's
     // own rule is that a session.json changed outside the app opens as it
@@ -569,5 +567,160 @@ fn an_older_session_json_restored_from_git_opens_as_restored() {
         "Version one",
         "the restored file was replayed over: {:?}",
         opened.recovered.map(|r| r.sentence(0))
+    );
+}
+
+#[test]
+fn undo_after_two_windows_saved_never_panics() {
+    // Two Package values on one package (a second window, or a helper), each
+    // makes one change and saves. Reopening anchors on the last save line,
+    // which names window B's file, and rebuilds an undo stack holding A's
+    // change too. A's rows don't fit B's file, and Package::step `expect`s
+    // that they do: the second ⌘Z panics, which takes the app down.
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = FakeClock::at(T0);
+    let pkg = Package::create(tmp.path(), sample_session(0), clock.clone()).unwrap();
+    let dir = pkg.dir().to_path_buf();
+    drop(pkg);
+    let (mut a, _) = Package::open(&dir, clock.clone()).unwrap();
+    let Ok((mut b, _)) = Package::open(&dir, clock.clone()) else {
+        return; // refused: the finding is fixed
+    };
+    a.edit("rename", |s| s.title = "From A".into()).unwrap();
+    a.save().unwrap();
+    b.edit("move clip", |s| s.tracks[0].events[0].at_ms = 2)
+        .unwrap();
+    b.save().unwrap();
+    drop(a);
+    drop(b);
+
+    let (mut pkg, opened) = Package::open(&dir, clock.clone()).unwrap();
+    if opened.history_reset {
+        return; // refused the mixed history instead: fine
+    }
+    let undone = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let first = pkg.undo();
+        let second = pkg.undo();
+        (first.is_ok(), second.is_ok())
+    }));
+    assert!(undone.is_ok(), "⌘Z panicked after reopening");
+}
+
+const SECOND_DIR: &str = "WWAV_REVIEW_SECOND_DIR";
+
+#[test]
+#[ignore = "the second window a_second_window_killed_mid_save_leaves_session_json_whole runs"]
+fn review_second_window() {
+    let Ok(dir) = env::var(SECOND_DIR) else {
+        return;
+    };
+    let (mut pkg, _) = Package::open(&PathBuf::from(dir), Arc::new(SystemClock)).unwrap();
+    say("open");
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line).unwrap();
+    for i in 0.. {
+        pkg.edit("move clip", |s| s.tracks[1].events[0].at_ms = 5000 + i)
+            .unwrap();
+        let _ = pkg.save();
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn a_second_window_killed_mid_save_leaves_session_json_whole() {
+    // F6.4 with two Package values on one package: window A has staged a
+    // save (session.json.tmp written and synced, the journal's save line
+    // written). Window B, another process, saves: File::create truncates
+    // the same session.json.tmp and starts writing, and is killed part way.
+    // A's rename then puts B's half-written file under session.json, and
+    // the session no longer opens.
+    //
+    // Fixed by the package lock: while B holds the package, A's open is
+    // refused in words, so there is one writer; B is then killed part way
+    // through a save, and session.json opens whole.
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = FakeClock::at(T0);
+    let pkg = Package::create(tmp.path(), sample_session(60_000), clock.clone()).unwrap();
+    let dir = pkg.dir().to_path_buf();
+    drop(pkg);
+
+    let mut child = Kid(Command::new(env::current_exe().unwrap())
+        .args([
+            "review_second_window",
+            "--exact",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(SECOND_DIR, &dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap());
+    let mut to_child = child.0.stdin.take().unwrap();
+    let mut from_child = BufReader::new(child.0.stdout.take().unwrap());
+    loop {
+        let mut line = String::new();
+        assert!(
+            from_child.read_line(&mut line).unwrap() > 0,
+            "the child stopped"
+        );
+        if line.contains("open") {
+            break;
+        }
+    }
+
+    // A, the second window.
+    match Package::open(&dir, clock.clone()) {
+        Ok(_) => panic!("a second window opened a package another process holds"),
+        Err(e) => assert_eq!(
+            e.to_string(),
+            "This session is already open in another window."
+        ),
+    }
+
+    writeln!(to_child).unwrap(); // B: edit and save, over and over
+    let started = std::time::Instant::now();
+    let writing = || {
+        fs::read_dir(&dir).unwrap().any(|e| {
+            let e = e.unwrap();
+            let name = e.file_name().to_string_lossy().into_owned();
+            name.starts_with("session.json.")
+                && name.ends_with(".tmp")
+                && e.metadata().is_ok_and(|m| m.len() > 0)
+        })
+    };
+    while !writing() {
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(120),
+            "B never started a save"
+        );
+    }
+    drop(child); // SIGKILL mid-write
+
+    let bytes = fs::read(dir.join("session.json")).unwrap();
+    let opened = Package::open(&dir, clock.clone());
+    assert!(
+        opened.is_ok(),
+        "session.json is half-written ({} bytes): {}",
+        bytes.len(),
+        opened.err().unwrap()
+    );
+}
+
+#[test]
+fn sessions_the_crate_calls_equal_save_to_the_same_bytes() {
+    // F6.1 directly: two sessions the model calls the same (Session's ==,
+    // like the journal's Value ==, has -0.0 == 0.0) are written as
+    // different bytes, "pan": -0.0 against "pan": 0.0. Either the writer
+    // should write one zero or the journal should tell them apart; as it
+    // is, the journal records no change where the file changes.
+    let a = sample_session(0);
+    let mut b = a.clone();
+    b.tracks[0].pan = -0.0;
+    assert_eq!(a, b, "the model calls them the same session");
+    assert!(
+        a.to_json_bytes() == b.to_json_bytes(),
+        "the same session saved twice gave different bytes"
     );
 }
