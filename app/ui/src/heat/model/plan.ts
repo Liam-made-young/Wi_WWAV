@@ -110,7 +110,11 @@ function newBlock(target: BlockTarget, date: DayKey, start: number, minutes: num
   return { id: newId(), ...target, date, start, minutes, origin: 'you' };
 }
 
-/** P: the selected task or habit into the next free gap after now. */
+// Where a search for a gap starts: now, but never before the column's 7 AM,
+// so a block made after midnight still lands where the column can show it.
+const searchFrom = (now: number, tz: string) => Math.max(COLUMN_START, minuteOfDay(now, tz));
+
+/** P: the selected task or habit into the next free gap after now (from 7 AM). */
 export function planNext(
   target: BlockTarget,
   data: PlanData,
@@ -121,7 +125,7 @@ export function planNext(
   const length = targetLength(target, data, estimateContext(data.tasks, data.sessions));
   if (length === null) return null;
   const today = dayKey(now, tz);
-  const start = firstGap(busySpans(data, today, tz), minuteOfDay(now, tz), COLUMN_END, length);
+  const start = firstGap(busySpans(data, today, tz), searchFrom(now, tz), COLUMN_END, length);
   return start === null ? null : newBlock(target, today, start, length, newId);
 }
 
@@ -161,7 +165,7 @@ export function planReason(task: Task, now: number, tz: string): string {
   return level === 'Overdue' ? copy.draft.overdue(phrase) : copy.draft.reason(phrase, level);
 }
 
-/** Plan my day: dashed drafts, nothing saved until they are accepted. */
+/** Plan my day: dashed drafts, nothing saved until they are accepted. Before 7 AM it plans from 7. */
 export function planMyDay(
   data: PlanData,
   now: number,
@@ -177,12 +181,12 @@ export function planMyDay(
     (t) => inSpace(options.spaceId)(t) && !plannedToday.has(t.id) && !parents.has(t.id),
   );
   const spans = busySpans(data, today, tz);
-  const nowMin = minuteOfDay(now, tz);
+  const from = searchFrom(now, tz);
   const drafts: Draft[] = [];
   for (const t of byHeat(candidates, now)) {
     const full = blockLength(estimateMin(t, ctx));
     const minutes = Math.min(PLAN_CAP_MIN, full);
-    const start = firstGap(spans, nowMin, options.dayEndsAt ?? DAY_ENDS_AT, minutes);
+    const start = firstGap(spans, from, options.dayEndsAt ?? DAY_ENDS_AT, minutes);
     if (start === null) continue;
     spans.push([start, start + minutes]);
     const leftMin = full - minutes;

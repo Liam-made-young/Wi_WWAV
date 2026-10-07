@@ -66,7 +66,7 @@ describe('the grade maths (3.1), unchanged', () => {
   it('current % weighs graded categories only, and decided % is their share of all weight', () => {
     const c = course([cat('hw', 25), cat('quiz', 20), cat('mid', 20), cat('final', 35)]);
     const grades = [grade('hw', 92), grade('quiz', 88), grade('mid', 74.8)];
-    expect(currentPct(c, grades)).toBeCloseTo((25 * 92 + 20 * 88 + 20 * 74.8) / 65, 10);
+    expect(currentPct(c, grades)).toBeCloseTo((25 * 92 + 20 * 88 + 20 * 74.8) / 65, 8); // rounded to 1e-9 before any letter is read
     expect(decidedPct(c, grades)).toBeCloseTo(65, 10);
     expect(currentPct(c, [])).toBeNull();
     expect(decidedPct(c, [])).toBe(0);

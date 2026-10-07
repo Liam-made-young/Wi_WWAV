@@ -15,7 +15,7 @@ import {
   setTook,
 } from './focus';
 import type { FocusSession } from './records';
-import { ny, session, task } from './testkit';
+import { NY, ids, ny, session, task } from './testkit';
 
 const MIN = 60_000;
 const t0 = ny('2026-10-06 09:00');
@@ -348,16 +348,18 @@ describe('checking a task off (3.5)', () => {
   it('completes at once when it has logged time, with "Done. Took 1h 15m across 3 focus sessions."', () => {
     const t = task();
     const sessions = [25, 25, 25].map((focusMin) => session({ taskId: t.id, focusMin }));
-    expect(checkOff(t, sessions, now)).toEqual({
+    expect(checkOff(t, { sessions, occurrences: [] }, now, NY, ids())).toEqual({
       kind: 'done',
       task: { ...t, done: true, doneAt: now },
       message: 'Done. Took 1h 15m across 3 focus sessions.',
     });
-    expect(checkOff(t, sessions.slice(0, 1), now)).toMatchObject({ message: 'Done. Took 25m across 1 focus session.' });
+    expect(checkOff(t, { sessions: sessions.slice(0, 1), occurrences: [] }, now, NY, ids())).toMatchObject({
+      message: 'Done. Took 25m across 1 focus session.',
+    });
   });
 
   it('asks "Time it took" only when nothing is logged', () => {
-    expect(checkOff(task(), [], now)).toEqual({
+    expect(checkOff(task(), { sessions: [], occurrences: [] }, now, NY, ids())).toEqual({
       kind: 'ask',
       title: 'Time it took',
       hint: 'This trains your time averages for this type of task.',
@@ -372,5 +374,48 @@ describe('checking a task off (3.5)', () => {
     const took = setTook(t, sessions, 75);
     expect(took.adjustMin).toBe(25);
     expect(actualMin(took, sessions)).toBe(75);
+  });
+});
+
+describe('a round’s minutes, however it is split', () => {
+  // A seeded walk through random presses, target changes, pulls away, stops
+  // and ticks. Whenever a focus round ends, the minutes it logged add up to
+  // its focus time rounded to the minute, whatever parts it was split into.
+  it('add up to the round’s focus time rounded, across 2,000 random rounds', () => {
+    let seed = 7;
+    const random = () => (seed = (seed * 1_103_515_245 + 12_345) % 2 ** 31) / 2 ** 31;
+    const targets: FocusTarget[] = ['a', 'b', 'c'].map((id) => ({ kind: 'task', id, title: id }));
+    const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)];
+    let s: FocusState = initialFocus();
+    let now = t0;
+    let focusMs = 0;
+    let logged = 0;
+    let rounds = 0;
+    const misses: string[] = [];
+    while (rounds < 2_000) {
+      const at = now + Math.floor(random() * 9 * MIN);
+      if (s.phase === 'focus' && s.running && s.endsAt !== null) focusMs += Math.min(at, s.endsAt) - now;
+      const event: FocusEvent = pick<FocusEvent>([
+        press(pick(targets)),
+        press(),
+        { type: 'setTarget', target: pick(targets) },
+        { type: 'pulledAway' },
+        { type: 'stop' },
+        tick,
+        tick,
+      ]);
+      const wasFocus = s.phase === 'focus';
+      const r = focusStep(s, event, at);
+      for (const e of r.effects) if (e.kind === 'log') logged += e.session.focusMin;
+      if (wasFocus && r.state.phase !== 'focus') {
+        if (logged !== Math.round(focusMs / MIN)) misses.push(`${logged} logged for ${focusMs} ms`);
+        rounds += 1;
+        focusMs = 0;
+        logged = 0;
+      }
+      s = r.state;
+      now = at;
+    }
+    expect(misses).toEqual([]);
   });
 });

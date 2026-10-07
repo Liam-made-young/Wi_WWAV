@@ -44,6 +44,9 @@ export const LEVEL_COLOUR: Record<Exclude<HeatLevel, 'Done'>, string> = {
 /** The badge: a glossy tube filled to v. */
 export const TUBE = { width: 46, height: 11 };
 
+/** A due date heat can read. One that isn't a finite number (a corrupt row) counts as none, so it can't upset the sort. */
+const dated = (due: number | null): due is number => due !== null && Number.isFinite(due);
+
 /** Days of runway: difficulty 1..5 gives 3, 5, 7, 9, 11. */
 export function runway(difficulty: number): number {
   const d = Math.min(5, Math.max(1, Math.round(difficulty)));
@@ -52,7 +55,7 @@ export function runway(difficulty: number): number {
 
 export function heatOf(t: HeatInput, now: number): Heat {
   if (t.done) return { level: 'Done', v: null };
-  if (t.due === null) return { level: 'Cool', v: FLOOR };
+  if (!dated(t.due)) return { level: 'Cool', v: FLOOR };
   const days = (t.due - now) / DAY_MS;
   if (days < 0) return { level: 'Overdue', v: OVERDUE };
   const v = Math.min(1, Math.max(0, 1 - days / runway(t.difficulty)));
@@ -79,7 +82,7 @@ export function byHeat<T extends HeatInput>(items: readonly T[], now: number): T
   keyed.sort((a, b) => {
     if (a.v === null || b.v === null) return (a.v === null ? 1 : 0) - (b.v === null ? 1 : 0);
     if (a.v !== b.v) return b.v - a.v;
-    if (a.t.due === null || b.t.due === null) return (a.t.due === null ? 1 : 0) - (b.t.due === null ? 1 : 0);
+    if (!dated(a.t.due) || !dated(b.t.due)) return (dated(a.t.due) ? 0 : 1) - (dated(b.t.due) ? 0 : 1);
     return a.t.due - b.t.due;
   });
   return keyed.map((k) => k.t);
@@ -113,7 +116,7 @@ export function duePhrase(due: number, now: number, tz: string): string {
 export function nextHeatChange(items: readonly HeatInput[], now: number): number | null {
   let soonest: number | null = null;
   for (const t of items) {
-    if (t.done || t.due === null || t.due < now) continue;
+    if (t.done || !dated(t.due) || t.due < now) continue;
     const level = heatOf(t, now).level;
     let lo = now;
     let hi = t.due + 1;

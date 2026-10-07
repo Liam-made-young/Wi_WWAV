@@ -59,9 +59,19 @@ export function estimateContext(tasks: readonly Task[], sessions: readonly Focus
   return { averages, children };
 }
 
+/**
+ * A task's estimate. Parent links that loop (a task its own parent, or
+ * A → B → A) are walked once: a task already on the way down counts as no
+ * child of the one below it.
+ */
 export function estimateMin(task: Task, ctx: EstimateContext): number {
-  const open = (ctx.children.get(task.id) ?? []).filter((c) => !c.done);
-  if (open.length > 0) return open.reduce((sum, c) => sum + estimateMin(c, ctx), 0);
+  return estimateBelow(task, ctx, new Set());
+}
+
+function estimateBelow(task: Task, ctx: EstimateContext, above: ReadonlySet<Id>): number {
+  const path = new Set(above).add(task.id);
+  const open = (ctx.children.get(task.id) ?? []).filter((c) => !c.done && !path.has(c.id));
+  if (open.length > 0) return open.reduce((sum, c) => sum + estimateBelow(c, ctx, path), 0);
   if (task.estMin !== null && task.estMin > 0) return task.estMin;
   const average = ctx.averages.get(typeKey(task.spaceId, task.type));
   if (average) return average.minutes;
@@ -90,8 +100,13 @@ export function weeklyLoad(tasks: readonly Task[], ctx: EstimateContext, now: nu
   const inWeek = tasks.filter((t) => !t.done && t.due !== null && t.due - now <= 7 * DAY_MS);
   const counted = new Set(inWeek.map((t) => t.id));
   const byId = new Map(tasks.map((t) => [t.id, t]));
+  // Stops where parent links loop back, so a malformed chain can't hang the re-render.
   const hasCountedAncestor = (t: Task): boolean => {
-    for (let p = t.parentTaskId; p; p = byId.get(p)?.parentTaskId) if (counted.has(p)) return true;
+    const seen = new Set([t.id]);
+    for (let p = t.parentTaskId; p && !seen.has(p); p = byId.get(p)?.parentTaskId) {
+      if (counted.has(p)) return true;
+      seen.add(p);
+    }
     return false;
   };
   const top = inWeek.filter((t) => !hasCountedAncestor(t));

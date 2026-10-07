@@ -7,6 +7,11 @@
 //
 // "What it would take" is plain arithmetic on the same numbers: the final
 // grade is current % × decided share + x × the remaining share.
+//
+// The formulas are exact, and floating point is not: 0.2 × 68 + 0.8 × 58 comes
+// out as 59.99999999999999, not 60. So every percentage that is compared with
+// a letter's threshold is first rounded to 1e-9, far finer than any score
+// can tell apart and far coarser than the arithmetic's error.
 
 import * as copy from './copy';
 import type { Course, Grade, GradeCategory, Id, LetterStep, Term } from './records';
@@ -47,21 +52,31 @@ function graded(course: Course, grades: readonly Grade[]): { category: GradeCate
 
 const totalWeight = (course: Course) => course.categories.reduce((sum, c) => sum + c.weight, 0);
 
-export function currentPct(course: Course, grades: readonly Grade[]): number | null {
+const tidy = (x: number) => Math.round(x * 1e9) / 1e9;
+
+// The graded weight, and the points it holds: Σ weight × category %.
+function banked(course: Course, grades: readonly Grade[]): { weight: number; points: number } {
   const g = graded(course, grades);
-  const weight = g.reduce((sum, x) => sum + x.category.weight, 0);
-  if (weight <= 0) return null;
-  return g.reduce((sum, x) => sum + x.category.weight * x.pct, 0) / weight;
+  return {
+    weight: g.reduce((sum, x) => sum + x.category.weight, 0),
+    points: g.reduce((sum, x) => sum + x.category.weight * x.pct, 0),
+  };
+}
+
+export function currentPct(course: Course, grades: readonly Grade[]): number | null {
+  const { weight, points } = banked(course, grades);
+  return weight <= 0 ? null : tidy(points / weight);
 }
 
 export function decidedPct(course: Course, grades: readonly Grade[]): number {
   const total = totalWeight(course);
   if (total <= 0) return 0;
-  return (graded(course, grades).reduce((sum, x) => sum + x.category.weight, 0) / total) * 100;
+  return tidy((banked(course, grades).weight / total) * 100);
 }
 
+/** The letter for a percentage; F below the lowest step of a scale that has no 0 floor. */
 export function letterFor(pct: number, scale: readonly LetterStep[] = DEFAULT_SCALE): string {
-  return (scale.find((s) => pct >= s.min) ?? scale[scale.length - 1]).letter;
+  return scale.find((s) => pct >= s.min)?.letter ?? 'F';
 }
 
 /** Letter pills are green for A, blue for B, amber for C and red for D or F. */
@@ -110,21 +125,26 @@ export function whatItWouldTake(course: Course, grades: readonly Grade[], letter
   const scale = scaleOf(course);
   const target = scale.find((s) => s.letter === letter);
   if (!target) return null;
-  const decided = decidedPct(course, grades) / 100;
-  const banked = (currentPct(course, grades) ?? 0) * decided;
-  const remaining = 1 - decided;
+  const total = totalWeight(course);
+  const { weight, points } = banked(course, grades);
+  // Shares of the final grade: what is banked (current % × decided share) and what is left.
+  const bankedShare = total > 0 ? points / total : 0;
+  const remaining = total > 0 ? 1 - weight / total : 1;
   if (remaining <= 1e-9) {
     const now = currentPct(course, grades) ?? 0;
     return copy.grades.allGraded(pct(now), letterFor(now, scale));
   }
-  const need = (target.min - banked) / remaining;
+  // Both from the same two numbers, so the sentence can't contradict itself.
+  const best = tidy(bankedShare + 100 * remaining);
+  const need = tidy((target.min - bankedShare) / remaining);
   const left = pct(remaining * 100);
-  if (need <= 0) return copy.grades.safe(letter, left);
-  if (need > 100) {
-    const best = banked + 100 * remaining;
-    return copy.grades.outOfReach(letter, pctDown(best), letterFor(best, scale));
+  if (best < target.min) {
+    // The letter comes from the number printed, so the sentence reads true.
+    const shown = pctDown(best);
+    return copy.grades.outOfReach(letter, shown, letterFor(Number(shown), scale));
   }
-  return copy.grades.need(letter, pct(target.min), pctUp(need), left);
+  if (need <= 0) return copy.grades.safe(letter, left);
+  return copy.grades.need(letter, pct(target.min), pctUp(Math.min(100, need)), left);
 }
 
 /**

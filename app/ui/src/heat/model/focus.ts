@@ -11,7 +11,8 @@
 import { countdown } from '../../shared/time/format';
 import * as copy from './copy';
 import { actualMin, formatMinutes } from './estimate';
-import type { FocusSession, Id, Room, Task } from './records';
+import type { FocusSession, Id, Room, Task, TaskOccurrence } from './records';
+import { checkOccurrence, recurs } from './recurrence';
 
 const MIN = 60_000;
 const ROUNDS = 4;
@@ -40,6 +41,12 @@ export interface FocusState {
   target: FocusTarget | null;
   /** The session in progress: the part of the round spent on one target. */
   session: { startedAt: number; fromLeftMs: number; interruptions: number; habitTicked: boolean } | null;
+  /**
+   * The round's parts closed so far: their focus time and the minutes logged
+   * for it. Each part logs the round's rounded total so far less what is
+   * already logged, so a split round's parts add up to the round.
+   */
+  closed: { ms: number; minutes: number };
   room: Room;
   /** What just ended ("Focus done. 25m logged to …"), until the next press. */
   note: string | null;
@@ -55,6 +62,7 @@ export type FocusEvent =
 
 export type FocusEffect =
   | { kind: 'log'; session: Omit<FocusSession, 'id'> }
+  /** Apply with habits.ts's markHabitDone, never a toggle: the habit may already be done today. */
   | { kind: 'tickHabit'; habitId: Id }
   | { kind: 'chime' };
 
@@ -71,9 +79,24 @@ export function initialFocus(): FocusState {
   return idle({ round: 1, focusMin: 25, target: null, room: 'heat', note: null });
 }
 
+const NOTHING_CLOSED = { ms: 0, minutes: 0 };
+
 function idle(s: Pick<FocusState, 'round' | 'focusMin' | 'target' | 'room' | 'note'>): FocusState {
   const lengthMs = s.focusMin * MIN;
-  return { ...s, phase: 'idle', running: false, lengthMs, endsAt: null, leftMs: lengthMs, session: null };
+  return {
+    round: s.round,
+    focusMin: s.focusMin,
+    target: s.target,
+    room: s.room,
+    note: s.note,
+    phase: 'idle',
+    running: false,
+    lengthMs,
+    endsAt: null,
+    leftMs: lengthMs,
+    session: null,
+    closed: NOTHING_CLOSED,
+  };
 }
 
 function leftAt(s: FocusState, now: number): number {
@@ -97,12 +120,18 @@ function habitTick(s: FocusState, leftNow: number): { state: FocusState; effects
   };
 }
 
-// Closes the session in progress; it is logged if it rounds to a minute or more.
-function closeSession(s: FocusState, endedAt: number, leftNow: number): { minutes: number; effects: FocusEffect[] } {
+// Closes the session in progress; it is logged if it comes to a minute or more.
+function closeSession(
+  s: FocusState,
+  endedAt: number,
+  leftNow: number,
+): { minutes: number; effects: FocusEffect[]; closed: FocusState['closed'] } {
   const ticked = habitTick(s, leftNow);
-  if (!s.session || !s.target) return { minutes: 0, effects: ticked.effects };
-  const minutes = Math.round((s.session.fromLeftMs - leftNow) / MIN);
-  if (minutes < 1) return { minutes, effects: ticked.effects };
+  if (!s.session || !s.target) return { minutes: 0, effects: ticked.effects, closed: s.closed };
+  const ms = s.closed.ms + (s.session.fromLeftMs - leftNow);
+  const minutes = Math.round(ms / MIN) - s.closed.minutes;
+  const closed = { ms, minutes: s.closed.minutes + minutes };
+  if (minutes < 1) return { minutes, effects: ticked.effects, closed };
   const owner = s.target.kind === 'task' ? { taskId: s.target.id } : { habitId: s.target.id };
   const session = {
     ...owner,
@@ -112,7 +141,7 @@ function closeSession(s: FocusState, endedAt: number, leftNow: number): { minute
     interruptions: s.session.interruptions,
     room: s.room,
   };
-  return { minutes, effects: [...ticked.effects, { kind: 'log', session }] };
+  return { minutes, effects: [...ticked.effects, { kind: 'log', session }], closed };
 }
 
 // A running focus or break whose time is up ends, whatever event arrives.
@@ -134,6 +163,7 @@ function settle(s: FocusState, now: number, settings: FocusSettings): { state: F
       endsAt: null,
       leftMs: lengthMs,
       session: null,
+      closed: NOTHING_CLOSED,
       note: minutes >= 1 ? copy.focus.done(formatMinutes(minutes), s.target?.title ?? '') : copy.focus.doneUnlogged,
     },
     effects: settings.chime ? [...effects, { kind: 'chime' }] : effects,
@@ -198,12 +228,13 @@ export function focusStep(
       // one and opens the next, and the round runs on.
       if (!event.target || event.target.id === s.target?.id) return done(s);
       const leftNow = leftAt(s, now);
-      const { effects } = closeSession(s, now, leftNow);
+      const { effects, closed } = closeSession(s, now, leftNow);
       return done(
         {
           ...s,
           target: event.target,
           session: { startedAt: now, fromLeftMs: leftNow, interruptions: 0, habitTicked: false },
+          closed,
         },
         effects,
       );
@@ -252,20 +283,50 @@ export function focusStrip(s: FocusState, now: number): string | null {
   return null;
 }
 
-export type CheckOff = { kind: 'done'; task: Task; message: string } | { kind: 'ask'; title: string; hint: string };
+export type CheckOff =
+  | { kind: 'done'; task: Task; message: string }
+  | { kind: 'ask'; title: string; hint: string }
+  /** A recurring task: its next open occurrence is ticked as a row of its own, and the series stays open. */
+  | { kind: 'occurrence'; occurrence: TaskOccurrence; message: string | null }
+  /** A recurring task whose series has ended: nothing is left to check. */
+  | { kind: 'none' };
 
 /**
  * Checking a task off. With logged time it is done at once and the status
  * bar says what it took; only a task with no logged time still asks.
+ *
+ * A recurring task never flips to done (3.6): checking it ticks its next
+ * open occurrence. The status bar then names the focus logged on it since
+ * the previous tick; with none, it doesn't ask, because an occurrence keeps
+ * no time of its own.
  */
-export function checkOff(task: Task, sessions: readonly FocusSession[], now: number): CheckOff {
-  const count = sessions.filter((s) => s.taskId === task.id).length;
-  const took = actualMin(task, sessions);
-  if (count === 0 && took <= 0) return { kind: 'ask', title: copy.check.title, hint: copy.check.hint };
+export function checkOff(
+  task: Task,
+  data: { sessions: readonly FocusSession[]; occurrences: readonly TaskOccurrence[] },
+  now: number,
+  tz: string,
+  newId: () => Id,
+): CheckOff {
+  const own = data.sessions.filter((s) => s.taskId === task.id);
+  if (recurs(task)) {
+    const occurrence = checkOccurrence(task, data.occurrences, now, tz, newId);
+    if (!occurrence) return { kind: 'none' };
+    const ticks = data.occurrences.filter((o) => o.taskId === task.id).map((o) => o.doneAt);
+    const since = ticks.length > 0 ? Math.max(...ticks) : -Infinity;
+    const recent = own.filter((s) => s.endedAt > since);
+    const took = recent.reduce((sum, s) => sum + s.focusMin, 0);
+    return {
+      kind: 'occurrence',
+      occurrence,
+      message: recent.length > 0 ? copy.check.done(formatMinutes(took), recent.length) : null,
+    };
+  }
+  const took = actualMin(task, own);
+  if (own.length === 0 && took <= 0) return { kind: 'ask', title: copy.check.title, hint: copy.check.hint };
   return {
     kind: 'done',
     task: { ...task, done: true, doneAt: now },
-    message: copy.check.done(formatMinutes(took), count),
+    message: copy.check.done(formatMinutes(took), own.length),
   };
 }
 

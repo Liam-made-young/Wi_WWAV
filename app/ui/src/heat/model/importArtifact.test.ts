@@ -139,7 +139,7 @@ describe('parsing the export', () => {
 });
 
 describe('moving in (3.15)', () => {
-  const result = importArtifact(dump(), [], ids('new'));
+  const result = importArtifact(dump(), {}, ids('new'));
 
   it('keeps every id: event ids, em- and gp- hashes, and the processed Gmail ids', () => {
     expect(result.tasks.map((t) => t.id)).toEqual([
@@ -234,7 +234,7 @@ describe('moving in (3.15)', () => {
 
   it('moves into spaces that already exist by name, keeping their ids', () => {
     const existing = defaultSpaces(ids('space'));
-    const again = importArtifact(dump(), existing, ids('new'));
+    const again = importArtifact(dump(), { spaces: existing }, ids('new'));
     expect(again.spaces).toEqual([]);
     expect(again.tasks.map((t) => t.spaceId)).toEqual(['space-1', 'space-1', 'space-2', 'space-3']);
   });
