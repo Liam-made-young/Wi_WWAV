@@ -3879,6 +3879,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "wi-heat"
+version = "0.1.0"
+
+[[package]]
 name = "wi-store"
 version = "0.1.0"
 

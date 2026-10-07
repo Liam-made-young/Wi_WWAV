@@ -8,6 +8,7 @@ members = [
   "crates/wwav-dsp",
   "crates/wwav-tokens",
   "crates/wi-store",
+  "crates/wi-heat",
   "crates/mock-engine",
   "crates/wwav-engine-cli",
   "app/src-tauri",
@@ -39,6 +40,7 @@ wwav-wire = { path = "crates/wwav-wire" }
 wwav-dsp = { path = "crates/wwav-dsp" }
 wwav-tokens = { path = "crates/wwav-tokens" }
 wi-store = { path = "crates/wi-store" }
+wi-heat = { path = "crates/wi-heat" }
 
 [profile.dev.package."*"]
 opt-level = 2
