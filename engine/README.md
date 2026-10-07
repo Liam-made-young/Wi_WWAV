@@ -139,7 +139,7 @@ only while a device opens or closes.
 
 | Suite | Proves |
 |---|---|
-| `engine_unit` | a reader never sees a torn clock against a writer at full rate (F8); the command queue keeps order; crumbs are standard FNV-1a 64; unity gain is exact; tracks fold into buses and buses into the master; the WAVE headers; probing WAV and `.wwav` files and the reference reader's verdicts; a streamed clip never returns wrong audio while its reader races it |
+| `engine_unit` | a reader never sees a torn clock against a writer at full rate (F8), nor a torn meter entry when the writer laps it; the command queue keeps order; crumbs are standard FNV-1a 64; unity gain is exact; tracks fold into buses and buses into the master; the WAVE headers; probing WAV and `.wwav` files and the reference reader's verdicts; a streamed clip never returns wrong audio while its reader races it |
 | `engine_protocol` | the listening line and nothing else on stdout; the socket is 0600; `hello` and the protocol refusal; a 16 MiB frame round-trips and bad frames close the connection (F8); one client at a time, and one that stops reading can't keep the next one out; devices; later stages answer `unsupported` |
 | `engine_playback` | a `.wwav` made by `wwav_pack.py` plays: the clock runs at the session rate on the reader's monotonic clock, each stem shows on its own bus, and a mute or solo is heard within one block of arriving (S0.3); a `session.load` during playback swaps the graph without stopping or moving the playhead; the transport and its events; loops; refusals |
 | `engine_render` | the stems sum to the master and each stem is exactly the one packed; renders are identical across runs and engines; 16-bit; playback stops for a render; pings are answered during one |
