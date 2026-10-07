@@ -29,6 +29,12 @@ export function habitLabel(h: Habit): string {
   return h.minutes === undefined ? h.title : `${h.title}, ${formatMinutes(h.minutes)}`;
 }
 
+/** Ticks a day without unticking it: how a focus session's tickHabit effect is applied. */
+export function markHabitDone(h: Habit, day: DayKey): Habit {
+  return h.log[day] ? h : { ...h, log: { ...h.log, [day]: true } };
+}
+
+/** A click on an orb. */
 export function toggleHabit(h: Habit, day: DayKey): Habit {
   const log = { ...h.log };
   if (log[day]) delete log[day];

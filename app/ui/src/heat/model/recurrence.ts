@@ -5,8 +5,10 @@
 //
 // The series starts at the task's due date, at its wall-clock time in the
 // person's zone, and every occurrence keeps that wall-clock time across DST.
-// A task with a rule but no due date runs from its scheduled date. Each
-// finished occurrence is a TaskOccurrence row; the series never flips to done.
+// A task with a rule but no due date runs from its scheduled date; setting a
+// rule on a task with neither pins today as its scheduled date, as the PKM's
+// task panel does. Each finished occurrence is a TaskOccurrence row; the
+// series never flips to done.
 
 import {
   addDays,
@@ -264,8 +266,23 @@ export function nextOpenOccurrence(
   return null;
 }
 
-/** Whether a task repeats. A rule Heat can't read leaves it a plain task, so it never vanishes. */
-export const recurs = (task: Task) => task.rrule !== undefined && parseRule(task.rrule) !== null;
+/**
+ * Whether a task repeats. A rule Heat can't read, or one with no date to
+ * start from, leaves it a plain task, so it never vanishes.
+ */
+export const recurs = (task: Task) =>
+  task.rrule !== undefined && parseRule(task.rrule) !== null && (task.due !== null || !!task.scheduledDate);
+
+/**
+ * Sets or clears a task's rule (the Repeat menu). A rule needs a day to start
+ * from, so a task with no due or scheduled date is scheduled for today.
+ */
+export function setRepeat(task: Task, rule: string | null, now: number, tz: string): Task {
+  const { rrule: _old, ...rest } = task;
+  if (rule === null) return rest;
+  const pinned = task.due === null && !task.scheduledDate ? { scheduledDate: dayKey(now, tz) } : {};
+  return { ...rest, rrule: rule, ...pinned };
+}
 
 /**
  * The task as heat sees it: a recurring task's due becomes its next open

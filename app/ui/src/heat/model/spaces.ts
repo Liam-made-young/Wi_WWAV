@@ -1,8 +1,11 @@
 // Spaces (docs/SPEC.md 3.4): named filters over Today, Tasks, Calendar and
 // Mail. Grades, Habits and calendar events ignore them, because they belong
 // to the person rather than to a project. Classes, WWAV and Personal are
-// created with the artifact's values (3.1), and the WWAV persona is the one
-// 3.4 rewrites to cover the app.
+// created with the names, group labels and types 3.1 gives, and the WWAV
+// persona is the one 3.4 rewrites to cover the app. The spec doesn't give the
+// artifact's hues or its Classes and Personal personas, so the ones below are
+// stand-ins until the founder supplies the artifact's text (QUESTIONS.md, "Artifact
+// values the spec doesn't give").
 
 import { DAY_MS, byHeat, heatOf } from './heat';
 import * as copy from './copy';
