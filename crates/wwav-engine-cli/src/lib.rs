@@ -30,9 +30,14 @@
 //! a `kill9`, a `respawn`, or at the end, closing the engine's stdin.
 //!
 //! At the end of the script the CLI closes the engine's stdin, as the app
-//! quitting would, and reports the exit. The exit status is 0 when every
-//! line read, 1 when one didn't or the engine couldn't be started, and 2
-//! for a bad command line.
+//! quitting would, and reports the exit; over `--connect` it says it has
+//! nothing more to send and waits (2 s at most) for the engine to hang up.
+//! Either way every event the engine sent until then is printed. The exit
+//! status is 0 when nothing failed; 1 when anything printed `failed` (a line
+//! that didn't read, a request with no answer, a directive that couldn't be
+//! done, an engine still running 2 s after its stdin closed) or the engine
+//! couldn't be started; and 2 for a bad command line. An engine's refusal
+//! (`"ok": false`) is an answer, not a failure.
 
 use serde_json::{json, Map, Value};
 use std::fs::File;
@@ -41,7 +46,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
-use wwav_wire::client::{CallError, Client};
+use wwav_wire::client::{Answer, CallError, Client};
 use wwav_wire::msg::Event;
 use wwav_wire::process::{EngineConfig, EngineProcess};
 use wwav_wire::shm::{self, Shm};
@@ -248,11 +253,14 @@ struct Session<'a> {
     pid: Option<u32>,
     /// Meter slot names by slot, from the last `session.load`.
     slots: Vec<String>,
+    /// Events printed from this connection, to put each response after the
+    /// events that came before it.
+    printed: u64,
     /// The CLI's last act, which `after_ms` counts from.
     since: Instant,
     told_closed: bool,
     told_exited: bool,
-    bad_lines: usize,
+    failures: usize,
 }
 
 impl<'a> Session<'a> {
@@ -286,10 +294,11 @@ impl<'a> Session<'a> {
             timeout: opts.timeout,
             pid,
             slots: Vec::new(),
+            printed: 0,
             since: Instant::now(),
             told_closed: false,
             told_exited: false,
-            bad_lines: 0,
+            failures: 0,
         };
         s.say(hello);
         Ok(s)
@@ -317,6 +326,7 @@ impl<'a> Session<'a> {
 
     fn failed(&mut self, line: usize, what: &str, error: impl Into<String>) {
         let error = error.into();
+        self.failures += 1;
         self.say(json!({"failed": {"line": line, "op": what, "error": error}}));
     }
 
@@ -330,7 +340,7 @@ impl<'a> Session<'a> {
             Ok(Some(Step::Kill9)) => self.kill9(n),
             Ok(Some(Step::Respawn)) => self.respawn(n),
             Err(e) => {
-                self.bad_lines += 1;
+                self.failures += 1;
                 self.say(json!({"failed": {"line": n, "error": e}}));
             }
         }
@@ -338,21 +348,32 @@ impl<'a> Session<'a> {
 
     fn call(&mut self, n: usize, op: &str, args: Value) {
         self.since = Instant::now();
-        let answer = self.client().request(op, args, self.timeout);
-        // Events that came before the answer were queued before it: print
-        // them first, so the output keeps the wire's order.
-        self.events();
-        match answer {
-            Ok(response) => {
+        let error = match self.client().request_ordered(op, args, self.timeout) {
+            Ok(Answer {
+                response,
+                events_before,
+            }) => {
+                // The events that came before the answer, and no more: the
+                // reader queued them before it handed the answer over.
+                while self.printed < events_before {
+                    match self.events.try_recv() {
+                        Ok(e) => self.event(e),
+                        Err(_) => break,
+                    }
+                }
                 if let Ok(result) = &response.outcome {
                     self.learn(op, result);
                 }
                 self.say(serde_json::to_value(&response).expect("a response is JSON"));
+                return;
             }
-            Err(CallError::Timeout(_)) => self.failed(n, op, "timeout"),
-            Err(CallError::Closed) => self.failed(n, op, "closed"),
-            Err(e) => self.failed(n, op, e.to_string()),
-        }
+            Err(CallError::Timeout(_)) => "timeout".to_string(),
+            Err(CallError::Closed) => "closed".to_string(),
+            Err(e) => e.to_string(),
+        };
+        // Whatever came before the failure.
+        self.events();
+        self.failed(n, op, error);
     }
 
     /// What later lines need from an answer: the engine's pid, and the
@@ -463,6 +484,7 @@ impl<'a> Session<'a> {
             Ok(events) => {
                 let pid = p.pid();
                 self.events = events;
+                self.printed = 0;
                 self.pid = Some(pid);
                 self.slots.clear();
                 (self.told_closed, self.told_exited) = (false, false);
@@ -483,7 +505,7 @@ impl<'a> Session<'a> {
                 break;
             }
             match self.events.recv_timeout(left.min(POLL)) {
-                Ok(e) => self.say(json!(e)),
+                Ok(e) => self.event(e),
                 // The connection has gone; keep watching for the exit.
                 Err(RecvTimeoutError::Disconnected) => thread::sleep(left.min(POLL)),
                 Err(RecvTimeoutError::Timeout) => {}
@@ -493,10 +515,15 @@ impl<'a> Session<'a> {
         }
     }
 
+    fn event(&mut self, e: Event) {
+        self.printed += 1;
+        self.say(json!(e));
+    }
+
     /// Prints every event that has arrived.
     fn events(&mut self) {
         while let Ok(e) = self.events.try_recv() {
-            self.say(json!(e));
+            self.event(e);
         }
     }
 
@@ -504,6 +531,9 @@ impl<'a> Session<'a> {
     fn notice(&mut self) {
         let after_ms = self.since.elapsed().as_millis() as u64;
         if !self.told_closed && self.client().is_closed() {
+            // Every event the connection carried is queued by now: they
+            // came before the close.
+            self.events();
             self.told_closed = true;
             let reason = self.client().closed_reason();
             self.say(json!({"closed": {"after_ms": after_ms, "reason": reason}}));
@@ -520,25 +550,41 @@ impl<'a> Session<'a> {
     }
 
     /// The end of the script: the engine's stdin closes, as when the app
-    /// quits, and the engine has 1 s by the contract (2 s here) to go.
+    /// quits, and the engine has 1 s by the contract (2 s here) to go. Over
+    /// `--connect`, the CLI says it has nothing more to send and the engine
+    /// hangs up. Either way the CLI prints events until the connection ends.
     fn finish(mut self) -> i32 {
         self.events();
         self.notice();
-        if let Engine::Spawned(p) = &mut self.engine {
-            if !self.told_exited {
-                p.close_stdin();
-                self.since = Instant::now();
-                self.wait_until(self.since + GONE_WITHIN, |s| s.told_exited);
+        match &mut self.engine {
+            Engine::Spawned(p) => {
                 if !self.told_exited {
-                    self.failed(
-                        0,
-                        "exit",
-                        "The engine was still running 2 s after its stdin closed.",
-                    );
+                    p.close_stdin();
+                    self.since = Instant::now();
+                    self.wait_until(self.since + GONE_WITHIN, |s| s.told_exited);
+                    if !self.told_exited {
+                        self.failed(
+                            0,
+                            "exit",
+                            "The engine was still running 2 s after its stdin closed.",
+                        );
+                    }
+                }
+            }
+            Engine::Connected { client, .. } => {
+                if !self.told_closed {
+                    client.close_writes();
+                    self.since = Instant::now();
                 }
             }
         }
-        if self.bad_lines > 0 {
+        // The socket closes with the engine, or soon after the half close;
+        // the events before it are all queued then.
+        if self.told_exited || matches!(self.engine, Engine::Connected { .. }) {
+            self.wait_until(Instant::now() + GONE_WITHIN, |s| s.told_closed);
+        }
+        self.events();
+        if self.failures > 0 {
             1
         } else {
             0

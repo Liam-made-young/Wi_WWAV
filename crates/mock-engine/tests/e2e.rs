@@ -37,7 +37,7 @@ fn cli_status(flags: &[String], script: &str) -> (i32, Vec<Value>) {
 }
 
 /// Runs a script through the CLI against a fresh mock-engine.
-fn cli(flags: &[&str], script: &str) -> Vec<Value> {
+fn cli_spawn(flags: &[&str], script: &str) -> (i32, Vec<Value>) {
     let tmp = tempfile::tempdir().unwrap();
     let mut args: Vec<String> = vec![
         "--spawn".into(),
@@ -46,7 +46,12 @@ fn cli(flags: &[&str], script: &str) -> Vec<Value> {
         tmp.path().display().to_string(),
     ];
     args.extend(flags.iter().map(|s| s.to_string()));
-    let (code, lines) = cli_status(&args, script);
+    cli_status(&args, script)
+}
+
+/// The same, for a script where nothing fails.
+fn cli(flags: &[&str], script: &str) -> Vec<Value> {
+    let (code, lines) = cli_spawn(flags, script);
     assert_eq!(code, 0, "the CLI failed:\n{lines:#?}");
     lines
 }
@@ -242,7 +247,8 @@ fn kill_9_is_seen_as_a_closed_socket_and_an_exit() {
         "hello {{\"protocol\": 1, \"client\": \"e2e\"}}\n{}transport.play\nsleep 100ms\nkill9\nping\n",
         load_line(0)
     );
-    let lines = cli(&["--device", "null"], &script);
+    let (code, lines) = cli_spawn(&["--device", "null"], &script);
+    assert_eq!(code, 1, "the ping after the kill fails the run");
     let closed = with_key(&lines, "closed");
     assert!(closed[0]["after_ms"].as_u64().unwrap() < 1000, "{closed:?}");
     let exited = with_key(&lines, "exited");
@@ -337,10 +343,11 @@ fn a_line_that_does_not_read_is_reported_and_fails_the_run() {
 
 #[test]
 fn a_protocol_mismatch_is_refused_and_the_connection_closes() {
-    let lines = cli(
+    let (code, lines) = cli_spawn(
         &[],
         "hello {\"protocol\": 2, \"client\": \"from the future\"}\nping\n",
     );
+    assert_eq!(code, 1, "the ping on the closed connection fails the run");
     let r = responses(&lines);
     assert_eq!(r[0]["ok"], false);
     assert_eq!(r[0]["error"]["code"], "protocol");
@@ -969,3 +976,4 @@ fn a_bad_frame_closes_the_connection_and_the_engine_takes_the_next_client() {
         .unwrap();
     assert_eq!(hello["protocol"], 1);
 }
+
