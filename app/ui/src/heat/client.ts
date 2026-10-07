@@ -78,6 +78,8 @@ export interface Task {
   sourceId?: string;
   /** The sentence Claude gave when it added the task (3.6). */
   claudeReason?: string;
+  /** The note whose checkbox it was made from. */
+  noteId?: Id;
   public?: boolean;
 }
 
@@ -293,8 +295,257 @@ export interface Note {
   markdown: string;
   projectId?: Id;
   link?: Link;
+  /** Where it is filed: a course, a space, or neither. */
+  courseId?: Id;
+  spaceId?: Id;
+  /** Its file in the notes folder, as the core keeps it. */
+  file?: string;
+  /** When a captured page was taken. */
+  capturedAt?: number;
+  /** True while a captured page waits in the Notes inbox to be filed. */
+  inbox?: boolean;
+  attachments?: string[];
+  createdAt?: number;
+  updatedAt?: number;
+  source?: string;
   public?: boolean;
 }
+
+/** One day of a commitment that doesn't go as usual (docs/COMMITMENTS.md). */
+export interface CommitmentException {
+  date: DayKey;
+  kind: 'skip' | 'move';
+  toDate?: DayKey;
+  start?: number;
+  end?: number;
+  location?: string;
+  note?: string;
+  source?: 'you' | 'mail' | 'claude';
+}
+
+export type CommitmentKind = 'class' | 'work' | 'commute' | 'other';
+
+/** A fixed thing in the week: a class, a shift, a commute. Times are minutes after local midnight. */
+export interface Commitment {
+  id: Id;
+  title: string;
+  kind: CommitmentKind;
+  location: string;
+  start: number;
+  end: number;
+  /** Absent: it happens once, on `from`. */
+  rrule?: string;
+  from: DayKey;
+  until?: DayKey;
+  exceptions: CommitmentException[];
+  bufferBefore: number;
+  bufferAfter: number;
+  hardness: 'fixed' | 'flexible';
+  courseId?: Id;
+  spaceId?: Id;
+  source: 'you' | 'paste' | 'photo' | 'ics' | 'claude';
+  sourceId?: string;
+  weekOf?: DayKey;
+  feedId?: Id;
+}
+
+/** Days classes don't meet. */
+export interface TermBreak {
+  id: Id;
+  title: string;
+  from: DayKey;
+  to: DayKey;
+  source?: string;
+}
+
+/** One day a commitment happens on, with every exception and break already applied. */
+export interface CommitmentOccurrence {
+  commitmentId: Id;
+  date: DayKey;
+  start: number;
+  end: number;
+  title: string;
+  kind: CommitmentKind;
+  location: string;
+  bufferBefore: number;
+  bufferAfter: number;
+  hardness: 'fixed' | 'flexible';
+  courseId?: Id;
+  spaceId?: Id;
+  /** The day an exception moved it from. */
+  movedFrom?: DayKey;
+  /** Its space's hue; null with no space. */
+  hue: number | null;
+  /** Its course, as "JPN 101 · Beginning Japanese I"; null with none. */
+  label: string | null;
+}
+
+/** What a day has left once commitments, their travel and sleep are out. */
+export interface FreeTime {
+  date: DayKey;
+  freeMin: number;
+  plannedMin: number;
+  overMin: number;
+  spans: [number, number][];
+  /** "3h 20m free today. Planned 4h. Move 40m?" */
+  line: string;
+}
+
+export type ScheduleMode = 'schedule' | 'week' | 'breaks';
+
+/** A schedule read and waiting to be applied. The fields below `error` are there once it is ready. */
+export interface CommitmentDraft {
+  id: Id;
+  mode: ScheduleMode;
+  source: 'paste' | 'photo' | 'ics';
+  fileName: string;
+  weekOf: DayKey;
+  createdAt: number;
+  state: 'reading' | 'ready' | 'failed';
+  error?: string;
+  items?: {
+    title: string;
+    kind: CommitmentKind;
+    start: number;
+    end: number;
+    location: string;
+    from: DayKey;
+    until: DayKey | null;
+    days: string[];
+    /** "MWF 10:00 AM to 10:50 AM" */
+    when: string;
+    course: string | null;
+    /** False: a commitment just like it is there already, and it won't be added. */
+    isNew: boolean;
+    newCourse: boolean;
+  }[];
+  breaks?: { title: string; from: DayKey; to: DayKey; isNew: boolean }[];
+  /** How many of that week's shifts accepting it replaces. */
+  replaces?: number;
+  unread?: number;
+  /** "3 classes and 2 shifts. 1 new course." */
+  line?: string;
+}
+
+/** An exception a mail asked for, waiting for one tap. */
+export interface PendingException {
+  id: Id;
+  commitmentId: Id;
+  title: string;
+  kind: 'skip' | 'move';
+  exception: CommitmentException;
+  /** "EGR 101 is canceled Thursday, Oct 8. Skip it?" */
+  line: string;
+  /** What the tap is called: "Skip it", "Move it". */
+  act: string;
+  mailThreadId?: string;
+  subject?: string;
+  createdAt: number;
+}
+
+export interface CommitmentsSnapshot {
+  days: Record<DayKey, CommitmentOccurrence[]>;
+  list: { id: Id; when: string; range: string; days: string[]; hue: number | null; label: string | null }[];
+  next: { commitmentId: Id; title: string; date: DayKey; start: number; leaveAt: number | null; line: string } | null;
+  free: FreeTime;
+  conflicts: { blockId: Id; commitmentId: Id; date: DayKey; bufferOnly: boolean; line: string }[];
+  sleep: { from: number; to: number };
+  term: { start: DayKey | null; end: DayKey | null };
+  drafts: CommitmentDraft[];
+  pending: PendingException[];
+  feeds: { id: Id; name: string; lastSyncedAt: number | null }[];
+}
+
+/** What `heat.commitment.create` and `.update` take. Times are minutes or a time such as "10:00" or "5pm". */
+export interface CommitmentInput {
+  title?: string;
+  kind?: CommitmentKind;
+  start?: number | string;
+  end?: number | string;
+  /** Weekday codes: MO TU WE TH FR SA SU. An empty list: no repeat. */
+  days?: string[];
+  /** One day, for something that happens once. */
+  date?: DayKey;
+  rrule?: string;
+  interval?: number;
+  from?: DayKey;
+  until?: DayKey | null;
+  location?: string;
+  bufferBefore?: number;
+  bufferAfter?: number;
+  hardness?: 'fixed' | 'flexible';
+  courseId?: Id | null;
+  /** A course by its code; a class naming one Learn doesn't hold makes a stub. */
+  course?: string;
+  spaceId?: Id | null;
+  space?: string;
+}
+
+/** What a note links to, what links to it, its tags and its checkboxes (docs/NOTES.md). */
+export interface NoteIndex {
+  title: string;
+  excerpt: string;
+  tags: string[];
+  links: { target: string; shown: string | null; kind: 'note' | 'course' | 'task' | 'missing'; id: Id | null; line: number }[];
+  backlinks: { id: Id; title: string; line: string }[];
+  /** A box that is a task carries `taskId`, and its `done` is the task's. */
+  boxes: { line: number; text: string; done: boolean; taskId: Id | null }[];
+  updatedAt: number | null;
+  /** Its course ("JPN 101 · Beginning Japanese I") or its space's name; null for neither. */
+  label: string | null;
+  hue: number | null;
+}
+
+export interface NoteSuggestion {
+  tasks: { title: string; due?: DayKey | null; taskId?: Id | null }[];
+  terms: string[];
+}
+
+export interface NotesSnapshot {
+  /** The notes folder on disk. */
+  folder: string;
+  index: Record<Id, NoteIndex>;
+  /** Newest first. */
+  order: Id[];
+  tags: { tag: string; count: number }[];
+  /** Captured pages waiting to be filed. */
+  inbox: Id[];
+  suggestions: Record<Id, NoteSuggestion>;
+  /** Today's daily note, the note titled with the day. */
+  daily: Id | null;
+  capture: {
+    folders: string[];
+    watching: boolean;
+    waiting: number;
+    /** "Reading IMG_2211.jpg", while a page is being read. */
+    doing: string | null;
+    /** Whether a captured page may be sent to Claude. */
+    claude: boolean;
+    /** The on-device reader: there, being built, or not to be had. */
+    reader: 'ready' | 'building' | 'missing';
+  };
+}
+
+/** One line Learn shows quietly, with its undo or its one act. */
+export interface Notice {
+  id: string;
+  kind: 'filed' | 'leave' | 'exception' | 'capture';
+  text: string;
+  at: number;
+  noteId?: Id;
+  undo?: { txnId: string };
+  act?: { label: string; cmd: string; args: Record<string, unknown> };
+}
+
+export interface NoteHit {
+  id: Id;
+  title: string;
+  snippet: string;
+  score: number;
+}
+
+/** Where a note is filed to: a course, a space, or `none`. */
+export type NotePlace = { courseId: Id } | { course: string } | { spaceId: Id } | { space: string } | { none: true };
 
 export interface ProfileShare {
   id: Id;
@@ -370,6 +621,8 @@ export interface Records {
   dailyNote: DailyNote;
   note: Note;
   profileShare: ProfileShare;
+  commitment: Commitment;
+  termBreak: TermBreak;
 }
 export type Kind = keyof Records;
 
@@ -479,6 +732,12 @@ export interface Snapshot {
   /** Each thread's place, by Gmail's thread id. */
   mailState?: Record<string, MailPlace>;
   mailSync?: MailSync;
+  /** Commitments: each day's, what is next, what today has left, what waits (docs/COMMITMENTS.md). */
+  commitments?: CommitmentsSnapshot;
+  /** Notes: links, backlinks, tags, the inbox, the capture folder (docs/NOTES.md). */
+  notes?: NotesSnapshot;
+  /** Quiet notices, newest first. */
+  notices?: Notice[];
   derived: {
     tasks: Record<Id, TaskDerived>;
     today: {
@@ -640,6 +899,85 @@ export function heatClient(t: Transport = real) {
     },
     setSchool: (school: { name: string; host: string; icalUrl?: string; codePattern: string; termStart: DayKey; termEnd: DayKey }) =>
       c<Record<string, never>>('heat.school.set', school),
+
+    commitments: {
+      create: (input: CommitmentInput) =>
+        c<{ commitment: Commitment; course: Course | null; line: string } & Undo>('heat.commitment.create', { ...input }),
+      /** `id` may be a title when only one commitment has it. */
+      update: (id: Id, set: CommitmentInput) =>
+        c<{ commitment: Commitment; line: string } & Undo>('heat.commitment.update', { id, set }),
+      remove: (id: Id) => c<Undo>('heat.delete', { kind: 'commitment', id }),
+      /** One day skipped or moved. Refused for a day it doesn't meet on. */
+      addException: (id: Id, exception: CommitmentException) =>
+        c<{ commitment: Commitment; line: string } & Undo>('heat.commitment.addException', { id, ...exception }),
+      removeException: (id: Id, date: DayKey) =>
+        c<{ commitment: Commitment } & Undo>('heat.commitment.removeException', { id, date }),
+      /** Pasted text, read by Claude into a draft that answers `reading`; nothing is written until it is accepted. */
+      importText: (text: string, mode: ScheduleMode = 'schedule', weekOf?: DayKey) =>
+        c<{ draft: CommitmentDraft }>('heat.commitment.importText', { text, mode, weekOf }),
+      /** A photo or screenshot of a schedule, by its path. */
+      importImage: (path: string, mode: ScheduleMode = 'schedule', weekOf?: DayKey) =>
+        c<{ draft: CommitmentDraft }>('heat.commitment.importImage', { path, mode, weekOf }),
+      /** An `.ics` file, its text, or its address. With `subscribe` the address is kept and read again every hour. */
+      importIcs: (
+        from: ({ path: string } | { url: string } | { text: string }) & { mode?: ScheduleMode; subscribe?: boolean; name?: string },
+      ) => c<{ draft?: CommitmentDraft; feed?: { id: Id; name: string }; changed?: number } & Partial<Undo>>('heat.commitment.importIcs', from),
+      accept: (draftId: Id, skip?: number[]) =>
+        c<{ commitments: number; breaks: number; replaced: number; courses: Course[] } & Undo>(
+          'heat.commitment.draft.accept',
+          { draftId, skip },
+        ),
+      discard: (draftId: Id) => c<Record<string, never>>('heat.commitment.draft.discard', { draftId }),
+      /** The one tap for what a mail asked for. */
+      confirm: (id: Id) => c<{ commitment: Commitment; line: string } & Undo>('heat.commitment.exception.confirm', { id }),
+      dismiss: (id: Id) => c<Record<string, never>>('heat.commitment.exception.dismiss', { id }),
+      syncFeed: (id?: Id) => c<{ changed: number }>('heat.commitment.feed.sync', { id }),
+      removeFeed: (id: Id) => c<Record<string, never>>('heat.commitment.feed.remove', { id }),
+      /** What each day has left, and what is fixed in it. Today when nothing is named. */
+      freeTime: (range: { date?: DayKey } | { from: DayKey; to: DayKey } = {}) =>
+        c<{ days: (FreeTime & { commitments: CommitmentOccurrence[] })[] }>('heat.planner.freeTime', range),
+      /** When the person sleeps: minutes after midnight, to bed and up. */
+      setSleep: (from: number, to: number) => c<Record<string, never>>('heat.sleep.set', { from, to }),
+    },
+    notes: {
+      /** A title another note has is refused, unless `ifMissing`, which answers the note that is there. */
+      create: (note: { title?: string; markdown?: string; ifMissing?: boolean } & Partial<Exclude<NotePlace, { none: true }>> = {}) =>
+        c<{ note: Note; existed?: boolean } & Undo>('heat.note.create', note),
+      /** A new title is the note's new name everywhere: links to it are rewritten in the same entry. */
+      save: (id: Id, set: { markdown?: string; title?: string }) =>
+        c<{ note: Note; renamed: number } & Undo>('heat.note.save', { id, ...set }),
+      remove: (id: Id) => c<Undo>('heat.delete', { kind: 'note', id }),
+      /** The note titled with the day; with `markdown` it is written, and made if it isn't there. */
+      daily: (date: DayKey, markdown?: string) => c<{ note: Note | null } & Partial<Undo>>('heat.note.daily', { date, markdown }),
+      search: (q: string, limit?: number) => c<{ hits: NoteHit[] }>('heat.note.search', { q, limit }),
+      /** Adds `[[to]]`; a name nothing has becomes a new, empty note. */
+      link: (id: Id, to: string) => c<{ note: Note; created: Note | null; line: string } & Undo>('heat.note.link', { id, to }),
+      file: (id: Id, place: NotePlace) => c<{ note: Note; line: string } & Undo>('heat.note.file', { id, ...place }),
+      /** A checkbox line becomes a task, and stays linked to it. */
+      taskFromLine: (id: Id, line: number) => c<{ task: Task; note: Note } & Undo>('heat.note.taskFromLine', { id, line }),
+      toggleBox: (id: Id, line: number, done: boolean) =>
+        c<{ note: Note; task: Task | null } & Undo>('heat.note.toggleBox', { id, line, done }),
+      acceptSuggestion: (noteId: Id, index: number) => c<{ task: Task } & Undo>('heat.note.suggestion.accept', { noteId, index }),
+      dismissSuggestions: (noteId: Id) => c<Record<string, never>>('heat.note.suggestion.dismiss', { noteId }),
+      /** An image of the notes folder, by the path the note writes (`attachments/…`), as a data URL. */
+      attachment: (path: string) => c<{ dataUrl: string }>('heat.note.attachment', { path }),
+      /** Shows the note's file, or the folder, in the Finder. */
+      reveal: (id?: Id) => c<{ path: string }>('heat.note.reveal', { id }),
+      sync: () => c<{ changed: number }>('heat.note.sync'),
+    },
+    pages: {
+      /** Reads what waits in the capture inbox now, or the one file named. */
+      process: (path?: string) => c<{ started: boolean; waiting: number }>('heat.capture.process', { path }),
+      /** Copies files, or a pasted image, into the inbox, where they are read like any other. */
+      add: (from: { paths: string[] } | { name: string; base64: string }) => c<{ added: number }>('heat.capture.inbox.add', from),
+      setClaude: (on: boolean) => c<Record<string, never>>('heat.capture.settings.set', { claude: on }),
+    },
+    notices: {
+      dismiss: (id: string) => c<Record<string, never>>('heat.notice.dismiss', { id }),
+      /** A notice's one act is a command of the core, run as it is given. */
+      run: (cmd: string, args: Record<string, unknown>) => c<Record<string, unknown>>(cmd, args),
+      undo: (txnId: string) => c<{ label: string }>('history.undoEntry', { txnId }),
+    },
 
     claude: {
       get: () => c<ClaudeSettings>('heat.claude.get'),

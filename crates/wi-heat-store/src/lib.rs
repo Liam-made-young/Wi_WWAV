@@ -14,15 +14,21 @@
 //! - [`timer`]: Plan my day's drafts, the current task and the focus timer.
 //! - [`snapshot`]: what the views read, and the public view.
 //! - [`feed`]: calendars and Brightspace, from a feed the core fetched.
+//! - [`commit`]: commitments (classes, shifts, commutes), the breaks classes
+//!   skip, a schedule read and waiting to be applied, and what a day has left.
+//! - [`notes`]: notes as records beside their files: links and backlinks, a
+//!   checkbox made a task, a captured page filed, and the quiet notices.
 //! - [`homes`]: a task's home (its course or project) and its type: the
 //!   minutes and difficulty every task starts with, courses found in what a
 //!   sync brings, and a syllabus previewed and accepted.
 
+pub mod commit;
 mod derive;
 pub mod feed;
 pub mod homes;
 pub mod mail;
 pub mod mcp;
+pub mod notes;
 pub mod ops;
 mod schema;
 pub mod snapshot;
@@ -74,6 +80,26 @@ pub mod kind {
     /// Outside the journal, on this Mac only: a syllabus read and waiting to
     /// be accepted. A draft is not a change.
     pub const SYLLABUS: &str = "syllabusDraft";
+    /// A fixed thing in the week: a class, a shift, a commute. Journaled,
+    /// and on this Mac only.
+    pub const COMMITMENT: &str = "commitment";
+    /// A stretch of days classes don't meet. Journaled, this Mac only.
+    pub const BREAK: &str = "termBreak";
+    /// Outside the journal: a schedule read and waiting to be applied.
+    pub const COMMITMENT_DRAFT: &str = "commitmentDraft";
+    /// Outside the journal: an exception a mail asked for, waiting for a tap.
+    pub const PENDING_EXCEPTION: &str = "pendingException";
+    /// Outside the journal: a calendar address commitments are read from.
+    pub const COMMITMENT_FEED: &str = "commitmentFeed";
+    /// Outside the journal: the tasks and key terms Claude suggested for a
+    /// captured page. Never applied.
+    pub const NOTE_SUGGESTION: &str = "noteSuggestion";
+    /// Outside the journal: one line Learn shows quietly.
+    pub const NOTICE: &str = "notice";
+    /// Outside the journal: what the core last saw of a note's file.
+    pub const NOTE_FILE: &str = "noteFile";
+    /// Outside the journal: a file from the capture inbox, and the note it became.
+    pub const CAPTURE_FILE: &str = "captureFile";
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -193,6 +219,8 @@ pub(crate) fn search_text(kind: &str, r: &Value) -> String {
         kind::DAILY_NOTE => vec![field("markdown")],
         kind::CAPTURE => vec![field("text")],
         kind::SPACE => vec![field("name")],
+        kind::COMMITMENT => vec![field("title"), field("location")],
+        kind::BREAK => vec![field("title")],
         _ => vec![],
     };
     parts

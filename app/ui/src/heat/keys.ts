@@ -3,7 +3,7 @@
 // key it didn't claim (⌘1-⌘4, ⌘K, ⌘⇧N, ⌘Z, Esc, ⇧Return and ⌘I are the
 // shell's); nothing here listens to the keyboard.
 //
-//   1-6        Today, Tasks, Calendar, Grades, Habits, Mail (no field focused)
+//   1-7        Today, Tasks, Calendar, Grades, Habits, Mail, Notes (no field focused)
 //   N          New item          C  make current       P  plan into the next free gap
 //   ↑ ↓        move              F  focus start or pause
 //   Return     edit the row under the cursor   ⇧F stop and log   I  pulled away
@@ -82,7 +82,8 @@ export function heatRoute(e: HeatKey, ctx: HeatKeyContext): HeatCommand | null {
   }
   const k = key.length === 1 ? key.toLowerCase() : key;
   if (e.shift) return k === 'f' ? { type: 'stopFocus' } : null;
-  if (/^[1-6]$/.test(k)) return { type: 'tab', tab: TAB_IDS[Number(k) - 1] };
+  // A number opens the tab in that place; one past the last tab does nothing.
+  if (/^[1-9]$/.test(k)) return Number(k) <= TAB_IDS.length ? { type: 'tab', tab: TAB_IDS[Number(k) - 1] } : null;
   switch (k) {
     case 'n':
       return { type: 'new' };

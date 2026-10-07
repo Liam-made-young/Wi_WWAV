@@ -32,10 +32,10 @@ import type { Id } from './client';
 /** What a dragged task carries in its dataTransfer: its id. */
 export const TASK_DRAG = 'application/x-heat-task';
 
-export type TabId = 'today' | 'tasks' | 'calendar' | 'grades' | 'habits' | 'mail';
+export type TabId = 'today' | 'tasks' | 'calendar' | 'grades' | 'habits' | 'mail' | 'notes';
 
-/** The six tabs in order, with their keys (3.17: 1-6, with no field focused). */
-export const TAB_IDS: readonly TabId[] = ['today', 'tasks', 'calendar', 'grades', 'habits', 'mail'];
+/** The tabs in order, with their keys (3.17: 1-6 and on, with no field focused). */
+export const TAB_IDS: readonly TabId[] = ['today', 'tasks', 'calendar', 'grades', 'habits', 'mail', 'notes'];
 
 /**
  * 3.3's table: what "+" adds (its tooltip is "New task", never "Add", 7.5)
@@ -54,6 +54,7 @@ export const TAB_TABLE: Record<TabId, { name: string; plus: string | null; adds:
   grades: { name: 'Grades', plus: 'New grade', adds: 'A grade', secondary: 'Add course' },
   habits: { name: 'Habits', plus: 'New habit', adds: 'A habit', secondary: 'Show the year' },
   mail: { name: 'Mail', plus: null, adds: null, secondary: 'Open in Gmail' },
+  notes: { name: 'Notes', plus: 'New note', adds: 'A note', secondary: 'Quick open' },
 };
 
 export interface Act {

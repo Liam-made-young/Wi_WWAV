@@ -81,7 +81,7 @@ fn in_window(record: &Value, from: &str, to: &str) -> bool {
 }
 
 /// A month around a day: from a week before the 1st to a week after the last.
-fn default_range(date: &str) -> (String, String) {
+pub(crate) fn default_range(date: &str) -> (String, String) {
     let (year, month, _) = zone::key_parts(date);
     let first = zone::key_of(year, month, 1.0);
     let last = zone::key_of(year, month, zone::days_in_month(year, month));

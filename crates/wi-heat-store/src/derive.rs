@@ -42,6 +42,9 @@ pub(crate) struct World {
     pub grades: Vec<Grade>,
     pub mail: Vec<Value>,
     pub events: Vec<CalendarEvent>,
+    /// Commitments, breaks and sleep: what a plan steps around
+    /// (`commit::Fixed`).
+    pub fixed: crate::commit::Fixed,
     /// The School sheet's course pattern, for reading a course out of a title.
     pub course_pattern: String,
 }
@@ -97,6 +100,7 @@ impl World {
             raw_grades,
             mail: all(store, kind::MAIL)?,
             events: typed(kind::EVENT, all(store, kind::EVENT)?).0,
+            fixed: crate::commit::Fixed::load(store)?,
             course_pattern: crate::setting(store, "school")?
                 .and_then(|s| s["codePattern"].as_str().map(str::to_string))
                 .filter(|p| !p.is_empty())
@@ -131,6 +135,14 @@ impl World {
             .find(|c| c.id == code)
             .or_else(|| self.courses.iter().find(|c| squash(&c.code) == want))
             .map_or_else(|| refused(format!("No course has the code {code}.")), Ok)
+    }
+
+    /// A day's busy time for a plan: other calendars' events, and every
+    /// commitment with its travel time, and sleep.
+    pub fn busy(&self, clock: &Clock, date: &str) -> Vec<CalendarEvent> {
+        let mut events = self.events.clone();
+        events.extend(self.fixed.busy_events(clock, date));
+        events
     }
 
     pub fn estimates(&self) -> estimate::EstimateContext<'_> {
@@ -237,7 +249,7 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
         tasks: world.tasks.clone(),
         occurrences: world.occurrences.clone(),
         blocks: world.blocks.clone(),
-        events: world.events.clone(),
+        events: world.busy(clock, date),
         sessions: world.sessions.clone(),
         habits: world.habits.clone(),
     };
@@ -320,7 +332,7 @@ fn free_minutes(
     day_ends: f64,
     drafts: &[plan::Draft],
 ) -> f64 {
-    let mut spans = plan::busy_spans(&world.blocks, &world.events, date, &clock.zone);
+    let mut spans = plan::busy_spans(&world.blocks, &world.busy(clock, date), date, &clock.zone);
     spans.extend(drafts.iter().map(|d| (d.start, d.start + d.minutes)));
     let mut mark =
         ((zone::minute_of_day(now, &clock.zone).max(DAY_STARTS_MIN)) / 15.0).ceil() * 15.0;

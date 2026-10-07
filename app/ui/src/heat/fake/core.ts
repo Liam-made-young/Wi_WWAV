@@ -78,6 +78,7 @@ export function derive(deriver: Deriver) {
 const KINDS: Kind[] = [
   'space', 'task', 'taskOccurrence', 'timeBlock', 'focusSession', 'project', 'milestone', 'habit',
   'term', 'course', 'grade', 'mailThread', 'calendar', 'capture', 'dailyNote', 'note', 'profileShare',
+  'commitment', 'termBreak',
 ];
 
 function emptyStore(): Store {

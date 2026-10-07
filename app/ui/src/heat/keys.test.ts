@@ -34,7 +34,8 @@ describe('Learn’s keyboard', () => {
       { type: 'tab', tab: 'habits' },
       { type: 'tab', tab: 'mail' },
     ]);
-    expect(heatRoute(key('7'), ctx())).toBeNull();
+    expect(heatRoute(key('7'), ctx())).toEqual({ type: 'tab', tab: 'notes' });
+    expect(heatRoute(key('8'), ctx())).toBeNull();
   });
 
   it('takes N, C, P, F, ⇧F and I, but C and P only with something selected', () => {

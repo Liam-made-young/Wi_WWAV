@@ -12,6 +12,7 @@ import type { TabId } from './frame';
 import { Grades } from './grades/Grades';
 import { Habits } from './habits/Habits';
 import { Mail } from './mail/Mail';
+import { Notes } from './notes/Notes';
 import { Tasks } from './tasks/Tasks';
 import { Today } from './today/Today';
 
@@ -22,4 +23,5 @@ export const HEAT_TABS: Record<TabId, ComponentType> = {
   grades: Grades,
   habits: Habits,
   mail: Mail,
+  notes: Notes,
 };

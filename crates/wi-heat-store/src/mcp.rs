@@ -948,10 +948,14 @@ pub fn get_notes(store: &Store, clock: &Clock, args: &Map<String, Value>) -> Res
             })
         })
         .collect();
-    let daily = one(store, kind::DAILY_NOTE, date)?.map(|d| {
-        let (text, cut) = clipped(d["markdown"].as_str().unwrap_or_default());
-        json!({"date": date, "text": text, "cut_short": cut})
-    });
+    // The daily note is the note titled with its day (docs/NOTES.md); one
+    // from before Notes is still read where it was.
+    let daily = one(store, kind::DAILY_NOTE, date)?
+        .or_else(|| crate::notes::find(store, date).ok())
+        .map(|d| {
+            let (text, cut) = clipped(d["markdown"].as_str().unwrap_or_default());
+            json!({"date": date, "text": text, "cut_short": cut})
+        });
     Ok(json!({"notes": notes, "daily_note": daily}))
 }
 

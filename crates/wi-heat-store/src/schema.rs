@@ -89,6 +89,7 @@ pub(crate) const SPECS: &[Spec] = &[
             "sourceId",
             "claudeReason",
             "tag",
+            "noteId",
             "public",
         ],
         &["due", "estMin", "doneAt"],
@@ -247,10 +248,52 @@ pub(crate) const SPECS: &[Spec] = &[
             "link",
             "source",
             "claudeReason",
+            "courseId",
+            "spaceId",
+            "file",
+            "capturedAt",
+            "inbox",
+            "attachments",
+            "createdAt",
+            "updatedAt",
             "public",
         ],
         &[],
         true,
+    ),
+    spec(
+        "commitment",
+        "id",
+        &[
+            "id",
+            "title",
+            "kind",
+            "location",
+            "start",
+            "end",
+            "rrule",
+            "from",
+            "until",
+            "exceptions",
+            "bufferBefore",
+            "bufferAfter",
+            "hardness",
+            "courseId",
+            "spaceId",
+            "source",
+            "sourceId",
+            "weekOf",
+            "feedId",
+        ],
+        &[],
+        false,
+    ),
+    spec(
+        "termBreak",
+        "id",
+        &["id", "title", "from", "to", "source"],
+        &[],
+        false,
     ),
 ];
 
@@ -406,7 +449,9 @@ pub(crate) fn finish(
             }
             needs(&mut candidate, "markdown", json!(""));
         }
-        "note" => needs(&mut candidate, "markdown", json!("")),
+        "note" => crate::notes::check(&mut candidate, existing, world, clock)?,
+        "commitment" => crate::commit::check(&mut candidate, world, clock, &[])?,
+        "termBreak" => crate::commit::check_break(&mut candidate)?,
         _ => {}
     }
     Ok(Finished {
