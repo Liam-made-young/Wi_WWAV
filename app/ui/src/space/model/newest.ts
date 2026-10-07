@@ -2,7 +2,7 @@
 // is the only order; every list ends; nothing is counted.
 
 import type { Medium, WorkFacts } from './catalogue';
-import { cardFacts, price, verbFor } from './facts';
+import { cardFacts, verbFor } from './facts';
 import { claimSentence, type LinkDraft } from './lineage';
 
 export interface NewestItem extends WorkFacts {
@@ -81,8 +81,6 @@ export function pageOf(items: NewestItem[], pages: number): { cards: Card[]; end
 export type SinceEvent =
   | { kind: 'fork'; at: string; who: string; work: string; fork: string }
   | { kind: 'link'; at: string; who: string; linkId: number; link: Pick<LinkDraft, 'from' | 'to' | 'kind'> }
-  | { kind: 'sale'; at: string; work: string; priceCents: number }
-  | { kind: 'payout'; at: string; amountCents: number }
   | { kind: 'work'; at: string; who: string; title: string }
   | { kind: 'letter'; at: string; who: string; greeting: string; opening: string };
 
@@ -99,10 +97,6 @@ function lineOf(e: SinceEvent): string {
       return `${e.who} forked ${e.work}: ${e.fork}.`;
     case 'link':
       return claimSentence(e.who, e.link);
-    case 'sale':
-      return `${e.work} sold for ${price(e.priceCents)}.`;
-    case 'payout':
-      return `${price(e.amountCents)} paid out.`;
     case 'work':
       return `New from ${e.who}: ${e.title}.`;
     case 'letter':
