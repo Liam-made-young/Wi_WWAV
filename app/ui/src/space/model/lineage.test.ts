@@ -86,10 +86,15 @@ describe('the family tree (v3 ring rule)', () => {
     expect(gap(angleOf(at('b1'), at('r')), base + (7 / 8) * TWO_PI)).toBeLessThanOrEqual(jitter + 1e-9);
   });
 
-  test('orders siblings by when they were made, whatever order they arrive in', () => {
-    const shuffled = [V3[3], V3[0], V3[5], V3[2], V3[4], V3[1]];
+  test('orders siblings and merges by when they were made, whatever order they arrive in', () => {
+    const merged = [
+      ...V3,
+      node('mix', 'moon1b', 8, { secondaryParentTrackId: 'moon1a1' }),
+      node('mix2', 'moon1a', 9, { secondaryParentTrackId: 'moon1b' }),
+    ];
+    const shuffled = [merged[7], merged[3], merged[0], merged[5], merged[6], merged[2], merged[4], merged[1]];
     expect(layoutFamilies(buildFamilies(['sun1', 'sun2'], shuffled))).toEqual(
-      layoutFamilies(buildFamilies(['sun1', 'sun2'], V3)),
+      layoutFamilies(buildFamilies(['sun1', 'sun2'], merged)),
     );
   });
 

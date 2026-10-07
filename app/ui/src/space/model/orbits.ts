@@ -147,7 +147,7 @@ export const SYSTEM_DISC_RADIUS = 300;
 const SYSTEM_DOTS_MAX = 12;
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 
-export interface PlacedSystem extends Point {
+export interface SystemDisc extends Point {
   id: number;
   radius: number;
   // A disc shows its worlds as dots, offsets from its centre.
@@ -170,7 +170,7 @@ export function systemDots(worldCount: number, seed: string): Point[] {
 
 // Systems take seats by orbit index, as worlds do, but don't orbit. An
 // owner's position wins over the seat.
-export function placeSystems(galaxy: Galaxy): PlacedSystem[] {
+export function placeSystems(galaxy: Galaxy): SystemDisc[] {
   const seed = galaxySeed(galaxy);
   const ordered = [...galaxy.systems].sort((a, b) => a.orbitIndex - b.orbitIndex || a.id - b.id);
   return ordered.map((system, seat) => {

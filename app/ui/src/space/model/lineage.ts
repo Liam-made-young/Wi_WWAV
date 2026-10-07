@@ -134,7 +134,7 @@ export function buildFamilies(roots: string[], nodes: LineageNode[]): Family[] {
   // A second parent is drawn as a merge only when both ends share a family.
   const familyOfNode = new Map<string, number>();
   families.forEach((f, i) => f.generations.flat().forEach((n) => familyOfNode.set(n.trackId, i)));
-  for (const n of nodes) {
+  for (const n of [...nodes].sort(bySortKey)) {
     if (n.secondaryParentTrackId === null) continue;
     const a = familyOfNode.get(n.secondaryParentTrackId);
     if (a === undefined || a !== familyOfNode.get(n.trackId)) continue;
