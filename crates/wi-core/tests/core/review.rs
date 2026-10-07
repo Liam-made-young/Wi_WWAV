@@ -425,9 +425,11 @@ fn review_a_forgotten_multipart_upload_starts_again() {
 
 // ---------------------------------------------------------------- account
 
-/// Finding: any 4xx from /api/auth/refresh deletes the tokens, a 429 (rate
-/// limited, the server's own `uploadSign`-style limiter) included: a
-/// moment of rate limiting signs the person out: the upload queue and Heat sync stop
+/// Finding: any 4xx from /api/auth/refresh deletes the tokens, a 429
+/// included. The server limits /api/auth/refresh with `authLogin`, 20 per
+/// 15 minutes per IP and shared with sign-in (server.md §1), so a few
+/// devices behind one school or home address are enough: one rate-limited
+/// refresh signs the person out, and the upload queue and Heat sync stop
 /// until they sign in again in the browser.
 #[test]
 #[ignore = "review finding: a 429 on refresh signs the person out"]
