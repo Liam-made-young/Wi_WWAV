@@ -38,8 +38,10 @@ fn menu_json(room: Room, h: &History) -> Value {
     })
 }
 
-/// Sends every room's labels: an undo in one room can hold or free another's.
+/// Sends every room's labels (an undo in one room can hold or free
+/// another's), and the save state: every committed change is saved (9.6).
 fn send_history(i: &Inner) {
+    i.bus.status("save", "Saved on this Mac");
     for room in ROOMS {
         if let Ok(h) = i.store().history(room) {
             i.bus.emit("history", menu_json(room, &h));

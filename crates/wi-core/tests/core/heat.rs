@@ -54,7 +54,16 @@ fn two_libraries_of_one_account_meet_field_by_field() {
         ["AM", "PM"].contains(&ampm) && synced_at.contains(':'),
         "{sentence}"
     );
-    let status = wait_event(&events, "status", Duration::from_secs(2));
+    let status = loop {
+        let e = wait_event(&events, "status", Duration::from_secs(2));
+        if e.payload["area"] == "sync" {
+            break e;
+        }
+        assert_eq!(
+            e.payload,
+            json!({"area": "save", "sentence": "Saved on this Mac"})
+        );
+    };
     assert_eq!(
         status.payload,
         json!({"area": "sync", "sentence": sentence})

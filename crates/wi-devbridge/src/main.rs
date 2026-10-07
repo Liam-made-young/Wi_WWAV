@@ -136,13 +136,14 @@ fn answer(core: &Core, text: &str) -> Value {
 /// One browser tab: commands in, answers, events and meters out. The
 /// socket is read with a short timeout so the same thread can write
 /// whatever is waiting in between.
-fn serve(core: &Arc<Core>, stream: TcpStream) -> Result<(), WsError> {
+fn serve(core: &Arc<Core>, stream: TcpStream) -> Result<(), Box<WsError>> {
     let mut ws = tungstenite::accept(stream).map_err(|e| match e {
-        tungstenite::HandshakeError::Failure(e) => e,
-        tungstenite::HandshakeError::Interrupted(_) => WsError::ConnectionClosed,
+        tungstenite::HandshakeError::Failure(e) => Box::new(e),
+        tungstenite::HandshakeError::Interrupted(_) => Box::new(WsError::ConnectionClosed),
     })?;
     ws.get_mut()
-        .set_read_timeout(Some(Duration::from_millis(5)))?;
+        .set_read_timeout(Some(Duration::from_millis(5)))
+        .map_err(|e| Box::new(WsError::Io(e)))?;
     let events = core.events();
     let meters = core.meters();
     let (out, answers) = mpsc::channel::<String>();
@@ -172,7 +173,7 @@ fn serve(core: &Arc<Core>, stream: TcpStream) -> Result<(), WsError> {
             Err(WsError::Io(e))
                 if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {}
             Err(WsError::ConnectionClosed | WsError::AlreadyClosed) => return Ok(()),
-            Err(e) => return Err(e),
+            Err(e) => return Err(Box::new(e)),
         }
     }
 }
