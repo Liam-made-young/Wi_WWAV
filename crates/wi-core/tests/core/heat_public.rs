@@ -1,7 +1,7 @@
 //! Public and private (docs/SPEC.md 3.15, 8.7; PLAN S2.9 and S2.11's Privacy
 //! half), against tools/mock-server. What a fail looks like:
 //! - a private record, grade or note appears in `/api/heat/public/:userId` or
-//!   in the preview, or a private grade leaves the Mac at all;
+//!   in the preview, or a private grade or course leaves the Mac at all;
 //! - a public record shows more than the fields 3.15 lists, or a public grade
 //!   puts more than its copy on the server;
 //! - switching it back doesn't remove its copy at the next sync;
@@ -133,8 +133,8 @@ fn s2_9_a_private_grade_never_leaves_the_mac_and_a_public_one_goes_up_as_its_cop
     let _ = space;
     core.sync_heat().unwrap();
     let rows = held(&m.server, &m.setup);
-    assert!(rows.iter().all(|c| c["kind"] != "grade"), "a grade left the Mac with its switch off");
-    assert!(rows.iter().any(|c| c["kind"] == "course" && c["field"] == "code"), "the course itself syncs as a private row");
+    assert!(rows.iter().all(|c| c["kind"] != "grade" && c["kind"] != "course"), "a private grade or course left the Mac");
+    assert!(rows.iter().any(|c| c["kind"] == "term"), "the rest of Heat syncs");
 
     // The switch says what it does, in the words of 3.15.
     let on = ok(core, "heat.public.set", json!({"kind": "grade", "id": open["id"], "public": true}));
@@ -156,6 +156,13 @@ fn s2_9_a_private_grade_never_leaves_the_mac_and_a_public_one_goes_up_as_its_cop
         .collect();
     assert_eq!(copy, ["courseId", "outOf", "public", "score", "title"].map(String::from).into_iter().collect());
     assert!(held(&m.server, &m.setup).iter().all(|c| c["id"] != private["id"]), "the private grade never went up");
+    // The course went up as its code and name alone, because the public grade names it: not its weights, scale or term.
+    let named: BTreeSet<String> = held(&m.server, &m.setup)
+        .iter()
+        .filter(|c| c["kind"] == "course" && c["id"] == course["id"])
+        .map(|c| c["field"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(named, ["code", "name"].map(String::from).into_iter().collect());
     assert_eq!(tidy(ok(core, "heat.publicView", json!({}))), tidy(body));
     // A score typed afterwards reaches the copy.
     ok(core, "heat.score", json!({"gradeId": open["id"], "score": 10}));
@@ -167,19 +174,46 @@ fn s2_9_a_private_grade_never_leaves_the_mac_and_a_public_one_goes_up_as_its_cop
     core.sync_heat().unwrap();
     assert!(public_view(&m.server)["items"].get("grade").is_none());
     assert_eq!(ok(core, "heat.publicView", json!({}))["items"], json!({}));
+    // With no public grade to name it, the course's code and name come down too.
+    assert!(
+        held(&m.server, &m.setup).iter().any(|c| c["kind"] == "course" && c["field"] == "deleted" && c["value"] == true),
+        "the course was still up with nothing public to name it"
+    );
     ok(core, "heat.public.set", json!({"kind": "grade", "id": open["id"], "public": true}));
     core.sync_heat().unwrap();
     assert_eq!(public_view(&m.server)["items"]["grade"][0]["score"], 10);
-    // Deleting a public grade removes its copy too.
+    assert_eq!(public_view(&m.server)["items"]["grade"][0]["course"], "JPN 201");
+
+    // A course has its own switch: its code and name, and nothing of its grades or weights.
+    ok(core, "heat.public.set", json!({"kind": "course", "id": course["id"], "public": true}));
+    core.sync_heat().unwrap();
+    let shown_course = public_view(&m.server);
+    assert_eq!(shown_course["items"]["course"], json!([{"id": course["id"], "code": "JPN 201", "name": "Japanese 2"}]));
+    let up: BTreeSet<String> = held(&m.server, &m.setup)
+        .iter()
+        .filter(|c| c["kind"] == "course" && c["id"] == course["id"])
+        .map(|c| c["field"].as_str().unwrap().to_string())
+        .collect();
+    assert!(["categories", "scale", "termId", "weights"].iter().all(|f| !up.contains(*f)), "more than the copy went up: {up:?}");
+    assert_eq!(tidy(ok(core, "heat.publicView", json!({}))), tidy(shown_course));
+    ok(core, "heat.public.set", json!({"kind": "course", "id": course["id"], "public": false}));
+    core.sync_heat().unwrap();
+    assert!(public_view(&m.server)["items"].get("course").is_none(), "switched back, the course's copy is gone");
+    assert_eq!(public_view(&m.server)["items"]["grade"][0]["course"], "JPN 201", "the public grade still names it");
+
+    // Deleting a public grade removes its copy too, and the course with it.
     ok(core, "heat.delete", json!({"kind": "grade", "id": open["id"]}));
     core.sync_heat().unwrap();
     assert!(public_view(&m.server)["items"].get("grade").is_none());
-    // And a second Mac of the same account never receives a grade, public or not.
+    assert!(held(&m.server, &m.setup).iter().any(|c| c["kind"] == "course" && c["field"] == "deleted" && c["value"] == true));
+    // And a second Mac of the same account never receives a grade or a course, public or not.
     let air_setup = Setup::new();
     std::fs::create_dir_all(air_setup.dir.path()).unwrap();
     let air = sign_in(&air_setup, &m.server);
     air.sync_heat().unwrap();
     assert!(records(&snap(&air, "2026-10-07"), "grade").is_empty());
+    assert!(records(&snap(&air, "2026-10-07"), "course").is_empty());
+    assert_eq!(records(&snap(&air, "2026-10-07"), "term").len(), 1, "what isn't held back arrives");
 }
 
 #[test]

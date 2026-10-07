@@ -11,11 +11,12 @@
 //! the library as one journal entry ("changes from your other devices"), in
 //! a journal room no view's ⌘Z acts on, so undo stays exact and a sync never
 //! takes the person's redo; an undo in any view is a new local change and
-//! syncs like one. Grades stay on this Mac (Open, 9.8, at its
-//! recommendation): a grade goes up only while its Public switch is on, as a
-//! copy of the fields 3.15 lists for it, and its copy is deleted when the
-//! switch goes off. A calendar record, what a calendar's feed held, the
-//! timer and the settings never go up.
+//! syncs like one. Grades and courses stay on this Mac (8.7): one goes up
+//! only while its Public switch is on, as a copy of the fields 3.15 lists for
+//! it, and its copy is deleted when the switch goes off. A private course
+//! goes up as nothing but its code and name, and only while one of its grades
+//! is public, because that grade names it. A calendar record, what a
+//! calendar's feed held, the timer and the settings never go up.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -62,9 +63,22 @@ fn is_grade(kind: &str) -> bool {
     kind.eq_ignore_ascii_case("grade")
 }
 
+fn is_course(kind: &str) -> bool {
+    kind.eq_ignore_ascii_case("course")
+}
+
+/// Kinds that stay on this Mac unless their Public switch is on (8.7).
+fn held_back(kind: &str) -> bool {
+    is_grade(kind) || is_course(kind)
+}
+
 /// What a grade's public copy holds (3.15): the course it names, the item, the
 /// score and what it was out of, and the switch itself.
 const GRADE_COPY: [&str; 5] = ["courseId", "title", "score", "outOf", "public"];
+
+/// What a course shows, with the switch (3.15). A private course whose grade
+/// is public goes up as the first two alone.
+const COURSE_COPY: [&str; 3] = ["code", "name", "public"];
 
 /// A field written only if it isn't what the replica holds already, so a
 /// change noticed twice is stamped once.
@@ -103,6 +117,83 @@ fn sync_grade(r: &mut Replica, id: &str, now: Option<&Value>) -> bool {
     }
 }
 
+/// A course, as the server should hold it: a copy with its switch while it is
+/// public; its code and name alone while a public grade names it; else nothing.
+/// `now` is the course as it stands here, `named` whether a public grade does.
+fn sync_course(r: &mut Replica, id: &str, now: Option<&Value>, named: bool) -> bool {
+    let public = now.is_some_and(|c| c.get("public") == Some(&json!(true)));
+    match now.filter(|_| public || named) {
+        Some(course) => {
+            let mut wrote = false;
+            for field in COURSE_COPY {
+                let value = match field {
+                    "public" => json!(public),
+                    _ => course.get(field).cloned().unwrap_or(Value::Null),
+                };
+                // The switch is sent only once it has been on.
+                if field == "public" && !public && r.value("course", id, "public").is_none() {
+                    continue;
+                }
+                if r.value("course", id, field) != Some(&value) {
+                    r.write("course", id, field, value);
+                    wrote = true;
+                }
+            }
+            if r.value("course", id, "deleted") == Some(&json!(true)) {
+                r.write("course", id, "deleted", json!(false));
+                wrote = true;
+            }
+            wrote
+        }
+        // Private and named by nothing, or gone: what went up is deleted, once.
+        None if r.value("course", id, "code").is_some() && r.value("course", id, "deleted") != Some(&json!(true)) => {
+            r.write("course", id, "public", json!(false));
+            r.write("course", id, "deleted", json!(true));
+            true
+        }
+        None => false,
+    }
+}
+
+/// What the held-back kinds stand at in the library now: the grades named,
+/// every course, and the courses a public grade names.
+struct Held {
+    grades: BTreeMap<String, Option<Value>>,
+    courses: BTreeMap<String, Value>,
+    named: BTreeSet<String>,
+}
+
+fn held_now(i: &Inner, grade_ids: &BTreeSet<String>) -> Result<Held, CoreError> {
+    let store = i.store();
+    let mut grades = BTreeMap::new();
+    for id in grade_ids {
+        grades.insert(id.clone(), store.doc("grade", id)?.map(|d| d.json));
+    }
+    let courses = store.docs("course")?.into_iter().map(|d| (d.key, d.json)).collect();
+    let named = store
+        .docs("grade")?
+        .into_iter()
+        .filter(|d| d.json.get("public") == Some(&json!(true)))
+        .filter_map(|d| d.json.get("courseId").and_then(Value::as_str).map(String::from))
+        .collect();
+    Ok(Held { grades, courses, named })
+}
+
+/// Brings the replica's grades and courses to what `held` says, for the
+/// grades it names and for every course there is or was. True if anything moved.
+fn sync_held(r: &mut Replica, held: &Held) -> bool {
+    let mut moved = false;
+    for (id, grade) in &held.grades {
+        moved |= sync_grade(r, id, grade.as_ref());
+    }
+    let mut courses: BTreeSet<String> = held.courses.keys().cloned().collect();
+    courses.extend(r.snapshot().keys().filter(|k| is_course(&k.0)).map(|k| k.1.clone()));
+    for id in courses {
+        moved |= sync_course(r, &id, held.courses.get(&id), held.named.contains(&id));
+    }
+    moved
+}
+
 fn load(i: &Inner) -> Result<Replica, CoreError> {
     match i.kv.get(REPLICA)? {
         Some(v) => serde_json::from_value::<Saved>(v)
@@ -119,31 +210,22 @@ fn save(i: &Inner, r: &Replica) -> Result<(), CoreError> {
 /// Local edits made in Heat, field by field, waiting to go up.
 pub(crate) fn wrote(i: &Inner, changes: &[(&str, &str, &str, &Value)]) -> Result<(), CoreError> {
     let grades: BTreeSet<String> = changes.iter().filter(|c| is_grade(c.0)).map(|c| c.1.to_string()).collect();
-    let synced: Vec<_> = changes.iter().filter(|c| !is_grade(c.0) && !local_only(c.0)).collect();
-    if synced.is_empty() && grades.is_empty() {
+    let held = changes.iter().any(|c| held_back(c.0));
+    let synced: Vec<_> = changes.iter().filter(|c| !held_back(c.0) && !local_only(c.0)).collect();
+    if synced.is_empty() && !held {
         return Ok(());
     }
-    let now = grades_now(i, &grades)?;
+    let now = if held { Some(held_now(i, &grades)?) } else { None };
     with_replica(i, |r| {
         for (kind, id, field, value) in synced {
             r.write(kind, id, field, (*value).clone());
         }
-        for (id, grade) in &now {
-            sync_grade(r, id, grade.as_ref());
+        if let Some(now) = &now {
+            sync_held(r, now);
         }
     })?;
     i.poke();
     Ok(())
-}
-
-/// The grades named, as they stand in the library now.
-fn grades_now(i: &Inner, ids: &BTreeSet<String>) -> Result<BTreeMap<String, Option<Value>>, CoreError> {
-    let store = i.store();
-    let mut out = BTreeMap::new();
-    for id in ids {
-        out.insert(id.clone(), store.doc("grade", id)?.map(|d| d.json));
-    }
-    Ok(out)
 }
 
 /// A journal entry's records, noticed: each field that changed goes up, a
@@ -152,11 +234,12 @@ fn grades_now(i: &Inner, ids: &BTreeSet<String>) -> Result<BTreeMap<String, Opti
 /// (docs/SPEC.md 8.7).
 pub(crate) fn wrote_entry(i: &Inner, docs: &[DocChange]) -> Result<(), CoreError> {
     let grades: BTreeSet<String> = docs.iter().filter(|d| is_grade(&d.kind)).map(|d| d.key.clone()).collect();
-    let others: Vec<&DocChange> = docs.iter().filter(|d| !is_grade(&d.kind) && !local_only(&d.kind)).collect();
-    if others.is_empty() && grades.is_empty() {
+    let held = docs.iter().any(|d| held_back(&d.kind));
+    let others: Vec<&DocChange> = docs.iter().filter(|d| !held_back(&d.kind) && !local_only(&d.kind)).collect();
+    if others.is_empty() && !held {
         return Ok(());
     }
-    let now = grades_now(i, &grades)?;
+    let now = if held { Some(held_now(i, &grades)?) } else { None };
     with_replica(i, |r| {
         for d in &others {
             let (kind, id) = (d.kind.as_str(), d.key.as_str());
@@ -181,8 +264,8 @@ pub(crate) fn wrote_entry(i: &Inner, docs: &[DocChange]) -> Result<(), CoreError
                 }
             }
         }
-        for (id, grade) in &now {
-            sync_grade(r, id, grade.as_ref());
+        if let Some(now) = &now {
+            sync_held(r, now);
         }
     })?;
     i.poke();
@@ -213,14 +296,18 @@ pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
         let store = i.store();
         store.docs("grade")?.into_iter().map(|d| d.key).collect()
     };
-    let grades = grades_now(i, &grade_ids)?;
+    let mut now = held_now(i, &grade_ids)?;
     let _held = lock(&HELD);
     let mut r = load(i)?;
     let snapshot = r.snapshot();
+    // A grade that went up and is gone now still has its copy to delete.
+    for k in snapshot.keys().filter(|k| is_grade(&k.0)) {
+        now.grades.entry(k.1.clone()).or_insert(None);
+    }
     let mut kinds: BTreeSet<String> = snapshot.keys().map(|k| k.0.clone()).collect();
     kinds.extend(i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind").unwrap_or_default());
     let mut writes: Vec<(String, String, String, Value)> = Vec::new();
-    for kind in kinds.iter().filter(|k| !is_grade(k) && !local_only(k)) {
+    for kind in kinds.iter().filter(|k| !held_back(k) && !local_only(k)) {
         let docs = i.store().docs(kind)?;
         let mut present = BTreeSet::new();
         for d in docs {
@@ -243,11 +330,8 @@ pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
             }
         }
     }
-    let known_grades: BTreeSet<String> = snapshot.keys().filter(|k| is_grade(&k.0)).map(|k| k.1.clone()).collect();
     let mut moved = !writes.is_empty();
-    for id in grade_ids.iter().chain(known_grades.iter()) {
-        moved |= sync_grade(&mut r, id, grades.get(id).and_then(Option::as_ref));
-    }
+    moved |= sync_held(&mut r, &now);
     for (kind, id, field, value) in writes {
         r.write(&kind, &id, &field, value);
     }
@@ -419,7 +503,7 @@ fn apply(i: &Inner, touched: &BTreeSet<(String, String)>) -> Result<(), CoreErro
     }
     let snapshot = with_replica(i, |r| r.snapshot())?;
     let mut records = Vec::new();
-    for (kind, id) in touched.iter().filter(|(kind, _)| !is_grade(kind) && !local_only(kind)) {
+    for (kind, id) in touched.iter().filter(|(kind, _)| !held_back(kind) && !local_only(kind)) {
         let fields: BTreeMap<&str, &Value> = snapshot
             .range((kind.clone(), id.clone(), String::new())..)
             .take_while(|(k, _)| &k.0 == kind && &k.1 == id)
