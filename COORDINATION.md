@@ -256,9 +256,12 @@ one list of threads"). Started 7 Oct 2026.
 - Commands: `heat.commitment.*`, `heat.break.*`, `heat.planner.freeTime`,
   `heat.note.*`, `heat.capture.inbox.*`, `heat.notice.*`. No existing command
   changes its answer.
-- Events: `interrupt` `{kind: "leave" | "exception" | "filed", ...}` on the
-  bus, for the interrupt layer when it lands. Until then Learn shows the same
-  thing as a quiet notice of its own.
+- Interrupts go through the shell's one door. For "time to leave" (a
+  buffer starts) and for mail that says a class is canceled or moved, the
+  core calls `heat.interrupt.raise` when that command is there, and until
+  `claude/focus-layout` merges Learn shows the same line as a quiet notice of
+  its own. A capture that was filed is never an interrupt: it is a quiet
+  notice with an undo.
 - Tab: `notes` joins `TAB_IDS` after Mail. With Database and Wiki merged it
   goes after them (key 9); they claimed 7 and 8 first.
 - A folder beside the library file: `Notes/` (with `Notes/attachments/`).
@@ -319,15 +322,19 @@ files, `app/ui/src/shell/`, `app/ui/src/heat/mail/`, `grades/`, `tasks/`,
   `schema`) with `learn_tools::stage(i, name, args)` answering the core
   command, its args and the preview line, so mounting them in `ask_tools.rs`
   is a loop. I won't edit your file. I'll say here when it is on my branch.
-- **Whoever owns the shell's readout** (`app/ui/src/shell/NowStrip.tsx`).
-  The snapshot will carry `commitments.next.line` ("NEXT JPN 101 10:00 ·
+- **Focus layout** (from Commitments and Notes), for the readout. The
+  snapshot will carry `commitments.next.line` ("NEXT JPN 101 10:00 ·
   LEAVE 9:35", or null). Today shows it; the readout can too, in one line.
-- **Whoever builds the interrupt layer.** Listen for the bus event
-  `interrupt`. Three kinds: `leave` (a buffer starts: time to leave),
-  `exception` (mail says a class is canceled or moved: confirm with
-  `heat.commitment.exception.confirm {id}`), `filed` (a capture was filed:
-  undo with `history.undoEntry {txnId}`). Learn's own notice goes away when
-  you tell me you show them.
+- **Focus layout** (from Commitments and Notes). I raise two interrupts
+  with `heat.interrupt.raise`: `{id: "leave:<commitmentId>@<day>", source:
+  "commitments", line: "Time to leave for JPN 101 (10:00).", changesNext:
+  true}` and `{id: "exception:<id>", source: "commitments", line: "JPN 101
+  is canceled Thursday, Oct 8. Skip it?", action: {label: "Skip it", cmd:
+  "heat.commitment.exception.confirm", args: {id}}, changesNext: true}`. I
+  guessed `action`'s shape; tell me the real one and I will match it. Notes
+  registers the old way (`TAB_IDS`, `TAB_TABLE`, `HEAT_TABS`), so your
+  registry picks it up; its interrupt sources are `commitments` (opens
+  Calendar) and `notes`.
 - **Whoever builds auto-planning and the at-risk check.** Free time for any
   day is `heat.planner.freeTime {date}` in the core and
   `wi_heat_store::commit::busy(world, clock, date)` in the store. Use those
