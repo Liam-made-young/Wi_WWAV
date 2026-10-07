@@ -128,6 +128,63 @@ fn events_arrive_between_responses() {
 }
 
 #[test]
+fn an_answer_says_how_many_events_came_before_it() {
+    let (client, events, mut engine) = pair();
+    let fake = thread::spawn(move || {
+        // Two events, the first answer, one event, the second answer, then
+        // an event: written in one go, so the reader has the lot before the
+        // first caller wakes.
+        let a = next_request(&mut engine);
+        let b = next_request(&mut engine);
+        let e = |n: u64| frame::encode(&event("e", json!({"n": n}))).unwrap();
+        let bytes = [
+            e(0),
+            e(1),
+            frame::encode(&ok(a.id, json!({}))).unwrap(),
+            e(2),
+            frame::encode(&ok(b.id, json!({}))).unwrap(),
+            e(3),
+        ]
+        .concat();
+        use std::io::Write;
+        engine.write_all(&bytes).unwrap();
+        engine
+    });
+    let client = std::sync::Arc::new(client);
+    let second = {
+        let client = client.clone();
+        thread::spawn(move || {
+            // Sent after the first, so it has the second id.
+            thread::sleep(Duration::from_millis(50));
+            client.request_ordered("b", Value::Null, T).unwrap()
+        })
+    };
+    let first = client.request_ordered("a", Value::Null, T).unwrap();
+    let second = second.join().unwrap();
+    assert_eq!((first.events_before, second.events_before), (2, 3));
+    let all: Vec<Value> = (0..4)
+        .map(|_| events.recv_timeout(T).unwrap().fields["n"].clone())
+        .collect();
+    assert_eq!(all, [json!(0), json!(1), json!(2), json!(3)]);
+    fake.join().unwrap();
+}
+
+#[test]
+fn a_half_close_still_gets_everything_the_engine_sends_before_it_closes() {
+    let (client, events, mut engine) = pair();
+    let fake = thread::spawn(move || {
+        // The engine reads to the end of its input, says one more thing and
+        // hangs up.
+        assert!(frame::read(&mut engine).unwrap().is_none());
+        frame::write(&mut engine, &event("last", json!({}))).unwrap();
+    });
+    client.close_writes();
+    fake.join().unwrap();
+    assert!(client.wait_closed(T));
+    assert_eq!(events.recv_timeout(T).unwrap().ev, "last");
+}
+
+#[test]
 fn a_refusal_comes_back_as_the_engines_error() {
     let (client, _events, mut engine) = pair();
     let fake = thread::spawn(move || {

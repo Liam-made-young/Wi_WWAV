@@ -224,6 +224,29 @@ impl Clock {
         self.seq.store(seq + 2, Ordering::Release);
     }
 
+    /// The app's side, once the writer is dead and before another starts
+    /// (§4.2, §5). A writer killed between the two halves of a write leaves
+    /// `seq` odd, so readers get no clock, and its fields part from one block
+    /// and part from the next. If so, this writes a whole clock over them,
+    /// stopped where the dead writer's `sample_pos` stood, and leaves `seq`
+    /// even, so the next writer starts from even whatever it does with an odd
+    /// one. Returns whether it had to.
+    pub fn repair(&self) -> bool {
+        let r = Ordering::Relaxed;
+        if self.seq.load(Ordering::Acquire) & 1 == 0 {
+            return false;
+        }
+        self.write(&ClockFields {
+            sample_pos: self.sample_pos.load(r),
+            host_time_ns: self.host_time_ns.load(r),
+            rate: 0.0,
+            state: STATE_STOPPED,
+            dropouts: self.dropouts.load(r),
+            callbacks: self.callbacks.load(r),
+        });
+        true
+    }
+
     /// The reader's side, from any thread or process: load `seq` (acquire),
     /// read the fields, an acquire fence, load `seq` again, and retry if it
     /// changed or is odd. `None` means `seq` stayed on one odd number: the
@@ -817,6 +840,47 @@ mod tests {
         c.write(&clock(2));
         assert_eq!(c.read(), Some(clock(2)));
         assert_eq!(c.seq.load(Ordering::Relaxed) % 2, 0);
+    }
+
+    /// A writer that does what §4.2's text says and no more: `seq += 1`,
+    /// the fields, `seq += 1`. `half` stops it after the first `seq += 1`,
+    /// as a kill would.
+    fn literal_write(c: &Clock, f: &ClockFields, half: bool) {
+        c.seq.fetch_add(1, Ordering::Relaxed);
+        fence(Ordering::Release);
+        c.sample_pos.store(f.sample_pos, Ordering::Relaxed);
+        if half {
+            return;
+        }
+        c.host_time_ns.store(f.host_time_ns, Ordering::Relaxed);
+        c.rate.store(f.rate.to_bits(), Ordering::Relaxed);
+        c.state.store(f.state, Ordering::Relaxed);
+        c.dropouts.store(f.dropouts, Ordering::Relaxed);
+        c.callbacks.store(f.callbacks, Ordering::Relaxed);
+        c.seq.fetch_add(1, Ordering::Release);
+    }
+
+    #[test]
+    fn the_app_repairs_a_clock_left_half_written_before_the_next_engine() {
+        let shm = region();
+        let c = &shm.region().clock;
+        assert!(!c.repair(), "a whole clock is left alone");
+        literal_write(c, &clock(1), false);
+        literal_write(c, &clock(2), true);
+        assert_eq!(c.read(), None, "the engine died mid-write");
+
+        assert!(c.repair());
+        let stopped = c.read().unwrap();
+        assert_eq!(
+            (stopped.state, stopped.rate, stopped.sample_pos),
+            (STATE_STOPPED, 0.0, clock(2).sample_pos),
+            "stopped where it stood"
+        );
+        // So an engine that only ever adds 1 still writes with seq odd and
+        // rests with it even.
+        literal_write(c, &clock(3), false);
+        assert_eq!(c.seq.load(Ordering::Relaxed) % 2, 0);
+        assert_eq!(c.read(), Some(clock(3)));
     }
 
     #[test]
