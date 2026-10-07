@@ -214,6 +214,7 @@ void AudioEngine::drain(Graph* g) {
   if (last) {
     ackPlaying_.store(transport_.playing, std::memory_order_relaxed);
     ackPos_.store(transport_.pos, std::memory_order_relaxed);
+    playhead_.store(transport_.pos, std::memory_order_relaxed);
     applied_.store(last, std::memory_order_release);
   }
 }
@@ -268,6 +269,7 @@ void AudioEngine::callback(float* const* out, int channels, int n) {
     if (g) g->endBlock(m, done + m == n ? meters : nullptr);
     done += m;
   }
+  playhead_.store(transport_.pos, std::memory_order_relaxed);
   meters->callback = callbacks_;
   meters->dsp_load = (float)((double)(monotonicNs() - start) * rate_ / ((double)n * 1e9));
   meters->dropouts = clock.dropouts;
@@ -284,6 +286,7 @@ void AudioEngine::post(Command c) {
     run(c, graph_.load());
     ackPlaying_.store(transport_.playing);
     ackPos_.store(transport_.pos);
+    playhead_.store(transport_.pos);
     applied_.store(c.seq);
     return;
   }

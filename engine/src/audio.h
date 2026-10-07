@@ -64,7 +64,10 @@ class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Tim
   // The same, then waits until the audio thread has applied it; returns the
   // transport as that block left it.
   Transport apply(Command c);
+  // The transport as the last command left it.
   Transport transport() const;
+  // Where the playhead is now: after the last block, or the last command.
+  int64_t playhead() const { return playhead_.load(std::memory_order_relaxed); }
 
   // One atomic pointer exchange; returns the old graph once the audio thread
   // has let go of it, to be freed off the audio thread.
@@ -104,6 +107,7 @@ class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Tim
   std::atomic<uint64_t> applied_{0};     // the audio thread: the last command it applied
   std::atomic<bool> ackPlaying_{false};  // and the transport as that block left it
   std::atomic<int64_t> ackPos_{0};
+  std::atomic<int64_t> playhead_{0};
 
   // The audio thread's own, or the worker's while no device runs.
   Transport transport_;

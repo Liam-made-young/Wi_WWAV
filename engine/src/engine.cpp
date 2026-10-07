@@ -188,11 +188,10 @@ void Engine::request(uint64_t conn, const juce::var& id, const std::string& op, 
   if (op == "midi.inputs" || op == "midi.route")
     return answer(Reply::fail("unsupported", "MIDI comes in a later stage."));
 
-  const bool debug = op == "debug.crash" || op == "debug.hang" || op == "debug.crumb";
-  if (debug && !args_.test) return answer(Reply::fail("unknown_op", "No op named \"" + op + "\"."));
-  if (debug && op != "debug.crumb") {
+  if (op == "debug.crash" || op == "debug.hang" || op == "debug.crumb") {
+    if (!args_.test) return answer(Reply::fail("unknown_op", "No op named \"" + op + "\"."));
     const std::string in = text(args["in"]);
-    if (in == "message") {
+    if (op != "debug.crumb" && in == "message") {
       if (op == "debug.crash") {
         juce::MessageManager::callAsync([] { abort(); });
         return;
@@ -203,8 +202,16 @@ void Engine::request(uint64_t conn, const juce::var& id, const std::string& op, 
       });
       return;
     }
-    if (in != "audio")
+    if (op != "debug.crumb" && in != "audio")
       return answer(Reply::fail("bad_args", "debug.crash and debug.hang take in: \"audio\" or \"message\"."));
+    // The worker is the audio thread's one sender. A crash has no answer:
+    // the connection closing is the answer.
+    worker_->post([this, op, args, answer] {
+      bool reply = true;
+      Reply r = debugAudio(op, args, &reply);
+      if (reply) answer(r);
+    });
+    return;
   }
 
   std::function<Reply()> run;
@@ -222,17 +229,8 @@ void Engine::request(uint64_t conn, const juce::var& id, const std::string& op, 
     run = [this, op, args] { return transportOp(op, args); };
   else if (op == "render")
     run = [this, args] { return render(args); };
-  else if (!debug)
+  else
     return answer(Reply::fail("unknown_op", "No op named \"" + op + "\"."));
-  if (debug) {
-    // A crash has no answer: the connection closing is the answer.
-    worker_->post([this, op, args, answer] {
-      bool reply = true;
-      Reply r = debugAudio(op, args, &reply);
-      if (reply) answer(r);
-    });
-    return;
-  }
   worker_->post([run, answer] { answer(run()); });
 }
 
@@ -310,7 +308,7 @@ Reply Engine::sessionLoad(const juce::var& args) {
   if (!g) return Reply::fail(f.code, f.message);
   g->gen = ++gen_;
   // Streamed clips start with their window full where the playhead will be.
-  g->prefill(playhead >= 0 ? playhead : audio_->transport().pos);
+  g->prefill(playhead >= 0 ? playhead : audio_->playhead());
   for (ClipSource* s : g->streamed()) reader_->add(s);
 
   Json slots;
@@ -375,7 +373,7 @@ Reply Engine::transportOp(const std::string& op, const juce::var& args) {
     c.kind = Command::Play;
     // Streamed clips need their first quarter second read before play starts.
     if (Graph* g = audio_->graph()) {
-      const int64_t pos = audio_->transport().pos;
+      const int64_t pos = audio_->playhead();
       const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(300);
       while (!g->ready(pos, g->sampleRate / 4) && std::chrono::steady_clock::now() < until)
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
