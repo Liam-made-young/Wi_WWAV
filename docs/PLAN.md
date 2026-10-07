@@ -25,7 +25,7 @@ Rules for this work, from the founder (7 Oct 2026): the main agent plus at most 
 - [x] 3: Heat, the profile view (`ch03.md`)
 - [x] 4: Space, the social view (`ch04.md`)
 - [x] 5: Console, the creation view (`ch05.md`)
-- [ ] 6–7: Files; Look, sound and feel (`ch06-07.md`)
+- [x] 6–7: Files; Look, sound and feel (`ch06-07.md`)
 - [ ] 8: Under the hood (`ch08.md`)
 - [ ] 9–10: Business and gates; Roadmap, open decisions, glossary (`ch09-10.md`)
 - [ ] Assemble: front matter, join, resolve `{{old:X.Y}}` references, contents table
