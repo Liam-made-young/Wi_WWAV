@@ -51,11 +51,17 @@ async function serving(url: string) {
 
 export default async function globalSetup() {
   // The bridge, the engine it starts, and the .wwav packer the tests use.
-  const built = spawnSync('cargo', ['build', '-q', '-p', 'wi-devbridge', '-p', 'mock-engine', '-p', 'wwav-formats'], {
-    cwd: ROOT,
-    stdio: 'inherit',
-  });
-  if (built.status !== 0) throw new Error('cargo build failed');
+  // WI_E2E_NO_BUILD=1 uses the ones already in target/debug: a checkout that
+  // has just run `cargo test --workspace` has them, and building them alone
+  // builds the same crates again with other features, which a small disk
+  // can't hold.
+  if (!process.env.WI_E2E_NO_BUILD) {
+    const built = spawnSync('cargo', ['build', '-q', '-p', 'wi-devbridge', '-p', 'mock-engine', '-p', 'wwav-formats'], {
+      cwd: ROOT,
+      stdio: 'inherit',
+    });
+    if (built.status !== 0) throw new Error('cargo build failed');
+  }
 
   const library = mkdtempSync(join(tmpdir(), 'wi-wwav-e2e-'));
   const children: ChildProcess[] = [];
