@@ -33,6 +33,11 @@ camelCase fields. `text` is what ⌘K searches (titles, notes, note text).
 | `heatSetting` | `claude.tools`, `school`, `dayEnds` | `claude.tools` is `{tool: bool}`, all true by default |
 | `calendarEvent` | `<calendarId>/<UID>` | what other calendars' feeds hold; written by sync, outside the journal, replaced each sync |
 
+Two fields beyond 3.16's lists: a task Claude added keeps `claudeReason`,
+the sentence Get Info shows under "Claude, Oct 6 8:41 AM" (3.6), and a
+pending grade from a notice keeps `postedAt`. A pending grade's `outOf` starts
+at 100 until the person types the real one with the score.
+
 Every record but `mailThread` carries `public: false` by default (3.16). A
 record that belongs to another follows it: a task's blocks and occurrences, a
 course's pending grades. iCal addresses are never in the library: `calendar`
