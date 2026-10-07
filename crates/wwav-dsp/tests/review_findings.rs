@@ -88,7 +88,6 @@ fn a_short_clip_never_reads_nan_bpm() {
 /// is 81:09, so a session of 81:00–81:09 is accepted and reads "81:05 →
 /// about 4.3 GB.".
 #[test]
-#[ignore = "finding: sessions of 81:00 to 81:09 are not refused"]
 fn a_session_just_over_81_minutes_is_refused() {
     let frames = (81 * 60 + 5) * RATE as u64;
     let bytes = wwav_bytes(frames, 195, 115, None);

@@ -1,7 +1,8 @@
 //! What the export sheet says about length, size and conversion (5.13, 6.1,
 //! 6.7). A `.wwav` is 20 bytes a frame at 44.1 kHz (4 for the master, 16 for
 //! the stems) plus its chunks, and the packer refuses anything over 4 GB,
-//! RIFF's 32-bit size, which is about 81 minutes.
+//! RIFF's 32-bit size, which is 81 whole minutes; the sheet refuses a
+//! session over those 81.
 
 use crate::resample::resampled_len;
 
@@ -34,18 +35,23 @@ pub fn wwav_bytes(frames: u64, wmet: u64, wlin: u64, wrmx: Option<u64>) -> u64 {
     stems_header_at + 16 + pad + frames * 16 + chunk(wlin) + wrmx.map_or(0, chunk)
 }
 
-/// Whole minutes a `.wwav` holds: 81.
+/// Whole minutes a `.wwav` holds: 81, the whole minutes under the packer's
+/// 4 GB.
 pub fn minutes_held() -> u64 {
     MAX_WWAV_BYTES / (20 * WWAV_RATE as u64 * 60)
 }
 
 /// "3:58 → about 210 MB." for `frames` at 44.1 kHz (`wwav_frames`) and the
 /// file's `wwav_bytes`. Megabytes are 1,000,000 bytes, as 6.1's table counts
-/// them; from 1,000 MB the size reads in gigabytes to one decimal.
+/// them; under one the size reads in kilobytes of 1,000 bytes, and from
+/// 1,000 MB in gigabytes to one decimal.
 pub fn size_line(frames: u64, bytes: u64) -> String {
     let secs = frames / WWAV_RATE as u64;
+    let kb = (bytes + 500) / 1_000;
     let mb = (bytes + 500_000) / 1_000_000;
-    let size = if mb < 1_000 {
+    let size = if kb < 1_000 {
+        format!("{kb} kB")
+    } else if mb < 1_000 {
         format!("{mb} MB")
     } else {
         let tenths = (bytes + 50_000_000) / 100_000_000;
@@ -54,12 +60,14 @@ pub fn size_line(frames: u64, bytes: u64) -> String {
     format!("{}:{:02} → about {size}.", secs / 60, secs % 60)
 }
 
-/// The refusal when the file would pass the limit: "A .wwav holds about 81
-/// minutes. This session is 94." Takes the same `frames` and `bytes` as
-/// `size_line`. The session's minutes round up, so a refused session never
-/// reads as one that fits.
+/// The refusal for a session over 81 minutes (6.7): "A .wwav holds about
+/// 81 minutes. This session is 94." The packer's 4 GB would take 81:09, but
+/// the sheet says 81 minutes and holds to it; the bytes are checked as well,
+/// since a file over 4 GB can't be written at any length. Takes the same
+/// `frames` and `bytes` as `size_line`. The session's minutes round up, so a
+/// refused session never reads as one that fits.
 pub fn refusal(frames: u64, bytes: u64) -> Option<String> {
-    if bytes <= MAX_WWAV_BYTES {
+    if frames <= minutes_held() * 60 * WWAV_RATE as u64 && bytes <= MAX_WWAV_BYTES {
         return None;
     }
     let minutes = frames.div_ceil(WWAV_RATE as u64 * 60);
