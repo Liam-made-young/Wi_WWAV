@@ -23,7 +23,7 @@ use crate::meta::{Kind, Lineage};
 use crate::pack::object_or_empty;
 use crate::text::{basename, key_values, splitext, today};
 use crate::wwav::read_at;
-use crate::{msg, Error};
+use crate::{msg, not_same, Error};
 
 const OWN: [&[u8; 4]; 2] = [b"wmet", b"wlin"];
 
@@ -221,18 +221,6 @@ fn tail(meta: &FilmMeta, lineage: &Lineage) -> Vec<u8> {
     let mut t = top_box(b"wmet", &meta.wmet());
     t.extend(top_box(b"wlin", &lineage.wlin()));
     t
-}
-
-/// The tool's refusal to write over its own input.
-fn not_same(src: &Path, out: &Path) -> Result<(), Error> {
-    if out.exists() && std::fs::canonicalize(src)? == std::fs::canonicalize(out)? {
-        return Err(msg(format!(
-            "{}: would write over {}",
-            out.display(),
-            src.display()
-        )));
-    }
-    Ok(())
 }
 
 fn copy(f: &mut File, n: u64, o: &mut impl Write, shown: &Path) -> Result<(), Error> {

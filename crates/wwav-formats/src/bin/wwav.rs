@@ -23,26 +23,72 @@ const USAGE: &str = "usage: wwav pack FOLDER [-o OUT] [--splitter S] [--creator 
        wwav swav info FILE
        wwav swav unpack FILE [-o OUT]";
 
-/// One positional argument and the options it was given, argparse-style:
-/// `-o X`, `-oX`, `--out X` and `--out=X`, before or after it.
+/// One positional argument and the options it was given.
 struct Args {
     target: String,
-    options: Vec<(String, String)>,
+    options: Vec<(&'static str, String)>,
 }
 
 impl Args {
-    /// An option's last value, "" when it wasn't given (which the tools
-    /// treat alike).
+    /// An option's last value; None when it wasn't given or is "", which
+    /// the tools treat alike (`a.out or ...`).
     fn get(&self, name: &str) -> Option<&str> {
         self.options
             .iter()
             .rev()
-            .find(|(k, _)| k == name)
+            .find(|(k, _)| *k == name)
             .map(|(_, v)| v.as_str())
+            .filter(|v| !v.is_empty())
     }
 }
 
-fn parse(args: &[String], options: &[&str]) -> Result<Args, String> {
+/// argparse's `^-\d+$|^-\d*\.\d+$`, with any script's digits as `\d`.
+fn negative_number(arg: &str) -> bool {
+    let digits = |s: &str| s.chars().all(|c| text::decimal(c).is_some());
+    match arg.strip_prefix('-').map(|n| n.split_once('.')) {
+        Some(None) => arg.len() > 1 && digits(&arg[1..]),
+        Some(Some((whole, fraction))) => digits(whole) && !fraction.is_empty() && digits(fraction),
+        None => false,
+    }
+}
+
+/// How argparse reads one argument (`_parse_optional`): Ok(None) for a
+/// positional, or an option by its full name with any value given in the
+/// same argument ("--out=x", "-ox"). A long option may be shortened to any
+/// prefix that names one ("--cr"). Err: it looks like an option this
+/// command doesn't have.
+fn option(
+    arg: &str,
+    options: &[&'static str],
+) -> Result<Option<(&'static str, Option<String>)>, String> {
+    if !arg.starts_with('-') || arg == "-" {
+        return Ok(None);
+    }
+    let (head, value) = match arg.split_once('=') {
+        Some((h, v)) => (h, Some(v.to_string())),
+        None => (arg, None),
+    };
+    if let Some(&o) = options.iter().find(|&&o| o == arg || o == head) {
+        return Ok(Some((o, if o == arg { None } else { value })));
+    }
+    let found: Vec<_> = if arg.starts_with("--") {
+        options.iter().filter(|o| o.starts_with(head)).collect()
+    } else {
+        options.iter().filter(|o| arg.starts_with(**o)).collect()
+    };
+    match found[..] {
+        [&o] if o.len() == 2 => Ok(Some((o, Some(arg[2..].to_string())))),
+        [&o] => Ok(Some((o, value))),
+        [] if negative_number(arg) || arg.contains(' ') => Ok(None),
+        [] => Err(format!("unrecognized arguments: {arg}")),
+        _ => Err(format!("ambiguous option: {arg}")),
+    }
+}
+
+/// The arguments after the command: `--` ends the options, an option's
+/// value can't look like an option, and -h or --help asks for the usage
+/// (Ok(None)).
+fn parse(args: &[String], options: &[&'static str]) -> Result<Option<Args>, String> {
     let mut positional = Vec::new();
     let mut found = Vec::new();
     let mut rest = args.iter();
@@ -51,36 +97,27 @@ fn parse(args: &[String], options: &[&str]) -> Result<Args, String> {
             positional.extend(rest.by_ref().cloned());
             break;
         }
-        if !arg.starts_with('-') || arg == "-" {
+        let Some((name, inline)) = option(arg, options)? else {
             positional.push(arg.clone());
             continue;
-        }
-        let (name, inline) = match arg.split_once('=') {
-            Some((n, v)) if n.starts_with("--") => (n.to_string(), Some(v.to_string())),
-            _ if !arg.starts_with("--") && arg.len() > 2 => {
-                (arg[..2].to_string(), Some(arg[2..].to_string()))
-            }
-            _ => (arg.clone(), None),
         };
-        let name = if name == "-o" {
-            "--out".to_string()
-        } else {
-            name
-        };
-        if !options.contains(&name.as_str()) {
-            return Err(format!("unrecognized arguments: {arg}"));
+        if name == "--help" || name == "-h" {
+            return Ok(None);
         }
-        let value = match inline.or_else(|| rest.next().cloned()) {
+        let value = match inline {
             Some(v) => v,
-            None => return Err(format!("argument {name}: expected one argument")),
+            None => match rest.next() {
+                Some(v) if v != "--" && option(v, options) == Ok(None) => v.clone(),
+                _ => return Err(format!("argument {name}: expected one argument")),
+            },
         };
-        found.push((name, value));
+        found.push((if name == "-o" { "--out" } else { name }, value));
     }
     match <[String; 1]>::try_from(positional) {
-        Ok([target]) => Ok(Args {
+        Ok([target]) => Ok(Some(Args {
             target,
             options: found,
-        }),
+        })),
         Err(_) => Err("expected one file or folder".into()),
     }
 }
@@ -170,27 +207,40 @@ fn main() -> ExitCode {
         eprintln!("{USAGE}\nwwav: error: an argument isn't UTF-8");
         return ExitCode::from(2);
     };
-    if args.iter().any(|a| a == "-h" || a == "--help") {
-        println!("{USAGE}");
-        return ExitCode::SUCCESS;
-    }
     let (film, rest) = match args.first().map(String::as_str) {
         Some("swav") => (true, &args[1..]),
         _ => (false, &args[..]),
     };
     let cmd = rest.first().map_or("", String::as_str);
-    let options: &[&str] = match (film, cmd) {
-        (false, "pack") => &["--out", "--splitter", "--creator"],
-        (true, "pack") => &["--out", "--title", "--artist", "--creator"],
-        (_, "unpack") => &["--out"],
-        (_, "info") => &[],
+    const HELP: [&str; 2] = ["-h", "--help"];
+    let options: &[&'static str] = match (film, cmd) {
+        (false, "pack") => &["-h", "--help", "-o", "--out", "--splitter", "--creator"],
+        (true, "pack") => &[
+            "-h",
+            "--help",
+            "-o",
+            "--out",
+            "--title",
+            "--artist",
+            "--creator",
+        ],
+        (_, "unpack") => &["-h", "--help", "-o", "--out"],
+        (_, "info") => &HELP,
+        _ if matches!(option(cmd, &HELP), Ok(Some(_))) => {
+            println!("{USAGE}");
+            return ExitCode::SUCCESS;
+        }
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
         }
     };
     let a = match parse(&rest[1..], options) {
-        Ok(a) => a,
+        Ok(Some(a)) => a,
+        Ok(None) => {
+            println!("{USAGE}");
+            return ExitCode::SUCCESS;
+        }
         Err(e) => {
             eprintln!("{USAGE}\nwwav: error: {e}");
             return ExitCode::from(2);

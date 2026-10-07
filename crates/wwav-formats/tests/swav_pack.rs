@@ -4,7 +4,9 @@
 //! Fails if: the Rust packer's bytes differ from swav_pack.py pack's for
 //! the same film and film.txt (or the tools print different lines);
 //! unpacking doesn't return the MP4 byte for byte, or writes another
-//! film.txt or warning than the tool; the two refuse differently; ffprobe
+//! film.txt or warning than the tool; Rust unpack then pack, or
+//! swav_pack.py unpack of a Rust pack then swav_pack.py pack, changes a
+//! byte; the two refuse differently; ffprobe
 //! -v error prints anything for a packed file; swav_pack.py info can't read
 //! the wmet and wlin of a film the library packs with a song as its parent.
 
@@ -150,6 +152,15 @@ fn pack_refuses_what_swav_pack_refuses() {
     let ours = wwav(&["swav", "pack", s(&src), "-o", s(&src)]);
     same_run(said(&ours), said(&reference), "writing over the film");
     same_bytes(&src, &corpus().join("fast.mp4"));
+    // or over another name for it: os.path.samefile knows a hard link
+    let link = src.with_extension("swav");
+    std::fs::hard_link(&src, &link).unwrap();
+    for cmd in [&["swav", "pack"][..], &["swav", "unpack"][..]] {
+        let reference = python(&swav_pack(), &[cmd[1], s(&src), "-o", s(&link)]);
+        let ours = wwav(&[cmd, &[s(&src), "-o", s(&link)]].concat());
+        same_run(said(&ours), said(&reference), "writing over a hard link");
+        same_bytes(&src, &corpus().join("fast.mp4"));
+    }
 }
 
 #[test]
@@ -241,6 +252,19 @@ fn unpack_then_pack_gives_the_same_swav() {
         let again = dir.join(format!("{name}.again.swav"));
         ok(wwav(&["swav", "pack", s(&back), "-o", s(&again)]));
         same_bytes(&again, &corpus().join(name));
+
+        // swav_pack.py unpack of the Rust pack, swav_pack.py pack
+        let py_back = dir.join(format!("{name}.py.mp4"));
+        ok(python(
+            &swav_pack(),
+            &["unpack", s(&again), "-o", s(&py_back)],
+        ));
+        let py_again = dir.join(format!("{name}.py.swav"));
+        ok(python(
+            &swav_pack(),
+            &["pack", s(&py_back), "-o", s(&py_again)],
+        ));
+        same_bytes(&py_again, &again);
     }
 }
 

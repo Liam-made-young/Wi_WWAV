@@ -281,6 +281,19 @@ def make(out):
         "A newer major version.", "the master only: version 1.0 is newer than this reader (0.x)")
     add("no-version.wwav", with_wmet(wmet.replace(b'"wwav": "0.1", ', b"")), "A wmet without its wwav key.",
         "the master only: wmet has no version")
+    # the two other places Wi's reader says it parts from the tool (wwav.js, above verdict())
+    add("version-number.wwav", with_wmet(wmet.replace(b'"wwav": "0.1"', b'"wwav": 1.0')),
+        "A version written as a JSON number, 1.0, not a string.",
+        "the master only: version 1.0 is newer than this reader (0.x)",
+        {"wi": "the master only: version 1 is newer than this reader (0.x)",
+         "because": "Wi's reader (wi/src/formats/wwav.js pyStr) prints a number with String(), which drops the .0 "
+                    "that python's str() keeps."})
+    add("version-digits.wwav", with_wmet(wmet.replace(b'"wwav": "0.1"', '"wwav": "١.0"'.encode())),
+        "A version in Arabic-Indic digits, which python's \\d reads as digits.",
+        "the master only: version ١.0 is newer than this reader (0.x)",
+        {"wi": "the master only: wmet has no version",
+         "because": "Wi's reader matches the version with an ASCII-only \\d, as the device does; wwav_pack.py's \\d "
+                    "takes any script's digits."})
     add("frames-wmet.wwav", with_wmet(wmet.replace(b'"frames": %d' % FRAMES, b'"frames": %d' % (FRAMES + 1))),
         "wmet's frames one more than the master's.",
         f"the master only: frame counts differ (data {FRAMES}, wstm {FRAMES}, wmet {FRAMES + 1})")

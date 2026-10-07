@@ -32,6 +32,7 @@ pub mod wwav;
 
 use std::fmt;
 use std::io;
+use std::path::Path;
 
 /// What went wrong, in words fit to show.
 #[derive(Debug)]
@@ -71,4 +72,29 @@ impl From<io::Error> for Error {
 
 fn msg(m: impl Into<String>) -> Error {
     Error::Msg(m.into())
+}
+
+/// swav_pack.py's refusal to write over its own input, under any name for
+/// it (`os.path.samefile`: the same device and inode, so a hard link too).
+/// The writers that read one file to write another refuse it too.
+pub(crate) fn not_same(src: &Path, out: &Path) -> Result<(), Error> {
+    #[cfg(unix)]
+    let same = |a: &Path, b: &Path| -> io::Result<bool> {
+        use std::os::unix::fs::MetadataExt;
+        let (a, b) = (std::fs::metadata(a)?, std::fs::metadata(b)?);
+        Ok((a.dev(), a.ino()) == (b.dev(), b.ino()))
+    };
+    // std has no stable file identity off Unix: the same path will do
+    #[cfg(not(unix))]
+    let same = |a: &Path, b: &Path| -> io::Result<bool> {
+        Ok(std::fs::canonicalize(a)? == std::fs::canonicalize(b)?)
+    };
+    if out.exists() && same(src, out)? {
+        return Err(msg(format!(
+            "{}: would write over {}",
+            out.display(),
+            src.display()
+        )));
+    }
+    Ok(())
 }
