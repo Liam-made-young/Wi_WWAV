@@ -870,6 +870,19 @@ mod tests {
     }
 
     #[test]
+    fn clone_and_eq_follow_every_kind_of_nesting() {
+        let text = r#"{"a": [1, {"b": [], "c": {}}, "x", [[]]], "d": {"e": [[1.5, null, true]]}, "f": {}}"#;
+        let v = loads(text.as_bytes(), true).unwrap();
+        let copy = v.clone();
+        assert_eq!(dumps(&copy), text);
+        assert!(copy == v && py_eq(&copy, &v));
+        let other = loads(text.replace("1.5", "2.5").as_bytes(), true).unwrap();
+        assert!(other != v && !py_eq(&other, &v));
+        let shorter = loads(text.replace(", [[]]", "").as_bytes(), true).unwrap();
+        assert!(shorter != v && !py_eq(&shorter, &v));
+    }
+
+    #[test]
     fn a_wide_object_reads_in_linear_time() {
         let keys: Vec<String> = (0..200_000).map(|i| format!(r#""k{i}": {i}"#)).collect();
         let text = format!("{{{}}}", keys.join(", "));
