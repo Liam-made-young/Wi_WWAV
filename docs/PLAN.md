@@ -27,8 +27,8 @@ Rules for this work, from the founder (7 Oct 2026): the main agent plus at most 
 - [x] 5: Console, the creation view (`ch05.md`)
 - [x] 6–7: Files; Look, sound and feel (`ch06-07.md`)
 - [x] 8: Under the hood (`ch08.md`)
-- [ ] 9–10: Business and gates; Roadmap, open decisions, glossary (`ch09-10.md`)
-- [ ] Assemble: front matter, join, resolve `{{old:X.Y}}` references, contents table
+- [x] 9–10: Business and gates; Roadmap, open decisions, glossary (`ch09-10.md`)
+- [x] Assemble: front matter, join, resolve `{{old:X.Y}}` references, contents table
 - [ ] Review: every brief decision present, nothing cut left, references resolve
 - [ ] Commit and push to `claude/relaxed-cori-x2igz9`
 - [ ] Re-scope the milestones below to the new spec (drop Unquantized rows, add MCP and public-view rows)
