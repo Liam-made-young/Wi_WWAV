@@ -65,13 +65,13 @@ Done only when all seven pass on a second Mac that has never built the app
 
 | # | Milestone | Fails if | Runs on | Status |
 |---|---|---|---|---|
-| S2.1 | Heat's maths | The heat value, level or "Warm at / Hot at" table differs from 3.1 for any difficulty; the estimate chain or weekly load differs; any grade, letter or "what it would take" result differs from 3.1 and 3.8 | Linux | **passed** (model): `app/ui/src/heat/model/heat.test.ts`, `estimate.test.ts`, `grades.test.ts` |
+| S2.1 | Heat's maths | The heat value, level or "Warm at / Hot at" table differs from 3.1 for any difficulty; the estimate chain or weekly load differs; any grade, letter or "what it would take" result differs from 3.1 and 3.8 | Linux | **passed** (model): `app/ui/src/heat/model/heat.test.ts`, `estimate.test.ts`, `grades.test.ts`, `review.findings.test.ts` (threshold sweeps) |
 | S2.2 | Today | Plan my day uses anything but the written rule (heat order, estimate rounded up to 15 min, capped at 90, first gap that fits, before "Day ends at"); a draft lacks its reason; Return doesn't accept all; Esc doesn't clear them | Linux | open: the rule passes (`plan.test.ts`); Return and Esc in the room are not built |
 | S2.3 | Focus | A round or break starts without a press; minutes don't add to the current task's `actualMin`; the timer stops when switching rooms; the chime sounds while off | Linux | open: the state machine passes (`focus.test.ts`); keeping it across rooms is shell work |
 | S2.4 | Tasks, Calendar, Grades, Habits, Mail | Any tab lacks its one "+" act and one secondary act from 3.3; a habit 7th fits; the streak counter shows by default; Mail can reply, send or delete | Linux | open |
-| S2.5 | Brightspace iCal | Against a stored raw feed, a due item is missed, a non-graded or cancelled item is kept, a UID changes, or an item missing from two syncs is deleted | Linux | open |
+| S2.5 | Brightspace iCal | Against a stored raw feed, a due item is missed, a non-graded or cancelled item is kept, a UID changes, or an item missing from two syncs is deleted | Linux | open: the parser and rules pass against a synthesised D2L feed (`crates/wi-heat/tests/brightspace_feed.rs`); the founder's real feed is not stored yet |
 | S2.6 | Moving in | Importing the artifact's JSON changes any id, so the first sync finds anything new | Linux | open |
-| S2.7 | Heat sync | A slower older write overwrites a newer one on any field | Linux (mock server) | open |
+| S2.7 | Heat sync | A slower older write overwrites a newer one on any field | Linux (mock server) | **passed**: `crates/wi-heat/tests/heat_sync.rs` (512 proptest cases, three devices, clocks ±10 min off) and `tools/mock-server/test/heat.test.js` |
 
 ## Stage 3: Console
 
@@ -95,9 +95,9 @@ Done only when all seven pass on a second Mac that has never built the app
 | S4.1 | The same sky everywhere | Positions hashed at t = 0 for one catalogue differ between WebKit and Chromium (and later Windows) | Linux | open: Node and Chromium give the same layout hash (`layoutHash.test.ts`, `e2e/space-layout.spec.ts`); WebKit not yet run |
 | S4.2 | A still sky | Anything moves while nothing plays (frame-diff over 5 s idle) | Linux | open |
 | S4.3 | The planet player | Moon gestures miss 4.6's thresholds (250 ms, 400 ms, 8 pt); a moon's level isn't its distance; ↑ Push stops playback | Linux | open: the thresholds pass in the model (`gesture.test.ts`); the player is not built |
-| S4.4 | Systems | A 22nd world is accepted, or the refusal isn't "A solar system holds 21 worlds. Start another one." | Linux (mock server) | open |
-| S4.5 | Lineage | A family tree layout differs from v3's ring rule; a link touching someone else's work shows before they agree | Linux | open |
-| S4.6 | Newest and Since you last looked | Any order but newest; no "That's everything."; any count | Linux | open |
+| S4.4 | Systems | A 22nd world is accepted, or the refusal isn't "A solar system holds 21 worlds. Start another one." | Linux (mock server) | open: the model and `tools/mock-server` refuse the 22nd world with the sentence (`space.test.js`, 30 concurrent adds); the room is not built |
+| S4.5 | Lineage | A family tree layout differs from v3's ring rule; a link touching someone else's work shows before they agree | Linux | open: the layout passes, bit-identical with a port of v3 over 11,000 families (`lineage.test.ts`); consent display is room work |
+| S4.6 | Newest and Since you last looked | Any order but newest; no "That's everything."; any count | Linux | open: the model passes (`newest.test.ts`); the room is not built |
 
 ## Stage 5: Unquantized
 
@@ -106,7 +106,7 @@ Done only when all seven pass on a second Mac that has never built the app
 | S5.1 | The door | Sound or motion starts before the press; the speaker glyph doesn't stop both | Linux | open |
 | S5.2 | The floor | A hall has no end wall reading "That's everything."; a shop's seat differs between two reads of the same day | Linux | open |
 | S5.3 | List view | Anything in the store can't be reached and bought from List view; it isn't the default under Reduce Motion | Linux | open |
-| S5.4 | The counter | Buying needs walking; a price adds a fee at checkout; a count of sales appears on the floor | Linux (mock server) | open |
+| S5.4 | The counter | Buying needs walking; a price adds a fee at checkout; a count of sales appears on the floor | Linux (mock server) | open: the mock server passes as a test double (`commerce.test.js`); the counter is not built |
 | S5.5 | Before launch | Any item in `docs/SPEC.md` 7.20 is open | Linux (server patches, test Postgres) | open |
 
 ## Stage 6: Windows
