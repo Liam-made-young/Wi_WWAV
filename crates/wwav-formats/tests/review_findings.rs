@@ -12,6 +12,8 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use common::*;
+use wwav_formats::meta::{Kind, Lineage, SongMeta, Wrmx};
+use wwav_formats::writer::WwavWriter;
 use wwav_formats::{pack, swav, wwav};
 
 /// A chunk: id, size, payload and the pad byte.
@@ -404,4 +406,200 @@ fn pack_never_writes_over_its_input() {
         !back.join("master.wav").exists(),
         "unpack wrote before refusing"
     );
+}
+
+/// An original the Console exports: four frames of silence with `meta`.
+fn export(path: &Path, meta: &SongMeta, lineage: &Lineage) -> Result<u64, wwav_formats::Error> {
+    let mut w = WwavWriter::create(path, 4, meta, lineage, None)?;
+    w.write_master(&[0; 8])?;
+    w.write_stems([&[1; 8], &[2; 8], &[3; 8], &[4; 8]])?;
+    w.finish()
+}
+
+/// Finding: WwavWriter wrote whatever metadata it was given, so an
+/// original exported with a title wwav_pack.py's song.txt can't hold
+/// ("Low Tide "), a bpm its num() can't give back (127.9988 is written
+/// 128.00 and comes back 128; 400 is dropped) or no created date came back
+/// from `wwav_pack.py unpack` then `pack` with another sha256 (6.13.1).
+/// Such an original is refused, and `SongMeta::normalized()` of it is
+/// written and survives the round trip byte for byte.
+#[test]
+fn an_original_export_survives_the_reference_round_trip_or_is_refused() {
+    let dir = tmp("review-export");
+    let good = SongMeta {
+        song_id: "0123456789abcdef0123456789abcdef".into(),
+        title: "Low Tide".into(),
+        artist: "LMY".into(),
+        bpm: 120.125,
+        key: "A minor".into(),
+        kind: Kind::Original,
+        splitter: String::new(),
+        created: "2026-10-07".into(),
+    };
+    let lineage = Lineage::original(&good.song_id, "liam_made_young");
+    let path = dir.join("good.wwav");
+    export(&path, &good, &lineage).unwrap();
+    let mut cases: Vec<SongMeta> = Vec::new();
+    for (title, artist, key, created) in [
+        ("Low Tide ", "LMY", "", "2026-10-07"),
+        ("Low\nTide", "LMY", "", "2026-10-07"),
+        ("Low Tide", " LMY", "", "2026-10-07"),
+        ("Low Tide", "LMY", "A minor\r", "2026-10-07"),
+        ("Low Tide", "LMY", "", " 2026-10-07"),
+    ] {
+        cases.push(SongMeta {
+            title: title.into(),
+            artist: artist.into(),
+            key: key.into(),
+            created: created.into(),
+            ..good.clone()
+        });
+    }
+    for bpm in [127.9988, 120.001, 20.001, 400.0, 399.996, 10.0, -5.0] {
+        cases.push(SongMeta {
+            bpm,
+            ..good.clone()
+        });
+    }
+    for (i, meta) in cases.iter().enumerate() {
+        let path = dir.join(format!("{i}.wwav"));
+        let e = export(&path, meta, &lineage);
+        assert!(e.is_err(), "{meta:?} was written");
+        assert!(!path.exists());
+        let fixed = meta.normalized();
+        export(&path, &fixed, &lineage).unwrap_or_else(|e| panic!("{fixed:?}: {e}"));
+        if wwav_pack().exists() && has("python3") {
+            let (back, again) = (
+                dir.join(format!("{i}")),
+                dir.join(format!("{i}.again.wwav")),
+            );
+            ok(python(&wwav_pack(), &["unpack", s(&path), "-o", s(&back)]));
+            let creator = "--creator=liam_made_young";
+            ok(python(
+                &wwav_pack(),
+                &["pack", s(&back), "-o", s(&again), creator],
+            ));
+            let (a, b) = (
+                std::fs::read(&path).unwrap(),
+                std::fs::read(&again).unwrap(),
+            );
+            assert!(a == b, "{fixed:?}: {}", first_difference(&a, &b));
+        }
+    }
+    // what pack writes in place of a missing title, song_id or date, and an
+    // original's lineage and lack of wrmx, can't come back either
+    let refused = [
+        (
+            SongMeta {
+                title: " ".into(),
+                ..good.clone()
+            },
+            lineage.clone(),
+        ),
+        (
+            SongMeta {
+                created: String::new(),
+                ..good.clone()
+            },
+            lineage.clone(),
+        ),
+        (
+            SongMeta {
+                song_id: "0123".into(),
+                ..good.clone()
+            },
+            Lineage::original("0123", ""),
+        ),
+        (
+            good.clone(),
+            Lineage {
+                generation: 1,
+                ..lineage.clone()
+            },
+        ),
+        (
+            good.clone(),
+            Lineage::child_of("fedcba9876543210fedcba9876543210", &lineage, ""),
+        ),
+        (
+            good.clone(),
+            Lineage {
+                device_id: "x".into(),
+                ..lineage.clone()
+            },
+        ),
+    ];
+    for (i, (meta, lineage)) in refused.iter().enumerate() {
+        let path = dir.join(format!("refused-{i}.wwav"));
+        assert!(
+            export(&path, meta, lineage).is_err(),
+            "{meta:?} {lineage:?}"
+        );
+        assert!(!path.exists());
+    }
+    let wrmx = Wrmx::default();
+    let path = dir.join("wrmx.wwav");
+    assert!(WwavWriter::create(&path, 4, &good, &lineage, Some(&wrmx)).is_err());
+}
+
+/// Finding: WwavWriter truncated the file at its final name and wrote it
+/// in place, so an export over an existing song destroyed it at once, and
+/// one cut short (an error, a cancelled or killed export) left a song with
+/// the right RIFF size and no wlin, which reads as "the master only".
+/// Until finish(), the old file has to stay as it was, and a writer
+/// dropped part way has to leave nothing behind.
+#[test]
+fn an_export_cut_short_leaves_the_old_file() {
+    let dir = tmp("review-staged");
+    let path = dir.join("Low Tide.wwav");
+    let old = std::fs::read(corpus().join("original.wwav")).unwrap();
+    std::fs::write(&path, &old).unwrap();
+    let meta = SongMeta {
+        song_id: "0123456789abcdef0123456789abcdef".into(),
+        title: "Low Tide".into(),
+        created: "2026-10-07".into(),
+        ..SongMeta::default()
+    };
+    let lineage = Lineage::original(&meta.song_id, "");
+    let mut w = WwavWriter::create(&path, 4, &meta, &lineage, None).unwrap();
+    w.write_master(&[0; 8]).unwrap();
+    assert!(
+        std::fs::read(&path).unwrap() == old,
+        "the old song changed before finish()"
+    );
+    drop(w);
+    assert!(
+        std::fs::read(&path).unwrap() == old,
+        "a dropped export changed the old song"
+    );
+    let names = |d: &Path| -> Vec<String> {
+        let mut n: Vec<String> = std::fs::read_dir(d)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        n.sort();
+        n
+    };
+    assert_eq!(
+        names(&dir),
+        ["Low Tide.wwav"],
+        "a dropped export left a file"
+    );
+    assert_eq!(
+        export(&path, &meta, &lineage).unwrap(),
+        std::fs::metadata(&path).unwrap().len()
+    );
+    assert_eq!(
+        wwav::Wwav::open(&path).unwrap().verdict().to_string(),
+        "4 stems, and the master"
+    );
+    assert_eq!(names(&dir), ["Low Tide.wwav"]);
+    // the film writer too
+    let film = dir.join("film.swav");
+    let film_meta = swav::FilmMeta {
+        film_id: meta.song_id.clone(),
+        ..Default::default()
+    };
+    swav::pack(&corpus().join("plain.mp4"), &film, &film_meta, &lineage).unwrap();
+    assert_eq!(names(&dir), ["Low Tide.wwav", "film.swav"]);
 }

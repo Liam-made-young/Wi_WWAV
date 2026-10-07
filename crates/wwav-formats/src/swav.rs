@@ -24,7 +24,7 @@ use crate::meta::{Kind, Lineage};
 use crate::pack::object_or_empty;
 use crate::text::{basename, key_values, splitext, today};
 use crate::wwav::read_at;
-use crate::{msg, not_same, Error};
+use crate::{msg, not_same, Error, Staged};
 
 const OWN: [&[u8; 4]; 2] = [b"wmet", b"wlin"];
 
@@ -274,15 +274,15 @@ fn pack_with(
             film.display()
         )));
     }
-    let mut o = BufWriter::with_capacity(1 << 20, File::create(out)?);
-    copy(&mut s.file, s.size, &mut o, film)?;
+    let mut o = Staged::create(out)?;
+    copy(&mut s.file, s.size, &mut *o, film)?;
     if patch {
         o.seek(SeekFrom::Start(last.at))?;
         o.write_all(&(last.size as u32).to_be_bytes())?;
         o.seek(SeekFrom::End(0))?;
     }
     o.write_all(&tail)?;
-    o.flush()?;
+    o.commit()?;
     Ok((meta, s.size + tail.len() as u64))
 }
 

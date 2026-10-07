@@ -177,7 +177,7 @@ pub fn pack(folder: &str, out: &str, splitter: &str, creator: &str) -> Result<Pa
     for w in &wavs {
         not_same(Path::new(&w.path), Path::new(out))?;
     }
-    let mut w = match WwavWriter::create(Path::new(out), frames, &meta, &lineage, None) {
+    let mut w = match WwavWriter::start(Path::new(out), frames, &meta, &lineage, None) {
         Err(Error::TooLong { .. }) => {
             return Err(msg(format!("{folder}: too long for one WAV file (4 GB)")))
         }

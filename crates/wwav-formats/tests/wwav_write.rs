@@ -136,9 +136,10 @@ fn a_song_over_4_gb_is_refused_in_the_specs_words() {
         e.to_string(),
         "A .wwav holds about 81 minutes. This session is 94."
     );
-    // at the limit it starts (a sparse file: nothing is written in between)
+    // at the limit it starts (a sparse file: nothing is written in between),
+    // and dropped unfinished it leaves nothing
     drop(WwavWriter::create(&path, limit, &meta, &lin, None).unwrap());
-    std::fs::remove_file(&path).unwrap();
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
 }
 
 fn corpus_wrmx() -> Wrmx {

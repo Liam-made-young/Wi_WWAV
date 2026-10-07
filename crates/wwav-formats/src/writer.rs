@@ -18,15 +18,15 @@
 //! [`wrap_wav`] makes a plain WAV a master-only `.wwav` as Wi does.
 
 use std::fs::File;
-use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use crate::json::{self, Value};
-use crate::meta::{Lineage, SongMeta, Wrmx};
+use crate::json::{self, num, Value};
+use crate::meta::{Kind, Lineage, SongMeta, Wrmx};
 use crate::wwav::{
     read_at, ChunkWalk, Fmt, Verdict, Wwav, ALIGN, FRAME, RATE, STEM_FRAME, WSTM_HEADER,
 };
-use crate::{msg, not_same, Error};
+use crate::{msg, not_same, Error, Staged};
 
 /// A RIFF file's size field is 32 bits: no file is longer.
 const MAX_FILE: u64 = u32::MAX as u64;
@@ -117,7 +117,10 @@ fn layout(frames: u64, meta: &SongMeta, lineage: &Lineage, wrmx: Option<&Wrmx>) 
 /// # Ok::<(), wwav_formats::Error>(())
 /// ```
 pub struct WwavWriter {
-    file: BufWriter<File>,
+    /// Written beside `path` and renamed into place by finish(): until
+    /// then the path keeps what it held, and a writer dropped part way
+    /// leaves nothing.
+    file: Staged,
     /// Where the file's cursor is, so writing on from there needs no seek.
     pos: u64,
     frames: u64,
@@ -135,10 +138,35 @@ impl WwavWriter {
     }
 
     /// Starts `path` for a song of `frames` frames at 44.1 kHz. `wrmx` makes
-    /// it a remix "as settings" (6.8); a baked remix has none. Refuses a
-    /// song that won't fit in one RIFF file (4 GB, about 81 minutes) before
-    /// creating anything.
+    /// it a remix "as settings" (6.8); a baked remix has none. Refuses,
+    /// before creating anything, a song that won't fit in one RIFF file
+    /// (4 GB, about 81 minutes), a song_id that isn't 32 lowercase hex, and
+    /// an original that `wwav_pack.py unpack` then `pack` wouldn't give back
+    /// byte for byte (6.13.1): one whose metadata [`SongMeta::normalized`]
+    /// changes, without a title or a created date, with a parent, another
+    /// root, a generation or a device_id, or with a wrmx.
     pub fn create(
+        path: &Path,
+        frames: u64,
+        meta: &SongMeta,
+        lineage: &Lineage,
+        wrmx: Option<&Wrmx>,
+    ) -> Result<WwavWriter, Error> {
+        if !wwav_ids::is_work_id(&meta.song_id) {
+            return Err(msg(format!(
+                "song_id {} isn't 32 lowercase hex",
+                json::quote(&meta.song_id)
+            )));
+        }
+        if meta.kind == Kind::Original {
+            survives_round_trip(meta, lineage, wrmx)?;
+        }
+        WwavWriter::start(path, frames, meta, lineage, wrmx)
+    }
+
+    /// create() without its checks on the metadata: pack writes what the
+    /// folder gives it, as wwav_pack.py does.
+    pub(crate) fn start(
         path: &Path,
         frames: u64,
         meta: &SongMeta,
@@ -150,7 +178,7 @@ impl WwavWriter {
             return Err(Error::TooLong { frames });
         }
         let mut w = WwavWriter {
-            file: BufWriter::with_capacity(1 << 20, File::create(path)?),
+            file: Staged::create(path)?,
             pos: 0,
             frames,
             stems_at: l.stems_at,
@@ -229,9 +257,60 @@ impl WwavWriter {
         }
         let tail = std::mem::take(&mut self.tail);
         self.put(self.total - tail.len() as u64, &tail)?;
-        self.file.flush()?;
+        self.file.commit()?;
         Ok(self.total)
     }
+}
+
+/// Whether an original written with this metadata comes back from
+/// `wwav_pack.py unpack` then `pack --creator <its creator>` byte for byte;
+/// if not, why not.
+fn survives_round_trip(
+    meta: &SongMeta,
+    lineage: &Lineage,
+    wrmx: Option<&Wrmx>,
+) -> Result<(), Error> {
+    let refuse = |why: String| {
+        Err(msg(format!(
+            "an original {why}, which wwav_pack.py's unpack and pack wouldn't give back"
+        )))
+    };
+    let fixed = meta.normalized();
+    let bpm = |m: &SongMeta| (m.bpm != 0.0).then(|| num(m.bpm).ok()).flatten();
+    let changed: Vec<String> = [
+        ("title", &meta.title, &fixed.title),
+        ("artist", &meta.artist, &fixed.artist),
+        ("key", &meta.key, &fixed.key),
+        ("created", &meta.created, &fixed.created),
+    ]
+    .into_iter()
+    .filter(|(_, a, b)| a != b)
+    .map(|(k, a, b)| format!("{k} {} (normalized: {})", json::quote(a), json::quote(b)))
+    .chain((bpm(meta) != bpm(&fixed)).then(|| {
+        let shown = |b: Option<String>| b.unwrap_or_else(|| "none".into());
+        format!(
+            "bpm {} (normalized: {})",
+            shown(bpm(meta)),
+            shown(bpm(&fixed))
+        )
+    }))
+    .collect();
+    if !changed.is_empty() {
+        return refuse(format!("with {}", changed.join(", ")));
+    }
+    if meta.title.is_empty() {
+        return refuse("without a title".into());
+    }
+    if meta.created.is_empty() {
+        return refuse("without a created date".into());
+    }
+    if *lineage != Lineage::original(&meta.song_id, &lineage.creator) {
+        return refuse(format!("with the lineage {}", lineage.wlin()));
+    }
+    if wrmx.is_some() {
+        return refuse("with a wrmx".into());
+    }
+    Ok(())
 }
 
 /// Copies `n` bytes from `at` in `src` to `out`.
@@ -265,11 +344,11 @@ pub fn master_only(src: &Path, out: &Path) -> Result<u64, Error> {
     }
     let (frames, data) = (w.master_frames(), w.first(b"data").map_or(0, |c| c.at));
     let total = 44 + frames * FRAME + tail.len() as u64;
-    let mut o = BufWriter::with_capacity(1 << 20, File::create(out)?);
+    let mut o = Staged::create(out)?;
     o.write_all(&wav_header(frames, total - 8))?;
-    copy(&mut file, data, frames * FRAME, &mut o)?;
+    copy(&mut file, data, frames * FRAME, &mut *o)?;
     o.write_all(&tail)?;
-    o.flush()?;
+    o.commit()?;
     Ok(total)
 }
 
@@ -367,11 +446,11 @@ pub fn wrap_wav(src: &Path, out: &Path, meta: &SongMeta, creator: &str) -> Resul
         if total - 8 > MAX_FILE {
             return Err(too_long());
         }
-        let mut o = BufWriter::with_capacity(1 << 20, File::create(out)?);
+        let mut o = Staged::create(out)?;
         o.write_all(&wav_header(frames, total - 8))?;
-        copy(&mut file, data.at, frames * FRAME, &mut o)?;
+        copy(&mut file, data.at, frames * FRAME, &mut *o)?;
         o.write_all(&tail)?;
-        o.flush()?;
+        o.commit()?;
         return Ok(total);
     }
 
@@ -397,12 +476,12 @@ pub fn wrap_wav(src: &Path, out: &Path, meta: &SongMeta, creator: &str) -> Resul
     if total - 8 > MAX_FILE {
         return Err(too_long());
     }
-    let mut o = BufWriter::with_capacity(1 << 20, File::create(out)?);
+    let mut o = Staged::create(out)?;
     o.write_all(b"RIFF")?;
     o.write_all(&((total - 8) as u32).to_le_bytes())?;
-    copy(&mut file, 8, size - 8, &mut o)?;
+    copy(&mut file, 8, size - 8, &mut *o)?;
     o.write_all(&vec![0; (size & 1) as usize])?;
     o.write_all(&tail)?;
-    o.flush()?;
+    o.commit()?;
     Ok(total)
 }

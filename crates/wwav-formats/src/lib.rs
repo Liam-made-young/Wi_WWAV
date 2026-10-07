@@ -30,9 +30,13 @@ pub mod text;
 pub mod writer;
 pub mod wwav;
 
+use std::ffi::OsString;
 use std::fmt;
-use std::io;
-use std::path::Path;
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufWriter};
+use std::ops::{Deref, DerefMut};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// What went wrong, in words fit to show.
 #[derive(Debug)]
@@ -97,4 +101,84 @@ pub(crate) fn not_same(src: &Path, out: &Path) -> Result<(), Error> {
         )));
     }
     Ok(())
+}
+
+/// A file written under a hidden name beside its own (".Song.wwav.<pid>-
+/// <n>.part") and renamed into place by [`Staged::commit`] once whole, so
+/// the path holds its old file until then, never a cut-off one. Dropped
+/// without a commit (an error, a cancelled export), it removes what it
+/// wrote; a process killed part way leaves only the hidden part file.
+pub(crate) struct Staged {
+    file: Option<BufWriter<File>>,
+    temp: PathBuf,
+    path: PathBuf,
+}
+
+impl Staged {
+    pub(crate) fn create(path: &Path) -> Result<Staged, Error> {
+        static N: AtomicU32 = AtomicU32::new(0);
+        let name = path
+            .file_name()
+            .ok_or_else(|| msg(format!("{}: not a file name", path.display())))?;
+        let dir = path.parent().unwrap_or(Path::new(""));
+        loop {
+            let mut part = OsString::from(".");
+            part.push(name);
+            part.push(format!(
+                ".{}-{}.part",
+                std::process::id(),
+                N.fetch_add(1, Ordering::Relaxed)
+            ));
+            let temp = dir.join(part);
+            match OpenOptions::new().write(true).create_new(true).open(&temp) {
+                Ok(f) => {
+                    return Ok(Staged {
+                        file: Some(BufWriter::with_capacity(1 << 20, f)),
+                        temp,
+                        path: path.into(),
+                    })
+                }
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(e) => return Err(e.into()),
+            }
+        }
+    }
+
+    /// Writes out what's buffered, syncs it to the disk and renames the
+    /// file into place.
+    pub(crate) fn commit(mut self) -> Result<(), Error> {
+        if let Some(file) = self.file.take() {
+            let file = file.into_inner().map_err(io::IntoInnerError::into_error)?;
+            file.sync_all()?;
+        }
+        std::fs::rename(&self.temp, &self.path)?;
+        self.temp = PathBuf::new(); // nothing left to remove
+        Ok(())
+    }
+}
+
+impl Deref for Staged {
+    type Target = BufWriter<File>;
+    fn deref(&self) -> &BufWriter<File> {
+        self.file
+            .as_ref()
+            .expect("a staged file is open until commit")
+    }
+}
+
+impl DerefMut for Staged {
+    fn deref_mut(&mut self) -> &mut BufWriter<File> {
+        self.file
+            .as_mut()
+            .expect("a staged file is open until commit")
+    }
+}
+
+impl Drop for Staged {
+    fn drop(&mut self) {
+        drop(self.file.take());
+        if !self.temp.as_os_str().is_empty() {
+            let _ = std::fs::remove_file(&self.temp);
+        }
+    }
 }
