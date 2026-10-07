@@ -1,0 +1,248 @@
+/* Generated from design/tokens.json by tools/tokens/compile.mjs.
+   Don't edit it: change the JSON and run the compiler again. */
+
+:root {
+  /* desk: Heat and the Console's chrome, Settings and every sheet (8.2).
+     Light and dark are Heat's tokens with 8.2's five fixes. */
+  --desk-ink: #1b1b1b;
+  --desk-ink2: #4a4a4a;
+  --desk-ink3: #5f5f5f;
+  --desk-well: #ffffff;
+  --desk-stripe: #edf3fe;
+  --desk-case-metal: #e4e4e4, #c9c9c9;
+  --desk-deck-metal: #fbfcfd, #e6eaef, #c9d0d8;
+  --desk-deck-edge: #98a2ad;
+  --desk-deck-pinstripe: #e9eff6;
+  --desk-pinstripe-every: 4px;
+  --desk-deck-ink: #161d26;
+  --desk-deck-ink-soft: #5d6975;
+  --desk-select: #1b4c8c;
+  --desk-select-ink: #ffffff;
+  --desk-select-bar: 3px;
+  --desk-highlight: #3875d7;
+  --desk-focus: rgb(56 117 215 / 0.6);
+  --desk-focus-width: 3px;
+  --desk-gel-selected: #336dcc, #1b4c8c;
+  --desk-gel-press: 0.88;
+  --desk-backdrop: rgb(0 0 0 / 0.25);
+
+  /* desk.lcd: The Now strip: Heat's olive LCD, with its dim text darkened
+     (2.2, 8.2). */
+  --desk-lcd-ground: #f2f4e4, #dfe3c6;
+  --desk-lcd-ink: #262a17;
+  --desk-lcd-dim: #4b5034;
+
+  /* desk.sourceList: The library drawer and Heat's sidebar, with headings
+     darkened (8.2). */
+  --desk-source-list-ground: #e7ecf2;
+  --desk-source-list-heading: #4f5761;
+
+  /* screen: The Game Boy inside: every Console readout is a DMG screen, the
+     same in light and dark (8.2, 5.2; MI-WWAV-OS theme.dart). Meters are DMG
+     green to -6 dBFS, amber to -1, rec above. */
+  --screen-dmg-deep: #0b1f0b;
+  --screen-dmg-dark: #0f380f;
+  --screen-dmg-mid: #306230;
+  --screen-dmg-lit: #8bac0f;
+  --screen-glow: #c6e24a;
+  --screen-amber: #f0a32e;
+  --screen-rec: #e0453a;
+  --screen-meter-amber-from-db: -6;
+  --screen-meter-rec-from-db: -1;
+
+  /* night: Space and the expanded player, in both appearances (8.2; v3, v4).
+     Seven ink opacities are the only hierarchy scale; royal blue has three
+     uses and is never text. */
+  --night-ground: #070a18;
+  --night-deep: #030510;
+  --night-clay: #1a2142;
+  --night-ink: #f4efe6;
+  --night-ink-steps: 1, 0.7, 0.5, 0.35, 0.2, 0.12, 0.07;
+  --night-ink-100: #f4efe6;
+  --night-ink-70: rgb(244 239 230 / 0.7);
+  --night-ink-50: rgb(244 239 230 / 0.5);
+  --night-ink-35: rgb(244 239 230 / 0.35);
+  --night-ink-20: rgb(244 239 230 / 0.2);
+  --night-ink-12: rgb(244 239 230 / 0.12);
+  --night-ink-07: rgb(244 239 230 / 0.07);
+  --night-text-steps-body: 1, 0.7;
+  --night-text-steps-secondary: 0.5;
+  --night-star: #dde4fb;
+  --night-accent: #2946ff;
+  --night-accent-uses: "armed", "branch", "commit";
+  --night-sun: #fff8e6, #ffd89a, #f0a23c, #b25f12;
+  --night-focus-width: 2px;
+
+  /* room: Unquantized, lit rather than painted (8.2; v3's mock, PRANA,
+     Crater). Dusk is light, after hours is dark: the walls fall to limousine
+     and paper stays paper. */
+  --room-field-ground: #f7f4ee, #e6dfd0;
+  --room-field-rose: #fbede8;
+  --room-field-cool: #dde2e6;
+  --room-field-drift-shortest: 53000ms;
+  --room-field-drift-longest: 131000ms;
+  --room-material-sand: #e8dcc8;
+  --room-material-sand-deep: #d4c4a8;
+  --room-material-clay: #b89878;
+  --room-material-clay-deep: #7a5e45;
+  --room-ink: #3d2e22;
+  --room-ink2: #6b5643;
+  --room-paper: #ffe9c8;
+  --room-accent: #c89668;
+  --room-lamp: #e8915b, #f4b483;
+  --room-sky: #f8d0a4, #d4763f;
+  --room-hairline: 1px;
+  --room-focus-width: 2px;
+
+  /* stem: PRANA's stem colours, the same everywhere, in stem order (8.3).
+     Every stem mark carries a ring in its register's ink; state is shape:
+     muted is a stem-colour ring, soloed adds an outer ring, silent under a
+     solo fills at 45% with a dashed ring, selected adds a notch. */
+  --stem-vocals: #d23c2a;
+  --stem-drums: #f0b90b;
+  --stem-other: #2e9a55;
+  --stem-bass: #1f4e9e;
+  --stem-ring: 1px;
+  --stem-muted-ring: 2px;
+  --stem-solo-ring: 2px;
+  --stem-silent-fill: 0.45;
+  --stem-notch: 2px;
+
+  /* heat: Heat's level colours (3.1). They fill tubes, pill borders and
+     dots; the level word is ink. */
+  --heat-cool: #4f9be6;
+  --heat-warm: #efa431;
+  --heat-hot: #e0402c;
+  --heat-overdue: #8f1d16;
+
+  /* label: The six colour labels, for sorting only (2.5). */
+  --label-red: #e0383e;
+  --label-orange: #f08a2c;
+  --label-yellow: #e8c73a;
+  --label-green: #3caa68;
+  --label-blue: #3d7dd5;
+  --label-purple: #9359c9;
+
+  /* key: A work's key colour (8.3, v4 keyColor.js): hue = ((pc * 7) mod 12)
+     * 30 with A = 0, in hsl with the mode's saturation and lightness. An
+     unknown key is night indigo in the minor look. The glow tone an orb's
+     rim takes is the same hue and saturation at the glow lightness. */
+  --key-unknown-hue: 232;
+  --key-major-saturation: 72;
+  --key-major-lightness: 58;
+  --key-minor-saturation: 58;
+  --key-minor-lightness: 42;
+  --key-glow-lightness: 65;
+
+  /* light: One light, from the upper left, as a fraction of the box (8.3, v3
+     WWAVLight.sun). */
+  --light-sun-x: 0.3;
+  --light-sun-y: 0.25;
+
+  /* motion: Built on MI-WWAV-OS's 140 ms beat with v4's curves (8.6). Under
+     Reduce Motion every move is a beat-long cross-fade. Nothing bounces. */
+  --motion-press: 70ms;
+  --motion-beat: 140ms;
+  --motion-fade: 280ms;
+  --motion-morph: 420ms;
+  --motion-wash: 760ms;
+  --motion-dive: 900ms;
+  --motion-toast: 2600ms;
+  --motion-rest: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* space: A 4 px grid (8.3). */
+  --space-s1: 4px;
+  --space-s2: 8px;
+  --space-s3: 12px;
+  --space-s4: 16px;
+  --space-s5: 24px;
+  --space-s6: 32px;
+  --space-s7: 48px;
+  --space-s8: 64px;
+
+  /* radius: Corners (8.3). Gels are full pills; a sheet rounds only its
+     lower corners. */
+  --radius-chip: 6px;
+  --radius-button: 10px;
+  --radius-card: 14px;
+  --radius-sheet: 8px;
+  --radius-pill: 999px;
+
+  /* type: Faces and sizes (8.4). Nothing is under 11; text read for more
+     than a line is at least the reading size (8.9, open: 17 or 19). */
+  --type-desk-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", sans-serif;
+  --type-desk-small: 11px;
+  --type-desk-body: 13px;
+  --type-desk-large: 15px;
+  --type-desk-title: 20px;
+  --type-desk-line-height: 1.35;
+  --type-mono-family: "Menlo", "Consolas", monospace;
+  --type-mono-small: 11px;
+  --type-mono-body: 13px;
+  --type-mono-large: 20px;
+  --type-name-family: "Cormorant Garamond", serif;
+  --type-name-min: 20px;
+  --type-name-header: 30px;
+  --type-name-sun: 46px;
+  --type-name-line-height: 1.18;
+  --type-name-weight: 400;
+  --type-name-light-weight: 300;
+  --type-name-light-weight-from: 28px;
+  --type-text-family: "Inter", sans-serif;
+  --type-text-label: 11px;
+  --type-text-label-tracking: 0.08em;
+  --type-text-small: 13px;
+  --type-text-body: 15px;
+  --type-text-reading: 17px;
+  --type-sign-family: "Jost", sans-serif;
+  --type-sign-min: 11px;
+  --type-sign-max: 15px;
+  --type-sign-tracking: 0.34em;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    --desk-ink: #ececec;
+    --desk-ink2: #c2c2c2;
+    --desk-ink3: #9a9a9a;
+    --desk-well: #26282b;
+    --desk-stripe: #2c3038;
+    --desk-case-metal: #5a5d61, #3f4246;
+    --desk-deck-metal: #5a5d61, #3f4246;
+    --desk-deck-edge: #26282b;
+    --desk-deck-pinstripe: rgb(0 0 0 / 0);
+    --desk-deck-ink: #ececec;
+    --desk-deck-ink-soft: #ececec;
+    --desk-highlight: #3a6fc4;
+    --desk-focus: rgb(58 111 196 / 0.6);
+    --desk-lcd-ground: #2c3121, #20241a;
+    --desk-lcd-ink: #d7e0a8;
+    --desk-lcd-dim: #8e9670;
+    --desk-source-list-ground: #2e3136;
+    --desk-source-list-heading: #9aa3ad;
+    --room-field-ground: #0f0c09, #0f0c09;
+  }
+}
+
+:root[data-appearance="dark"] {
+  --desk-ink: #ececec;
+  --desk-ink2: #c2c2c2;
+  --desk-ink3: #9a9a9a;
+  --desk-well: #26282b;
+  --desk-stripe: #2c3038;
+  --desk-case-metal: #5a5d61, #3f4246;
+  --desk-deck-metal: #5a5d61, #3f4246;
+  --desk-deck-edge: #26282b;
+  --desk-deck-pinstripe: rgb(0 0 0 / 0);
+  --desk-deck-ink: #ececec;
+  --desk-deck-ink-soft: #ececec;
+  --desk-highlight: #3a6fc4;
+  --desk-focus: rgb(58 111 196 / 0.6);
+  --desk-lcd-ground: #2c3121, #20241a;
+  --desk-lcd-ink: #d7e0a8;
+  --desk-lcd-dim: #8e9670;
+  --desk-source-list-ground: #2e3136;
+  --desk-source-list-heading: #9aa3ad;
+  --room-field-ground: #0f0c09, #0f0c09;
+}
