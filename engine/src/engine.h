@@ -46,9 +46,12 @@ class Worker {
 };
 
 // Asks the whole engine to stop its audio and exit (stdin closed, shutdown):
-// the message loop ends and main tears down. A watchdog ends the process if
-// that takes longer than the contract's second. Any thread may call it.
+// the message loop ends and main tears down. Any thread may call it.
 void requestQuit(const char* why);
+// Ends the process 0.75 s from now if it is still running: the contract
+// gives it a second. requestQuit arms it, and so does main once the message
+// loop ends however it ended (JUCE quits on SIGINT by itself).
+void armExitDeadline();
 
 class Engine {
  public:

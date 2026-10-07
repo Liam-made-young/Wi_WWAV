@@ -59,6 +59,7 @@ class EngineApp final : public juce::JUCEApplicationBase {
   }
 
   void shutdown() override {
+    wwav::armExitDeadline();
     if (engine_) engine_->stop();
     engine_.reset();
   }

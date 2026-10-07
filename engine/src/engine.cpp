@@ -35,19 +35,27 @@ class Json {
 std::string text(const juce::var& v) { return v.toString().toStdString(); }
 
 std::atomic<bool> quitting{false};
+std::atomic<bool> deadline{false};
 
 }  // namespace
+
+void armExitDeadline() {
+  if (deadline.exchange(true)) return;
+  // The contract gives the engine a second to exit. If tearing down hangs (a
+  // hung audio thread, a device that won't close, a worker op that can't be
+  // cut short, or one waiting on a message the stopped loop will never run),
+  // leave anyway, with a quarter second to spare for a busy machine.
+  std::thread([] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(750));
+    fprintf(stderr, "wwav-engine: stopping took too long; leaving now\n");
+    _exit(0);
+  }).detach();
+}
 
 void requestQuit(const char* why) {
   if (quitting.exchange(true)) return;
   fprintf(stderr, "wwav-engine: %s; stopping\n", why);
-  // The contract gives the engine a second to exit. If tearing down hangs
-  // (a hung audio thread, a device that won't close), leave anyway.
-  std::thread([] {
-    std::this_thread::sleep_for(std::chrono::milliseconds(900));
-    fprintf(stderr, "wwav-engine: stopping took too long; leaving now\n");
-    _exit(0);
-  }).detach();
+  armExitDeadline();
   juce::JUCEApplicationBase::quit();
 }
 

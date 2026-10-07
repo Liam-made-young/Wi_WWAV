@@ -1,6 +1,7 @@
 #include "audio.h"
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -36,6 +37,7 @@ AudioEngine::~AudioEngine() { close(); }
 
 std::string AudioEngine::findDevice(const std::string& name, juce::String* type) {
   std::string found;
+  // callSync can't run once the engine is quitting; then nothing is found.
   juce::MessageManager::callSync([&] {
     for (juce::AudioIODeviceType* t : devices_.getAvailableDeviceTypes()) {
       t->scanForDevices();
@@ -63,6 +65,11 @@ bool AudioEngine::open(const std::string& name, int rate, int block, std::string
     }
   }
   close();
+  if (running_) {  // still open: the engine is quitting
+    *code = "device_failed";
+    *message = "The engine is stopping.";
+    return false;
+  }
   if (name == "null") {
     // No hardware: a timer thread calls the graph every block at the nominal
     // rate, so the clock and meters behave as with a device (docs/ENGINE.md 1).
@@ -75,8 +82,9 @@ bool AudioEngine::open(const std::string& name, int rate, int block, std::string
     shm_.setFormat((uint32_t)rate, (uint32_t)block);
     return true;
   }
-  std::string failed;
+  std::string failed = "the engine is stopping";
   juce::MessageManager::callSync([&] {
+    failed.clear();
     juce::AudioDeviceManager::AudioDeviceSetup setup;
     setup.outputDeviceName = real;
     setup.inputDeviceName = {};
@@ -118,11 +126,15 @@ bool AudioEngine::open(const std::string& name, int rate, int block, std::string
 void AudioEngine::close() {
   if (!running_) return;
   if (juceDevice_) {
-    juce::MessageManager::callSync([&] {
+    // When the engine is quitting, callSync from the worker can't run: the
+    // device stays open and running, and Engine::stop closes it from the
+    // message thread itself, where callSync runs at once.
+    const bool closed = juce::MessageManager::callSync([&] {
       stopTimer();
       devices_.removeAudioCallback(this);
       devices_.closeAudioDevice();
     });
+    if (!closed) return;
     juceDevice_ = false;
   } else {
     nullStop_ = true;
@@ -138,9 +150,11 @@ void AudioEngine::timerCallback() { xruns_.store((uint32_t)std::max(0, devices_.
 
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
   // Called before the device's callbacks start, also when it restarts with
-  // new settings of its own.
+  // new settings of its own. The clock and the header follow it; what hello
+  // and device.open report catches up at the next device.open.
   rate_ = (int)device->getCurrentSampleRate();
   outputLatency_ = device->getOutputLatencyInSamples();
+  shm_.setFormat((uint32_t)rate_, (uint32_t)device->getCurrentBufferSizeSamples());
 }
 
 void AudioEngine::audioDeviceIOCallbackWithContext(const float* const*, int, float* const* out, int numOut, int n,
@@ -169,7 +183,9 @@ void AudioEngine::nullDevice(int rate, int block) {
       start = next = monotonicNs();
       k = 0;
     }
-    sleepUntil(next);
+    // In slices of 10 ms at most, so close() never waits out a long block.
+    for (uint64_t now = monotonicNs(); now < next && !nullStop_.load(std::memory_order_relaxed); now = monotonicNs())
+      sleepUntil(std::min(next, now + 10000000));
   }
 }
 
@@ -290,7 +306,17 @@ void AudioEngine::post(Command c) {
     applied_.store(c.seq);
     return;
   }
-  while (!commands_.push(c)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  // The queue holds 1024 commands, so it is full only when the audio thread
+  // has stopped taking them (a device that went away). Give up on this one
+  // rather than wait for ever.
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+  while (!commands_.push(c)) {
+    if (std::chrono::steady_clock::now() > until) {
+      fprintf(stderr, "wwav-engine: the audio thread isn't taking commands; one was dropped\n");
+      return;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
 }
 
 Transport AudioEngine::apply(Command c) {

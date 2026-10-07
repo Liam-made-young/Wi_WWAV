@@ -116,6 +116,28 @@ class Restart(unittest.TestCase):
         self.assertEqual(engine.proc.wait(timeout=1.0), 0)
         self.assertLess(time.monotonic() - asked, 1.0)
 
+    def test_closing_stdin_exits_within_1_s_even_with_a_hung_audio_thread(self):
+        # The app can die while its engine hangs: the engine must still go (docs/SPEC.md 9.3).
+        engine = self.start()
+        c = engine.connect()
+        self.load(c)
+        c.call("transport.play")
+        c.call("debug.hang", {"in": "audio"})
+        closed = time.monotonic()
+        engine.close_stdin()
+        engine.proc.wait(timeout=2.0)
+        self.assertLess(time.monotonic() - closed, 1.0)
+
+    def test_sigint_exits_within_1_s_even_with_a_hung_audio_thread(self):
+        engine = self.start()
+        c = engine.connect()
+        c.call("transport.play")
+        c.call("debug.hang", {"in": "audio"})
+        asked = time.monotonic()
+        engine.proc.send_signal(signal.SIGINT)
+        engine.proc.wait(timeout=2.0)
+        self.assertLess(time.monotonic() - asked, 1.0)
+
     def test_debug_crumb_names_the_node(self):
         engine = self.start()
         c = engine.connect()
