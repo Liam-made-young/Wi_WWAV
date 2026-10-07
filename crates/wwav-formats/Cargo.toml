@@ -5,5 +5,15 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+description = ".wwav and .swav 0.1, byte for byte as prana/tools/wwav_pack.py and formats/swav/swav_pack.py"
 
 [dependencies]
+wwav-ids.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+# today's date by the local clock, as python's datetime.date.today()
+libc = "0.2"
+
+[[bin]]
+name = "wwav"
+path = "src/bin/wwav.rs"

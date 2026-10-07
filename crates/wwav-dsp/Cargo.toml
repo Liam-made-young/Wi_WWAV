@@ -7,3 +7,11 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+# Pure-Rust maths (a port of musl), so sin, exp and log2 give the same bits on
+# every platform; std's call the system's libm, which differs between macOS and
+# Linux in the last place.
+libm = "0.2.16"
+
+[dev-dependencies]
+# Only the tests measure spectra; the crate's own FFT is analysis.js's.
+rustfft = "6.4"

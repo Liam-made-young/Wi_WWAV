@@ -1,0 +1,307 @@
+{
+  "about": "Made by tools/corpus/make_corpus.py. verdict is what wwav_pack.py or swav_pack.py info says; differs names a reader known to say something else, and why.",
+  "files": [
+    {
+      "file": "original.wwav",
+      "why": "An original packed by wwav_pack.py: a quote and an accent in the title, bpm 120.125 (an exact binary tie, written 120.12), a creator.",
+      "verdict": "4 stems, and the master",
+      "sha256": "dc564c69e52c560695641169db0c9f16dd48a7533507639108cbde4237ae30b8"
+    },
+    {
+      "file": "odd-chunks.wwav",
+      "why": "An original whose wmet and wlin both have odd lengths, so each is followed by a pad byte.",
+      "verdict": "4 stems, and the master",
+      "sha256": "8e38b37d96bcf565b9dd5ebf79c63051b70e3a295c9bb6ac56a6f756834e1cc7"
+    },
+    {
+      "file": "unicode.wwav",
+      "why": "An original whose wmet holds UTF-8 written as itself, a tab, a backslash and a control character (escaped as \\u0001), a whole bpm, a splitter and no key.",
+      "verdict": "4 stems, and the master",
+      "sha256": "43c1645e01c7f687f392349636bbaca9deccc19788cd7a3f57c2bb9fb2b13227"
+    },
+    {
+      "file": "remix.wwav",
+      "why": "A remix in PRANA's chunk order (fmt, data, wmet, wstm, wlin, wrmx): type remix, the original as its parent and root, generation 1, and wrmx as the device writes it.",
+      "verdict": "4 stems, and the master",
+      "sha256": "02a2e7a754eb1ea50a720a036649c62897eac2a1c07af90bf7cddb23bb00294a"
+    },
+    {
+      "file": "remix-wrmx-not-json.wwav",
+      "why": "A remix whose wrmx isn't JSON: info says so, and the verdict doesn't look at wrmx.",
+      "verdict": "4 stems, and the master",
+      "sha256": "39a8dfe3871509c4894ab29af1e7796305461aa5190a28d5061df27a06b08c6e"
+    },
+    {
+      "file": "master-only.wwav",
+      "why": "The original without its stems (the store's '.wwav, master only'): the same wmet and wlin, no wstm.",
+      "verdict": "the master only: no wstm",
+      "sha256": "c8e59140fe365356c28c03f05012961a775bdc85c8e73ab1c5ff557ab2ef22b8"
+    },
+    {
+      "file": "no-wstm.wwav",
+      "why": "The original with its wstm chunk renamed: identity, an unknown chunk, and no stems.",
+      "verdict": "the master only: no wstm",
+      "sha256": "ecca68cbf65cd777fd0ab4bb959a1dce7a690535351cb2bb799c8b35d6a4f6c3"
+    },
+    {
+      "file": "plain.wav",
+      "why": "A plain 44.1 kHz 16-bit stereo WAV.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "2016445886995dd27a4a83ce116f2dd5c52b1a1541a15db6f3741bf7199597c9"
+    },
+    {
+      "file": "odd-list.wav",
+      "why": "A plain WAV ending in an odd-length LIST chunk with no pad byte, so the file's size is odd.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "e0a159d3cea413b8e9d675c3e456427c0175ba6ad066459704fc08b4fd5681ed"
+    },
+    {
+      "file": "48k.wav",
+      "why": "A 48 kHz WAV.",
+      "verdict": "not listed: the master isn't 44.1 kHz 16-bit stereo PCM",
+      "sha256": "7bfe6d9fdca74ef3983a0e992b5f6c69d7a99079624d6d9911d4388c7d89b5f9"
+    },
+    {
+      "file": "24bit.wav",
+      "why": "A 24-bit WAV.",
+      "verdict": "not listed: the master isn't 44.1 kHz 16-bit stereo PCM",
+      "sha256": "1b0e7ca5ee6273b6f26d67bb04d2ef2b51f75f7778a647d70f1c030239b2ce40"
+    },
+    {
+      "file": "mono.wav",
+      "why": "A mono WAV.",
+      "verdict": "not listed: the master isn't 44.1 kHz 16-bit stereo PCM",
+      "sha256": "bba9cc84be8e32d7dbf894abeccaa55add9c0f47dd266408341d60670845c425"
+    },
+    {
+      "file": "extensible.wav",
+      "why": "A plain WAV whose fmt is WAVE_FORMAT_EXTENSIBLE (40 bytes) with PCM in its subformat.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "77410f3d0c498603f63cc526f38aa2daaec6f6b7578e2af1f5ae6f807d784deb"
+    },
+    {
+      "file": "two-fmt-last-44.wav",
+      "why": "Two fmt chunks, 48 kHz then 44.1 kHz: the last fmt wins.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "5a0b998ca4ef57d350ed6a264ac16f31a65a24e101c42371551d41483e2ab901"
+    },
+    {
+      "file": "two-fmt-last-48.wav",
+      "why": "Two fmt chunks, 44.1 kHz then 48 kHz: the last fmt wins.",
+      "verdict": "not listed: the master isn't 44.1 kHz 16-bit stereo PCM",
+      "sha256": "08413c686e1a38e261bd7013d47cf99cf68ff91b97faa838d628fba76f1aaf3a"
+    },
+    {
+      "file": "extensible.wwav",
+      "why": "The original with a WAVE_FORMAT_EXTENSIBLE fmt, so the master starts at byte 68.",
+      "verdict": "4 stems, and the master",
+      "sha256": "b132cb6730f75fcdab2dff1b4c4c74e5874f11c5285c3ba941ed6fd970c338c3"
+    },
+    {
+      "file": "wmet-not-json.wwav",
+      "why": "A wmet that isn't JSON.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "924a01177f7e18b183018736c0de8f093e81f12922609a8ef31ee0c48043bd37"
+    },
+    {
+      "file": "wmet-array.wwav",
+      "why": "A wmet that is JSON but not an object.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "ac7192027bad73f56f51015f97545d24f191005052e86053a7069987c40d5e6f"
+    },
+    {
+      "file": "wmet-almost-json.wwav",
+      "why": "A wmet with a trailing comma, which isn't JSON.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "differs": {
+        "prana": "4 stems, and the master",
+        "because": "PRANA's JSON reader (core/base/json.cpp) looks values up without checking the rest of the text, so it reads this wmet's version and frames and lists the stems."
+      },
+      "sha256": "6b7945553b10bcc224b2d7b69eb04b5dc6556d5437fb8a9692bdcdc74dd6066f"
+    },
+    {
+      "file": "wmet-nan.wwav",
+      "why": "A wmet whose bpm is NaN, which python's json and PRANA read and JSON.parse doesn't.",
+      "verdict": "4 stems, and the master",
+      "differs": {
+        "wi": "the master only: no wmet and wlin, so a plain WAV",
+        "because": "JSON.parse rejects NaN, so Wi's reader (wi/src/formats/wwav.js) finds no wmet; wwav_pack.py's json.loads takes NaN as a float, and PRANA skips a bpm it can't parse."
+      },
+      "sha256": "b131c289d02546d456f25b12bb4f333541b3753048c0e2ebb188a5f88e05471e"
+    },
+    {
+      "file": "version-1.0.wwav",
+      "why": "A newer major version.",
+      "verdict": "the master only: version 1.0 is newer than this reader (0.x)",
+      "sha256": "6f8f01c418ffc24699f672b51972cb22401daaa10903a9740f928332143af17f"
+    },
+    {
+      "file": "no-version.wwav",
+      "why": "A wmet without its wwav key.",
+      "verdict": "the master only: wmet has no version",
+      "sha256": "83fee9133e4e48b8c70caec52be46d1f61b53e4e334a26d3d69079fda1ff7ffb"
+    },
+    {
+      "file": "version-number.wwav",
+      "why": "A version written as a JSON number, 1.0, not a string.",
+      "verdict": "the master only: version 1.0 is newer than this reader (0.x)",
+      "differs": {
+        "wi": "the master only: version 1 is newer than this reader (0.x)",
+        "because": "Wi's reader (wi/src/formats/wwav.js pyStr) prints a number with String(), which drops the .0 that python's str() keeps."
+      },
+      "sha256": "fadd75737fd46d75313f550bc01a284c2536a161e312682ff1437a6b5678ce75"
+    },
+    {
+      "file": "version-digits.wwav",
+      "why": "A version in Arabic-Indic digits, which python's \\d reads as digits.",
+      "verdict": "the master only: version ١.0 is newer than this reader (0.x)",
+      "differs": {
+        "wi": "the master only: wmet has no version",
+        "because": "Wi's reader matches the version with an ASCII-only \\d, as the device does; wwav_pack.py's \\d takes any script's digits."
+      },
+      "sha256": "da4bbcd961f244a39d765af93ed367c1db7a2f3766acd8e501948371eac916da"
+    },
+    {
+      "file": "frames-wmet.wwav",
+      "why": "wmet's frames one more than the master's.",
+      "verdict": "the master only: frame counts differ (data 600, wstm 600, wmet 601)",
+      "sha256": "d51d9a9210af870afd804aec1160c308fbfe7238dbb214f9b006eb0116f1d25c"
+    },
+    {
+      "file": "frames-wstm.wwav",
+      "why": "wstm's header one frame short of the master's.",
+      "verdict": "the master only: frame counts differ (data 600, wstm 599, wmet 600)",
+      "sha256": "82deebce3e8cfa812d0dc2e35aa618ccae6e519e493b7d152b48e6a22b4cf461"
+    },
+    {
+      "file": "wstm-v2.wwav",
+      "why": "A wstm header of version 2.",
+      "verdict": "the master only: wstm isn't v1, 4 stereo 16-bit stems at 44.1 kHz",
+      "sha256": "b1cecd35f8198cc16c282794a8bb28cad21ae8c5c4ac60c0b18543473dde1647"
+    },
+    {
+      "file": "wstm-cut-off.wwav",
+      "why": "A wstm chunk 100 frames short of its header's count, with wlin whole after it.",
+      "verdict": "the master only: wstm is cut off",
+      "sha256": "5c57c55f4b026c1aaea20766eb3c3ecd1b95fde49efa198c015ab9985a9a0280"
+    },
+    {
+      "file": "cut-in-stems.wwav",
+      "why": "The original cut off in the middle of its stems: wstm is the last chunk, cut off, and wlin is gone.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "322a710b5c985ecf4e74aeb347f98f2800c5548c0bf342f04463424c9386f931"
+    },
+    {
+      "file": "wlin-cut-off.wwav",
+      "why": "The original missing its last 5 bytes: wlin is the last chunk, cut off.",
+      "verdict": "the master only: no wmet and wlin, so a plain WAV",
+      "sha256": "7ca369aaf03d576b4f2aa2684afd864ef816ae3bab67e3982bbc36bb272ec1fa"
+    },
+    {
+      "file": "junk-cut-off.wwav",
+      "why": "The original, then a JUNK chunk that says 4096 bytes and has 100: a cut-off last chunk after a whole song.",
+      "verdict": "4 stems, and the master",
+      "sha256": "411133963ec5aedb0119df5687c642b71e6b772bbec553f5a79a6689284cfa2c"
+    },
+    {
+      "file": "dup-data.wwav",
+      "why": "A second, shorter data chunk after wlin: the first chunk of each id is the one read, so the master is the first.",
+      "verdict": "4 stems, and the master",
+      "sha256": "8000b11a33a23f4fe95f59c6aa94a36afc7e54eb1aebd73677a0b30206d273bd"
+    },
+    {
+      "file": "dup-wmet.wwav",
+      "why": "A second wmet after wlin with another title: the first chunk of each id is the one read.",
+      "verdict": "4 stems, and the master",
+      "sha256": "3e030727b023ddaf2140d1992a84b2b6070b8ab907344dd916f2487cd5f3634b"
+    },
+    {
+      "file": "dup-wmet-newer.wwav",
+      "why": "A second wmet after wlin saying version 1.0: the first chunk of each id is the one read.",
+      "verdict": "4 stems, and the master",
+      "differs": {
+        "prana": "the master only",
+        "because": "PRANA's chunk walk (core/disc/wwav.cpp wwavChunk) keeps the last chunk of each id, so it reads the second wmet's version 1.0."
+      },
+      "sha256": "b216d2c406a5c51b595326cca9840263ef057baaf0766c18731baa8ce8577f5d"
+    },
+    {
+      "file": "plain.mp4",
+      "why": "A tiny H.264 and AAC film from ffmpeg: ftyp, free, mdat, moov.",
+      "verdict": "a plain MP4: no wmet and wlin",
+      "sha256": "81d63fe8bb5532955cb53d0d02589f380191680fc2c87b0fe5888ee46bec2dda"
+    },
+    {
+      "file": "fast.mp4",
+      "why": "The same film with fast start: ftyp, moov, free, mdat.",
+      "verdict": "a plain MP4: no wmet and wlin",
+      "sha256": "ff7ad181dfce84724da128762d1ac2b25ae4075568e08952c303fde0936b9730"
+    },
+    {
+      "file": "zero.mp4",
+      "why": "fast.mp4 with its last box (mdat) of size 0: to the end of the file.",
+      "verdict": "a plain MP4: no wmet and wlin",
+      "sha256": "e24803f1bef6eef765f3dc6201f8f57840de41b3af54b474f4db8abf71eb0f06"
+    },
+    {
+      "file": "large.mp4",
+      "why": "plain.mp4 with a 64-bit mdat size (size 1, then the size after the type).",
+      "verdict": "a plain MP4: no wmet and wlin",
+      "sha256": "7673d2b382dc1f7e3115a1b5e42c07a4d69e62f6cb8339b2a4f4b6df3c2930bc"
+    },
+    {
+      "file": "plain.swav",
+      "why": "plain.mp4 packed by swav_pack.py with a film.txt.",
+      "verdict": "a .swav: the film, its wmet and wlin",
+      "sha256": "8255c0b07a4a62bc603ec760c7f9fe305389a7b5220feac5c6f1b825d6bc7aa3"
+    },
+    {
+      "file": "zero.swav",
+      "why": "zero.mp4 packed by swav_pack.py: its last box gets its real size first.",
+      "verdict": "a .swav: the film, its wmet and wlin",
+      "sha256": "6a1eef1d3bd9f01c483639c34cf64a552135df8e8452852d1d484945d1d61f58"
+    },
+    {
+      "file": "large.swav",
+      "why": "large.mp4 packed by swav_pack.py: a 64-bit box before wmet and wlin.",
+      "verdict": "a .swav: the film, its wmet and wlin",
+      "sha256": "937a2b8a346bbdc09bbaf9b0f11c255e76789e1973857bc9fb7c44c393176044"
+    },
+    {
+      "file": "version-1.0.swav",
+      "why": "A newer major version.",
+      "verdict": "the film only: version 1.0 is newer than this reader (0.x)",
+      "sha256": "07dd4ea2f7e863b1126577be7f49637a5e28fd2e0df148fb8eaac6b16e3cbe0c"
+    },
+    {
+      "file": "no-version.swav",
+      "why": "A wmet without its swav key.",
+      "verdict": "the film only: wmet has no version",
+      "sha256": "80e47bb9c7ae032b87096ac095f13c8e2577186ac96428108dc0c925079985e5"
+    },
+    {
+      "file": "nan.swav",
+      "why": "A wmet with NaN, which isn't JSON to any .swav reader.",
+      "verdict": "a plain MP4: no wmet and wlin",
+      "sha256": "80a704220258a9fb4fcb0be7f7c628479e757433fac87f80b0894f95a59a8af8"
+    },
+    {
+      "file": "wlin-not-json.swav",
+      "why": "A wlin that isn't JSON.",
+      "verdict": "a plain MP4: no wmet and wlin",
+      "sha256": "d1f5e1b1bc8b0048b995fe97da2c77434931db723a0c4e0510d7951b363bfa63"
+    },
+    {
+      "file": "not-at-end.swav",
+      "why": "plain.swav with a box after wlin: it reads, but unpack refuses to move the film.",
+      "verdict": "a .swav: the film, its wmet and wlin",
+      "sha256": "08e2da7f8a26c32a1642e3fd0182f2d53d2b326aa516ddb09df7749788cc8438"
+    },
+    {
+      "file": "child.swav",
+      "why": "A film whose parent is original.wwav's song (one id space): what the Console's export writes.",
+      "verdict": "a .swav: the film, its wmet and wlin",
+      "sha256": "d49582c3efd48def85034aaa253e2b10af63879bb0d6443ec6a93fa1bc312306"
+    }
+  ]
+}

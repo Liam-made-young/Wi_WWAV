@@ -20,10 +20,10 @@ Built first because every room reads and writes `.wwav` and `.swav`.
 
 | # | Milestone | Fails if | Runs on | Status |
 |---|---|---|---|---|
-| F1 | `.wwav` 0.1 in Rust (`crates/wwav-formats`) | An original packed by the Rust writer differs by any byte from `wwav_pack.py pack` of the same folder and `song.txt`; Rust `unpack` then `pack` changes a byte; the Rust verdict differs by any character from `wwav_pack.py info`'s on any file in `tests/corpus/` | Linux | open |
-| F2 | `.swav` 0.1 in Rust | The Rust packer's bytes differ from `swav_pack.py pack`'s for the same film and `film.txt`; unpacking doesn't return the MP4 byte for byte; `ffprobe -v error` prints anything for a packed file | Linux | open |
-| F3 | One verdict | Any of the four readers (Python `wwav_pack.py`, PRANA's C++ `core/disc/wwav.cpp`, Wi's `wwav.js`, the app's Rust) gives a different sentence for any file in `tests/corpus/` | Linux | open |
-| F4 | Ids | ULIDs don't sort by creation time as strings; the FNV-1a 128 `song_id` for a track id differs from `prana/web/src/sim/wwavdisc.js`'s; a stable hash differs between two runs or two builds | Linux | open |
+| F1 | `.wwav` 0.1 in Rust (`crates/wwav-formats`) | An original packed by the Rust writer differs by any byte from `wwav_pack.py pack` of the same folder and `song.txt`; Rust `unpack` then `pack` changes a byte; the Rust verdict differs by any character from `wwav_pack.py info`'s on any file in `tests/corpus/` | Linux | **passed**: `crates/wwav-formats/tests/wwav_pack.rs` packs 14 folders with both tools, byte for byte; unpack-pack identity tested (originals with no creator or splitter, #68) |
+| F2 | `.swav` 0.1 in Rust | The Rust packer's bytes differ from `swav_pack.py pack`'s for the same film and `film.txt`; unpacking doesn't return the MP4 byte for byte; `ffprobe -v error` prints anything for a packed file | Linux | **passed**: `crates/wwav-formats/tests/swav_pack.rs` (plain, fast-start, size-0 last box, 64-bit boxes); unpack byte for byte; ffprobe silent |
+| F3 | One verdict | Any of the four readers (Python `wwav_pack.py`, PRANA's C++ `core/disc/wwav.cpp`, Wi's `wwav.js`, the app's Rust) gives a different sentence for any file in `tests/corpus/` | Linux | **failed**: the Rust agrees with `wwav_pack.py` on all 45 corpus files, but the reference readers disagree among themselves on 3 (`tools/parity/check.py`; questions #62, #76) |
+| F4 | Ids | ULIDs don't sort by creation time as strings; the FNV-1a 128 `song_id` for a track id differs from `prana/web/src/sim/wwavdisc.js`'s; a stable hash differs between two runs or two builds | Linux | **passed**: `crates/wwav-ids` (ULID order over 20,000 ids; FNV-1a 128 against `wwavdisc.js`; FNV vectors) |
 | F5 | Undo journal | After a random run of edits, undo-all doesn't return the first state byte for byte, or redo-all the last; ⌘Z acts outside the current room; a label is lost on relaunch; any table has `ON DELETE CASCADE` | Linux | open |
 | F6 | `.wwavsession` | Saving the same session twice gives different bytes; save, quit and reopen changes `session.json` by a byte or changes ⌘Z's label; killing the process mid-edit loses a journalled change; a crash mid-write leaves a half-written `session.json` | Linux | open |
 | F7 | Tokens | A token is defined anywhere but `design/tokens.json`; the CSS, Rust and C++ outputs disagree on any value; any pair in `docs/SPEC.md` 8.11 marked as text misses its ratio (7:1 body, 4.5:1 secondary) | Linux | open |
@@ -52,7 +52,7 @@ Done only when all seven pass on a second Mac that has never built the app
 | S1.1 | The window | The title bar isn't 52 pt with switcher, Now strip, search pill and astronaut chip; below 1180 pt the pill isn't a 28 pt magnifier and the strip isn't 440 pt; anything overflows at 1024 × 680 | Linux | open |
 | S1.2 | Rooms keep their place | Switching away and back loses a room's scroll, selection, open sheet or half-typed text; a room change isn't a 140 ms cross-fade (a cut under Reduce Motion) | Linux | open |
 | S1.3 | The Now strip | Either half shows something other than 2.2's rules; an empty half doesn't read "All clear / Nothing open right now." or "Nothing playing / Select anything and press Space."; stem state is shown by colour alone | Linux | open |
-| S1.4 | Stem lights | A click doesn't mute at once; a second click within 250 ms doesn't revert the mute and solo instead; any light's hit area is under 44 × 44 pt | Linux | open |
+| S1.4 | Stem lights | A click doesn't mute at once; a second click within 250 ms doesn't revert the mute and solo instead; any light's hit area is under 44 × 44 pt | Linux | open: the model passes (`app/ui/src/shared/stems/gesture.test.ts`); the strip itself is not built |
 | S1.5 | One grammar | ⌘Z isn't labelled in the menu and a 2.6 s toast; Esc discards typed text; a screen has more than one ⇧Return act; work that left the machine is offered as undoable | Linux | open |
 | S1.6 | ⌘K, ⌘⇧N, ⌘L | The palette doesn't search tasks, clips, sessions, settings and actions with the filters in 2.7; capture doesn't keep the panel open on Enter with "N in inbox · captured ✓"; the drawer isn't 280 pt over any room | Linux | open |
 | S1.7 | The library | Import names a file anything but a ULID; renaming a song renames a file; a plain WAV comes in as anything but master only, without saying so; a tag isn't lowercase or a clip takes a 13th; a fifth pin fits; a delete removes a file; the verdict in Get Info differs from `wwav_pack.py info` | Linux | open |
@@ -65,13 +65,13 @@ Done only when all seven pass on a second Mac that has never built the app
 
 | # | Milestone | Fails if | Runs on | Status |
 |---|---|---|---|---|
-| S2.1 | Heat's maths | The heat value, level or "Warm at / Hot at" table differs from 3.1 for any difficulty; the estimate chain or weekly load differs; any grade, letter or "what it would take" result differs from 3.1 and 3.8 | Linux | open |
-| S2.2 | Today | Plan my day uses anything but the written rule (heat order, estimate rounded up to 15 min, capped at 90, first gap that fits, before "Day ends at"); a draft lacks its reason; Return doesn't accept all; Esc doesn't clear them | Linux | open |
-| S2.3 | Focus | A round or break starts without a press; minutes don't add to the current task's `actualMin`; the timer stops when switching rooms; the chime sounds while off | Linux | open |
+| S2.1 | Heat's maths | The heat value, level or "Warm at / Hot at" table differs from 3.1 for any difficulty; the estimate chain or weekly load differs; any grade, letter or "what it would take" result differs from 3.1 and 3.8 | Linux | **passed** (model): `app/ui/src/heat/model/heat.test.ts`, `estimate.test.ts`, `grades.test.ts`, `review.findings.test.ts` (threshold sweeps) |
+| S2.2 | Today | Plan my day uses anything but the written rule (heat order, estimate rounded up to 15 min, capped at 90, first gap that fits, before "Day ends at"); a draft lacks its reason; Return doesn't accept all; Esc doesn't clear them | Linux | open: the rule passes (`plan.test.ts`); Return and Esc in the room are not built |
+| S2.3 | Focus | A round or break starts without a press; minutes don't add to the current task's `actualMin`; the timer stops when switching rooms; the chime sounds while off | Linux | open: the state machine passes (`focus.test.ts`); keeping it across rooms is shell work |
 | S2.4 | Tasks, Calendar, Grades, Habits, Mail | Any tab lacks its one "+" act and one secondary act from 3.3; a habit 7th fits; the streak counter shows by default; Mail can reply, send or delete | Linux | open |
-| S2.5 | Brightspace iCal | Against a stored raw feed, a due item is missed, a non-graded or cancelled item is kept, a UID changes, or an item missing from two syncs is deleted | Linux | open |
+| S2.5 | Brightspace iCal | Against a stored raw feed, a due item is missed, a non-graded or cancelled item is kept, a UID changes, or an item missing from two syncs is deleted | Linux | open: the parser and rules pass against a synthesised D2L feed (`crates/wi-heat/tests/brightspace_feed.rs`); the founder's real feed is not stored yet |
 | S2.6 | Moving in | Importing the artifact's JSON changes any id, so the first sync finds anything new | Linux | open |
-| S2.7 | Heat sync | A slower older write overwrites a newer one on any field | Linux (mock server) | open |
+| S2.7 | Heat sync | A slower older write overwrites a newer one on any field | Linux (mock server) | **passed**: `crates/wi-heat/tests/heat_sync.rs` (512 proptest cases, three devices, clocks ±10 min off) and `tools/mock-server/test/heat.test.js` |
 
 ## Stage 3: Console
 
@@ -92,12 +92,12 @@ Done only when all seven pass on a second Mac that has never built the app
 
 | # | Milestone | Fails if | Runs on | Status |
 |---|---|---|---|---|
-| S4.1 | The same sky everywhere | Positions hashed at t = 0 for one catalogue differ between WebKit and Chromium (and later Windows) | Linux | open |
+| S4.1 | The same sky everywhere | Positions hashed at t = 0 for one catalogue differ between WebKit and Chromium (and later Windows) | Linux | open: Node and Chromium give the same layout hash (`layoutHash.test.ts`, `e2e/space-layout.spec.ts`); WebKit not yet run |
 | S4.2 | A still sky | Anything moves while nothing plays (frame-diff over 5 s idle) | Linux | open |
-| S4.3 | The planet player | Moon gestures miss 4.6's thresholds (250 ms, 400 ms, 8 pt); a moon's level isn't its distance; ↑ Push stops playback | Linux | open |
-| S4.4 | Systems | A 22nd world is accepted, or the refusal isn't "A solar system holds 21 worlds. Start another one." | Linux (mock server) | open |
-| S4.5 | Lineage | A family tree layout differs from v3's ring rule; a link touching someone else's work shows before they agree | Linux | open |
-| S4.6 | Newest and Since you last looked | Any order but newest; no "That's everything."; any count | Linux | open |
+| S4.3 | The planet player | Moon gestures miss 4.6's thresholds (250 ms, 400 ms, 8 pt); a moon's level isn't its distance; ↑ Push stops playback | Linux | open: the thresholds pass in the model (`gesture.test.ts`); the player is not built |
+| S4.4 | Systems | A 22nd world is accepted, or the refusal isn't "A solar system holds 21 worlds. Start another one." | Linux (mock server) | open: the model and `tools/mock-server` refuse the 22nd world with the sentence (`space.test.js`, 30 concurrent adds); the room is not built |
+| S4.5 | Lineage | A family tree layout differs from v3's ring rule; a link touching someone else's work shows before they agree | Linux | open: the layout passes, bit-identical with a port of v3 over 11,000 families (`lineage.test.ts`); consent display is room work |
+| S4.6 | Newest and Since you last looked | Any order but newest; no "That's everything."; any count | Linux | open: the model passes (`newest.test.ts`); the room is not built |
 
 ## Stage 5: Unquantized
 
@@ -106,7 +106,7 @@ Done only when all seven pass on a second Mac that has never built the app
 | S5.1 | The door | Sound or motion starts before the press; the speaker glyph doesn't stop both | Linux | open |
 | S5.2 | The floor | A hall has no end wall reading "That's everything."; a shop's seat differs between two reads of the same day | Linux | open |
 | S5.3 | List view | Anything in the store can't be reached and bought from List view; it isn't the default under Reduce Motion | Linux | open |
-| S5.4 | The counter | Buying needs walking; a price adds a fee at checkout; a count of sales appears on the floor | Linux (mock server) | open |
+| S5.4 | The counter | Buying needs walking; a price adds a fee at checkout; a count of sales appears on the floor | Linux (mock server) | open: the mock server passes as a test double (`commerce.test.js`); the counter is not built |
 | S5.5 | Before launch | Any item in `docs/SPEC.md` 7.20 is open | Linux (server patches, test Postgres) | open |
 
 ## Stage 6: Windows

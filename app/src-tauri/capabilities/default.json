@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "The main window gets only the commands it uses (docs/SPEC.md 9.8).",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
