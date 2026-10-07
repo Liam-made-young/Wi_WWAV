@@ -274,3 +274,232 @@ pub fn sign_in(setup: &Setup, server: &MockServer) -> Core {
     ok(&core, "account.signIn", json!({}));
     core
 }
+
+// ----- Heat -----
+
+/// "2026-10-07 09:00" in New York as epoch milliseconds: the zone 3.11 says
+/// URI's students get from the system.
+pub fn ny(text: &str) -> f64 {
+    let (date, time) = text.split_once(' ').unwrap_or((text, "00:00"));
+    let d: Vec<i16> = date.split('-').map(|p| p.parse().unwrap()).collect();
+    let t: Vec<i8> = time.split(':').map(|p| p.parse().unwrap()).collect();
+    jiff::civil::date(d[0], d[1] as i8, d[2] as i8)
+        .at(t[0], t[1], 0, 0)
+        .in_tz("America/New_York")
+        .unwrap()
+        .timestamp()
+        .as_millisecond() as f64
+}
+
+/// A core with no server and no engine worth waiting for, on New York's
+/// clock, standing at `now` ("2026-10-07 09:00").
+pub fn heat_core(setup: &Setup, now: &str) -> Core {
+    let core = setup.core();
+    pin(&core, now);
+    core
+}
+
+/// Puts a core's clock at `now` in New York.
+pub fn pin(core: &Core, now: &str) {
+    ok(
+        core,
+        "app.settings.set",
+        json!({"patch": {"heat": {"timeZone": "America/New_York"}}}),
+    );
+    core.set_now(Some(ny(now)));
+}
+
+/// The snapshot for `date`.
+pub fn snap(core: &Core, date: &str) -> Value {
+    ok(core, "heat.snapshot", json!({"date": date}))
+}
+
+/// Records of one kind in a snapshot.
+pub fn records(snapshot: &Value, kind: &str) -> Vec<Value> {
+    snapshot["records"][kind].as_array().cloned().unwrap_or_default()
+}
+
+/// A command refused: its code and sentence.
+pub fn refused(core: &Core, cmd: &str, args: Value) -> (String, String) {
+    let e = core.invoke(cmd, args).expect_err(cmd);
+    (e.code, e.message)
+}
+
+/// A task the way a view makes one.
+pub fn add_task(core: &Core, space: &str, title: &str, extra: Value) -> Value {
+    let mut record = json!({"spaceId": space, "title": title});
+    for (k, v) in extra.as_object().cloned().unwrap_or_default() {
+        record[k] = v;
+    }
+    ok(core, "heat.put", json!({"kind": "task", "record": record}))["record"].clone()
+}
+
+/// Events of one name received so far, without waiting.
+pub fn drain(rx: &Receiver<Event>, name: &str) -> Vec<Event> {
+    rx.try_iter().filter(|e| e.event == name).collect()
+}
+
+/// A core standing at `now` (New York's clock) from the moment it opens, so
+/// the workers that start with it see the same time the test does.
+pub fn heat_core_on(setup: &Setup, now: &str, server: &str) -> Core {
+    let mut config = setup.config(server, no_browser());
+    config.now = Some(ny(now));
+    let core = Core::open(&setup.library(), config).unwrap();
+    ok(&core, "app.settings.set", json!({"patch": {"heat": {"timeZone": "America/New_York"}}}));
+    core
+}
+
+/// A calendar feed on a free port: answers every request with what it is
+/// told to, and counts them. For the core's iCal fetch.
+pub struct FeedServer {
+    pub port: u16,
+    state: Arc<std::sync::Mutex<(u16, Vec<u8>)>>,
+    hits: Arc<std::sync::atomic::AtomicUsize>,
+    stop: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl FeedServer {
+    pub fn start(body: &[u8]) -> FeedServer {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::atomic::Ordering;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let state = Arc::new(std::sync::Mutex::new((200u16, body.to_vec())));
+        let hits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (s, h, st) = (state.clone(), hits.clone(), stop.clone());
+        std::thread::spawn(move || {
+            for conn in listener.incoming() {
+                if st.load(Ordering::SeqCst) {
+                    break;
+                }
+                let Ok(mut conn) = conn else { continue };
+                h.fetch_add(1, Ordering::SeqCst);
+                let (status, body) = s.lock().unwrap().clone();
+                std::thread::spawn(move || {
+                    let mut seen = Vec::new();
+                    let mut buf = [0u8; 1024];
+                    while !seen.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match conn.read(&mut buf) {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => seen.extend_from_slice(&buf[..n]),
+                        }
+                    }
+                    let head = format!(
+                        "HTTP/1.1 {status} X\r\nContent-Type: text/calendar\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = conn.write_all(head.as_bytes());
+                    let _ = conn.write_all(&body);
+                });
+            }
+        });
+        FeedServer { port, state, hits, stop }
+    }
+
+    /// What the next requests are answered with.
+    pub fn serve(&self, status: u16, body: &[u8]) {
+        *self.state.lock().unwrap() = (status, body.to_vec());
+    }
+
+    pub fn hits(&self) -> usize {
+        self.hits.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// The private address of the feed, with a token in it as D2L's carry.
+    pub fn address(&self, token: &str) -> String {
+        format!("http://127.0.0.1:{}/d2l/le/calendar/feed/user/feed.ics?token={token}", self.port)
+    }
+}
+
+impl Drop for FeedServer {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        let _ = std::net::TcpStream::connect(("127.0.0.1", self.port));
+    }
+}
+
+// ----- the MCP helper, as a second process -----
+
+static BUILD_MCP: Once = Once::new();
+
+/// The workspace's `wi-mcp`, built once per test run.
+pub fn wi_mcp() -> PathBuf {
+    BUILD_MCP.call_once(|| {
+        let ok = Command::new(env!("CARGO"))
+            .args(["build", "-q", "-p", "wi-mcp", "--bin", "wi-mcp"])
+            .current_dir(workspace())
+            .status()
+            .expect("cargo runs")
+            .success();
+        assert!(ok, "wi-mcp didn't build");
+    });
+    let path = target_dir().join("wi-mcp");
+    assert!(path.exists(), "no wi-mcp at {}", path.display());
+    path
+}
+
+/// `wi-mcp` running on a library, spoken to over stdio as Claude would.
+pub struct McpHelper {
+    child: Child,
+    stdin: std::process::ChildStdin,
+    stdout: BufReader<std::process::ChildStdout>,
+    next: i64,
+}
+
+impl McpHelper {
+    pub fn start(library: &Path) -> McpHelper {
+        use std::io::Write;
+        let mut child = Command::new(wi_mcp())
+            .arg("--library")
+            .arg(library)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("wi-mcp starts");
+        let stdin = child.stdin.take().unwrap();
+        let stdout = BufReader::new(child.stdout.take().unwrap());
+        let mut h = McpHelper { child, stdin, stdout, next: 1 };
+        h.request("initialize", json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1"}}));
+        writeln!(h.stdin, "{}", json!({"jsonrpc": "2.0", "method": "notifications/initialized"})).unwrap();
+        h
+    }
+
+    fn request(&mut self, method: &str, params: Value) -> Value {
+        use std::io::Write;
+        let id = self.next;
+        self.next += 1;
+        writeln!(self.stdin, "{}", json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})).unwrap();
+        self.stdin.flush().unwrap();
+        let mut line = String::new();
+        self.stdout.read_line(&mut line).unwrap();
+        let reply: Value = serde_json::from_str(&line).unwrap_or_else(|e| panic!("{e}: {line}"));
+        assert_eq!(reply["id"], id);
+        reply
+    }
+
+    /// A tool's answer: Ok(structuredContent), or Err(the sentence).
+    pub fn call(&mut self, tool: &str, args: Value) -> Result<Value, String> {
+        let reply = self.request("tools/call", json!({"name": tool, "arguments": args}));
+        let result = &reply["result"];
+        if result["isError"] == true {
+            Err(result["content"][0]["text"].as_str().unwrap_or_default().to_string())
+        } else {
+            Ok(result["structuredContent"].clone())
+        }
+    }
+
+    pub fn tools(&mut self) -> Vec<String> {
+        let reply = self.request("tools/list", json!({}));
+        reply["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect()
+    }
+}
+
+impl Drop for McpHelper {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}

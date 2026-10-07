@@ -1,7 +1,7 @@
 //! Reading a command's args. A command missing what it needs answers
 //! `bad_args` with a sentence naming it, never a panic.
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 use wi_store::Room;
 
 use crate::CoreError;
@@ -22,6 +22,16 @@ impl<'a> Args<'a> {
 
     pub fn get(&self, key: &str) -> Option<&'a Value> {
         self.v.get(key).filter(|v| !v.is_null())
+    }
+
+    /// The key as sent: a `null` is told from a key left out.
+    pub fn raw(&self, key: &str) -> Option<&'a Value> {
+        self.v.get(key)
+    }
+
+    /// All the args, as an object (empty if they weren't one).
+    pub fn object(&self) -> Map<String, Value> {
+        self.v.as_object().cloned().unwrap_or_default()
     }
 
     pub fn str(&self, key: &str) -> Result<&'a str, CoreError> {

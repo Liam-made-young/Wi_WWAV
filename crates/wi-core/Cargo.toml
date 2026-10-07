@@ -10,6 +10,7 @@ description = "The app's Rust core: the library, undo, the listening player, the
 [dependencies]
 wi-store.workspace = true
 wi-heat.workspace = true
+wi-heat-store = { path = "../wi-heat-store" }
 wwav-formats.workspace = true
 wwav-wire.workspace = true
 wwav-ids.workspace = true

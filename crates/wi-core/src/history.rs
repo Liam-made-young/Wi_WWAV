@@ -101,6 +101,28 @@ pub(crate) fn undo(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     step(i, a, true)
 }
 
+/// `history.undoEntry {txnId}`: one entry undone out of order, for Settings →
+/// Claude's list. Refused, with a sentence, when a later change touched the
+/// same records ("This changed again since. Undo the later change first.").
+pub(crate) fn undo_entry(i: &Inner, a: &Args) -> Result<Value, CoreError> {
+    let id = a.str("txnId")?;
+    let done = i.store().undo_entry(id);
+    let label = match done {
+        Ok(label) => label,
+        Err(wi_store::Error::Refused(why)) => return Err(CoreError::new("cant_undo", why)),
+        Err(e) => return Err(e.into()),
+    };
+    // What the entry changed is back as it was: every view refetches, and
+    // sync takes the records as new local changes.
+    let kinds = all_kinds(i);
+    i.bus.emit("library", json!({"ids": []}));
+    i.bus.emit("heat", json!({"kinds": kinds}));
+    records_changed(i, kinds);
+    heat::journal_moved(i)?;
+    i.poke();
+    Ok(json!({"label": label}))
+}
+
 pub(crate) fn redo(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     step(i, a, false)
 }
@@ -233,7 +255,10 @@ fn write_records(i: &Inner, room: Room, label: &str, ops: &[Op]) -> Result<(), C
             None => tx.delete_doc(&op.kind, &op.id)?,
         }
     }
-    tx.commit()?;
+    // The watcher is to tell the views about other processes' entries, not this one.
+    if let Some(id) = tx.commit()? {
+        i.note_own(&id);
+    }
     Ok(())
 }
 
@@ -292,6 +317,8 @@ pub(crate) fn apply_remote(
     }
     write_records(i, Room::Sync, label, &ops)?;
     let kinds: BTreeSet<String> = ops.iter().map(|o| o.kind.clone()).collect();
-    records_changed(i, kinds.into_iter().collect());
+    let kinds: Vec<String> = kinds.into_iter().collect();
+    i.bus.emit("heat", json!({"kinds": kinds}));
+    records_changed(i, kinds);
     Ok(())
 }

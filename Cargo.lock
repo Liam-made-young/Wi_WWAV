@@ -5316,6 +5316,7 @@ dependencies = [
  "thiserror 2.0.21",
  "ureq",
  "wi-heat",
+ "wi-heat-store",
  "wi-store",
  "wwav-formats",
  "wwav-ids",

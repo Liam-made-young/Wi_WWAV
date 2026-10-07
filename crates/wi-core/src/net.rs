@@ -197,6 +197,30 @@ impl Net {
         }
     }
 
+    /// One calendar feed, read as bytes. No account, no token: the address is
+    /// the only secret, and it is never in what fails. Redirects are followed
+    /// (a feed link may move), up to five.
+    pub fn fetch_feed(&self, address: &str) -> Result<Vec<u8>, Fail> {
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(Duration::from_secs(15))
+            .timeout_read(Duration::from_secs(30))
+            .redirects(5)
+            .user_agent("Wi_WWAV")
+            .build();
+        match agent.get(address).call() {
+            Ok(resp) => {
+                let mut bytes = Vec::new();
+                resp.into_reader()
+                    .take(16 << 20)
+                    .read_to_end(&mut bytes)
+                    .map_err(|_| Fail::Offline)?;
+                Ok(bytes)
+            }
+            Err(ureq::Error::Status(status, _)) => Err(Fail::Status { status, body: Value::Null }),
+            Err(ureq::Error::Transport(_)) => Err(Fail::Offline),
+        }
+    }
+
     /// A request that must succeed (2xx): any other answer is a [`Fail`].
     pub fn expect(
         &self,

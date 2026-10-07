@@ -13,14 +13,20 @@
 //! - `player`: the one listening player (2.3).
 //! - `engine`: the supervisor (docs/ENGINE.md §1, §3.1, §5).
 //! - `account`, `upload`, `heat`: mi-wwav.com (2.4, 2.8, 9.7).
+//! - `heat_cmd`, `calendars`, `claude`, `watch`: Heat's `heat.*` commands,
+//!   its iCal calendars, Settings → Claude, and noticing the MCP helper
+//!   (docs/HEAT.md).
 //! - `export`: Export everything (2.9).
 
 mod account;
 mod args;
 mod bus;
+mod calendars;
+mod claude;
 pub mod engine;
 mod export;
 mod heat;
+mod heat_cmd;
 mod history;
 mod kv;
 mod library;
@@ -28,8 +34,9 @@ mod net;
 mod player;
 mod settings;
 mod upload;
+mod watch;
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -144,6 +151,12 @@ pub struct Config {
     pub engine_test: bool,
     /// Where the engine's private socket directory goes: `$TMPDIR`.
     pub tmp_dir: PathBuf,
+    /// Where `wi-mcp` is, for Settings → Claude's lines. None: `WI_WWAV_MCP`,
+    /// else beside the app (docs/HEAT.md).
+    pub helper: Option<PathBuf>,
+    /// A fixed "now" in milliseconds since 1970, for tests of what the time
+    /// decides. None: the clock.
+    pub now: Option<f64>,
 }
 
 impl Config {
@@ -161,6 +174,8 @@ impl Config {
             device: None,
             engine_test: false,
             tmp_dir: std::env::temp_dir(),
+            helper: None,
+            now: None,
         }
     }
 }
@@ -173,6 +188,14 @@ pub(crate) struct Inner {
     engine: Engine,
     player: Mutex<player::Player>,
     net: net::Net,
+    /// The Keychain, for the calendars' addresses as well as the account.
+    secrets: Arc<dyn SecretStore>,
+    helper: Option<PathBuf>,
+    /// The journal entries this process made, so the watcher tells the views
+    /// only about other processes' (the MCP helper's).
+    own: Mutex<BTreeSet<String>>,
+    /// A fixed "now" for tests (milliseconds), instead of the clock.
+    fixed_now: Mutex<Option<f64>>,
     uploads: Mutex<upload::Status>,
     opener: Opener,
     /// One sign-in at a time: the browser may only be asked once.
@@ -189,6 +212,30 @@ impl Inner {
 
     fn closing(&self) -> bool {
         self.closing.load(Ordering::Relaxed)
+    }
+
+    /// Notes a journal entry this process made.
+    fn note_own(&self, id: &str) {
+        let mut own = lock(&self.own);
+        if own.len() > 10_000 {
+            own.clear();
+        }
+        own.insert(id.to_string());
+    }
+
+    /// Whether `id` is an entry this process made (and forgets it was).
+    fn take_own(&self, id: &str) -> bool {
+        lock(&self.own).remove(id)
+    }
+
+    /// Now and the person's time zone: Settings → Heat's, else the system's.
+    fn clock(&self) -> wi_heat_store::Clock {
+        let now = lock(&self.fixed_now).unwrap_or_else(|| jiff::Timestamp::now().as_millisecond() as f64);
+        let zone = settings::read(self)
+            .ok()
+            .and_then(|s| s["heat"]["timeZone"].as_str().and_then(|name| jiff::tz::TimeZone::get(name).ok()))
+            .unwrap_or_else(jiff::tz::TimeZone::system);
+        wi_heat_store::Clock::at(now, zone)
     }
 
     /// Wakes the workers now.
@@ -244,6 +291,7 @@ impl Core {
             bus.clone(),
         );
         let net = net::Net::new(&config.server_url, config.secrets.clone());
+        let secrets = config.secrets.clone();
         let inner = Arc::new(Inner {
             root: library.to_path_buf(),
             store: Mutex::new(store),
@@ -252,6 +300,10 @@ impl Core {
             engine,
             player: Mutex::new(player::Player::default()),
             net,
+            secrets,
+            helper: config.helper.clone(),
+            own: Mutex::new(BTreeSet::new()),
+            fixed_now: Mutex::new(config.now),
             uploads: Mutex::new(upload::Status::default()),
             opener: config.opener,
             signing_in: Mutex::new(()),
@@ -259,7 +311,12 @@ impl Core {
             wake: (Mutex::new(0), Condvar::new()),
         });
         player::listen(&inner);
-        let workers = vec![upload::start(&inner), heat::start(&inner)];
+        let workers = vec![
+            upload::start(&inner),
+            heat::start(&inner),
+            watch::start(&inner),
+            calendars::start(&inner),
+        ];
         Ok(Core { inner, workers })
     }
 
@@ -275,10 +332,13 @@ impl Core {
             "history.get" => history::get(i, &a),
             "history.undo" => history::undo(i, &a),
             "history.redo" => history::redo(i, &a),
+            "history.undoEntry" => history::undo_entry(i, &a),
 
             "records.list" => history::records_list(i, &a),
             "records.get" => history::records_get(i, &a),
             "records.mutate" => history::records_mutate(i, &a),
+
+            heat if heat.starts_with("heat.") => heat_cmd::invoke(i, heat, &a),
 
             "library.list" => library::list(i, &a),
             "library.search" => library::search(i, &a),
@@ -351,6 +411,13 @@ impl Core {
     /// Pushes and pulls Heat's records now, rather than at the next round.
     pub fn sync_heat(&self) -> Result<Value, CoreError> {
         heat::sync_now(&self.inner)
+    }
+
+    /// Makes "now" a fixed time (milliseconds since 1970), or the clock again
+    /// for None. For tests of what the time decides: heat, Plan my day, the
+    /// timer, what a Now making line shows.
+    pub fn set_now(&self, ms: Option<f64>) {
+        *lock(&self.inner.fixed_now) = ms;
     }
 }
 

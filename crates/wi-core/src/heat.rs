@@ -12,7 +12,10 @@
 //! a journal room no view's ⌘Z acts on, so undo stays exact and a sync never
 //! takes the person's redo; an undo in any view is a new local change and
 //! syncs like one. Grades stay on this Mac (Open, 9.8, at its
-//! recommendation).
+//! recommendation): a grade goes up only while its Public switch is on, as a
+//! copy of the fields 3.15 lists for it, and its copy is deleted when the
+//! switch goes off. A calendar record, what a calendar's feed held, the
+//! timer and the settings never go up.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -21,6 +24,7 @@ use std::time::Duration;
 
 use serde_json::{json, Map, Value};
 use wi_heat::sync::{Change, Key, Page, Replica, Saved};
+use wi_store::DocChange;
 
 use crate::bus::lock;
 use crate::net::Fail;
@@ -47,9 +51,56 @@ fn with_replica<T>(i: &Inner, f: impl FnOnce(&mut Replica) -> T) -> Result<T, Co
     Ok(out)
 }
 
-/// Kinds that never leave this Mac.
+/// Kinds that never go up: what a calendar's feed held and the calendar
+/// records themselves (their addresses are in the Keychain, and another Mac
+/// has no use for this one's), and what isn't a record.
 fn local_only(kind: &str) -> bool {
+    ["calendar", "calendarEvent", "heatState", "heatSetting"].iter().any(|k| kind.eq_ignore_ascii_case(k))
+}
+
+fn is_grade(kind: &str) -> bool {
     kind.eq_ignore_ascii_case("grade")
+}
+
+/// What a grade's public copy holds (3.15): the course it names, the item, the
+/// score and what it was out of, and the switch itself.
+const GRADE_COPY: [&str; 5] = ["courseId", "title", "score", "outOf", "public"];
+
+/// A field written only if it isn't what the replica holds already, so a
+/// change noticed twice is stamped once.
+fn write_if_changed(r: &mut Replica, kind: &str, id: &str, field: &str, value: &Value) {
+    if r.value(kind, id, field) != Some(value) {
+        r.write(kind, id, field, value.clone());
+    }
+}
+
+/// A grade, as the server should hold it: a copy in the clear while its
+/// switch is on, and no copy otherwise. `now` is the grade as it stands here.
+fn sync_grade(r: &mut Replica, id: &str, now: Option<&Value>) -> bool {
+    match now.filter(|g| g.get("public") == Some(&json!(true))) {
+        Some(grade) => {
+            let mut wrote = false;
+            for field in GRADE_COPY {
+                let value = grade.get(field).unwrap_or(&Value::Null);
+                if r.value("grade", id, field) != Some(value) {
+                    r.write("grade", id, field, value.clone());
+                    wrote = true;
+                }
+            }
+            if r.value("grade", id, "deleted") == Some(&json!(true)) {
+                r.write("grade", id, "deleted", json!(false));
+                wrote = true;
+            }
+            wrote
+        }
+        // Switched back, or gone: the copy is deleted, once.
+        None if r.value("grade", id, "public") == Some(&json!(true)) => {
+            r.write("grade", id, "public", json!(false));
+            r.write("grade", id, "deleted", json!(true));
+            true
+        }
+        None => false,
+    }
 }
 
 fn load(i: &Inner) -> Result<Replica, CoreError> {
@@ -67,34 +118,114 @@ fn save(i: &Inner, r: &Replica) -> Result<(), CoreError> {
 
 /// Local edits made in Heat, field by field, waiting to go up.
 pub(crate) fn wrote(i: &Inner, changes: &[(&str, &str, &str, &Value)]) -> Result<(), CoreError> {
-    let synced: Vec<_> = changes.iter().filter(|c| !local_only(c.0)).collect();
-    if synced.is_empty() {
+    let grades: BTreeSet<String> = changes.iter().filter(|c| is_grade(c.0)).map(|c| c.1.to_string()).collect();
+    let synced: Vec<_> = changes.iter().filter(|c| !is_grade(c.0) && !local_only(c.0)).collect();
+    if synced.is_empty() && grades.is_empty() {
         return Ok(());
     }
+    let now = grades_now(i, &grades)?;
     with_replica(i, |r| {
         for (kind, id, field, value) in synced {
             r.write(kind, id, field, (*value).clone());
+        }
+        for (id, grade) in &now {
+            sync_grade(r, id, grade.as_ref());
         }
     })?;
     i.poke();
     Ok(())
 }
 
-/// After an undo or redo in Heat: every record that now differs from what
-/// the replica holds is a new local change.
+/// The grades named, as they stand in the library now.
+fn grades_now(i: &Inner, ids: &BTreeSet<String>) -> Result<BTreeMap<String, Option<Value>>, CoreError> {
+    let store = i.store();
+    let mut out = BTreeMap::new();
+    for id in ids {
+        out.insert(id.clone(), store.doc("grade", id)?.map(|d| d.json));
+    }
+    Ok(out)
+}
+
+/// A journal entry's records, noticed: each field that changed goes up, a
+/// deleted record as `deleted`, and a grade by its own rule. Used for the
+/// core's own Heat writes and for the MCP helper's, which only the app syncs
+/// (docs/SPEC.md 8.7).
+pub(crate) fn wrote_entry(i: &Inner, docs: &[DocChange]) -> Result<(), CoreError> {
+    let grades: BTreeSet<String> = docs.iter().filter(|d| is_grade(&d.kind)).map(|d| d.key.clone()).collect();
+    let others: Vec<&DocChange> = docs.iter().filter(|d| !is_grade(&d.kind) && !local_only(&d.kind)).collect();
+    if others.is_empty() && grades.is_empty() {
+        return Ok(());
+    }
+    let now = grades_now(i, &grades)?;
+    with_replica(i, |r| {
+        for d in &others {
+            let (kind, id) = (d.kind.as_str(), d.key.as_str());
+            match &d.after {
+                None => write_if_changed(r, kind, id, "deleted", &json!(true)),
+                Some(after) => {
+                    if r.value(kind, id, "deleted") == Some(&json!(true)) {
+                        r.write(kind, id, "deleted", json!(false));
+                    }
+                    let before = d.before.as_ref().and_then(Value::as_object);
+                    for (field, value) in after.as_object().into_iter().flatten() {
+                        if before.map_or(true, |b| b.get(field) != Some(value)) {
+                            write_if_changed(r, kind, id, field, value);
+                        }
+                    }
+                    // A field the change took away goes up as null.
+                    for field in before.into_iter().flat_map(|b| b.keys()) {
+                        if after.get(field).is_none() {
+                            write_if_changed(r, kind, id, field, &Value::Null);
+                        }
+                    }
+                }
+            }
+        }
+        for (id, grade) in &now {
+            sync_grade(r, id, grade.as_ref());
+        }
+    })?;
+    i.poke();
+    Ok(())
+}
+
+/// Records made outside a journal entry (the spaces Heat makes the first time
+/// it opens), carried the same way.
+pub(crate) fn wrote_made(i: &Inner, made: &[(&'static str, Value)]) -> Result<(), CoreError> {
+    let docs: Vec<DocChange> = made
+        .iter()
+        .map(|(k, v)| DocChange {
+            kind: (*k).to_string(),
+            key: v.get("id").and_then(Value::as_str).unwrap_or_default().to_string(),
+            before: None,
+            after: Some(v.clone()),
+        })
+        .collect();
+    wrote_entry(i, &docs)
+}
+
+/// After an undo or redo in Heat, or when the library may have changed
+/// behind the core's back (the MCP helper wrote while the app was closed):
+/// every record that now differs from what the replica holds is a new local
+/// change.
 pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
+    let grade_ids: BTreeSet<String> = {
+        let store = i.store();
+        store.docs("grade")?.into_iter().map(|d| d.key).collect()
+    };
+    let grades = grades_now(i, &grade_ids)?;
     let _held = lock(&HELD);
     let mut r = load(i)?;
     let snapshot = r.snapshot();
-    let kinds: BTreeSet<String> = snapshot.keys().map(|k| k.0.clone()).collect();
+    let mut kinds: BTreeSet<String> = snapshot.keys().map(|k| k.0.clone()).collect();
+    kinds.extend(i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind").unwrap_or_default());
     let mut writes: Vec<(String, String, String, Value)> = Vec::new();
-    for kind in &kinds {
+    for kind in kinds.iter().filter(|k| !is_grade(k) && !local_only(k)) {
         let docs = i.store().docs(kind)?;
         let mut present = BTreeSet::new();
         for d in docs {
             present.insert(d.key.clone());
-            let gone = snapshot.get(&(kind.clone(), d.key.clone(), "deleted".into()))
-                == Some(&json!(true));
+            let gone = snapshot.get(&(kind.clone(), d.key.clone(), "deleted".into())) == Some(&json!(true));
             if gone {
                 writes.push((kind.clone(), d.key.clone(), "deleted".into(), json!(false)));
             }
@@ -105,21 +236,22 @@ pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
                 }
             }
         }
-        let ids: BTreeSet<&String> = snapshot
-            .keys()
-            .filter(|k| &k.0 == kind)
-            .map(|k| &k.1)
-            .collect();
+        let ids: BTreeSet<&String> = snapshot.keys().filter(|k| &k.0 == kind).map(|k| &k.1).collect();
         for id in ids.into_iter().filter(|id| !present.contains(*id)) {
             if snapshot.get(&(kind.clone(), id.clone(), "deleted".into())) != Some(&json!(true)) {
                 writes.push((kind.clone(), id.clone(), "deleted".into(), json!(true)));
             }
         }
     }
-    if !writes.is_empty() {
-        for (kind, id, field, value) in writes {
-            r.write(&kind, &id, &field, value);
-        }
+    let known_grades: BTreeSet<String> = snapshot.keys().filter(|k| is_grade(&k.0)).map(|k| k.1.clone()).collect();
+    let mut moved = !writes.is_empty();
+    for id in grade_ids.iter().chain(known_grades.iter()) {
+        moved |= sync_grade(&mut r, id, grades.get(id).and_then(Option::as_ref));
+    }
+    for (kind, id, field, value) in writes {
+        r.write(&kind, &id, &field, value);
+    }
+    if moved {
         save(i, &r)?;
         i.poke();
     }
@@ -178,6 +310,7 @@ pub(crate) fn sync_now(i: &Inner) -> Result<Value, CoreError> {
     match result {
         Ok(()) => {
             let sentence = format!("Synced {}", clock_time());
+            let _ = i.kv.set("heat.syncedAt", &json!(jiff::Timestamp::now().as_millisecond()));
             i.bus.status("sync", &sentence);
             Ok(json!({"sentence": sentence, "changed": touched.len()}))
         }
@@ -286,7 +419,7 @@ fn apply(i: &Inner, touched: &BTreeSet<(String, String)>) -> Result<(), CoreErro
     }
     let snapshot = with_replica(i, |r| r.snapshot())?;
     let mut records = Vec::new();
-    for (kind, id) in touched {
+    for (kind, id) in touched.iter().filter(|(kind, _)| !is_grade(kind) && !local_only(kind)) {
         let fields: BTreeMap<&str, &Value> = snapshot
             .range((kind.clone(), id.clone(), String::new())..)
             .take_while(|(k, _)| &k.0 == kind && &k.1 == id)

@@ -4,7 +4,7 @@
 //! ```text
 //! media/ + manifest.json   every library file byte for byte, with its sha256
 //! sessions/                every Console session, with the plugin state it saved
-//! heat.json                every record, by kind
+//! heat.json                every record, by kind, each with its Public switch
 //! notes/                   Markdown with frontmatter and [[wikilinks]]
 //! galaxy.json              the galaxy, as last seen from mi-wwav.com
 //! index.html               plays every master and film from disk; after one
@@ -409,15 +409,30 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
         }
     }
 
-    // Every record, by kind.
+    // Every record, by kind, each with its Public switch (3.14). What isn't a
+    // record is left out: the timer, the settings, and what other calendars'
+    // feeds held. The calendars' addresses are in the Keychain, not here (3.11).
     let kinds =
         i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")?;
     let mut records = Map::new();
-    for kind in &kinds {
+    for kind in kinds.iter().filter(|k| !["heatState", "heatSetting", "calendarEvent"].contains(&k.as_str())) {
         let docs = i.store().docs(kind)?;
+        let switch = [
+            "task", "focusSession", "project", "milestone", "habit", "course", "grade", "dailyNote", "note",
+        ]
+        .contains(&kind.as_str());
         records.insert(
             kind.clone(),
-            json!(docs.into_iter().map(|d| d.json).collect::<Vec<_>>()),
+            json!(docs
+                .into_iter()
+                .map(|d| {
+                    let mut v = d.json;
+                    if let (true, Some(m)) = (switch, v.as_object_mut()) {
+                        m.entry("public").or_insert(json!(false));
+                    }
+                    v
+                })
+                .collect::<Vec<_>>()),
         );
     }
     let exported = jiff::Timestamp::now().to_string();
@@ -426,7 +441,7 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
         &pretty(&json!({"version": 1, "exported": exported, "records": records})),
     )?;
 
-    write_notes(out, &clips, &records, &mut count)?;
+    write_notes(out, &clips, &records, &i.clock().zone, &mut count)?;
     count.write(&out.join("galaxy.json"), &pretty(&galaxy(i)))?;
     count.write(&out.join("index.html"), &page(&songs, &films, &exported))?;
     Ok((count, mismatched))
@@ -439,6 +454,7 @@ fn write_notes(
     out: &Path,
     clips: &[wi_store::Clip],
     records: &Map<String, Value>,
+    zone: &jiff::tz::TimeZone,
     count: &mut Counter,
 ) -> io::Result<()> {
     let dir = out.join("notes");
@@ -535,6 +551,98 @@ fn write_notes(
             }
         }
         count.write(&dir.join(format!("{}.md", names[id])), &text)?;
+    }
+
+    // Notes, each linked to its project.
+    for n in of("note") {
+        let body = str_of(n, &["markdown"]);
+        let title = match n["title"].as_str().map(str::trim).filter(|t| !t.is_empty()) {
+            Some(t) => t.to_string(),
+            None => body.lines().next().unwrap_or("").chars().take(40).collect(),
+        };
+        let name = note_name(&title, &mut taken);
+        let project = n["projectId"].as_str().and_then(|p| names.get(p)).map(|p| format!("[[{p}]]"));
+        let text = frontmatter(&[("id", n["id"].clone()), ("project", json!(project)), ("public", n["public"].clone())]) + body;
+        count.write(&dir.join(format!("{name}.md")), &text)?;
+    }
+
+    // Courses with their categories and grades, by the course's code.
+    let terms: BTreeMap<&str, &str> = of("term").into_iter().map(|t| (str_of(t, &["id"]), str_of(t, &["name"]))).collect();
+    let all_grades = of("grade");
+    let mut course_names: BTreeMap<String, String> = BTreeMap::new();
+    for c in of("course") {
+        let id = str_of(c, &["id"]).to_string();
+        course_names.insert(id, note_name(str_of(c, &["code"]), &mut taken));
+    }
+    for c in of("course") {
+        let id = str_of(c, &["id"]);
+        let term = terms.get(str_of(c, &["termId"])).map(|t| t.to_string());
+        let mut text = frontmatter(&[
+            ("id", json!(id)),
+            ("name", c["name"].clone()),
+            ("term", json!(term)),
+            ("public", c["public"].clone()),
+        ]);
+        let cats = c["categories"].as_array().cloned().unwrap_or_default();
+        if !cats.is_empty() {
+            text += "## Categories\n\n";
+            for k in &cats {
+                text += &format!("- {}: {}%\n", str_of(k, &["name"]), k["weight"]);
+            }
+            text += "\n";
+        }
+        let mine: Vec<&&Value> = all_grades.iter().filter(|g| str_of(g, &["courseId"]) == id).collect();
+        if !mine.is_empty() {
+            text += "## Grades\n\n";
+            for g in mine {
+                let score = match g["score"].as_f64() {
+                    Some(s) => format!("{s}/{}", g["outOf"]),
+                    None => "pending".to_string(),
+                };
+                text += &format!("- {}: {score}\n", str_of(g, &["title"]));
+            }
+        }
+        count.write(&dir.join(format!("{}.md", course_names[id])), &text)?;
+    }
+
+    // Habits: each day done is a link to that day's note.
+    for h in of("habit") {
+        let name = note_name(str_of(h, &["title"]), &mut taken);
+        let mut text = frontmatter(&[("id", h["id"].clone()), ("minutes", h["minutes"].clone()), ("public", h["public"].clone())]);
+        let mut days: Vec<&str> = h["log"]
+            .as_object()
+            .map(|l| l.iter().filter(|(_, v)| **v == json!(true)).map(|(d, _)| d.as_str()).collect())
+            .unwrap_or_default();
+        days.sort_unstable();
+        for d in days {
+            text += &format!("- [[{d}]]\n");
+        }
+        count.write(&dir.join(format!("{name}.md")), &text)?;
+    }
+
+    // Every task, open and done, with links to its space, project and course.
+    if !tasks.is_empty() {
+        let day = |ms: f64| {
+            jiff::Timestamp::from_millisecond(ms as i64).map(|t| t.to_zoned(zone.clone()).strftime("%Y-%m-%d").to_string()).unwrap_or_default()
+        };
+        let line = |t: &Value| {
+            let mut s = format!("- [{}] {}", if t["done"] == json!(true) { "x" } else { " " }, str_of(t, &["title"]));
+            if let Some(due) = t["due"].as_f64() {
+                s += &format!(", due {}", day(due));
+            }
+            for (field, map) in [("spaceId", &names), ("projectId", &names), ("courseId", &course_names)] {
+                if let Some(n) = t[field].as_str().and_then(|id| map.get(id)) {
+                    s += &format!(" [[{n}]]");
+                }
+            }
+            s + "\n"
+        };
+        let mut text = String::from("## Open\n\n");
+        text.extend(tasks.iter().filter(|t| t["done"] != json!(true)).map(|t| line(t)));
+        text += "\n## Done\n\n";
+        text.extend(tasks.iter().filter(|t| t["done"] == json!(true)).map(|t| line(t)));
+        let name = note_name("Tasks", &mut taken);
+        count.write(&dir.join(format!("{name}.md")), &text)?;
     }
     Ok(())
 }
