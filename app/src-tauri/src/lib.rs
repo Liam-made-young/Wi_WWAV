@@ -7,6 +7,8 @@ mod core_link;
 mod menu;
 mod open;
 mod paths;
+#[cfg(test)]
+mod review_tests;
 mod secrets;
 mod update;
 
