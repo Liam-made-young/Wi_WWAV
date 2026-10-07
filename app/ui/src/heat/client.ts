@@ -299,6 +299,16 @@ export interface TaskDerived {
   next?: DayKey | null;
 }
 
+/** The School sheet's values (3.11). The iCal address itself is in the Keychain: only whether one is saved is read back. */
+export interface School {
+  name: string;
+  host: string;
+  icalSaved: boolean;
+  codePattern: string;
+  termStart: DayKey;
+  termEnd: DayKey;
+}
+
 export interface Snapshot {
   now: number;
   date: DayKey;
@@ -306,6 +316,8 @@ export interface Snapshot {
   records: { [K in Kind]: Records[K][] };
   heatState: HeatState;
   events: CalendarEvent[];
+  /** The School sheet as saved, or null before one is; beyond docs/HEAT.md. */
+  school?: School | null;
   derived: {
     tasks: Record<Id, TaskDerived>;
     today: {
@@ -376,6 +388,8 @@ export function heatClient(t: Transport = real) {
     whatItWouldTake: (courseId: Id, letter: string) => c<{ text: string }>('heat.whatItWouldTake', { courseId, letter }),
     reviewWeek: (weekStart: DayKey) => c<Record<string, unknown>>('heat.review.week', { weekStart }),
     publicView: () => c<PublicView>('heat.publicView'),
+    /** Your galaxy's solar systems, for the sidebar's drop targets and a project's timeline; beyond docs/HEAT.md. */
+    galaxy: () => c<{ systems: { id: Id; title: string }[] }>('heat.galaxy'),
 
     put: <K extends Kind>(kind: K, record: Omit<Records[K], 'id'> & { id?: Id }) =>
       c<{ record: Records[K] } & Undo>('heat.put', { kind, record }),
