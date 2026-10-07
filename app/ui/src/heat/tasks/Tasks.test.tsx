@@ -17,6 +17,7 @@ const titles = () => $$(rig, '.heat-table [role="row"]:not(.heat-thead) .heat-td
 const rowFor = (title: string) =>
   $$(rig, '.heat-table [role="row"]').find((r) => r.querySelector('.heat-td-name')?.textContent === title)!;
 const side = () => $$(rig, '.heat-tasks-sidebar-none, .heat-sidebar-slot .heat-side-row').map((r) => r.textContent);
+const task = (id: string) => rig.fake.store.task.get(id)!;
 const undoLabel = async () => (await rig.call<{ undo: string | null }>('history.get', {})).undo;
 
 async function openTasks(options: Parameters<typeof mountHeat>[0] = {}) {
@@ -241,6 +242,41 @@ describe('Tasks’ keys', () => {
     });
     await act(async () => void rowFor('Grammar quiz 4').dispatchEvent(e));
     expect(carried['application/x-heat-task']).toBe('t-quiz4');
+  });
+});
+
+describe('linking by drop', () => {
+  const dropOn = async (el: Element | undefined, id: string) => {
+    const e = Object.assign(new Event('drop', { bubbles: true, cancelable: true }), {
+      dataTransfer: {
+        types: ['application/x-heat-task'],
+        getData: (t: string) => (t === 'application/x-heat-task' ? id : ''),
+      },
+    });
+    await act(async () => {
+      el!.dispatchEvent(e);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await settle();
+  };
+
+  it('links a task dropped on a milestone, a project or a course in the sidebar', async () => {
+    await openTasks();
+    await dropOn(button(rig, /^EP v1 mixed/), 't-passport');
+    expect(task('t-passport').milestoneId).toBe('ms-mixed');
+    expect(rig.status().count).toBe('Linked ‘Renew passport’ to EP v1 mixed.');
+    expect(await undoLabel()).toBe('Undo edit task');
+    await dropOn(button(rig, /^MTH 142/), 't-dentist');
+    expect(task('t-dentist').courseId).toBe('c-mth142');
+    await dropOn(button(rig, /^EP4/), 't-dentist');
+    expect(task('t-dentist').projectId).toBe('proj-ep');
+  });
+
+  it('links a task dropped on a bead of the timeline', async () => {
+    await openTasks();
+    await click(button(rig, /^WWAV/));
+    await dropOn($(rig, '.heat-bead') ?? undefined, 't-passport');
+    expect(task('t-passport').milestoneId).toBe('ms-mixed');
   });
 });
 

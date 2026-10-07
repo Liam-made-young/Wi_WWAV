@@ -382,7 +382,17 @@ function Frame(p: FrameProps) {
         <div className="heat-sidebar-slot" ref={p.setSidebar} />
       </aside>
 
-      <main className="heat-main">
+      <main
+        className="heat-main"
+        onClickCapture={(e) => {
+          // ⇧-click is the other way to ⇧Return: the tab's one secondary act (2.7).
+          const act = e.shiftKey ? nowSecondary() : undefined;
+          if (!act || act.hidden || act.disabled) return;
+          e.preventDefault();
+          e.stopPropagation();
+          act.run();
+        }}
+      >
         {TAB_IDS.map((id) => {
           const Tab = HEAT_TABS[id];
           return (

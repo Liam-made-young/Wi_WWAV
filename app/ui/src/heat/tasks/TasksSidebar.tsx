@@ -4,7 +4,9 @@
 // average time". Counts come from the snapshot's lists.
 
 import { type ReactNode } from 'react';
+import { useActions } from '../actions';
 import { copy, formatMinutes } from '../fmt';
+import { carriesTask, draggedTask } from '../ui';
 import { useHeat } from '../store';
 import { useSpaceFilter } from '../frame';
 import { LISTS, sameView, type TasksView } from './view';
@@ -19,12 +21,15 @@ function Row({
   count,
   on,
   onPick,
+  onDropTask,
   depth = 0,
 }: {
   label: string;
   count?: number;
   on: boolean;
   onPick(): void;
+  /** A task dropped on the row: a group row links it. */
+  onDropTask?(taskId: string): void;
   depth?: number;
 }) {
   return (
@@ -35,6 +40,16 @@ function Row({
       aria-current={on ? 'true' : undefined}
       style={depth ? { paddingLeft: 12 + depth * 14 } : undefined}
       onClick={onPick}
+      onDragOver={(e) => {
+        if (onDropTask && carriesTask(e)) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const id = draggedTask(e);
+        if (onDropTask && id) {
+          e.preventDefault();
+          onDropTask(id);
+        }
+      }}
     >
       <span className="heat-side-name">{label}</span>
       {count !== undefined && (
@@ -49,6 +64,7 @@ function Row({
 export function TasksSidebar({ view, onView }: Props) {
   const { snap, idx } = useHeat();
   const { spaceId } = useSpaceFilter();
+  const actions = useActions();
   if (!snap) return null;
   const lists = snap.derived.lists;
   const inSpace = (taskId: string) => !spaceId || idx.task.get(taskId)?.spaceId === spaceId;
@@ -79,6 +95,7 @@ export function TasksSidebar({ view, onView }: Props) {
         count={countBy((t) => (t as unknown as Record<string, unknown>)[field], id)}
         on={sameView(view, next)}
         onPick={() => onView(next)}
+        onDropTask={by === 'area' ? undefined : (taskId) => void actions.linkTo(taskId, by, id, label)}
         depth={depth}
       />
     );

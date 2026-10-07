@@ -553,3 +553,10 @@
 .heat-note-line {
   border-color: color-mix(in srgb, var(--desk-ink) 40%, var(--desk-well));
 }
+
+.heat-now-heat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s1) var(--space-s2);
+}

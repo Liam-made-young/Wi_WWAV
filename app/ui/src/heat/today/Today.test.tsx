@@ -297,6 +297,20 @@ describe('Plan my day', () => {
     expect($$(rig, '[data-draft]').length).toBeGreaterThan(0);
   });
 
+  it('runs on a ⇧-click in the main view, the other way to ⇧Return, and a plain click still selects', async () => {
+    rig = await mountHeat();
+    const target = row('Grammar quiz 4');
+    await act(async () => {
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }));
+    });
+    await settle();
+    expect($$(rig, '[data-draft]').length).toBeGreaterThan(0);
+    expect($(rig, '.heat-info')).toBeNull();
+    await escape(rig);
+    await click(row('Grammar quiz 4'));
+    expect($(rig, '.heat-info')).not.toBeNull();
+  });
+
   it('puts Return to work even when the Plan my day button still has the keyboard', async () => {
     rig = await mountHeat();
     await plan();

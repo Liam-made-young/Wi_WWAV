@@ -6,11 +6,14 @@
 import type { CSSProperties } from 'react';
 import { daysBetween } from '../../shared/time/zone';
 import { shortMonthDay } from '../../shared/time/format';
+import { useActions } from '../actions';
 import type { Id } from '../client';
+import { carriesTask, draggedTask } from '../ui';
 import { useHeat } from '../store';
 
 export function Timeline({ spaceId, picked, onPick }: { spaceId: Id; picked: Id | null; onPick(id: Id): void }) {
   const { snap, date } = useHeat();
+  const actions = useActions();
   const beads = (snap?.records.milestone ?? []).filter((m) => m.spaceId === spaceId).sort((a, b) => a.order - b.order);
   if (beads.length === 0) return null;
   const first = beads.reduce((lo, m) => (m.date < lo ? m.date : lo), date);
@@ -37,6 +40,13 @@ export function Timeline({ spaceId, picked, onPick }: { spaceId: Id; picked: Id 
             title={`${m.title}, ${shortMonthDay(m.date)}`}
             style={{ '--at': at(m.date) } as CSSProperties}
             onClick={() => onPick(m.id)}
+            onDragOver={(e) => carriesTask(e) && e.preventDefault()}
+            onDrop={(e) => {
+              const task = draggedTask(e);
+              if (!task) return;
+              e.preventDefault();
+              void actions.linkTo(task, 'milestone', m.id, m.title);
+            }}
           >
             <span className="heat-bead-glass" />
           </button>

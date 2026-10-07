@@ -187,8 +187,10 @@ function NowWidget() {
         <SpaceDot hue={idx.space.get(task.spaceId)?.hue} />
         <span className="heat-now-name">{task.title}</span>
       </button>
-      {d && <Heat level={d.heat.level} v={d.heat.v} />}
-      {due !== null && <p className="heat-now-line">{dueText(due, now, tz)}</p>}
+      <p className="heat-now-line heat-now-heat">
+        {d && <Heat level={d.heat.level} v={d.heat.v} />}
+        {due !== null && <span>{dueText(due, now, tz)}</span>}
+      </p>
       {block && <p className="heat-now-line">{copy.today.blockEnds(clock(block.start + block.minutes))}</p>}
       {onThis && (
         <p className="heat-now-line" data-text="secondary">

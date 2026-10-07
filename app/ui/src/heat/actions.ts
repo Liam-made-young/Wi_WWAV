@@ -146,6 +146,15 @@ export function useActions() {
         else say(to === 'upload' ? 'Marked for upload.' : `Made a ${to} from the capture.`);
       },
 
+      /** A task dropped on a course, a project or a milestone in Tasks' sidebar (or a bead): linked to it. */
+      async linkTo(taskId: Id, by: 'course' | 'milestone' | 'project', id: Id, label: string) {
+        const t = idx.task.get(taskId);
+        if (!t) return;
+        const field = { course: 'courseId', milestone: 'milestoneId', project: 'projectId' }[by];
+        const r = await act(client.patch('task', taskId, { [field]: id } as Partial<Task>));
+        if (r) say(`Linked ‘${t.title}’ to ${label}.`);
+      },
+
       /** A task dropped on a Calendar day: that is when it will be worked on (the When column). */
       async schedule(taskId: Id, day: DayKey) {
         const t = idx.task.get(taskId);
