@@ -44,7 +44,8 @@ every local window call it.
 cd app/src-tauri
 cargo tauri dev                           # the UI from Vite, the core on ~/Music/Wi_WWAV
 cargo tauri build --debug --no-bundle     # the UI built in, for the end-to-end check
-node ../ui/e2e-webkit/run.mjs             # needs tauri-driver, WebKitWebDriver, xdotool
+cargo build -p mock-engine                # the engine the end-to-end check runs
+node ../ui/e2e-webkit/run.mjs             # needs tauri-driver, WebKitWebDriver, xdotool, Xvfb
 ```
 
 Run the Tauri CLI from this folder: the build hooks find `ui/` from here.
