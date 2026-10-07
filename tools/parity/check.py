@@ -77,8 +77,9 @@ def rust(binary, path):
 
 
 def wi(paths):
-    r = subprocess.run(["node", os.path.join(HERE, "wi_verdicts.mjs"), WI, *paths],
-                       capture_output=True, text=True, check=True)
+    r = subprocess.run(["node", os.path.join(HERE, "wi_verdicts.mjs"), WI, *paths], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit("check.py: Wi's readers didn't run (Node 22 is needed, for fs.openAsBlob):\n" + r.stderr)
     return {j["file"]: j["verdict"] for j in map(json.loads, r.stdout.splitlines())}
 
 

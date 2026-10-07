@@ -162,7 +162,14 @@ fn swav_command(cmd: &str, a: &Args) -> Said {
 }
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let Ok(args) = std::env::args_os()
+        .skip(1)
+        .map(|a| a.into_string())
+        .collect::<Result<Vec<String>, _>>()
+    else {
+        eprintln!("{USAGE}\nwwav: error: an argument isn't UTF-8");
+        return ExitCode::from(2);
+    };
     if args.iter().any(|a| a == "-h" || a == "--help") {
         println!("{USAGE}");
         return ExitCode::SUCCESS;

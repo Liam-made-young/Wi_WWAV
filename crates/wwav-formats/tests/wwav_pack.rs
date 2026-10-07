@@ -15,8 +15,8 @@ use common::*;
 
 const SONG_ID: &str = "0123456789abcdef0123456789abcdef";
 
-fn song_txt(extra: &str) -> String {
-    format!("title = Tést \"Song\"\nartist = Mi\nbpm = 120.125\nkey = A minor\nsong_id = {SONG_ID}\ncreated = 2026-10-03\n{extra}")
+fn song_txt() -> String {
+    format!("title = Tést \"Song\"\nartist = Mi\nbpm = 120.125\nkey = A minor\nsong_id = {SONG_ID}\ncreated = 2026-10-03\n")
 }
 
 /// Packs `folder` with both tools (the same extra arguments) and checks
@@ -51,13 +51,13 @@ fn pack_writes_the_bytes_wwav_pack_writes() {
     }
     let dir = tmp("pack-bytes");
     let folders: Vec<(PathBuf, Vec<&str>)> = vec![
-        (song_folder(&dir, "01 Test Song", 3000, &NAMED, &song_txt("")), vec!["--creator", "liam_made_young"]),
-        (song_folder(&dir, "02 Split", 3001, &NAMED, &song_txt("")), vec!["--splitter", "demucs", "--creator", "a b"]),
+        (song_folder(&dir, "01 Test Song", 3000, &NAMED, &song_txt()), vec!["--creator", "liam_made_young"]),
+        (song_folder(&dir, "02 Split", 3001, &NAMED, &song_txt()), vec!["--splitter", "demucs", "--creator", "a b"]),
         // three passes of 65536 frames, the last one short
-        (song_folder(&dir, "03 Long", 140_001, &NAMED, &song_txt("")), vec![]),
+        (song_folder(&dir, "03 Long", 140_001, &NAMED, &song_txt()), vec![]),
         // a breadboard folder: 1.wav is the master, 2-5 the stems
-        (song_folder(&dir, "04 Legacy", 777, &["1.wav", "2.wav", "3.wav", "4.wav", "5.wav"], &song_txt("")), vec![]),
-        (song_folder(&dir, "05 Upper", 100, &["MASTER.WAV", "Vocals.wav", "DRUMS.wav", "other.WAV", "Bass.Wav"], &song_txt("")), vec![]),
+        (song_folder(&dir, "04 Legacy", 777, &["1.wav", "2.wav", "3.wav", "4.wav", "5.wav"], &song_txt()), vec![]),
+        (song_folder(&dir, "05 Upper", 100, &["MASTER.WAV", "Vocals.wav", "DRUMS.wav", "other.WAV", "Bass.Wav"], &song_txt()), vec![]),
         // song.txt as people write it: CRLF, comments, odd spacing, keys in
         // capitals, no title (the folder names it), a bpm python's float reads
         (
@@ -80,7 +80,7 @@ fn pack_writes_the_bytes_wwav_pack_writes() {
         // a BOM and bytes that aren't UTF-8, which python reads as U+FFFD
         (song_folder(&dir, "13 Bytes", 10, &NAMED, ""), vec![]),
         // an empty song: no frames at all
-        (song_folder(&dir, "14 Empty", 0, &NAMED, &song_txt("")), vec![]),
+        (song_folder(&dir, "14 Empty", 0, &NAMED, &song_txt()), vec![]),
     ];
     std::fs::write(
         dir.join("13 Bytes/song.txt"),
@@ -195,7 +195,7 @@ fn pack_refuses_what_wwav_pack_refuses() {
         return;
     }
     let dir = tmp("pack-refuses");
-    let txt = song_txt("");
+    let txt = song_txt();
     let missing = song_folder(&dir, "01 Missing", 10, &["master.wav", "vocals.wav"], &txt);
     let legacy_missing = song_folder(&dir, "02 Legacy", 10, &["1.wav", "2.wav", "5.wav"], &txt);
     let lengths = song_folder(&dir, "03 Lengths", 10, &NAMED, &txt);
@@ -264,7 +264,7 @@ fn pack_refuses_over_4_gb_as_wwav_pack_does() {
             .set_len(44 + frames * 4)
             .unwrap();
     }
-    std::fs::write(folder.join("song.txt"), song_txt("")).unwrap();
+    std::fs::write(folder.join("song.txt"), song_txt()).unwrap();
     pack_both(&folder, &[]);
     assert!(!dir.join("01 Long.rs.wwav").exists());
 }
@@ -308,7 +308,7 @@ fn unpack_then_pack_gives_the_same_bytes() {
         return;
     }
     let dir = tmp("round-trip");
-    let long = song_folder(&dir, "01 Long", 140_001, &NAMED, &song_txt(""));
+    let long = song_folder(&dir, "01 Long", 140_001, &NAMED, &song_txt());
     let packed = pack_both(&long, &["--creator", ""]);
     let originals = [
         corpus().join("original.wwav"),
@@ -382,7 +382,7 @@ fn ffprobe_reads_a_packed_wwav_without_a_word() {
         return;
     }
     let dir = tmp("ffprobe-wwav");
-    let folder = song_folder(&dir, "01 Probe", 70_000, &NAMED, &song_txt(""));
+    let folder = song_folder(&dir, "01 Probe", 70_000, &NAMED, &song_txt());
     let out = dir.join("probe.wwav");
     ok(wwav(&["pack", s(&folder), "-o", s(&out)]));
     for file in [
