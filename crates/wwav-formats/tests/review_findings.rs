@@ -179,7 +179,6 @@ fn pack_refuses_a_song_txt_it_cannot_read() {
 /// `-h=x` are usage errors (exit 2, "ignored explicit argument 'x'");
 /// `wwav` prints the usage and exits 0.
 #[test]
-#[ignore = "review finding: wwav takes --help=x as --help (bin/wwav.rs option)"]
 fn help_with_a_value_is_a_usage_error() {
     for arg in ["--help=x", "-h=x"] {
         let o = wwav(&["info", arg]);
