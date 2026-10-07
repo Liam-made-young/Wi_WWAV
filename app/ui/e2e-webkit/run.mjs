@@ -123,6 +123,8 @@ async function main() {
   await wd.newSession({ 'tauri:options': { application: app } });
   try {
     await until('the page to load', () => wd.run('return document.readyState === "complete"'));
+    // The paint entry can land a moment after load.
+    await until('a paint entry', () => wd.run('return performance.getEntriesByType("paint").length > 0'), 1000).catch(() => {});
     const page = await wd.run(`return {
       url: location.href, title: document.title, rendered: !!document.querySelector('#root')?.childElementCount,
       origin: performance.timeOrigin, paints: performance.getEntriesByType('paint').map((p) => [p.name, p.startTime]),

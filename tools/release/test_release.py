@@ -10,7 +10,8 @@ What a fail looks like, written before the checks:
   plutil -lint refuses), or an entitlement is missing, extra, or relaxes
   library validation in the app.
 - The engine's Info.plist isn't a faceless helper (LSUIElement), or the
-  bundle doesn't put it in Contents/Helpers.
+  bundle doesn't put it in Contents/Helpers; on Linux and Windows it isn't
+  beside the app, or the desktop entry doesn't hand opened files over.
 - The app's document types disagree with tauri.conf.json's file
   associations, or a session isn't a package.
 - macos.sh has a syntax error; builds outside ~/Library/Developer/
@@ -92,6 +93,9 @@ class Plists(unittest.TestCase):
     def test_elsewhere_the_engine_sits_beside_the_app(self):
         linux = json.loads((APP_SRC / "tauri.linux.conf.json").read_text())["bundle"]["linux"]
         self.assertEqual(linux["deb"]["files"]["/usr/bin/wwav-engine"], "helpers/wwav-engine")
+        # A file manager hands the opened files over only if Exec takes them.
+        desktop = (APP_SRC / linux["deb"]["desktopTemplate"]).read_text()
+        self.assertIn("Exec={{exec}} %F\n", desktop)
         windows = json.loads((APP_SRC / "tauri.windows.conf.json").read_text())["bundle"]
         self.assertEqual(windows["externalBin"], ["helpers/wwav-engine"])
 
