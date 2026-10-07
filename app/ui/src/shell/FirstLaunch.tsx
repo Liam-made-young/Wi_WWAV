@@ -1,11 +1,13 @@
-// First launch (docs/SPEC.md 2.14): five steps, each with exactly one
-// secondary action, "Skip for now", ending on Heat → Today with the strip
+// First launch (docs/SPEC.md 2.14): five steps (sign in, claim your galaxy,
+// import your folder, add your calendars, connect Claude), each with exactly
+// one secondary action, "Skip for now", ending on Heat → Today with the strip
 // reading "All clear" and "Nothing playing". The app is fully usable signed
 // out (Open #4, at its recommendation): Heat, the library and the Console
 // are local. Steps whose parts aren't in this build yet say so.
 
 import { forwardRef, useImperativeHandle, useState } from 'react';
 import { call } from '../bridge';
+import { CLAUDE_TOOLS } from './claudeTools';
 import { useCoreEvent } from './hooks';
 import { NotYet } from './NotYet';
 
@@ -21,13 +23,7 @@ export interface FirstLaunchHandle {
   drop(paths: string[]): void;
 }
 
-const STEPS = [
-  'Sign in',
-  'Make your astronaut',
-  'Claim your galaxy',
-  'Import your folder',
-  'Connect your school calendar',
-];
+const STEPS = ['Sign in', 'Claim your galaxy', 'Import your folder', 'Add your calendars', 'Connect Claude'];
 
 export const FirstLaunch = forwardRef<FirstLaunchHandle, Props>(function FirstLaunch(
   { shown, signedIn, onSignIn, onSaid, onDone },
@@ -61,7 +57,7 @@ export const FirstLaunch = forwardRef<FirstLaunchHandle, Props>(function FirstLa
 
   useImperativeHandle(ref, () => ({
     drop(paths) {
-      if (step === 3 && paths.length) void inspect(paths[0]);
+      if (step === 2 && paths.length) void inspect(paths[0]);
     },
   }));
 
@@ -86,7 +82,7 @@ export const FirstLaunch = forwardRef<FirstLaunchHandle, Props>(function FirstLa
             <p>
               {signedIn
                 ? 'You’re signed in.'
-                : 'Your account puts your work in Space and on your shelf. Heat, the library and the Console work fully without one.'}
+                : 'Your account puts your work in Space, in a galaxy of your own. Heat, the library and the Console work fully without one.'}
             </p>
             <button
               type="button"
@@ -99,23 +95,18 @@ export const FirstLaunch = forwardRef<FirstLaunchHandle, Props>(function FirstLa
         )}
         {step === 1 && (
           <>
-            <p>Race · body · hair & marks · rocket · ready. Skipping gives you the starter astronaut.</p>
-            <NotYet
-              label="Make my astronaut"
-              why="The astronaut maker comes with Space, which isn’t in this build yet."
-            />
-          </>
-        )}
-        {step === 2 && (
-          <>
             <p>
               You have no galaxy yet. A galaxy is yours. Projects orbit it as solar systems, and each song or film is a
               world inside one. The sun at the centre is where you say who you are.
             </p>
+            <p data-text="secondary">
+              Behind your sun, people can see a simple version of Heat, once you choose what goes there. Everything in
+              Heat stays private until then.
+            </p>
             <NotYet label="Make my galaxy" why="Making a galaxy comes with Space, which isn’t in this build yet." />
           </>
         )}
-        {step === 3 && (
+        {step === 2 && (
           <div data-drop="import">
             <p>Drop your music folder here, or type where it is. Nothing is copied until you press.</p>
             <form
@@ -151,13 +142,36 @@ export const FirstLaunch = forwardRef<FirstLaunchHandle, Props>(function FirstLa
             {progress && <p role="status">{progress}</p>}
           </div>
         )}
-        {step === 4 && (
+        {step === 3 && (
           <>
+            <p>Each calendar comes in as a private iCal address, so the app needs no Google sign-in.</p>
             <NotYet
               label="Paste your Brightspace calendar link"
               why="The link is kept in the keychain, and this build can’t store it there yet."
             />
-            <NotYet label="Connect Google" why="Connecting Google isn’t in this build yet." />
+            <NotYet
+              label="Add another calendar"
+              why="Its private iCal address is kept in the keychain, and this build can’t store it there yet."
+            />
+          </>
+        )}
+        {step === 4 && (
+          <>
+            <p>
+              Claude reaches Wi_WWAV through its MCP server, from Claude Desktop or Claude Code. These are the tools it
+              will see, and Claude asks before it calls one you haven’t allowed.
+            </p>
+            <ul className="tools">
+              {CLAUDE_TOOLS.map((t) => (
+                <li key={t.name}>
+                  <code>{t.name}</code> {t.does}
+                </li>
+              ))}
+            </ul>
+            <NotYet label="Add Wi_WWAV to Claude" why="The MCP server isn’t in this build yet." />
+            <p data-text="secondary">
+              Skipping leaves Heat whole: estimates use your averages, and Plan my day is Heat’s own rule.
+            </p>
           </>
         )}
         {error && (

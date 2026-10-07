@@ -27,13 +27,8 @@ export function optionalUser(ctx) {
   return bearer(ctx) ? requireUser(ctx) : null;
 }
 
-export function onboarded(user) {
-  const c = user.connect;
-  return Boolean(c.account && c.detailsSubmitted && c.chargesEnabled && c.payoutsEnabled);
-}
-
 // The user as login answers it (server routes/auth.js), less the fields
-// the desktop never reads. /me adds the tier.
+// the desktop never reads: no plan, no payout account, no shipping address.
 export function userPayload(user) {
   return {
     id: user.id,
@@ -41,13 +36,6 @@ export function userPayload(user) {
     username: user.username,
     bio: user.bio,
     profilePicture: user.profilePicture,
-    stripeConnectOnboarded: onboarded(user),
-    isPro: user.isPro,
-    proExpiresAt: user.proExpiresAt,
-    shipFromCity: user.shipFrom.city,
-    shipFromState: user.shipFrom.state,
-    shipFromZip: user.shipFrom.zip,
-    shipFromCountry: user.shipFrom.country,
     astronaut: user.astronaut,
     stemPlayerCustomization: user.stemPlayerCustomization,
   };

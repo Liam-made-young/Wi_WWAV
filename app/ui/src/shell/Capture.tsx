@@ -1,5 +1,5 @@
 // ⌘⇧N, quick capture (docs/SPEC.md 2.7, 3.13): a 420 × 160 pt panel from
-// any room. Type or paste a link and press Enter: it saves and stays open,
+// any view. Type or paste a link and press Enter: it saves and stays open,
 // and the footer reads "3 in inbox · captured ✓". A dropped file comes into
 // the library and is captured by name. Esc closes it and keeps whatever is
 // typed for next time. Captures wait in Heat's inbox until triaged.

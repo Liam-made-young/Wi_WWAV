@@ -13,11 +13,13 @@
 // - The window doesn't open, or opens with anything but the UI built into
 //   the app (tauri://localhost, not a dev server), or not at 1280 × 800, or
 //   shrinks below 1024 × 680.
-// - Ctrl+1 to Ctrl+4 pressed on the window (real key events through GTK,
+// - Ctrl+1 to Ctrl+3 pressed on the window (real key events through GTK,
 //   which hands them to the View menu) don't reach the page as the menu
-//   actions room.heat, room.space, room.console and room.unquantized.
-// - Ctrl+1 to Ctrl+4 don't change which room the switcher shows, whether
+//   actions room.heat, room.space and room.console (the wire still says
+//   room for a view).
+// - Ctrl+1 to Ctrl+3 don't change which view the switcher shows, whether
 //   they come through the menu or straight to the page.
+// - Ctrl+4 does anything: there are three views and no fourth.
 // - A song the app was opened with (as a file manager opens it: a path on
 //   the command line) doesn't come into the library through the core.
 // - The engine's meters (mock-engine's here) don't reach the page as raw
@@ -34,7 +36,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { WebDriver } from './webdriver.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
-const ROOMS = ['Heat', 'Space', 'Console', 'Unquantized'];
+const VIEWS = ['Heat', 'Space', 'Console'];
 const SONG = join(ROOT, 'tests/corpus/original.wwav');
 const ENGINE = join(ROOT, 'target/debug/mock-engine');
 const argApp = process.argv.indexOf('--app');
@@ -95,10 +97,10 @@ async function windowShown(DISPLAY) {
   return Date.now();
 }
 
-// The room the switcher shows as chosen, by the accessibility state a
+// The view the switcher shows as chosen, by the accessibility state a
 // segmented control carries.
-const CURRENT_ROOM = `
-  const names = ${JSON.stringify(ROOMS)};
+const CURRENT_VIEW = `
+  const names = ${JSON.stringify(VIEWS)};
   const on = '[aria-selected="true"],[aria-checked="true"],[aria-pressed="true"],[aria-current="page"],[aria-current="true"]';
   const chosen = [...document.querySelectorAll(on)].map((e) => e.textContent.trim()).filter((t) => names.includes(t));
   const shown = [...document.querySelectorAll('button, [role]')].some((e) => names.includes(e.textContent.trim()));
@@ -194,7 +196,7 @@ async function main() {
     const listening = await wd.runAsync(LISTEN);
     check(listening === true, 'the page can listen to the shell', String(listening));
     const actions = [];
-    for (let n = 1; n <= 4; n++) {
+    for (let n = 1; n <= 3; n++) {
       pressOnWindow(DISPLAY, `ctrl+${n}`);
       const heard = await until(`the menu action for Ctrl+${n}`, async () => {
         const all = await wd.run('return window.__heard');
@@ -202,29 +204,37 @@ async function main() {
       }, 3000).catch(() => []);
       actions.push(heard[n - 1]?.event === 'menu' ? heard[n - 1].payload.action : '—');
     }
-    const want = ['room.heat', 'room.space', 'room.console', 'room.unquantized'];
-    check(want.every((a, i) => actions[i] === a), 'Ctrl+1–4 on the window reach the page as the View menu’s room actions', actions.join(', '));
+    const want = ['room.heat', 'room.space', 'room.console'];
+    check(want.every((a, i) => actions[i] === a), 'Ctrl+1–3 on the window reach the page as the View menu’s actions', actions.join(', '));
+    pressOnWindow(DISPLAY, 'ctrl+4');
+    await sleep(500);
+    const heardAll = await wd.run('return window.__heard');
+    check(heardAll.length === 3, 'Ctrl+4 on the window reaches the page as nothing', `${heardAll.length - 3} more events`);
 
     // The switcher itself is the web UI's (app/ui/src); until it is built
     // there is nothing to switch, which is a fail, not a pass.
-    const before = await wd.run(CURRENT_ROOM);
+    const before = await wd.run(CURRENT_VIEW);
     if (!before.shown) {
-      check(false, 'Ctrl+1–4 switch rooms', 'this build’s UI has no room switcher yet');
+      check(false, 'Ctrl+1–3 switch views', 'this build’s UI has no view switcher yet');
     } else {
       const viaMenu = [];
       const viaPage = [];
-      for (let n = 1; n <= 4; n++) {
+      for (let n = 1; n <= 3; n++) {
         pressOnWindow(DISPLAY, `ctrl+${n}`);
         await sleep(300);
-        viaMenu.push((await wd.run(CURRENT_ROOM)).chosen.join('+') || '—');
+        viaMenu.push((await wd.run(CURRENT_VIEW)).chosen.join('+') || '—');
       }
-      for (let n = 4; n >= 1; n--) {
+      for (let n = 3; n >= 1; n--) {
         await wd.keys(['', String(n)]);
         await sleep(300);
-        viaPage.unshift((await wd.run(CURRENT_ROOM)).chosen.join('+') || '—');
+        viaPage.unshift((await wd.run(CURRENT_VIEW)).chosen.join('+') || '—');
       }
-      check(ROOMS.every((r, i) => viaMenu[i] === r), 'Ctrl+1–4 through the menu switch rooms', viaMenu.join(', '));
-      check(ROOMS.every((r, i) => viaPage[i] === r), 'Ctrl+1–4 in the page switch rooms', viaPage.join(', '));
+      check(VIEWS.every((r, i) => viaMenu[i] === r), 'Ctrl+1–3 through the menu switch views', viaMenu.join(', '));
+      check(VIEWS.every((r, i) => viaPage[i] === r), 'Ctrl+1–3 in the page switch views', viaPage.join(', '));
+      pressOnWindow(DISPLAY, 'ctrl+4');
+      await sleep(300);
+      const after4 = (await wd.run(CURRENT_VIEW)).chosen.join('+');
+      check(after4 === VIEWS[2], 'Ctrl+4 changes nothing', after4 || '—');
     }
   } finally {
     await wd.deleteSession().catch(() => {});

@@ -40,14 +40,10 @@ describe('what a work is', () => {
   test('one fact line and one verb per medium', () => {
     expect(cardFacts({ medium: 'song', key: 'A minor', bpm: 128 })).toBe('Song · A minor · 128 BPM');
     expect(cardFacts({ medium: 'writing', key: null, bpm: null, words: 1200 })).toBe('Writing · 1,200 words');
-    expect(cardFacts({ medium: 'fashion', key: null, bpm: null, photos: 14, priceCents: 12000 })).toBe(
-      'Fashion · 14 photos · $120',
-    );
+    expect(cardFacts({ medium: 'fashion', key: null, bpm: null, photos: 14 })).toBe('Fashion · 14 photos');
     expect(cardFacts({ medium: 'film', key: null, bpm: null, durationSeconds: 238 })).toBe('Film · 3:58');
     expect(cardFacts({ medium: 'song', key: null, bpm: 127.6 })).toBe('Song · 128 BPM');
-    expect(cardFacts({ medium: 'fashion', key: null, bpm: null, photos: 1, priceCents: 450 })).toBe(
-      'Fashion · 1 photo · $4.50',
-    );
+    expect(cardFacts({ medium: 'fashion', key: null, bpm: null, photos: 1 })).toBe('Fashion · 1 photo');
     expect(['song', 'film', 'writing', 'fashion'].map((m) => verbFor(m as World['medium']))).toEqual([
       'Play',
       'Watch',

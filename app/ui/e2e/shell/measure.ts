@@ -221,8 +221,26 @@ export function judge(a: Audit): Findings {
   };
 }
 
+/**
+ * Waits for a screen to come to rest after it loads: its first answers from
+ * the core arrive a few tens of milliseconds after the case paints, and a
+ * screenshot taken before they do is a screen that is still arriving, not one
+ * that moves. Two screenshots 250 ms apart that agree, for up to 10 s; a
+ * screen that never agrees is left to stillFor5s to fail.
+ */
+export async function settled(page: Page): Promise<void> {
+  let last = await page.screenshot({ animations: 'allow', caret: 'initial' });
+  for (let i = 0; i < 40; i++) {
+    await page.waitForTimeout(250);
+    const next = await page.screenshot({ animations: 'allow', caret: 'initial' });
+    if (next.equals(last)) return;
+    last = next;
+  }
+}
+
 /** Two screenshots 5 s apart, compared byte for byte: nothing may move while nothing plays. */
 export async function stillFor5s(page: Page): Promise<boolean> {
+  await settled(page);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const a = await page.screenshot({ animations: 'allow', caret: 'initial' });
   await page.waitForTimeout(5000);

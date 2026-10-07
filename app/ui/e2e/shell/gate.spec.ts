@@ -2,17 +2,20 @@
 import { type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { audit, type Findings, judge, stillFor5s } from './measure';
-import { clearTasks, CMD, expect, packSong, test } from './kit';
+import { audit, type Findings, judge, settled, stillFor5s } from './measure';
+import { clearTasks, CMD, expect, packSong, plainWav, test } from './kit';
 
 // docs/GATES.md 2.4 for the shell, measured before it is called passed.
 // What a fail looks like, written down first: in light or dark, at 1024 ×
-// 680 or 1280 × 800, in any room or anything that opens over one, any body
+// 680 or 1280 × 800, in any view or anything that opens over one, any body
 // text under 7:1 or secondary text under 4.5:1 against what is drawn
 // behind it; a button, tab or orb under 44 × 44 pt; a dense row or grid
 // cell under 24 × 24 pt; any text under 11 pt; or, with nothing playing,
-// two screenshots taken 5 s apart that differ by a byte. The results are
-// written to e2e/reports/shell-gate-2.4.md, fails and all.
+// two screenshots taken 5 s apart that differ by a byte. A shell is first
+// given time to finish arriving (settled, in measure.ts): the core's first
+// answers land a few tens of milliseconds after the case paints, and a
+// screen caught before them has not moved, it has not finished loading. The
+// results are written to e2e/reports/shell-gate-2.4.md, fails and all.
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(600_000);
@@ -25,7 +28,7 @@ const SCHEMES = ['light', 'dark'] as const;
 
 type Setup = (page: Page) => Promise<void>;
 
-const room =
+const view =
   (n: number): Setup =>
   async (page) =>
     page.keyboard.press(`${CMD}+${n}`);
@@ -34,26 +37,35 @@ const pane =
   async (page) => {
     await page.getByRole('button', { name: 'You' }).click();
     await page.getByRole('menuitem', { name: 'Settings…' }).click();
-    await page.getByRole('tab', { name }).click();
+    await page.getByLabel('Settings panes').getByRole('tab', { name }).click();
   };
+
+// Loads Gate Song and leaves it playing with the drawer shut: with the drawer
+// open, Space loads the song under the cursor and plays it. A state sets up
+// what it needs, so none of them leans on a song another test left loaded.
+async function loadGateSong(page: Page) {
+  await page.keyboard.press(`${CMD}+l`);
+  await page
+    .getByRole('option', { name: /Gate Song/ })
+    .first()
+    .click();
+  await page.keyboard.press(' ');
+  // The title comes with the load; the song is playing, and Space will pause
+  // it rather than play it again, once the time has moved.
+  await page.locator('.strip-title').waitFor();
+  await expect(page.locator('.strip-time')).not.toHaveText(/^0:00\b/);
+  await page.keyboard.press(`${CMD}+l`);
+}
 
 // Each state, from a freshly opened shell.
 const STATES: [string, Setup, { idle?: boolean }?][] = [
-  ['Heat', room(1), { idle: true }],
-  ['Space', room(2), { idle: true }],
-  ['Console', room(3), { idle: true }],
-  ['Unquantized', room(4), { idle: true }],
+  ['Heat', view(1), { idle: true }],
+  ['Space', view(2), { idle: true }],
+  ['Console', view(3), { idle: true }],
   [
     'Now strip filled, paused',
     async (page) => {
-      await page.keyboard.press(`${CMD}+l`);
-      await page
-        .getByRole('option', { name: /Gate Song/ })
-        .first()
-        .click();
-      await page.keyboard.press(`${CMD}+l`);
-      await page.keyboard.press(' ');
-      await page.locator('.strip-title').waitFor();
+      await loadGateSong(page);
       await page.keyboard.press(' ');
       await page.locator('.strip [data-stem="drums"]').click();
     },
@@ -101,21 +113,20 @@ const STATES: [string, Setup, { idle?: boolean }?][] = [
   [
     'Player, expanded',
     async (page) => {
-      await page.keyboard.press(' ');
-      await page.locator('.strip-title').waitFor();
+      await loadGateSong(page);
       await page.keyboard.press(' ');
       const expand = page.getByRole('button', { name: /^Show the player/ });
       const half = (await expand.boundingBox())!;
       await expand.click({ position: { x: half.width - 20, y: 22 } });
     },
   ],
-  ['Astronaut menu', async (page) => page.getByRole('button', { name: 'You' }).click()],
+  ['Galaxy chip menu', async (page) => page.getByRole('button', { name: 'You' }).click()],
   ['Settings · Account', pane(/^Account/)],
   ['Settings · Library', pane(/^Library/)],
   ['Settings · Heat', pane(/^Heat/)],
   ['Settings · Audio & MIDI · Video', pane(/^Audio/)],
   ['Settings · Claude', pane(/^Claude/)],
-  ['Settings · Selling · Privacy', pane(/^Selling/)],
+  ['Settings · Privacy', pane(/^Privacy/)],
   ['Settings · Appearance · Keyboard', pane(/^Appearance/)],
   ['Export everything', async (page) => page.keyboard.press(`${CMD}+Shift+e`)],
   [
@@ -131,13 +142,7 @@ const STATES: [string, Setup, { idle?: boolean }?][] = [
   ],
 ];
 
-const FIRST_STEPS = [
-  'Sign in',
-  'Make your astronaut',
-  'Claim your galaxy',
-  'Import your folder',
-  'Connect your school calendar',
-];
+const FIRST_STEPS = ['Sign in', 'Claim your galaxy', 'Import your folder', 'Add your calendars', 'Connect Claude'];
 
 interface Row {
   state: string;
@@ -163,8 +168,12 @@ test('gate 2.4: contrast, targets, type sizes and stillness, in every shell stat
       },
     ],
   });
+  // A song, and a few plain takes, so the drawer has rows to select from.
   await core.call('library.import', {
-    paths: [packSong({ title: 'Gate Song', key: 'F minor', bpm: 128, seconds: 20 })],
+    paths: [
+      packSong({ title: 'Gate Song', key: 'F minor', bpm: 128, seconds: 20 }),
+      ...[1, 2, 3].map((n) => plainWav(`gate take ${n}.wav`, 1 + n / 10)),
+    ],
     label: 'import',
   });
 
@@ -177,6 +186,7 @@ test('gate 2.4: contrast, targets, type sizes and stillness, in every shell stat
         const page = await context.newPage();
         await page.goto('/');
         await page.locator('.case-bar').waitFor();
+        await settled(page);
         await setup(page);
         const found = judge(await audit(page));
         const still = opts?.idle ? await stillFor5s(page) : null;

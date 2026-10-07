@@ -21,16 +21,17 @@ const cmd = (k: string, mods: Partial<KeyLike> = {}) => key(k, { metaKey: true, 
 const mac: KeyContext = { mac: true, field: null, stem: null, overlay: null };
 
 describe('the keyboard router', () => {
-  it('switches rooms on ⌘1–⌘4, from anywhere, even a text field', () => {
+  it('switches views on ⌘1–⌘3, from anywhere, even a text field, and there is no ⌘4', () => {
     expect(route(cmd('1', { code: 'Digit1' }), mac)).toEqual({ type: 'room', room: 'heat' });
     expect(route(cmd('2', { code: 'Digit2' }), mac)).toEqual({ type: 'room', room: 'space' });
-    expect(route(cmd('3', { code: 'Digit3' }), mac)).toEqual({ type: 'room', room: 'console' });
-    expect(route(cmd('4', { code: 'Digit4' }), { ...mac, field: 'text' })).toEqual({
+    expect(route(cmd('3', { code: 'Digit3' }), { ...mac, field: 'text' })).toEqual({
       type: 'room',
-      room: 'unquantized',
+      room: 'console',
     });
+    // The fourth room, a shop to walk through, is cut: ⌘4 is nothing.
+    expect(route(cmd('4', { code: 'Digit4' }), mac)).toBeNull();
     expect(route(cmd('5', { code: 'Digit5' }), mac)).toBeNull();
-    // Plain digits are Heat's tabs (3.16), not rooms.
+    // Plain digits are Heat's tabs (3.16), not views.
     expect(route(key('1', { code: 'Digit1' }), mac)).toBeNull();
   });
 
@@ -77,7 +78,7 @@ describe('the keyboard router', () => {
     expect(route(cmd('E', { code: 'KeyE', shiftKey: true }), mac)).toEqual({ type: 'exportEverything' });
   });
 
-  it('moves and opens in the palette, with ⌘Return opening in the other room', () => {
+  it('moves and opens in the palette, with ⌘Return opening in the other view', () => {
     const palette = { ...mac, field: 'text' as const, overlay: 'palette' as const };
     expect(route(key('ArrowDown'), palette)).toEqual({ type: 'move', by: 1 });
     expect(route(key('ArrowUp'), palette)).toEqual({ type: 'move', by: -1 });

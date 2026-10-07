@@ -2,7 +2,7 @@
 // actions. Local matches show at once; the library's search answers after
 // 200 ms, and an older answer never replaces a newer one. Filters: tag:,
 // key:, bpm:, is:hot, is:remix and @name. Return opens a result; ⌘Return
-// opens it in its other room. Its keys come through the shell's router.
+// opens it in its other view. Its keys come through the shell's router.
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { call } from '../bridge';
@@ -186,7 +186,7 @@ export const Palette = forwardRef<PaletteHandle, Props>(function Palette(
         {results.length === 0 && <p className="palette-empty">{why ?? 'Nothing here right now.'}</p>}
       </div>
       <p className="palette-foot" data-text="secondary">
-        Return opens · {keys('⌘')}Return opens in its other room · Esc closes
+        Return opens · {keys('⌘')}Return opens in its other view · Esc closes
       </p>
     </div>
   );

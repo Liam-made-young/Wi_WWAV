@@ -23,6 +23,22 @@ export function useMedia(query: string): boolean {
   return matches;
 }
 
+/**
+ * Appearance, text size and Reduce Motion (2.13), from Settings and the
+ * system, put on the page. Both windows wear them.
+ */
+export function useAppearance(settings: { appearance: string; textSize: number; reduceMotion: boolean } | null) {
+  const systemReduce = useMedia('(prefers-reduced-motion: reduce)');
+  const reduce = systemReduce || settings?.reduceMotion === true;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!settings || settings.appearance === 'system') delete root.dataset.appearance;
+    else root.dataset.appearance = settings.appearance;
+    root.style.setProperty('--text-size', `${settings?.textSize ?? 13}px`);
+    root.dataset.reduceMotion = String(reduce);
+  }, [settings, reduce]);
+}
+
 /** Below 1180 pt the search pill is a magnifier and the strip 440 pt (2.1). */
 export const useNarrow = () => useMedia('(max-width: 1179.98px)');
 
@@ -47,10 +63,10 @@ export interface Menu {
   cant: string | null;
 }
 
-export type UndoRoom = 'heat' | 'space' | 'console' | 'unquantized' | 'library';
-const UNDO_ROOMS: UndoRoom[] = ['heat', 'space', 'console', 'unquantized', 'library'];
+export type UndoRoom = 'heat' | 'space' | 'console' | 'library';
+const UNDO_ROOMS: UndoRoom[] = ['heat', 'space', 'console', 'library'];
 
-/** Each room's undo and redo labels ("Undo move clip"), kept fresh by `history` events. */
+/** Each view's undo and redo labels ("Undo move clip"), kept fresh by `history` events. */
 export function useHistory(): Partial<Record<UndoRoom, Menu>> {
   const [menus, setMenus] = useState<Partial<Record<UndoRoom, Menu>>>({});
   useEffect(() => {

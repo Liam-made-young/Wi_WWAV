@@ -15,13 +15,6 @@ export function grouped(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-// "$120", "$4.50"
-export function price(cents: number): string {
-  const dollars = Math.floor(cents / 100);
-  const rest = cents % 100;
-  return rest === 0 ? `$${grouped(dollars)}` : `$${grouped(dollars)}.${String(rest).padStart(2, '0')}`;
-}
-
 // "3:58", "1:02:07"
 function runningTime(seconds: number): string {
   const s = Math.round(seconds);
@@ -50,7 +43,6 @@ export function factParts(f: WorkFacts): string[] {
       break;
     case 'fashion':
       if (f.photos != null) parts.push(counted(f.photos, 'photo', 'photos'));
-      if (f.priceCents != null) parts.push(price(f.priceCents));
       break;
   }
   return parts;

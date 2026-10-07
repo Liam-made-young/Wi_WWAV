@@ -14,7 +14,10 @@ import { writeWav } from './support/wav';
 // song's four stems don't decode, or muting one doesn't change what comes
 // out; or the list doesn't end with "That's everything.".
 
-// Four tones, one per stem, the vocals loudest so muting them is plain.
+// Four tones, one per stem, the vocals loudest so muting them is plain. The
+// song runs 12 s, so a slow machine is still playing it when the levels are
+// read (at 2 s it had ended, and every level read 0).
+const SECONDS = 12;
 const STEMS: Record<string, [number, number]> = {
   vocals: [440, 0.4],
   drums: [110, 0.1],
@@ -31,8 +34,8 @@ test('the export plays offline: masters and films, then every song apart', async
   // A song packed by the app's own packer, a film, and a plain WAV.
   const folder = join(work, 'Offline Song');
   mkdirSync(folder);
-  for (const [stem, tone] of Object.entries(STEMS)) writeWav(join(folder, `${stem}.wav`), [tone], 2);
-  writeWav(join(folder, 'master.wav'), Object.values(STEMS), 2);
+  for (const [stem, tone] of Object.entries(STEMS)) writeWav(join(folder, `${stem}.wav`), [tone], SECONDS);
+  writeWav(join(folder, 'master.wav'), Object.values(STEMS), SECONDS);
   const song = join(work, 'Offline Song.wwav');
   const packed = spawnSync(join(root, 'target/debug/wwav'), ['pack', folder, '-o', song], { encoding: 'utf8' });
   expect(packed.status, packed.stderr).toBe(0);

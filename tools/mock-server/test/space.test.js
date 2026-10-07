@@ -292,18 +292,16 @@ describe('saved, Newest, the universe and travel', () => {
 describe('Since you last looked', () => {
   const ctx = useServer();
 
-  test("LMY sees Ana's fork, her waiting link, the sale and the payout, newest first", async () => {
+  test("LMY sees Ana's fork and her waiting link, newest first, and nothing of money", async () => {
     const res = await ctx.call('GET', '/api/v2/since?after=2026-10-01T00:00:00.000Z', { token: ctx.lmy });
     assert.equal(res.status, 200);
     const kinds = res.body.data.events.map((e) => e.kind);
-    assert.deepEqual(kinds.sort(), ['fork', 'link', 'payout', 'sale']);
+    assert.deepEqual(kinds.sort(), ['fork', 'link']);
     const fork = res.body.data.events.find((e) => e.kind === 'fork');
     assert.deepEqual(
       { who: fork.who, work: fork.work, fork: fork.fork },
       { who: 'Ana', work: 'Low Tide', fork: 'glass hours' },
     );
-    const sale = res.body.data.events.find((e) => e.kind === 'sale');
-    assert.deepEqual({ work: sale.work, priceCents: sale.priceCents }, { work: 'World Ending', priceCents: 900 });
     const times = res.body.data.events.map((e) => e.at);
     assert.deepEqual(times, [...times].sort().reverse());
   });

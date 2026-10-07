@@ -144,8 +144,6 @@ function publish(ctx) {
     remixDepth: parent ? parent.remixDepth + 1 : file ? file.generation : 0,
     inFeed: true,
     remixSnapshot: null,
-    priceCents: null,
-    isForSale: false,
     withdrawn: false,
     createdAt: iso(state.now()),
     versions: [],
@@ -182,7 +180,6 @@ function unpublish(ctx) {
   if (!track) return error(404, 'Not published');
   if (track.uploaderId !== me.id) return error(403, 'Unauthorized');
   track.withdrawn = true;
-  track.isForSale = false;
   ctx.state.planets = ctx.state.planets.filter((p) => p.publishedTrackId !== track.id);
   return json(200, { success: true });
 }
@@ -297,8 +294,6 @@ function isPublished(ctx) {
     inFeed: track.inFeed,
     settings: track.settings,
     tags: track.tags,
-    price: track.priceCents === null ? null : (track.priceCents / 100).toFixed(2),
-    isForSale: track.isForSale,
     duration: track.duration,
     bpm: track.bpm,
     musicalKey: track.musicalKey,

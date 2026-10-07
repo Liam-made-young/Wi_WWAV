@@ -5,6 +5,7 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { call } from '../bridge';
+import { CLAUDE_TOOLS } from './claudeTools';
 import { SHORTCUTS } from './keys';
 import { NotYet } from './NotYet';
 import { keys } from './platform';
@@ -16,11 +17,8 @@ export interface SettingsValue {
   library: { watchedFolders: string[]; leaveInPlace: boolean };
   audio: { device: string | null; buffer: number; pluginFolders: string[] };
   video: { hardwareEncode: boolean; proxyMedia: boolean };
-  claude: Record<ClaudeFeature, 'unasked' | 'on' | 'off'>;
   heat: { timeZone: string | null; school: string | null };
 }
-
-type ClaudeFeature = 'scoring' | 'mail' | 'feedback' | 'clerk';
 
 export const PANES = [
   { id: 'account', label: 'Account' },
@@ -28,33 +26,23 @@ export const PANES = [
   { id: 'heat', label: 'Heat' },
   { id: 'audio', label: 'Audio & MIDI · Video' },
   { id: 'claude', label: 'Claude' },
-  { id: 'selling', label: 'Selling · Privacy' },
+  { id: 'privacy', label: 'Privacy' },
   { id: 'appearance', label: 'Appearance · Keyboard' },
 ] as const;
 
 export type Pane = (typeof PANES)[number]['id'];
 
-// 2.11: each feature off until its first use, and what each one sends.
-const CLAUDE: { id: ClaudeFeature; label: string; sends: string }[] = [
-  {
-    id: 'scoring',
-    label: 'Score a task',
-    sends: 'Heat sends the task’s title, type and notes, and your average minutes per type. Nothing else.',
-  },
-  {
-    id: 'mail',
-    label: 'Read school email',
-    sends: 'Heat sends up to 8 messages per sync, the date, your time zone and up to 80 existing task titles.',
-  },
-  { id: 'feedback', label: 'Feedback on your work', sends: 'The Console sends the work’s analysis and your question.' },
-  { id: 'clerk', label: 'The clerk', sends: 'Unquantized sends one record’s details and the seller’s notes.' },
-];
+export interface Account {
+  signedIn: boolean;
+  username?: string;
+  galaxy?: string;
+}
 
 interface Props {
   shown: boolean;
   pane: Pane;
   settings: SettingsValue | null;
-  account: { signedIn: boolean; username?: string; galaxy?: string };
+  account: Account;
   library: string;
   onPane(pane: Pane): void;
   onPatch(patch: Record<string, unknown>): void;
@@ -85,8 +73,8 @@ export function Settings({ shown, pane, settings, account, library, onPane, onPa
         {settings && pane === 'library' && <LibraryPane settings={settings} library={library} onPatch={onPatch} />}
         {settings && pane === 'heat' && <HeatPane settings={settings} onPatch={onPatch} />}
         {settings && pane === 'audio' && <AudioPane settings={settings} onPatch={onPatch} />}
-        {settings && pane === 'claude' && <ClaudePane settings={settings} onPatch={onPatch} />}
-        {settings && pane === 'selling' && <SellingPane />}
+        {settings && pane === 'claude' && <ClaudePane />}
+        {settings && pane === 'privacy' && <PrivacyPane />}
         {settings && pane === 'appearance' && <AppearancePane settings={settings} onPatch={onPatch} />}
       </div>
     </div>
@@ -129,10 +117,6 @@ function Account({ account, onSignIn, onSignOut }: Pick<Props, 'account' | 'onSi
       <Row label="Galaxy address">
         <p>{account.galaxy ?? 'Your galaxy’s address shows here once you have one.'}</p>
       </Row>
-      <NotYet
-        label="Your astronaut & rocket…"
-        why="The astronaut maker comes with Space, which isn’t in this build yet."
-      />
       <NotYet label="Stem player skin…" why="Skins come with Space, which isn’t in this build yet." />
       <NotYet
         label="Delete account…"
@@ -261,7 +245,10 @@ function HeatPane({ settings, onPatch }: { settings: SettingsValue; onPatch: Pro
         label="Brightspace calendar link…"
         why="The link is kept in the keychain, and this build can’t store it there yet."
       />
-      <NotYet label="Connect Google…" why="Connecting Google isn’t in this build yet." />
+      <NotYet
+        label="Other calendars’ iCal links…"
+        why="Each address is kept in the keychain, and this build can’t store it there yet."
+      />
     </>
   );
 }
@@ -312,33 +299,44 @@ function AudioPane({ settings, onPatch }: { settings: SettingsValue; onPatch: Pr
   );
 }
 
-function ClaudePane({ settings, onPatch }: { settings: SettingsValue; onPatch: Props['onPatch'] }) {
+function ClaudePane() {
   return (
     <>
-      {CLAUDE.map((f) => (
-        <Row key={f.id} label={f.label}>
-          <Check
-            label={settings.claude[f.id] === 'unasked' ? 'On (not asked yet)' : 'On'}
-            checked={settings.claude[f.id] === 'on'}
-            onChange={(v) => onPatch({ claude: { [f.id]: v ? 'on' : 'off' } })}
-          />
-          <p className="why" data-text="secondary">
-            {f.sends}
-          </p>
-        </Row>
-      ))}
+      <Row label="How Claude reaches Wi_WWAV">
+        <p>
+          Claude connects to Wi_WWAV as an MCP server, from Claude Desktop or Claude Code. The app holds no Anthropic key
+          and calls no model. Claude asks before it calls a tool you haven’t allowed, and every change it makes is
+          labelled and can be undone.
+        </p>
+      </Row>
+      <NotYet label="Add Wi_WWAV to Claude…" why="The MCP server isn’t in this build yet." />
+      <Row label="The tools Claude will see">
+        <ul className="tools">
+          {CLAUDE_TOOLS.map((t) => (
+            <li key={t.name}>
+              <code>{t.name}</code> {t.does}
+            </li>
+          ))}
+        </ul>
+        <p className="why" data-text="secondary">
+          Each will have a switch, and Claude’s recent changes will list here with Undo, once the server is in this
+          build.
+        </p>
+      </Row>
     </>
   );
 }
 
-function SellingPane() {
+function PrivacyPane() {
   return (
     <>
       <NotYet
-        label="Set up payouts…"
-        why="Payouts are set up from your shelf in Unquantized, which isn’t in this build yet."
+        label="Everything public…"
+        why="The table of what is public, and your public Heat view as others see it, come with Space, which isn’t in this build yet."
       />
-      <NotYet label="Everything public…" why="The table of what’s public needs Space, which isn’t in this build yet." />
+      <p className="why" data-text="secondary">
+        Until then everything in Heat stays private.
+      </p>
     </>
   );
 }

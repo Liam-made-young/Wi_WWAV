@@ -65,12 +65,7 @@ function refresh(ctx) {
 function me(ctx) {
   if (!ctx.req.headers.authorization) return error(401, 'No token');
   const user = requireUser(ctx);
-  return json(200, {
-    ...userPayload(user),
-    tier: user.tier,
-    tierExpiresAt: user.tierExpiresAt,
-    foundingMemberNumber: user.foundingMemberNumber,
-  });
+  return json(200, userPayload(user));
 }
 
 // --- desktop sign-in ---------------------------------------------------------

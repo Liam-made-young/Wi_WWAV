@@ -136,39 +136,6 @@ inline constexpr List<Color> kSun{kSunItems, 4};
 inline constexpr float kFocusWidthPx = 2.0f;
 }  // namespace night
 
-namespace room {
-// Unquantized, lit rather than painted (8.2; v3's mock, PRANA, Crater). Dusk
-// is light, after hours is dark: the walls fall to limousine and paper stays
-// paper.
-
-namespace field {
-inline constexpr Color kGroundLight[] = {{0xf7, 0xf4, 0xee, 1.0f}, {0xe6, 0xdf, 0xd0, 1.0f}};
-inline constexpr Color kGroundDark[] = {{0x0f, 0x0c, 0x09, 1.0f}, {0x0f, 0x0c, 0x09, 1.0f}};
-inline constexpr Themed<List<Color>> kGround{{kGroundLight, 2}, {kGroundDark, 2}};
-inline constexpr Color kRose{0xfb, 0xed, 0xe8, 1.0f};
-inline constexpr Color kCool{0xdd, 0xe2, 0xe6, 1.0f};
-inline constexpr float kDriftShortestMs = 53000.0f;
-inline constexpr float kDriftLongestMs = 131000.0f;
-}  // namespace field
-
-namespace material {
-inline constexpr Color kSand{0xe8, 0xdc, 0xc8, 1.0f};
-inline constexpr Color kSandDeep{0xd4, 0xc4, 0xa8, 1.0f};
-inline constexpr Color kClay{0xb8, 0x98, 0x78, 1.0f};
-inline constexpr Color kClayDeep{0x7a, 0x5e, 0x45, 1.0f};
-}  // namespace material
-inline constexpr Color kInk{0x3d, 0x2e, 0x22, 1.0f};
-inline constexpr Color kInk2{0x6b, 0x56, 0x43, 1.0f};
-inline constexpr Color kPaper{0xff, 0xe9, 0xc8, 1.0f};
-inline constexpr Color kAccent{0xc8, 0x96, 0x68, 1.0f};
-inline constexpr Color kLampItems[] = {{0xe8, 0x91, 0x5b, 1.0f}, {0xf4, 0xb4, 0x83, 1.0f}};
-inline constexpr List<Color> kLamp{kLampItems, 2};
-inline constexpr Color kSkyItems[] = {{0xf8, 0xd0, 0xa4, 1.0f}, {0xd4, 0x76, 0x3f, 1.0f}};
-inline constexpr List<Color> kSky{kSkyItems, 2};
-inline constexpr float kHairlinePx = 1.0f;
-inline constexpr float kFocusWidthPx = 2.0f;
-}  // namespace room
-
 namespace stem {
 // PRANA's stem colours, the same everywhere, in stem order (8.3). Every stem
 // mark carries a ring in its register's ink; state is shape: muted is a

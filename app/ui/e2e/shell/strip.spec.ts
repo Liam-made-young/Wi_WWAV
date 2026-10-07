@@ -109,6 +109,9 @@ test('the track half shows the planet, title, four lights and time, and the curs
 
   const time = track.locator('.strip-time');
   await expect(time).toHaveText(/^0:0[0-9] \/ 0:30$/);
+  // 2.2's "1:42 / 3:58" is as wide as this, and fits its box whole: with the
+  // old 8 pt inset and 4 pt of padding it was clipped by a pixel and a half.
+  expect(await time.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await expect(time).not.toHaveText(/^0:00 /, { timeout: 5000 });
   // Paused: the cursor stands still.
   await page.keyboard.press(' ');

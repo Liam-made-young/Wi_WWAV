@@ -179,7 +179,7 @@ fn only_pages_from_this_machine_are_let_in() {
         if let Some(o) = origin {
             request.headers_mut().insert("Origin", o.parse().unwrap());
         }
-        tungstenite::connect(request)
+        tungstenite::connect(request).map_err(Box::new)
     };
     for local in [
         None,
@@ -200,7 +200,7 @@ fn only_pages_from_this_machine_are_let_in() {
             panic!("a page from {other} connected");
         });
         assert!(
-            matches!(&refused, tungstenite::Error::Http(r) if r.status() == 403),
+            matches!(&*refused, tungstenite::Error::Http(r) if r.status() == 403),
             "{other}: {refused}"
         );
     }

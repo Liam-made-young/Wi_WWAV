@@ -149,13 +149,6 @@ describe('↑ Push: a fork owns no audio', () => {
     const unsigned = await fork(undefined, WORKS.lowTide.trackId, { mix: MIX });
     assert.equal(unsigned.status, 401);
   });
-
-  test("a fork has no file of its own, so it can't be priced until it's exported", async () => {
-    const mine = ctx.state.tracks.find((t) => t.title === 'Second hand');
-    const res = await ctx.call('PUT', `/api/tracks/${mine.trackId}/set-price`, { token: ctx.lmy, body: { price: 4 } });
-    assert.equal(res.status, 400);
-    assert.equal(res.body.code, 'no_file');
-  });
 });
 
 describe('the global forest and is-published', () => {
@@ -195,7 +188,8 @@ describe('the global forest and is-published', () => {
     assert.equal(owner.body.canUnpublish, true);
     assert.equal(owner.body.publishedTrack.id, trackOf(ctx, WORKS.lowTide).id);
     assert.equal(owner.body.publishedTrack.trackId, WORKS.lowTide.trackId);
-    assert.equal(owner.body.publishedTrack.price, '4.00');
+    assert.equal(owner.body.publishedTrack.price, undefined);
+    assert.equal(owner.body.publishedTrack.isForSale, undefined);
     const other = await ctx.call('GET', path, { token: ctx.ana });
     assert.equal(other.body.canUnpublish, false);
     const anyone = await ctx.call('GET', path);

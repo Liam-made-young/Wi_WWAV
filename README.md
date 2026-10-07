@@ -4,8 +4,10 @@ One desktop app, said "we wave", with three views: **Heat** (⌘1, the profile
 view) plans your time, **Space** (⌘2, the social view) holds people and their
 work as a universe in 3D, and the **Console** (⌘3, the creation view) makes
 songs and films on one clock. Every view reads and writes the same two files:
-a song is a `.wwav` and a film is a `.swav` (`docs/SPEC.md` chapter 6).
-Claude works on Heat through the app's MCP server (`docs/HEAT.md`).
+a song is a `.wwav` and a film is a `.swav` (`docs/SPEC.md` chapter 6). The app
+calls no model and takes no money: Claude works on Heat through the app's MCP
+server (`docs/HEAT.md`), and commerce comes later, inside Space
+(`docs/SCOPE_CUT.md`).
 
 - `docs/SPEC.md` is the design, written before any code.
 - `docs/GATES.md` holds the founder's four gates, with fail criteria written first.
