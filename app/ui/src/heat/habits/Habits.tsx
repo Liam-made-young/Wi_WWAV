@@ -104,7 +104,7 @@ function HabitCard({ habit, year }: { habit: Habit; year: boolean }) {
             <button
               key={day}
               type="button"
-              className="heat-cell"
+              className="habit-cell"
               data-dense
               data-done={habit.log[day] === true}
               data-today={day === date}
@@ -113,7 +113,7 @@ function HabitCard({ habit, year }: { habit: Habit; year: boolean }) {
               title={day === date ? `${shortMonthDay(day)}. ${copy.habitsUi.today}` : shortMonthDay(day)}
               onClick={() => tick(day)}
             >
-              <span className="heat-cell-square" />
+              <span className="habit-cell-square" />
             </button>
           ))}
         </div>

@@ -28,7 +28,7 @@ describe('Habits', () => {
     // The record only grows: "Done 9 days since September 28", never a counter by default.
     expect(text($(card('Practise kanji'), '.heat-habit-record'))).toBe('Done 9 days since September 28');
     expect(text($(card('Practise kanji'), '.heat-habit-title'))).toBe('Practise kanji, 20m');
-    expect($$(card('Practise kanji'), '.heat-cell')).toHaveLength(14);
+    expect($$(card('Practise kanji'), '.habit-cell')).toHaveLength(14);
     expect(
       $$(rig, '.heat-habit-record')
         .map((r) => r.textContent)
@@ -36,7 +36,7 @@ describe('Habits', () => {
     ).not.toMatch(/streak/);
     expect(rig.status().count).toBe('1 of 3 done');
     // Today's square is open until it is ticked, because today counts until midnight.
-    const today = $$(card('Stretch'), '.heat-cell').at(-1)!;
+    const today = $$(card('Stretch'), '.habit-cell').at(-1)!;
     expect(today.getAttribute('data-today')).toBe('true');
     expect(today.getAttribute('aria-label')).toContain('today');
   });
@@ -47,7 +47,7 @@ describe('Habits', () => {
     expect(rig.fake.store.habit.get('h-stretch')!.log['2026-10-07']).toBe(true);
     expect((await rig.call<{ undo: string }>('history.get', {})).undo).toBe('Undo tick habit');
     // Two days back was missed: its square ticks it.
-    await click($$(card('Stretch'), '.heat-cell').at(-3)!);
+    await click($$(card('Stretch'), '.habit-cell').at(-3)!);
     expect(rig.fake.store.habit.get('h-stretch')!.log['2026-10-05']).toBe(true);
     await click($(card('Stretch'), '.heat-habit-orb'));
     expect((await rig.call<{ undo: string }>('history.get', {})).undo).toBe('Undo untick habit');

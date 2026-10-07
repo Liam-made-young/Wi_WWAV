@@ -74,7 +74,7 @@
   flex-wrap: wrap;
 }
 
-.heat-cell {
+.habit-cell {
   display: grid;
   place-items: center;
   width: 24px;
@@ -84,7 +84,7 @@
   background: none;
 }
 
-.heat-cell-square {
+.habit-cell-square {
   width: 13px;
   height: 13px;
   border: 1px solid var(--desk-ink2);
@@ -92,12 +92,12 @@
   background: var(--desk-well);
 }
 
-.heat-cell[data-done='true'] .heat-cell-square {
+.habit-cell[data-done='true'] .habit-cell-square {
   background: var(--desk-select);
   border-color: var(--desk-select);
 }
 
-.heat-cell[data-today='true'][data-done='false'] .heat-cell-square {
+.habit-cell[data-today='true'][data-done='false'] .habit-cell-square {
   border-style: dashed;
 }
 
