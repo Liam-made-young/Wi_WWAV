@@ -6,7 +6,7 @@
 // other fader."
 
 import type { Effect, FxOwner, Mix } from './mix';
-import type { Stem } from './stems';
+import { STEMS, type Stem } from './stems';
 
 export interface Point {
   x: number;
@@ -99,22 +99,52 @@ export function fxCentre(g: StageGeometry, owner: FxOwner, effect: Effect, mix: 
   return { x: reach.parent.x + dir.x * d, y: reach.parent.y + dir.y * d };
 }
 
-// The Now strip's lights are 8 pt, and each answers to a 44 × 44 pt
-// square round it; where squares overlap, the nearer light wins.
+// The Now strip (2.2) is 520 × 44 pt, or 440 pt in a window under 1180 pt
+// (2.1): two lines over a 6 pt meter, a task half and a track half either
+// side of a 1 px divider. The track half's line 2 starts with the four 8 pt
+// lights, and each owns a 44 × 44 pt square, the strip's full height. The
+// squares stand side by side, so no light's area is cut short by its
+// neighbour's; they take 176 pt, and line 2 keeps the rest of the half
+// (83.5 pt, or 43.5 in the narrow strip) for "1:42 / 3:58". Coordinates
+// are the strip's own.
+export const NOW_STRIP = { w: 520, h: 44 };
+export const NOW_STRIP_NARROW_W = 440;
+const METER = 6;
 export const LIGHT_SIZE = 8;
 export const LIGHT_HIT = 44;
 
-export function lightAt(centres: Record<Stem, Point>, p: Point): Stem | null {
-  let best: Stem | null = null;
-  let bestD = Infinity;
-  for (const [stem, c] of Object.entries(centres) as [Stem, Point][]) {
-    const dx = Math.abs(p.x - c.x);
-    const dy = Math.abs(p.y - c.y);
-    if (dx > LIGHT_HIT / 2 || dy > LIGHT_HIT / 2) continue;
-    if (dx * dx + dy * dy < bestD) {
-      bestD = dx * dx + dy * dy;
-      best = stem;
-    }
-  }
-  return best;
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface StemLight {
+  stem: Stem;
+  centre: Point;
+  hit: Box;
+}
+
+export function trackHalfX(stripW: number = NOW_STRIP.w): number {
+  return (stripW + 1) / 2;
+}
+
+const LINE_2_Y = ((NOW_STRIP.h - METER) * 3) / 4;
+
+export function stemLights(stripW: number = NOW_STRIP.w): StemLight[] {
+  const left = trackHalfX(stripW);
+  return STEMS.map((stem, i) => ({
+    stem,
+    centre: { x: left + LIGHT_HIT * (i + 0.5), y: LINE_2_Y },
+    hit: { x: left + LIGHT_HIT * i, y: 0, w: LIGHT_HIT, h: LIGHT_HIT },
+  }));
+}
+
+// Which light a point in the strip falls on, if any.
+export function lightAt(p: Point, stripW: number = NOW_STRIP.w): Stem | null {
+  const light = stemLights(stripW).find(
+    ({ hit }) => p.x >= hit.x && p.x < hit.x + hit.w && p.y >= hit.y && p.y < hit.y + hit.h,
+  );
+  return light ? light.stem : null;
 }

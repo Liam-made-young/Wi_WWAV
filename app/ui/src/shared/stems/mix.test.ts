@@ -28,16 +28,16 @@ describe('who is audible', () => {
     expect(audible(mix({ drums: { muted: true } }))).toEqual({ vocals: true, drums: false, other: true, bass: true });
   });
 
-  test('with a solo, only the soloed stems, muted or not', () => {
+  test('with a solo, only the soloed stems that are not muted', () => {
     const m = mix({ bass: { soloed: true, muted: true }, vocals: { soloed: true } });
-    expect(audible(m)).toEqual({ vocals: true, drums: false, other: false, bass: true });
+    expect(audible(m)).toEqual({ vocals: true, drums: false, other: false, bass: false });
   });
 });
 
 describe('state is shape, not colour (8.3)', () => {
-  test('names each state, a solo before a mute before a silence', () => {
-    const m = mix({ vocals: { soloed: true, muted: true }, drums: { muted: true } });
-    expect(STEMS.map((s) => stemState(m, s))).toEqual(['soloed', 'muted', 'silent', 'silent']);
+  test('names each state, a stem’s own settings before a silence, a solo and a mute together as both', () => {
+    const m = mix({ vocals: { soloed: true, muted: true }, drums: { muted: true }, other: { soloed: true } });
+    expect(STEMS.map((s) => stemState(m, s))).toEqual(['soloedMuted', 'muted', 'soloed', 'silent']);
     expect(stemState(freshMix(), 'bass')).toBe('audible');
   });
 
@@ -55,6 +55,15 @@ describe('state is shape, not colour (8.3)', () => {
     expect(stemShape(m, 'vocals', false, 'desk')).toMatchObject({ fill: 1, outerRing: 'ink' });
     expect(stemShape(m, 'other', false, 'night')).toMatchObject({ fill: 0.45, inkRing: 'dashed', outerRing: null });
     expect(stemShape(m, 'bass', true, 'night')).toMatchObject({ notch: true });
+    // Soloed and muted: the muted centre and the solo's ring, both.
+    const both = mix({ vocals: { soloed: true, muted: true } });
+    expect(stemShape(both, 'vocals', false, 'night')).toEqual({
+      fill: 0,
+      stemRing: 2,
+      inkRing: 'solid',
+      outerRing: '#2946FF',
+      notch: false,
+    });
   });
 });
 
@@ -66,6 +75,7 @@ describe('what VoiceOver reads', () => {
     const solo = mix({ bass: { soloed: true } });
     expect(voiceLabel(solo, 'bass')).toBe('Bass, soloed');
     expect(voiceLabel(solo, 'other')).toBe('Other, silent under a solo');
+    expect(voiceLabel(mix({ bass: { soloed: true, muted: true } }), 'bass')).toBe('Bass, soloed and muted');
   });
 });
 

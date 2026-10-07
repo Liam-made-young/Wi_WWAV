@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { SolarSystem, World } from './catalogue';
-import { CENTER, OVERFLOW_RING_RADIUS, RING_PLANET_RADII, ringRadius } from './orbits';
+import type { Medium, SolarSystem, World } from './catalogue';
+import { CENTER, OVERFLOW_RING_RADIUS, RING_PLANET_RADII, ringOf, ringRadius } from './orbits';
 import { arrangedOrbit, placeSystem, systemOrbits, turnBy } from './system';
 
 function world(id: number, extra: Partial<World> = {}): World {
@@ -94,4 +94,26 @@ describe('a system', () => {
     const orbits = systemOrbits(system(Array.from({ length: 21 }, (_, i) => world(i))));
     expect(placeSystem(orbits, 30)).toEqual(placeSystem(orbits, 30));
   });
+});
+
+// The review of #72's fix: turning each ring a third of a seat brought
+// neighbouring full rings closer than iOS's half seat, and some
+// mixed-media albums of 14 and 21 opened with two worlds overlapping.
+// Full rings keep iOS's room from the ring just inside.
+test('full rings of mixed media open with no two worlds on neighbouring rings overlapping', () => {
+  const media: Medium[] = ['song', 'film', 'writing', 'fashion'];
+  const crowded: string[] = [];
+  for (const n of [14, 21]) {
+    for (let k = 0; k < 250; k++) {
+      const ws = Array.from({ length: n }, (_, i) => world(i, { trackId: `t${k}-${i}`, medium: media[(i * 7 + k * 3) % 4] }));
+      const placed = placeSystem(systemOrbits({ ...system(ws), slug: `album-${k}` }), 0).worlds;
+      for (const a of placed) {
+        for (const b of placed) {
+          if (ringOf(b.seat) !== ringOf(a.seat) + 1) continue;
+          if (Math.hypot(a.x - b.x, a.y - b.y) < a.radius + b.radius) crowded.push(`${n} worlds, album-${k}: seats ${a.seat} and ${b.seat}`);
+        }
+      }
+    }
+  }
+  expect(crowded).toEqual([]);
 });

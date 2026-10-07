@@ -56,11 +56,12 @@ const OVERFLOW_SCALE = 1.14;
 export const OVERFLOW_SEAT = SHOWN_CAP;
 export const OVERFLOW_RING_RADIUS = RING_RADII[2] + OUTER_RING_GAP;
 
-// iOS turns each ring half a seat further than the one inside it, which
-// brings ring 2 a whole seat round, in line with ring 0. A third of a seat
-// per ring keeps every pair of full rings a third of a seat apart.
-const STAGGER = TWO_PI / PER_RING / 3;
+const SEAT_ANGLE = TWO_PI / PER_RING;
 
+// Unlike iOS, which clamps every seat past the twenty-first onto ring 2
+// (so seat 21 lands on seat 14), rings go on outward: the gathered world
+// takes ring 3, and a galaxy with more than twenty-one systems fills rings
+// 3, 4 and on, each OUTER_RING_GAP further out (docs/DECISIONS.md).
 export function ringOf(seat: number): number {
   return Math.floor(Math.max(seat, 0) / PER_RING);
 }
@@ -85,11 +86,73 @@ export function ringRadius(seat: number, seed: string): number {
 }
 
 // Seats share their ring evenly, turned by a per-system rotation so two
-// systems with the same population don't look stamped.
+// systems with the same population don't look stamped, and each ring
+// turned further by ringTurn.
 export function ringAngle(seat: number, count: number, seed: string): number {
   const rotation = unitJitter(seed, 'rotation') * TWO_PI;
-  const within = seatWithinRing(seat) / occupancy(seat, Math.max(count, 1));
-  return rotation + ringOf(seat) * STAGGER + within * TWO_PI;
+  const occupied = occupancy(seat, Math.max(count, 1));
+  const within = seatWithinRing(seat) / occupied;
+  return rotation + ringTurn(ringOf(seat), occupied) * SEAT_ANGLE + within * TWO_PI;
+}
+
+// How far round a ring turns, in seats: the fix of docs/QUESTIONS.md #72.
+//
+// iOS turns each ring half a seat further than the one inside it, so ring 2
+// comes a whole seat round, in line with ring 0: seven spokes. A part-full
+// ring spread round the whole circle can line up too (eleven worlds put
+// ring 1's four on ring 0's rays). Here a ring turns from iOS's half seat
+// per ring to wherever its worlds keep the most room from the worlds of
+// the rings inside it, counting room from the ring just inside (which they
+// could touch) once and room from rings further in (which they can only
+// line up with) twice. Full rings come out at 0, ½ and 1⅙ seats: the first
+// two as on iOS, the third a third of a seat from ring 1 and a sixth from
+// ring 0. No two worlds on different rings ever share a ray.
+//
+// A ring of m worlds (m < 7) repeats every 1/m seat against the full rings
+// inside it, since 7 and m share no factor; a full ring every seat. Working
+// in units of that period, the room left by each inner ring is a sawtooth
+// with a zero on that ring's worlds, and the best turn is where a rising
+// edge from one zero meets a falling edge into the next.
+const turns = new Map<string, number>();
+const FAR_WEIGHT = 2;
+
+export function ringTurn(ring: number, occupied: number): number {
+  if (ring <= 0) return 0;
+  const m = occupied >= PER_RING ? 1 : occupied;
+  const key = `${ring}/${m}`;
+  const known = turns.get(key);
+  if (known !== undefined) return known;
+
+  const frac = (v: number) => v - Math.floor(v);
+  const inner = Array.from({ length: ring }, (_, i) => ({
+    zero: frac(ringTurn(i, PER_RING) * m),
+    weight: i === ring - 1 ? 1 : FAR_WEIGHT,
+  }));
+  const room = (v: number) =>
+    Math.min(...inner.map(({ zero, weight }) => weight * Math.min(frac(v - zero), frac(zero - v))));
+  const ios = (ring / 2) * m;
+  let best = { v: 0, room: -1, shift: Infinity };
+  // A binding edge's zero lies within half a period of the best turn, so
+  // the falling edge's zero is less than a period past the rising one's.
+  for (const a of inner) {
+    for (const b of inner) {
+      for (const next of [b.zero, b.zero + 1]) {
+        if (next <= a.zero) continue;
+        const v = (a.weight * a.zero + b.weight * next) / (a.weight + b.weight);
+        // Of equally roomy turns, the one nearest iOS's, forward on a tie.
+        let shift = frac(v - ios);
+        if (shift > 0.5) shift -= 1;
+        const r = room(v);
+        const distance = Math.abs(shift) + (shift < 0 ? 1e-9 : 0);
+        if (r > best.room + 1e-12 || (r > best.room - 1e-12 && distance < best.shift)) {
+          best = { v: ios + shift, room: r, shift: distance };
+        }
+      }
+    }
+  }
+  const turn = best.v / m;
+  turns.set(key, turn);
+  return turn;
 }
 
 export function seatPoint(seat: number, count: number, seed: string): Point {

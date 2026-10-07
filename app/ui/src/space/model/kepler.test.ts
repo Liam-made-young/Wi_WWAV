@@ -3,6 +3,7 @@ import { sin } from '../../shared/dmath';
 import { CENTER, ringAngle, ringRadius } from './orbits';
 import {
   SEPARATION_RATE,
+  VIEW_TILT,
   eccentricAnomaly,
   orbitForSeat,
   periodOf,
@@ -124,6 +125,27 @@ describe('keeping worlds apart', () => {
       [260, 260],
     );
     expect(off).toEqual([0, 0]);
+  });
+
+  // The review: iOS measures closeness on its screen, where every orbit is
+  // squashed to 0.88 of its height (KeplerMotion.viewTilt), so two worlds
+  // the iPhone nudges apart must be nudged here too, by the same amount.
+  test("measures closeness as iOS does, on its screen with y squashed by 0.88", () => {
+    const a = { x: CENTER.x, y: CENTER.y + 1000 };
+    const b = { x: CENTER.x + 150, y: CENTER.y + 1200 };
+    // 250 apart in the plane, beyond the 236 wanted; 231 apart on iOS's screen.
+    expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeGreaterThan(200 * 1.18);
+    const screen = (p: { x: number; y: number }) => ({ x: p.x, y: CENTER.y + (p.y - CENTER.y) * VIEW_TILT });
+    const [sa, sb] = [screen(a), screen(b)];
+    const d = Math.hypot(sb.x - sa.x, sb.y - sa.y);
+    const push = SEPARATION_RATE * ((236 - d) / 236) * (1 / 30);
+    const toward = Math.atan2(sb.y - sa.y, sb.x - sa.x);
+    const tangent = (p: { x: number; y: number }) => Math.atan2(p.y - CENTER.y, p.x - CENTER.x) + Math.PI / 2;
+    const off = separationOffsets([a, b], [100, 100]);
+    expect(VIEW_TILT).toBe(0.88);
+    expect(off[0]).toBeCloseTo(-push * Math.cos(toward - tangent(sa)), 12);
+    expect(off[1]).toBeCloseTo(push * Math.cos(toward - tangent(sb)), 12);
+    expect(off[0]).not.toBe(0);
   });
 
   test('is bounded so the nudge stays invisible', () => {

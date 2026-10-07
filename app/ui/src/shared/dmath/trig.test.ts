@@ -43,6 +43,23 @@ describe('sin and cos', () => {
     expect(worst).toBeLessThanOrEqual(1);
   });
 
+  // The review: the comment in reduce() put the end of exact reduction at
+  // 2^19·π/2; it is 2^20·π/2, and past it the error is bounded, not an ulp.
+  test('match the engine up to 2^20·π/2, and stay within 3.9e−17·|x| of it beyond', () => {
+    const edge = (2 ** 20 * Math.PI) / 2;
+    let worst = 0;
+    for (const x of sweep(1e5, edge, 20000)) {
+      worst = Math.max(worst, ulps(sin(x), Math.sin(x)), ulps(cos(x), Math.cos(x)));
+    }
+    expect(worst).toBeLessThanOrEqual(1);
+    let drift = 0;
+    for (let i = 0; i <= 20000; i++) {
+      const x = 1.7e6 * Math.pow(1e9 / 1.7e6, i / 20000);
+      drift = Math.max(drift, Math.abs(sin(x) - Math.sin(x)) / x, Math.abs(cos(x) - Math.cos(x)) / x);
+    }
+    expect(drift).toBeLessThan(3.9e-17);
+  });
+
   test('keep sin² + cos² at 1', () => {
     for (const x of sweep(-50, 50, 997)) {
       expect(Math.abs(sin(x) * sin(x) + cos(x) * cos(x) - 1)).toBeLessThan(4e-16);

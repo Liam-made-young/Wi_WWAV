@@ -10,8 +10,8 @@ import { placeGalaxies, placeSystems } from '../orbits';
 import { placeSystem, systemOrbits } from '../system';
 import { GALAXIES, LINEAGE } from './catalogue';
 
-export const LAYOUT_HASH = '06743e118731ed46';
-export const LAYOUT_HASH_LATER = '737e5ace7f5e28e2';
+export const LAYOUT_HASH = '7ec19aa30535ac4f';
+export const LAYOUT_HASH_LATER = 'c284e0427b5c73a5';
 
 export function layoutText(galaxies: Galaxy[], lineage: { roots: string[]; nodes: LineageNode[] }, t: number): string {
   const b = hexBits;
