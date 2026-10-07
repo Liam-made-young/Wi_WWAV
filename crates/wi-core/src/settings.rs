@@ -18,7 +18,6 @@ fn defaults() -> Value {
         "library": {"watchedFolders": [], "leaveInPlace": false},
         "audio": {"device": null, "buffer": 128, "pluginFolders": []},
         "video": {"hardwareEncode": true, "proxyMedia": false},
-        "claude": {"scoring": "unasked", "mail": "unasked", "feedback": "unasked", "clerk": "unasked"},
         "heat": {"timeZone": null, "school": null},
         "privacy": {"location": false},
     })
@@ -64,13 +63,6 @@ fn check(s: &Value) -> Result<(), CoreError> {
     let buffer = s["audio"]["buffer"].as_u64().unwrap_or(0);
     if !(64..=1024).contains(&buffer) || !buffer.is_power_of_two() {
         return bad("The buffer is 64, 128, 256, 512 or 1024 samples.");
-    }
-    let claude = s["claude"].as_object().into_iter().flat_map(|m| m.values());
-    if claude
-        .clone()
-        .any(|v| !matches!(v.as_str(), Some("unasked" | "on" | "off")))
-    {
-        return bad("Each Claude feature is on, off, or not asked yet.");
     }
     for flag in ["reduceMotion"] {
         if !s[flag].is_boolean() {

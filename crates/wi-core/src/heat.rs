@@ -1,5 +1,6 @@
-//! Heat's private sync and Claude (docs/SPEC.md 2.8, 2.11, 3.12, 9.7), over
-//! wi-heat's rules: wi-core does the HTTP and the storage.
+//! Heat's private sync (docs/SPEC.md 2.8, 8.7), over wi-heat's rules: wi-core
+//! does the HTTP and the storage. The app calls no model: Claude reaches Heat
+//! through the MCP server (2.11), so there is no `assist.call` here.
 //!
 //! Every field of a record written in Heat goes into this library's
 //! [`Replica`] with a stamp, and waits to go up. A round pushes what waits
@@ -16,12 +17,10 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use serde_json::{json, Map, Value};
-use wi_heat::assist::{self, Failure, Outcome, Step};
 use wi_heat::sync::{Change, Key, Page, Replica, Saved};
 
-use crate::args::Args;
 use crate::bus::lock;
-use crate::net::{encode, Fail};
+use crate::net::Fail;
 use crate::{history, CoreError, Inner};
 
 const REPLICA: &str = "heat.replica";
@@ -306,127 +305,4 @@ fn apply(i: &Inner, touched: &BTreeSet<(String, String)>) -> Result<(), CoreErro
         records.push((kind.clone(), id.clone(), Some(Value::Object(whole))));
     }
     history::apply_remote(i, REMOTE_LABEL, records)
-}
-
-// ----- Claude -----
-
-/// The jobs `/api/assist/:task` answers, and the switch each one needs.
-const TASKS: [(&str, Option<&str>); 8] = [
-    ("score", Some("scoring")),
-    ("score-batch", Some("scoring")),
-    ("read-mail", Some("mail")),
-    ("syllabus", None),
-    ("review-note", None),
-    ("release-plan", None),
-    ("feedback", Some("feedback")),
-    ("clerk", Some("clerk")),
-];
-
-fn failure_code(f: &Failure) -> &'static str {
-    match f {
-        Failure::NotGranted => "not_granted",
-        Failure::RateLimited => "rate_limited",
-        Failure::Offline => "offline",
-        Failure::DailyLimit { .. } => "daily_limit",
-        Failure::Unavailable => "unavailable",
-        Failure::Refused => "refused",
-    }
-}
-
-fn failure(f: Failure) -> CoreError {
-    CoreError::new(failure_code(&f), f.sentence())
-}
-
-/// wi-heat's rules on what an answer may say, where the answer's shape is
-/// the one wi-heat reads: an estimate is clamped and needs its reason, and a
-/// review draft holding a number the facts don't is dropped, leaving the
-/// facts alone ("never invent metrics").
-fn held_to_the_rules(task: &str, body: &Value, result: Value) -> Result<Value, CoreError> {
-    match task {
-        "score" => assist::parse_score(&result.to_string())
-            .map(|s| json!({"difficulty": s.difficulty, "minutes": s.minutes, "reason": s.reason}))
-            .ok_or_else(|| failure(Failure::Unavailable)),
-        "review-note" => {
-            let facts: Vec<String> = body["facts"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|f| f.as_str().map(String::from))
-                .collect();
-            Ok(json!({"draft": assist::check_review(&result.to_string(), &facts)}))
-        }
-        _ => Ok(result),
-    }
-}
-
-/// `assist.call {task, body}`: one Claude job through mi-wwav.com, with
-/// 2.11's consent, failures and one retry. The answer is a draft for the
-/// person; nothing here applies it.
-pub(crate) fn assist_call(i: &Inner, a: &Args) -> Result<Value, CoreError> {
-    let task = a.str("task")?;
-    let body = a.get("body").cloned().unwrap_or_else(|| json!({}));
-    let Some((_, switch)) = TASKS.iter().find(|(t, _)| *t == task) else {
-        return Err(CoreError::new(
-            "bad_args",
-            format!("Claude has no job called '{task}'."),
-        ));
-    };
-    if let Some(switch) = switch {
-        let settings = crate::settings::read(i)?;
-        match settings["claude"][switch].as_str() {
-            Some("on") => {}
-            Some("off") => return Err(failure(Failure::NotGranted)),
-            _ => {
-                let what = match *switch {
-                    "scoring" => assist::SCORING_CONSENT,
-                    "mail" => assist::MAIL_CONSENT,
-                    _ => "Turn this on in Settings → Claude first.",
-                };
-                return Err(CoreError::new("consent_needed", what));
-            }
-        }
-    }
-    if !i.net.signed_in() {
-        return Err(CoreError::new(
-            "signed_out",
-            "Sign in to mi-wwav.com to ask Claude.",
-        ));
-    }
-    let mut rng = rand::thread_rng();
-    let mut attempt = 1;
-    loop {
-        let outcome = match i.net.api(
-            "POST",
-            &format!("/api/assist/{}", encode(task)),
-            Some(&body),
-        ) {
-            Ok(v) => Outcome::Answered {
-                status: 200,
-                body: v.to_string(),
-            },
-            Err(Fail::Status { status, body }) => Outcome::Answered {
-                status,
-                body: body.to_string(),
-            },
-            Err(Fail::Offline) => Outcome::Offline,
-            Err(Fail::SignedOut) => {
-                return Err(CoreError::new(
-                    "signed_out",
-                    "Sign in to mi-wwav.com to ask Claude.",
-                ))
-            }
-        };
-        match assist::step(attempt, outcome, &mut rng) {
-            Step::Done(Ok(text)) => {
-                let v: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
-                let result = v.get("result").cloned().unwrap_or(v);
-                return held_to_the_rules(task, &body, result).map(|r| json!({"result": r}));
-            }
-            Step::Done(Err(f)) => return Err(failure(f)),
-            Step::RetryAfter(d) => {
-                std::thread::sleep(d);
-                attempt += 1;
-            }
-        }
-    }
 }

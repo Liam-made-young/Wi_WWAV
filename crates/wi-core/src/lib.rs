@@ -314,8 +314,6 @@ impl Core {
 
             "export.everything" => export::everything(i, &a),
 
-            "assist.call" => heat::assist_call(i, &a),
-
             _ => Err(CoreError::new(
                 "unknown_command",
                 format!("There is no command called '{cmd}'."),

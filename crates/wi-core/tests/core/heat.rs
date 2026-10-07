@@ -1,11 +1,10 @@
-//! Heat sync and Claude through the core, against tools/mock-server
-//! (docs/SPEC.md 2.8, 2.11, 9.7). What a fail looks like:
+//! Heat sync through the core, against tools/mock-server (docs/SPEC.md 2.8,
+//! 8.7). What a fail looks like:
 //! - a record written in Heat on one library doesn't reach another library
 //!   of the same account, or comes back as anything but one undoable change;
 //! - two devices editing different fields of one record lose one edit;
 //! - an undo in Heat doesn't sync, or a grade leaves the machine;
-//! - a Claude call goes out before the person turned the feature on, or a
-//!   failure reads as anything but 2.11's sentence.
+//! - the app calls a model: there is no assist command.
 
 use std::time::Duration;
 
@@ -138,88 +137,17 @@ fn an_undo_syncs_and_a_grade_stays_here() {
 }
 
 #[test]
-fn claude_asks_first_and_fails_in_plain_words() {
-    let server = MockServer::start();
+fn the_app_calls_no_model() {
+    // Claude reaches Heat through the MCP server (2.11); the core has no
+    // job to give it, and no switch to ask first.
     let setup = Setup::new();
-    let core = sign_in(&setup, &server);
-    let body = json!({"title": "Grammar quiz 4", "type": "Quiz", "notes": "", "averages": {}});
-    let ask = core
-        .invoke("assist.call", json!({"task": "score", "body": body}))
+    let core = setup.core();
+    let e = core
+        .invoke("assist.call", json!({"task": "score", "body": {}}))
         .unwrap_err();
-    assert_eq!(ask.code, "consent_needed");
-    assert_eq!(
-        ask.message,
-        "Heat will send this task's title, type and notes, and your average minutes per type. Nothing else."
-    );
-    ok(
-        &core,
-        "app.settings.set",
-        json!({"patch": {"claude": {"scoring": "on"}}}),
-    );
-    let answer = ok(&core, "assist.call", json!({"task": "score", "body": body}));
-    let difficulty = answer["result"]["difficulty"].as_u64().unwrap();
-    let minutes = answer["result"]["minutes"].as_u64().unwrap();
-    assert!(
-        (1..=5).contains(&difficulty) && (5..=600).contains(&minutes),
-        "{answer}"
-    );
-    assert!(answer["result"]["reason"].is_string());
-    let facts = json!({"facts": ["Classes: 6 tasks done, 4h 10m of focus"]});
-    let review = ok(
-        &core,
-        "assist.call",
-        json!({"task": "review-note", "body": facts}),
-    );
-    let draft = review["result"]["draft"].as_str().unwrap();
-    assert!(draft.contains("6 tasks done"), "{draft}");
-
-    // Ten a minute, then the server's limit, in 2.11's words.
-    let mut limited = None;
-    for _ in 0..12 {
-        if let Err(e) = core.invoke("assist.call", json!({"task": "score", "body": body})) {
-            limited = Some(e);
-            break;
-        }
-    }
-    let limited = limited.expect("the eleventh call in a minute is refused");
-    assert_eq!(limited.code, "rate_limited");
-    assert_eq!(
-        limited.message,
-        "Too many requests. Wait a minute, then try again."
-    );
-
-    ok(
-        &core,
-        "app.settings.set",
-        json!({"patch": {"claude": {"scoring": "off"}}}),
-    );
-    let off = core
-        .invoke("assist.call", json!({"task": "score", "body": body}))
-        .unwrap_err();
-    assert_eq!(
-        off.message,
-        "Claude scoring is off. Set difficulty yourself."
-    );
-    assert_eq!(
-        core.invoke("assist.call", json!({"task": "poem"}))
-            .unwrap_err()
-            .code,
-        "bad_args"
-    );
-
-    ok(
-        &core,
-        "app.settings.set",
-        json!({"patch": {"claude": {"scoring": "on"}}}),
-    );
-    drop(server);
-    let offline = core
-        .invoke("assist.call", json!({"task": "score", "body": body}))
-        .unwrap_err();
-    assert_eq!(
-        (offline.code.as_str(), offline.message.as_str()),
-        ("offline", "Needs a connection")
-    );
+    assert_eq!(e.code, "unknown_command");
+    let s = ok(&core, "app.settings.get", json!({}));
+    assert!(s.get("claude").is_none(), "{s}");
 }
 
 #[test]
@@ -227,7 +155,6 @@ fn settings_change_only_what_exists() {
     let setup = Setup::new();
     let core = setup.core();
     let s = ok(&core, "app.settings.get", json!({}));
-    assert_eq!(s["claude"]["scoring"], "unasked");
     assert_eq!(s["appearance"], "system");
     let s = ok(
         &core,

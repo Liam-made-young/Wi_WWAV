@@ -537,42 +537,6 @@ fn review_a_sync_from_another_device_keeps_the_redo() {
     );
 }
 
-// ---------------------------------------------------------------- Claude
-
-/// Finding: three of `assist.call`'s jobs have no consent switch at all
-/// (`syllabus`, `review-note`, `release-plan`), so their first use sends
-/// the person's text to mi-wwav.com without ever showing what will be
-/// sent (2.11: "Each feature is off until its first use. The first use
-/// shows exactly what will be sent").
-#[test]
-#[ignore = "review finding: syllabus, review-note and release-plan go out without consent"]
-fn review_every_claude_job_asks_first() {
-    let server = MockServer::start();
-    let setup = Setup::new();
-    let core = sign_in(&setup, &server);
-    let mut went_out = Vec::new();
-    for (task, body) in [
-        (
-            "syllabus",
-            json!({"text": "JPN 201. Quizzes 20%, exams 50%, homework 30%."}),
-        ),
-        ("review-note", json!({"facts": ["Classes: 6 tasks done"]})),
-        (
-            "release-plan",
-            json!({"title": "World Ending", "date": "2026-11-01"}),
-        ),
-    ] {
-        match core.invoke("assist.call", json!({"task": task, "body": body})) {
-            Err(e) if e.code == "consent_needed" => {}
-            other => went_out.push(format!("{task}: {other:?}")),
-        }
-    }
-    assert!(
-        went_out.is_empty(),
-        "sent before the person turned the feature on: {went_out:#?}"
-    );
-}
-
 /// Finding: only a change made with `room: "heat"` reaches Heat sync. A
 /// Heat record written from another room (Space's "Plan in Heat" adds a
 /// milestone from your sun, 2.6) never syncs, and an undo of it in that

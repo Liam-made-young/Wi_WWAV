@@ -26,7 +26,6 @@ let meters = core.meters();                            // raw bytes, at most onc
 | cmd | args | result |
 |---|---|---|
 | `library.rename` | `{id, title, label}` | `{clips}`: Get Info's title; the file keeps its name and bytes |
-| `assist.call` | `{task, body}` | `{result}`, or `consent_needed` (with the consent sentence), `not_granted`, `rate_limited`, `daily_limit`, `offline`, `unavailable`, `signed_out`. Tasks are the mock server's: `score`, `score-batch`, `read-mail`, `syllabus`, `review-note`, `release-plan`, `feedback`, `clerk` |
 
 Rust-only, for the Console and tests: `Core::pause_player(PausedFor::Console
 | Film)` (2.3: pressing play in the Console), `Core::sync_heat()` (a Heat sync
@@ -41,11 +40,17 @@ to send one, so nothing could test it.
 
 ## For the Tauri app
 
-`app/ui/src/bridge` expects two commands: `core` taking `{cmd, args}` and
-answering `invoke`'s result or rejecting with the `CoreError` (`{code,
-message}`), and `core_listen` taking `{events, meters}`, two `Channel`s, once
-per window: send each `Event` on `events` and each meters frame on `meters`
-as raw bytes (`InvokeResponseBody::Raw`), never JSON.
+`app/src-tauri` hosts the core and gives the web UI one command, `core`,
+taking `{cmd, args}` and answering the result or rejecting with the
+`CoreError` (`{code, message}`). It sends each `Event` to the main window as
+the Tauri event `core` `{event, payload}`, and each meters frame to the
+`Channel` the UI names with `core` `meters.listen {channel}`, as raw bytes
+(`InvokeResponseBody::Raw`), never JSON. `app/src-tauri/README.md` has the
+whole contract, and `app/ui/src/bridge` is its other end.
+
+The app calls no model. Claude reaches Heat through an MCP server that
+reuses wi-heat's rules (docs/SPEC.md 2.11, 8.8), so the core has no
+`assist.call`, no Claude switches in settings and no Anthropic key.
 
 ## Tests
 
