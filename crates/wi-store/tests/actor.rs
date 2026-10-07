@@ -121,3 +121,22 @@ fn the_journal_refuses_an_actor_it_doesnt_know() {
     let err = conn.execute("UPDATE txn SET actor = 'someone'", []).unwrap_err().to_string();
     assert!(err.contains("CHECK"), "{err}");
 }
+
+#[test]
+fn state_that_is_not_a_change_stays_out_of_the_journal() {
+    let (_dir, mut store) = library();
+    store.set_doc("heatState", "state", &json!({"planDrafts": [{"taskId": "t1"}]}), "").unwrap();
+    store.set_doc("heatState", "state", &json!({"planDrafts": []}), "").unwrap();
+    assert_eq!(store.doc("heatState", "state").unwrap().unwrap().json, json!({"planDrafts": []}));
+    assert!(store.entries(false, 10).unwrap().is_empty(), "no journal entry");
+    assert_eq!(store.history(Room::Heat).unwrap().undo_text(), "Nothing to undo.");
+    store.remove_doc("heatState", "state").unwrap();
+    assert!(store.doc("heatState", "state").unwrap().is_none());
+
+    // A record the journal holds can't be written around it.
+    put(&mut store, "add task", Actor::You, "t1", json!({"title": "Quiz 4"}));
+    let refused = store.set_doc("task", "t1", &json!({"title": "sneaky"}), "").unwrap_err().to_string();
+    assert!(refused.contains("journal"), "{refused}");
+    assert!(store.remove_doc("task", "t1").is_err());
+    assert_eq!(title(&store, "t1").as_deref(), Some("Quiz 4"));
+}
