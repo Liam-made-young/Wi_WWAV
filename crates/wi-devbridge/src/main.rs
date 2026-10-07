@@ -154,6 +154,8 @@ fn local_origin(origin: &str) -> bool {
 }
 
 /// The handshake's check: pages from this machine and clients with no Origin.
+// The signature is tungstenite's callback (`Result<Response, ErrorResponse>`), which clippy finds large.
+#[allow(clippy::result_large_err)]
 fn check_origin(req: &Request, resp: Response) -> Result<Response, ErrorResponse> {
     match req.headers().get("Origin") {
         None => Ok(resp),
