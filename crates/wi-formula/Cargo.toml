@@ -1,0 +1,10 @@
+[package]
+name = "wi-formula"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "The Database tab's formula language: spreadsheet formulas over named columns, with no I/O and no dependencies (docs/ASK.md)"
+
+[dependencies]

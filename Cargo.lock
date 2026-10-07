@@ -5336,6 +5336,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "wi-formula"
+version = "0.1.0"
+
+[[package]]
 name = "wi-heat"
 version = "0.1.0"
 dependencies = [
@@ -5386,6 +5390,13 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "wwav-ids",
+]
+
+[[package]]
+name = "wi-wiki"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
