@@ -1,0 +1,11 @@
+/target/
+**/target/
+node_modules/
+dist/
+/engine/build/
+/engine/third_party/JUCE/
+/app/ui/test-results/
+/app/ui/playwright-report/
+*.log
+.DS_Store
+/tests/out/

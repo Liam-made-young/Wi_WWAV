@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/wwav-ids",
+  "crates/wwav-formats",
+  "crates/wwav-session",
+  "crates/wwav-wire",
+  "crates/wwav-dsp",
+  "crates/wwav-tokens",
+  "crates/wi-store",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "LicenseRef-Proprietary"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "2"
+anyhow = "1"
+rand = "0.8"
+tempfile = "3"
+proptest = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+wwav-ids = { path = "crates/wwav-ids" }
+wwav-formats = { path = "crates/wwav-formats" }
+wwav-session = { path = "crates/wwav-session" }
+wwav-wire = { path = "crates/wwav-wire" }
+wwav-dsp = { path = "crates/wwav-dsp" }
+wwav-tokens = { path = "crates/wwav-tokens" }
+wi-store = { path = "crates/wi-store" }
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
