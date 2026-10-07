@@ -571,3 +571,156 @@ fn an_older_session_json_restored_from_git_opens_as_restored() {
         opened.recovered.map(|r| r.sentence(0))
     );
 }
+
+#[test]
+#[ignore = "finding: two open packages leave a history whose ⌘Z panics (step's expect)"]
+fn undo_after_two_windows_saved_never_panics() {
+    // Two Package values on one package (a second window, or a helper), each
+    // makes one change and saves. Reopening anchors on the last save line,
+    // which names window B's file, and rebuilds an undo stack holding A's
+    // change too. A's rows don't fit B's file, and Package::step `expect`s
+    // that they do: the second ⌘Z panics, which takes the app down.
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = FakeClock::at(T0);
+    let pkg = Package::create(tmp.path(), sample_session(0), clock.clone()).unwrap();
+    let dir = pkg.dir().to_path_buf();
+    drop(pkg);
+    let (mut a, _) = Package::open(&dir, clock.clone()).unwrap();
+    let Ok((mut b, _)) = Package::open(&dir, clock.clone()) else {
+        return; // refused: the finding is fixed
+    };
+    a.edit("rename", |s| s.title = "From A".into()).unwrap();
+    a.save().unwrap();
+    b.edit("move clip", |s| s.tracks[0].events[0].at_ms = 2)
+        .unwrap();
+    b.save().unwrap();
+    drop(a);
+    drop(b);
+
+    let (mut pkg, opened) = Package::open(&dir, clock.clone()).unwrap();
+    if opened.history_reset {
+        return; // refused the mixed history instead: fine
+    }
+    let undone = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let first = pkg.undo();
+        let second = pkg.undo();
+        (first.is_ok(), second.is_ok())
+    }));
+    assert!(undone.is_ok(), "⌘Z panicked after reopening");
+}
+
+const SECOND_DIR: &str = "WWAV_REVIEW_SECOND_DIR";
+
+#[test]
+#[ignore = "the second window a_second_window_killed_mid_save_leaves_session_json_whole runs"]
+fn review_second_window() {
+    let Ok(dir) = env::var(SECOND_DIR) else {
+        return;
+    };
+    let (mut pkg, _) = Package::open(&PathBuf::from(dir), Arc::new(SystemClock)).unwrap();
+    say("open");
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line).unwrap();
+    for i in 0.. {
+        pkg.edit("move clip", |s| s.tracks[1].events[0].at_ms = 5000 + i)
+            .unwrap();
+        let _ = pkg.save();
+    }
+}
+
+#[test]
+#[ignore = "finding: no lock, so a second window killed mid-save leaves session.json half-written (F6.4)"]
+#[cfg(unix)]
+fn a_second_window_killed_mid_save_leaves_session_json_whole() {
+    // F6.4 with two Package values on one package: window A has staged a
+    // save (session.json.tmp written and synced, the journal's save line
+    // written). Window B, another process, saves: File::create truncates
+    // the same session.json.tmp and starts writing, and is killed part way.
+    // A's rename then puts B's half-written file under session.json, and
+    // the session no longer opens.
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = FakeClock::at(T0);
+    let pkg = Package::create(tmp.path(), sample_session(60_000), clock.clone()).unwrap();
+    let dir = pkg.dir().to_path_buf();
+    drop(pkg);
+    let staged_tmp = dir.join("session.json.tmp");
+
+    // B opens first: open removes a leftover session.json.tmp, which would
+    // otherwise take A's staged file away.
+    let mut child = Kid(Command::new(env::current_exe().unwrap())
+        .args([
+            "review_second_window",
+            "--exact",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(SECOND_DIR, &dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap());
+    let mut to_child = child.0.stdin.take().unwrap();
+    let mut from_child = BufReader::new(child.0.stdout.take().unwrap());
+    loop {
+        let mut line = String::new();
+        assert!(
+            from_child.read_line(&mut line).unwrap() > 0,
+            "the child stopped"
+        );
+        if line.contains("open") {
+            break;
+        }
+    }
+
+    let (mut a, _) = Package::open(&dir, clock.clone()).unwrap();
+    a.edit("rename", |s| s.title = "From A".into()).unwrap();
+    let staged = a.stage_save().unwrap().expect("A has a change to save");
+    let full = fs::metadata(&staged_tmp).unwrap().len();
+
+    writeln!(to_child).unwrap(); // B: edit and save
+    let started = std::time::Instant::now();
+    loop {
+        // B's File::create truncated A's staged file: B is mid-write.
+        if fs::metadata(&staged_tmp)
+            .map(|m| m.len() < full)
+            .unwrap_or(false)
+        {
+            break;
+        }
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(120),
+            "B never started its save"
+        );
+    }
+    drop(child); // SIGKILL mid-write
+    let _ = a.commit_save(staged);
+
+    let bytes = fs::read(dir.join("session.json")).unwrap();
+    let opened = Package::open(&dir, clock.clone());
+    assert!(
+        opened.is_ok(),
+        "session.json is half-written ({} of {} bytes): {}",
+        bytes.len(),
+        full,
+        opened.err().unwrap()
+    );
+}
+
+#[test]
+#[ignore = "finding: the journal's equality and the writer's disagree on -0.0 (F6.1)"]
+fn sessions_the_crate_calls_equal_save_to_the_same_bytes() {
+    // F6.1 directly: two sessions the model calls the same (Session's ==,
+    // like the journal's Value ==, has -0.0 == 0.0) are written as
+    // different bytes, "pan": -0.0 against "pan": 0.0. Either the writer
+    // should write one zero or the journal should tell them apart; as it
+    // is, the journal records no change where the file changes.
+    let a = sample_session(0);
+    let mut b = a.clone();
+    b.tracks[0].pan = -0.0;
+    assert_eq!(a, b, "the model calls them the same session");
+    assert!(
+        a.to_json_bytes() == b.to_json_bytes(),
+        "the same session saved twice gave different bytes"
+    );
+}
