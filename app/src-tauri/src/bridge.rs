@@ -47,8 +47,8 @@ fn matches(pattern: &str, cmd: &str) -> bool {
     }
 }
 
-/// Whether a window whose capability gives `scope` may send `cmd`. Nothing
-/// listed means nothing allowed.
+/// Whether a window may send `cmd`, given what its capability allows and
+/// denies. Nothing listed means nothing allowed.
 pub fn permitted(allow: &[Arc<Allow>], deny: &[Arc<Allow>], cmd: &str) -> bool {
     allow.iter().any(|a| matches(&a.cmd, cmd)) && !deny.iter().any(|d| matches(&d.cmd, cmd))
 }

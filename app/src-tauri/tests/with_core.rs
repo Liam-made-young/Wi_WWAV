@@ -48,16 +48,21 @@ fn edit_item(app: &App<MockRuntime>, id: &str) -> (String, bool) {
     (item.text().unwrap(), item.is_enabled().unwrap())
 }
 
-/// Waits for the core to send the main window a `history` event for `room`.
+/// Waits for the core to send the main window a `history` event for `room`,
+/// then for the rest of that change's events to pass. On the mock runtime the
+/// menu changes on the forwarding thread rather than the main thread, so the
+/// test reads it only once that thread is quiet.
 fn history_for(events: &mpsc::Receiver<Value>, room: &str) -> Value {
-    loop {
+    let found = loop {
         let e = events
             .recv_timeout(Duration::from_secs(5))
             .expect("a history event within 5 s");
         if e["event"] == "history" && e["payload"]["room"] == room {
-            return e["payload"].clone();
+            break e["payload"].clone();
         }
-    }
+    };
+    while events.recv_timeout(Duration::from_millis(300)).is_ok() {}
+    found
 }
 
 #[test]

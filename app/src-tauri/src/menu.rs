@@ -69,15 +69,14 @@ pub enum Action {
 }
 
 pub fn action(id: &str) -> Option<Action> {
-    let ui = [&NEW_SESSION, &EXPORT, &DISC, &UNDO, &REDO, &LIBRARY]
-        .into_iter()
-        .chain(ROOMS.iter())
-        .find(|i| i.id == id);
     match id {
-        _ if ui.is_some() => ui.map(|i| Action::Ui(i.id)),
         "file.open" => Some(Action::OpenFiles),
         "settings" => Some(Action::Settings),
-        _ => None,
+        _ => [&NEW_SESSION, &EXPORT, &DISC, &UNDO, &REDO, &LIBRARY]
+            .into_iter()
+            .chain(&ROOMS)
+            .find(|i| i.id == id)
+            .map(|i| Action::Ui(i.id)),
     }
 }
 
@@ -316,7 +315,7 @@ pub async fn show_room<R: Runtime>(app: &AppHandle<R>, args: &Value) -> Result<V
     Ok(json!({}))
 }
 
-/// The core's `history` event: `{room, undo, redo, cant}`.
+/// The core's `history` event: `{room, undo, redo, cant, cantRedo}`.
 pub fn history_changed<R: Runtime>(app: &AppHandle<R>, payload: &Value) {
     let (Some(room), Ok(history)) = (payload["room"].as_str(), History::deserialize(payload))
     else {
@@ -333,15 +332,11 @@ pub fn history_changed<R: Runtime>(app: &AppHandle<R>, payload: &Value) {
 
 /// Sets Undo, Redo and the View ticks from the state.
 fn refresh<R: Runtime>(app: &AppHandle<R>) {
-    let (room, history) = {
-        let state = app.state::<Mutex<EditState>>();
-        let state = state.lock().unwrap();
-        (
-            state.room.clone(),
-            state.history.get(&state.room).cloned().unwrap_or_default(),
-        )
-    };
+    let state = app.state::<Mutex<EditState>>();
+    // Held while the menu changes, so two refreshes can't interleave.
+    let state = state.lock().unwrap();
     let Some(menu) = app.menu() else { return };
+    let history = state.history.get(&state.room).cloned().unwrap_or_default();
     let ((undo, can_undo), (redo, can_redo)) = history.titles();
     for (id, text, enabled) in [(UNDO.id, undo, can_undo), (REDO.id, redo, can_redo)] {
         if let Some(item) = find(&menu, id).as_ref().and_then(MenuItemKind::as_menuitem) {
@@ -350,7 +345,7 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
         }
     }
     // The library drawer opens over a room, so the tick stays on that room.
-    if room == "library" {
+    if state.room == "library" {
         return;
     }
     for segment in &ROOMS {
@@ -358,7 +353,7 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
             .as_ref()
             .and_then(MenuItemKind::as_check_menuitem)
         {
-            let _ = item.set_checked(segment.id == format!("room.{room}"));
+            let _ = item.set_checked(segment.id == format!("room.{}", state.room));
         }
     }
 }

@@ -12,6 +12,7 @@ mod update;
 
 use std::sync::Mutex;
 
+use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Builder, Manager, RunEvent, Runtime, WebviewWindowBuilder};
 
 pub use bridge::{Bridge, Core, CoreError};
@@ -24,6 +25,7 @@ pub fn shell<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder
         .manage(Bridge::new())
         .manage(Mutex::new(menu::EditState::default()))
+        .manage(open::Waiting::default())
         .invoke_handler(tauri::generate_handler![bridge::core])
 }
 
@@ -40,6 +42,11 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .menu(menu::build)
         .on_menu_event(menu::on_event)
+        .on_page_load(|webview, load| {
+            if webview.label() == "main" && load.event() == PageLoadEvent::Finished {
+                open::page_loaded(webview.app_handle());
+            }
+        })
         .setup(|app| {
             start_core(app.handle());
             open::route(app.handle(), open::from_args(std::env::args()));
