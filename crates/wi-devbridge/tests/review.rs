@@ -1,5 +1,5 @@
-//! An independent reviewer's adversarial test of the dev bridge, ignored
-//! until the finding it names is fixed.
+//! An independent reviewer's adversarial test of the dev bridge. It exposed a
+//! finding, ran ignored until it was fixed, and runs now.
 
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -24,7 +24,6 @@ fn workspace() -> PathBuf {
 /// sends it to the signed-in account, export the library to any path, or
 /// sign out. The handshake's Origin is never checked.
 #[test]
-#[ignore = "review finding: the dev bridge takes commands from any web page's origin"]
 fn review_a_page_from_another_origin_cant_drive_the_core() {
     let built = Command::new(env!("CARGO"))
         .args(["build", "-q", "-p", "mock-engine", "--bin", "mock-engine"])
@@ -77,13 +76,13 @@ fn review_a_page_from_another_origin_cant_drive_the_core() {
     };
     let _ = child.kill();
     let _ = child.wait();
-    if let Ok(answer) = outcome {
-        let came_in = answer["result"]["clips"]
-            .as_array()
-            .is_some_and(|c| !c.is_empty());
-        assert!(
-            !came_in,
-            "a page on https://evil.example imported a file through the bridge: {answer}"
-        );
+    match outcome {
+        Err(refused) => assert!(
+            refused.contains("403"),
+            "refused, but not with a 403: {refused}"
+        ),
+        Ok(answer) => {
+            panic!("a page on https://evil.example imported a file through the bridge: {answer}")
+        }
     }
 }

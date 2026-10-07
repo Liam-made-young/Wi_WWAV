@@ -19,6 +19,14 @@
 //! listens on 127.0.0.1 only and prints `wi-devbridge listening ws://…`
 //! once it is ready. Secrets are held in memory: nothing here touches the
 //! keychain.
+//!
+//! Browsers don't hold a WebSocket to the same-origin policy, so any web page
+//! open on the machine could reach this port and run every command of the
+//! core (import a file it names, send it to the signed-in account, export
+//! the library anywhere). A connection whose `Origin` isn't this machine
+//! (`localhost`, `127.0.0.1` or `[::1]`, any port: the Vite server, Playwright)
+//! is refused with a 403 before it is a WebSocket. A client that sends no
+//! Origin at all (Node, a terminal) is not a web page and is let in.
 
 use std::io::ErrorKind;
 use std::net::{TcpListener, TcpStream};
@@ -28,6 +36,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{json, Value};
+use tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tungstenite::{Error as WsError, Message};
 use wi_core::{Config, Core, MemorySecrets};
 
@@ -118,6 +127,51 @@ fn main() {
     }
 }
 
+/// Whether a web page at `origin` may use the bridge: a page served from this
+/// machine. (`Origin: null`, which a sandboxed frame or a `file:` page sends,
+/// is not.)
+fn local_origin(origin: &str) -> bool {
+    let Some((scheme, rest)) = origin.split_once("://") else {
+        return false;
+    };
+    if !matches!(scheme, "http" | "https") {
+        return false;
+    }
+    let host = match rest.strip_prefix('[') {
+        Some(v6) => v6.split_once(']').map_or("", |(h, _)| h),
+        None => rest.split(':').next().unwrap_or(""),
+    };
+    // Whatever follows the host must be a port, or nothing: no path, no userinfo.
+    let after = rest
+        .strip_prefix('[')
+        .and_then(|v6| v6.split_once(']').map(|(_, a)| a))
+        .unwrap_or_else(|| &rest[host.len()..]);
+    let port_ok = after.is_empty()
+        || after
+            .strip_prefix(':')
+            .is_some_and(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
+    port_ok && matches!(host, "localhost" | "127.0.0.1" | "::1")
+}
+
+/// The handshake's check: pages from this machine and clients with no Origin.
+fn check_origin(req: &Request, resp: Response) -> Result<Response, ErrorResponse> {
+    match req.headers().get("Origin") {
+        None => Ok(resp),
+        Some(origin) if origin.to_str().is_ok_and(local_origin) => Ok(resp),
+        Some(origin) => {
+            eprintln!(
+                "wi-devbridge: refused a page from {}",
+                origin.to_str().unwrap_or("an unreadable origin")
+            );
+            let mut refused = ErrorResponse::new(Some(
+                "The dev bridge takes commands only from pages on this machine.".to_string(),
+            ));
+            *refused.status_mut() = tungstenite::http::StatusCode::FORBIDDEN;
+            Err(refused)
+        }
+    }
+}
+
 /// The answer to one text frame.
 fn answer(core: &Core, text: &str) -> Value {
     let req: Value = serde_json::from_str(text).unwrap_or(Value::Null);
@@ -137,7 +191,7 @@ fn answer(core: &Core, text: &str) -> Value {
 /// socket is read with a short timeout so the same thread can write
 /// whatever is waiting in between.
 fn serve(core: &Arc<Core>, stream: TcpStream) -> Result<(), Box<WsError>> {
-    let mut ws = tungstenite::accept(stream).map_err(|e| match e {
+    let mut ws = tungstenite::accept_hdr(stream, check_origin).map_err(|e| match e {
         tungstenite::HandshakeError::Failure(e) => Box::new(e),
         tungstenite::HandshakeError::Interrupted(_) => Box::new(WsError::ConnectionClosed),
     })?;
@@ -184,6 +238,34 @@ mod tests {
 
     fn args(s: &str) -> Result<Args, String> {
         parse(s.split_whitespace().map(String::from))
+    }
+
+    #[test]
+    fn only_pages_on_this_machine_may_use_the_bridge() {
+        for ok in [
+            "http://localhost:5173",
+            "http://localhost",
+            "http://127.0.0.1:5173",
+            "https://127.0.0.1:8443",
+            "http://[::1]:5173",
+        ] {
+            assert!(local_origin(ok), "{ok}");
+        }
+        for refused in [
+            "https://evil.example",
+            "http://evil.example:5173",
+            "http://localhost.evil.example",
+            "http://localhost@evil.example",
+            "http://127.0.0.1.evil.example:80",
+            "http://localhost:80/path",
+            "http://localhost:abc",
+            "null",
+            "file://",
+            "tauri://localhost",
+            "",
+        ] {
+            assert!(!local_origin(refused), "{refused}");
+        }
     }
 
     #[test]

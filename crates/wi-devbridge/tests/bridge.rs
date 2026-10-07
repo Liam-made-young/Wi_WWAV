@@ -10,6 +10,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
+use tungstenite::client::IntoClientRequest;
 use tungstenite::{stream::MaybeTlsStream, Message, WebSocket};
 
 type Socket = WebSocket<MaybeTlsStream<std::net::TcpStream>>;
@@ -163,4 +164,44 @@ fn commands_events_and_meters_cross_the_socket() {
         }
     }
     assert_eq!(clock.expect("a clock event")["state"], "playing");
+}
+
+/// Browsers don't hold a WebSocket to the same-origin policy, so the bridge
+/// checks the handshake's Origin itself: a page from this machine (the Vite
+/// server, Playwright) connects, a page from anywhere else is refused with a
+/// 403 before it is a socket, and a client with no Origin at all (Node, a
+/// terminal) isn't a web page.
+#[test]
+fn only_pages_from_this_machine_are_let_in() {
+    let bridge = start();
+    let connect = |origin: Option<&str>| {
+        let mut request = bridge.url.as_str().into_client_request().unwrap();
+        if let Some(o) = origin {
+            request.headers_mut().insert("Origin", o.parse().unwrap());
+        }
+        tungstenite::connect(request)
+    };
+    for local in [
+        None,
+        Some("http://localhost:5173"),
+        Some("http://127.0.0.1:5173"),
+    ] {
+        let (mut ws, _) = connect(local).unwrap_or_else(|e| panic!("{local:?} was refused: {e}"));
+        send(&mut ws, 1, "app.hello", json!({}));
+        let hello = answer(&mut ws, 1, &mut Vec::new(), &mut 0);
+        assert_eq!(hello["ok"], true, "{local:?}");
+    }
+    for other in [
+        "https://evil.example",
+        "http://localhost.evil.example",
+        "null",
+    ] {
+        let refused = connect(Some(other)).err().unwrap_or_else(|| {
+            panic!("a page from {other} connected");
+        });
+        assert!(
+            matches!(&refused, tungstenite::Error::Http(r) if r.status() == 403),
+            "{other}: {refused}"
+        );
+    }
 }
