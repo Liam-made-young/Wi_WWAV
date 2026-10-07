@@ -1,6 +1,7 @@
 //! Library search (docs/PLAN.md S1.8). It fails if a search takes over 50 ms
-//! with 50,000 clips in the library. Timing means nothing in a debug build, so
-//! this runs with `cargo test -p wi-store --release --test search_speed`.
+//! with 50,000 clips in the library. The time is SQLite's, and the workspace
+//! builds dependencies optimized even in debug, so the plain test run measures
+//! it; CI also runs it with `--release`.
 
 mod common;
 
@@ -14,18 +15,22 @@ const BUDGET: Duration = Duration::from_millis(50);
 
 fn word(rng: &mut StdRng) -> String {
     const SYLLABLES: [&str; 24] = [
-        "lo", "ti", "de", "glas", "hour", "wor", "end", "ing", "be", "yon", "cé", "ra", "mu", "sa", "ka", "ne",
-        "on", "vel", "dri", "ft", "noc", "tur", "ne", "ah",
+        "lo", "ti", "de", "glas", "hour", "wor", "end", "ing", "be", "yon", "cé", "ra", "mu", "sa",
+        "ka", "ne", "on", "vel", "dri", "ft", "noc", "tur", "ne", "ah",
     ];
-    (0..rng.gen_range(1..=3)).map(|_| SYLLABLES[rng.gen_range(0..SYLLABLES.len())]).collect()
+    (0..rng.gen_range(1..=3))
+        .map(|_| SYLLABLES[rng.gen_range(0..SYLLABLES.len())])
+        .collect()
 }
 
 fn title(rng: &mut StdRng) -> String {
-    (0..rng.gen_range(1..=4)).map(|_| word(rng)).collect::<Vec<_>>().join(" ")
+    (0..rng.gen_range(1..=4))
+        .map(|_| word(rng))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[test]
-#[cfg_attr(debug_assertions, ignore = "timing needs --release")]
 fn search_answers_in_under_50_ms_at_50000_clips() {
     let (_dir, mut store) = common::library();
     let mut rng = StdRng::seed_from_u64(50_000);
@@ -37,7 +42,9 @@ fn search_answers_in_under_50_ms_at_50000_clips() {
             let info = Inspection {
                 artist: format!("{} {}", word(&mut rng), word(&mut rng)),
                 bpm: Some(rng.gen_range(60..180) as f64),
-                key: Some(["A minor", "C major", "F# minor", "Eb major"][rng.gen_range(0..4)].to_string()),
+                key: Some(
+                    ["A minor", "C major", "F# minor", "Eb major"][rng.gen_range(0..4)].to_string(),
+                ),
                 duration_ms: rng.gen_range(30_000..400_000),
                 verdict: "4 stems, and the master".into(),
                 ..Inspection::new(Kind::Wwav, &title(&mut rng))
@@ -88,9 +95,15 @@ fn search_answers_in_under_50_ms_at_50000_clips() {
             found = store.search(text, rule, 200).unwrap().len();
             slowest = slowest.max(start.elapsed());
         }
-        eprintln!("{text:>10?} {}: {found:>3} results, slowest of 5 {slowest:.2?}", if rule == &any { "" } else { "+rule" });
+        eprintln!(
+            "{text:>10?} {}: {found:>3} results, slowest of 5 {slowest:.2?}",
+            if rule == &any { "" } else { "+rule" }
+        );
         worst = worst.max(slowest);
     }
     eprintln!("slowest search at {CLIPS} clips: {worst:.2?}");
-    assert!(worst < BUDGET, "library search took {worst:?} at {CLIPS} clips; the budget is {BUDGET:?}");
+    assert!(
+        worst < BUDGET,
+        "library search took {worst:?} at {CLIPS} clips; the budget is {BUDGET:?}"
+    );
 }

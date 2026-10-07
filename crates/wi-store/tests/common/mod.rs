@@ -13,7 +13,13 @@ use rusqlite::{Connection, OpenFlags};
 use tempfile::TempDir;
 use wi_store::{Room, Store};
 
-pub const ROOMS: [Room; 5] = [Room::Heat, Room::Space, Room::Console, Room::Unquantized, Room::Library];
+pub const ROOMS: [Room; 5] = [
+    Room::Heat,
+    Room::Space,
+    Room::Console,
+    Room::Unquantized,
+    Room::Library,
+];
 
 pub fn library() -> (TempDir, Store) {
     let dir = tempfile::tempdir().unwrap();
@@ -31,7 +37,11 @@ pub fn source_file(dir: &Path, name: &str, bytes: &[u8]) -> PathBuf {
 }
 
 fn reader(root: &Path) -> Connection {
-    Connection::open_with_flags(root.join("library.sqlite"), OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap()
+    Connection::open_with_flags(
+        root.join("library.sqlite"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap()
 }
 
 /// Tables that hold records: everything but the journal itself, the search
@@ -55,10 +65,15 @@ pub fn dump(root: &Path) -> String {
     let conn = reader(root);
     let mut out = String::new();
     for table in record_tables(&conn) {
-        let mut stmt = conn.prepare(&format!("SELECT * FROM {table}")).unwrap();
+        let stmt = conn.prepare(&format!("SELECT * FROM {table}")).unwrap();
         let cols: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
-        let order = (1..=cols.len()).map(|i| i.to_string()).collect::<Vec<_>>().join(", ");
-        let mut stmt = conn.prepare(&format!("SELECT * FROM {table} ORDER BY {order}")).unwrap();
+        let order = (1..=cols.len())
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut stmt = conn
+            .prepare(&format!("SELECT * FROM {table} ORDER BY {order}"))
+            .unwrap();
         writeln!(out, "## {table} ({})", cols.join(", ")).unwrap();
         let mut rows = stmt.query([]).unwrap();
         while let Some(row) = rows.next().unwrap() {
@@ -92,8 +107,11 @@ pub fn journal(root: &Path) -> BTreeMap<String, (String, String)> {
 pub fn search_indexes_agree(root: &Path) {
     let conn = Connection::open(root.join("library.sqlite")).unwrap();
     for fts in ["clips_fts", "docs_fts"] {
-        conn.execute(&format!("INSERT INTO {fts}({fts}) VALUES ('integrity-check')"), [])
-            .unwrap_or_else(|e| panic!("{fts} disagrees with its table: {e}"));
+        conn.execute(
+            &format!("INSERT INTO {fts}({fts}) VALUES ('integrity-check')"),
+            [],
+        )
+        .unwrap_or_else(|e| panic!("{fts} disagrees with its table: {e}"));
     }
 }
 
@@ -106,7 +124,10 @@ pub fn redo_all(store: &mut Store) -> usize {
     step_all(store, |s, room| s.redo(room))
 }
 
-fn step_all(store: &mut Store, step: impl Fn(&mut Store, Room) -> wi_store::Result<Option<String>>) -> usize {
+fn step_all(
+    store: &mut Store,
+    step: impl Fn(&mut Store, Room) -> wi_store::Result<Option<String>>,
+) -> usize {
     let mut steps = 0;
     loop {
         let mut moved = false;

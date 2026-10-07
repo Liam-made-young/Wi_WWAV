@@ -12,24 +12,64 @@ use serde_json::json;
 use std::collections::BTreeMap;
 use wi_store::*;
 
-const TITLES: [&str; 6] = ["untitled", "Low Tide", "glass hours", "World Ending", "Beyoncé", "break"];
+const TITLES: [&str; 6] = [
+    "untitled",
+    "Low Tide",
+    "glass hours",
+    "World Ending",
+    "Beyoncé",
+    "break",
+];
 const KEYS: [&str; 4] = ["A minor", "C major", "F# minor", "Eb major"];
 const TAGS: [&str; 15] = [
-    "live-drums", "wip", "dark", "rough", "sketch", "keeper", "vocal", "lofi", "tape", "night", "dub",
-    "choir", "bass", "fast", "slow",
+    "live-drums",
+    "wip",
+    "dark",
+    "rough",
+    "sketch",
+    "keeper",
+    "vocal",
+    "lofi",
+    "tape",
+    "night",
+    "dub",
+    "choir",
+    "bass",
+    "fast",
+    "slow",
 ];
 const DOC_KINDS: [&str; 3] = ["task", "space", "time_block"];
 const DOC_KEYS: [&str; 4] = ["1", "2", "em-77", "gp-3"];
 
-#[derive(Default)]
 struct Known {
     clips: Vec<String>,
     folders: Vec<String>,
     sequences: Vec<String>,
 }
 
+impl Known {
+    /// What the library holds now, so most edits land.
+    fn read(store: &Store) -> Known {
+        Known {
+            clips: store.clips().unwrap().into_iter().map(|c| c.id).collect(),
+            folders: store
+                .smart_folders()
+                .unwrap()
+                .into_iter()
+                .map(|f| f.id)
+                .collect(),
+            sequences: store
+                .sequences()
+                .unwrap()
+                .into_iter()
+                .map(|s| s.id)
+                .collect(),
+        }
+    }
+}
+
 fn any<'a>(rng: &mut StdRng, ids: &'a [String]) -> &'a str {
-    if ids.is_empty() {
+    if ids.is_empty() || rng.gen_bool(0.03) {
         "01JC5Q8V3M2T7R9X4K6W0YHZNB" // not in the library: the edit is refused
     } else {
         &ids[rng.gen_range(0..ids.len())]
@@ -41,7 +81,10 @@ fn pick<T: Copy>(rng: &mut StdRng, from: &[T]) -> T {
 }
 
 fn tag_kind(rng: &mut StdRng) -> TagKind {
-    pick(rng, &[TagKind::User, TagKind::User, TagKind::Card, TagKind::System])
+    pick(
+        rng,
+        &[TagKind::User, TagKind::User, TagKind::Card, TagKind::System],
+    )
 }
 
 /// One random edit inside an open transaction.
@@ -51,10 +94,21 @@ fn random_edit(tx: &mut Txn, rng: &mut StdRng, known: &mut Known) -> Result<()> 
         0 => tx.rename_clip(&clip, pick(rng, &TITLES)),
         1 => tx.set_artist(&clip, pick(rng, &["LMY", "Ana", ""])),
         2 => {
-            let colour = pick(rng, &[None, Some(Colour::Red), Some(Colour::Blue), Some(Colour::Purple)]);
+            let colour = pick(
+                rng,
+                &[
+                    None,
+                    Some(Colour::Red),
+                    Some(Colour::Blue),
+                    Some(Colour::Purple),
+                ],
+            );
             tx.set_colour(&clip, colour)
         }
-        3 => tx.set_bpm(&clip, pick(rng, &[None, Some(86.0), Some(128.0), Some(130.5)])),
+        3 => tx.set_bpm(
+            &clip,
+            pick(rng, &[None, Some(86.0), Some(128.0), Some(130.5)]),
+        ),
         4 => tx.set_key(&clip, pick(rng, &[None, Some("A minor"), Some("C major")])),
         5 | 6 => tx.add_tag(&clip, pick(rng, &TAGS), tag_kind(rng)),
         7 => tx.remove_tag(&clip, pick(rng, &TAGS), tag_kind(rng)),
@@ -90,7 +144,8 @@ fn random_edit(tx: &mut Txn, rng: &mut StdRng, known: &mut Known) -> Result<()> 
         12 => {
             let (kind, key) = (pick(rng, &DOC_KINDS), pick(rng, &DOC_KEYS));
             let n = rng.gen_range(0..1000);
-            let json = json!({"id": key, "title": format!("task {n}"), "estMin": n, "done": n % 2 == 0});
+            let json =
+                json!({"id": key, "title": format!("task {n}"), "estMin": n, "done": n % 2 == 0});
             tx.put_doc(kind, key, &json, &format!("task {n}"))
         }
         13 => tx.delete_doc(pick(rng, &DOC_KINDS), pick(rng, &DOC_KEYS)),
@@ -137,13 +192,28 @@ fn only_one_moved(
     from: &str,
     to: &str,
 ) {
-    let moved: Vec<_> = before.iter().filter(|(id, v)| after.get(*id) != Some(v)).collect();
-    assert_eq!(moved.len(), 1, "one step must move exactly one entry: {moved:?}");
+    let moved: Vec<_> = before
+        .iter()
+        .filter(|(id, v)| after.get(*id) != Some(v))
+        .collect();
+    assert_eq!(
+        moved.len(),
+        1,
+        "one step must move exactly one entry: {moved:?}"
+    );
     let (id, (entry_room, state)) = moved[0];
-    assert_eq!(entry_room, room.as_str(), "⌘Z in {room:?} moved an entry of {entry_room}");
+    assert_eq!(
+        entry_room,
+        room.as_str(),
+        "⌘Z in {room:?} moved an entry of {entry_room}"
+    );
     assert_eq!(state, from);
     assert_eq!(after[id].1, to);
-    assert_eq!(before.len(), after.len(), "a step never adds or drops entries");
+    assert_eq!(
+        before.len(),
+        after.len(),
+        "a step never adds or drops entries"
+    );
 }
 
 #[derive(Debug, Default)]
@@ -158,39 +228,65 @@ struct Tally {
 fn random_run(seed: u64, steps: usize) -> Tally {
     let (dir, mut store) = library();
     let root = store.root().to_path_buf();
+    // The first state already holds clips, bought, so no undo removes them:
+    // every value the run changes on them must come back exactly.
+    for (n, title) in TITLES.iter().enumerate() {
+        let src = source_file(dir.path(), &format!("{title}.wwav"), &[n as u8; 32]);
+        let receipt = Receipt {
+            remote_id: format!("pur_{n}"),
+            file_name: format!("{title}.wwav"),
+            bytes: 32,
+            sha256: hex::encode(<sha2::Sha256 as sha2::Digest>::digest([n as u8; 32])),
+            json: json!({}),
+        };
+        store
+            .record_purchase(Room::Unquantized, &src, &receipt, &ByExtension)
+            .unwrap();
+    }
     let first = dump(&root);
     let mut rng = StdRng::seed_from_u64(seed);
-    let mut known = Known::default();
     let mut tally = Tally::default();
 
     for step in 0..steps {
+        let mut known = Known::read(&store);
         let room = pick(&mut rng, &ROOMS);
         let roll = rng.gen_range(0..100);
-        if roll < 20 {
-            let undo = roll < 12;
-            let before = journal(&root);
-            let result = if undo { store.undo(room) } else { store.redo(room) };
-            match result {
-                Ok(Some(_)) if undo => {
-                    tally.undos += 1;
-                    only_one_moved(&before, &journal(&root), room, "done", "undone");
+        if roll < 40 {
+            // Several steps in a row, so undone changes pile up across rooms.
+            let undo = roll < 25;
+            for _ in 0..rng.gen_range(1..=4) {
+                let before = journal(&root);
+                let result = if undo {
+                    store.undo(room)
+                } else {
+                    store.redo(room)
+                };
+                match result {
+                    Ok(Some(_)) if undo => {
+                        tally.undos += 1;
+                        only_one_moved(&before, &journal(&root), room, "done", "undone");
+                    }
+                    Ok(Some(_)) => {
+                        tally.redos += 1;
+                        only_one_moved(&before, &journal(&root), room, "undone", "done");
+                    }
+                    Ok(None) => assert_eq!(before, journal(&root)),
+                    Err(Error::Refused(_)) => {
+                        tally.held_back += 1;
+                        assert_eq!(before, journal(&root));
+                    }
+                    Err(e) => panic!("seed {seed} step {step}: {e}"),
                 }
-                Ok(Some(_)) => {
-                    tally.redos += 1;
-                    only_one_moved(&before, &journal(&root), room, "undone", "done");
-                }
-                Ok(None) => assert_eq!(before, journal(&root)),
-                Err(Error::Refused(_)) => {
-                    tally.held_back += 1;
-                    assert_eq!(before, journal(&root));
-                }
-                Err(e) => panic!("seed {seed} step {step}: {e}"),
             }
-        } else if roll < 28 {
+        } else if roll < 46 {
             let bytes: Vec<u8> = (0..rng.gen_range(1..64)).map(|_| rng.gen()).collect();
-            let name = format!("{}.{}", pick(&mut rng, &TITLES), pick(&mut rng, &["wav", "wwav", "png"]));
+            let name = format!(
+                "{}.{}",
+                pick(&mut rng, &TITLES),
+                pick(&mut rng, &["wav", "wwav", "png"])
+            );
             let src = source_file(dir.path(), &name, &bytes);
-            known.clips.push(store.import(room, &src, &ByExtension).unwrap().id);
+            store.import(room, &src, &ByExtension).unwrap();
             tally.commits += 1;
         } else {
             let before = dump(&root);
@@ -207,7 +303,11 @@ fn random_run(seed: u64, steps: usize) -> Tally {
                 Err(Error::Refused(_)) => {
                     drop(tx);
                     tally.refused_edits += 1;
-                    assert_eq!(before, dump(&root), "seed {seed} step {step}: a refused edit left a trace");
+                    assert_eq!(
+                        before,
+                        dump(&root),
+                        "seed {seed} step {step}: a refused edit left a trace"
+                    );
                 }
                 Err(e) => panic!("seed {seed} step {step}: {e}"),
                 Ok(()) => {
@@ -217,9 +317,19 @@ fn random_run(seed: u64, steps: usize) -> Tally {
                         // The newest change always undoes, back to the state before it.
                         let after = dump(&root);
                         assert_eq!(store.undo(room).unwrap().as_deref(), Some(label.as_str()));
-                        assert_eq!(before, dump(&root), "seed {seed} step {step}: undo of {label}");
+                        assert_eq!(
+                            before,
+                            dump(&root),
+                            "seed {seed} step {step}: undo of {label}"
+                        );
                         assert_eq!(store.redo(room).unwrap().as_deref(), Some(label.as_str()));
-                        assert_eq!(after, dump(&root), "seed {seed} step {step}: redo of {label}");
+                        assert_eq!(
+                            after,
+                            dump(&root),
+                            "seed {seed} step {step}: redo of {label}"
+                        );
+                        tally.undos += 1;
+                        tally.redos += 1;
                     }
                 }
             }
@@ -237,31 +347,49 @@ fn random_run(seed: u64, steps: usize) -> Tally {
         .collect();
 
     undo_all(&mut store);
-    assert_eq!(first, dump(&root), "seed {seed}: undo-all must return the first state byte for byte");
-    assert!(journal(&root).values().all(|(_, state)| state == "undone"), "seed {seed}: undo-all left work done");
+    assert_eq!(
+        first,
+        dump(&root),
+        "seed {seed}: undo-all must return the first state byte for byte"
+    );
+    assert!(
+        journal(&root).values().all(|(_, state)| state == "undone"),
+        "seed {seed}: undo-all left work done"
+    );
     search_indexes_agree(&root);
 
     redo_all(&mut store);
-    assert_eq!(last, dump(&root), "seed {seed}: redo-all must return the last state byte for byte");
+    assert_eq!(
+        last,
+        dump(&root),
+        "seed {seed}: redo-all must return the last state byte for byte"
+    );
     search_indexes_agree(&root);
 
     drop(store);
     let store = Store::open(&root).unwrap();
     for (room, labels) in ROOMS.iter().zip(&labels) {
         let h = store.history(*room).unwrap();
-        assert_eq!(&(h.undo_text(), h.redo_text()), labels, "seed {seed}: {room:?} lost its labels on reopening");
+        assert_eq!(
+            &(h.undo_text(), h.redo_text()),
+            labels,
+            "seed {seed}: {room:?} lost its labels on reopening"
+        );
     }
     tally
 }
 
 #[test]
 fn undo_all_returns_the_first_state_and_redo_all_the_last() {
-    for seed in 1..=4 {
+    for seed in 1..=6 {
         let tally = random_run(seed, 1500);
         // The run must actually cross rooms and hit the rules, or it proves nothing.
-        assert!(tally.commits > 800, "seed {seed}: {tally:?}");
+        assert!(tally.commits > 600, "seed {seed}: {tally:?}");
         assert!(tally.refused_edits > 20, "seed {seed}: {tally:?}");
-        assert!(tally.undos > 50 && tally.redos > 20, "seed {seed}: {tally:?}");
+        assert!(
+            tally.undos > 50 && tally.redos > 20,
+            "seed {seed}: {tally:?}"
+        );
         assert!(tally.held_back > 5, "seed {seed}: {tally:?}");
         eprintln!("seed {seed}: {tally:?}");
     }
@@ -297,17 +425,41 @@ fn undo_acts_only_in_its_room() {
     let (dir, mut store) = library();
     let clip = import(&mut store, dir.path(), Room::Library, "Low Tide.wav");
     let mut tx = store.begin(Room::Heat, "add task").unwrap();
-    tx.put_doc("task", "t1", &json!({"title": "mix EP"}), "mix EP").unwrap();
+    tx.put_doc("task", "t1", &json!({"title": "mix EP"}), "mix EP")
+        .unwrap();
     tx.commit().unwrap();
-    rename(&mut store, Room::Console, "rename clip", &clip, "Low Tide v2");
+    rename(
+        &mut store,
+        Room::Console,
+        "rename clip",
+        &clip,
+        "Low Tide v2",
+    );
 
-    assert_eq!(store.undo(Room::Space).unwrap(), None, "Space has nothing of its own to undo");
+    assert_eq!(
+        store.undo(Room::Space).unwrap(),
+        None,
+        "Space has nothing of its own to undo"
+    );
     assert_eq!(store.undo(Room::Heat).unwrap().as_deref(), Some("add task"));
     assert!(store.doc("task", "t1").unwrap().is_none());
-    assert_eq!(title(&store, &clip), "Low Tide v2", "⌘Z in Heat must not touch the Console's rename");
-    assert_eq!(store.history(Room::Console).unwrap().undo_text(), "Undo rename clip");
-    assert_eq!(store.history(Room::Heat).unwrap().undo_text(), "Nothing to undo.");
-    assert_eq!(store.history(Room::Heat).unwrap().redo_text(), "Redo add task");
+    assert_eq!(
+        title(&store, &clip),
+        "Low Tide v2",
+        "⌘Z in Heat must not touch the Console's rename"
+    );
+    assert_eq!(
+        store.history(Room::Console).unwrap().undo_text(),
+        "Undo rename clip"
+    );
+    assert_eq!(
+        store.history(Room::Heat).unwrap().undo_text(),
+        "Nothing to undo."
+    );
+    assert_eq!(
+        store.history(Room::Heat).unwrap().redo_text(),
+        "Redo add task"
+    );
 }
 
 #[test]
@@ -325,7 +477,10 @@ fn undo_waits_for_a_later_change_to_the_same_thing_in_another_room() {
     }
     assert_eq!(title(&store, &clip), "B");
     assert_eq!(store.undo(Room::Space).unwrap().as_deref(), Some("retitle"));
-    assert_eq!(store.undo(Room::Library).unwrap().as_deref(), Some("rename clip"));
+    assert_eq!(
+        store.undo(Room::Library).unwrap().as_deref(),
+        Some("rename clip")
+    );
     assert_eq!(title(&store, &clip), "break");
 
     // Different values of the same clip don't hold each other back.
@@ -333,7 +488,10 @@ fn undo_waits_for_a_later_change_to_the_same_thing_in_another_room() {
     tx.set_colour(&clip, Some(Colour::Green)).unwrap();
     tx.commit().unwrap();
     rename(&mut store, Room::Space, "retitle", &clip, "C");
-    assert_eq!(store.undo(Room::Library).unwrap().as_deref(), Some("colour clip"));
+    assert_eq!(
+        store.undo(Room::Library).unwrap().as_deref(),
+        Some("colour clip")
+    );
     assert_eq!(store.clip(&clip).unwrap().unwrap().colour, None);
     assert_eq!(title(&store, &clip), "C");
 }
@@ -357,7 +515,8 @@ fn a_new_edit_discards_the_rooms_redo_branch() {
     let (dir, mut store) = library();
     let put = |store: &mut Store, room: Room, label: &str, key: &str| {
         let mut tx = store.begin(room, label).unwrap();
-        tx.put_doc("task", key, &json!({"title": label}), label).unwrap();
+        tx.put_doc("task", key, &json!({"title": label}), label)
+            .unwrap();
         tx.commit().unwrap();
     };
     put(&mut store, Room::Heat, "add a", "a");
@@ -365,21 +524,61 @@ fn a_new_edit_discards_the_rooms_redo_branch() {
     store.undo(Room::Heat).unwrap();
     assert_eq!(store.history(Room::Heat).unwrap().redo_text(), "Redo add b");
     put(&mut store, Room::Heat, "add c", "c");
-    assert_eq!(store.history(Room::Heat).unwrap().redo_text(), "Nothing to redo.");
+    assert_eq!(
+        store.history(Room::Heat).unwrap().redo_text(),
+        "Nothing to redo."
+    );
     assert!(store.doc("task", "b").unwrap().is_none());
 
     // Another room's redo survives an edit elsewhere...
     put(&mut store, Room::Console, "add d", "d");
     store.undo(Room::Console).unwrap();
     put(&mut store, Room::Heat, "add e", "e");
-    assert_eq!(store.history(Room::Console).unwrap().redo_text(), "Redo add d");
+    assert_eq!(
+        store.history(Room::Console).unwrap().redo_text(),
+        "Redo add d"
+    );
 
     // ...unless the edit changed the same value, which it could no longer redo onto.
     let clip = import(&mut store, dir.path(), Room::Library, "untitled.wav");
     rename(&mut store, Room::Space, "retitle", &clip, "X");
     store.undo(Room::Space).unwrap();
     rename(&mut store, Room::Library, "rename clip", &clip, "Y");
-    assert_eq!(store.history(Room::Space).unwrap().redo_text(), "Nothing to redo.");
+    assert_eq!(
+        store.history(Room::Space).unwrap().redo_text(),
+        "Nothing to redo."
+    );
+}
+
+#[test]
+fn a_discarded_change_takes_the_undone_changes_built_on_it() {
+    let (dir, mut store) = library();
+    let clip = import(&mut store, dir.path(), Room::Library, "orig.wav");
+    rename(&mut store, Room::Library, "rename clip", &clip, "v");
+    rename(&mut store, Room::Space, "retitle", &clip, "w"); // made over "v"
+    store.undo(Room::Space).unwrap();
+    store.undo(Room::Library).unwrap();
+    assert_eq!(title(&store, &clip), "orig");
+
+    // A new edit in the library ends its redo branch: "rename clip" is gone,
+    // so "retitle", which was made over it, can't be redone either.
+    let mut tx = store.begin(Room::Library, "colour clip").unwrap();
+    tx.set_colour(&clip, Some(Colour::Blue)).unwrap();
+    tx.commit().unwrap();
+    assert_eq!(
+        store.history(Room::Library).unwrap().redo_text(),
+        "Nothing to redo."
+    );
+    assert_eq!(
+        store.history(Room::Space).unwrap().redo_text(),
+        "Nothing to redo."
+    );
+    redo_all(&mut store);
+    assert_eq!(
+        title(&store, &clip),
+        "orig",
+        "nothing redoes onto a change that is gone"
+    );
 }
 
 #[test]
@@ -387,12 +586,24 @@ fn labels_survive_reopening() {
     let (dir, mut store) = library();
     let root = store.root().to_path_buf();
     let clip = import(&mut store, dir.path(), Room::Console, "World Ending.wav");
-    rename(&mut store, Room::Console, "move clip", &clip, "World Ending (edit)");
+    rename(
+        &mut store,
+        Room::Console,
+        "move clip",
+        &clip,
+        "World Ending (edit)",
+    );
     drop(store);
 
     let mut store = Store::open(&root).unwrap();
-    assert_eq!(store.history(Room::Console).unwrap().undo_text(), "Undo move clip");
-    assert_eq!(store.undo(Room::Console).unwrap().as_deref(), Some("move clip"));
+    assert_eq!(
+        store.history(Room::Console).unwrap().undo_text(),
+        "Undo move clip"
+    );
+    assert_eq!(
+        store.undo(Room::Console).unwrap().as_deref(),
+        Some("move clip")
+    );
     drop(store);
 
     let store = Store::open(&root).unwrap();
@@ -411,7 +622,7 @@ fn publishing_undoes_only_while_queued() {
         tx.commit().unwrap();
     };
     publish(&mut store);
-    assert_eq!(ids(&store.upload_queue().unwrap()), [clip.clone()]);
+    assert_eq!(ids(&store.upload_queue().unwrap()), [clip.as_str()]);
     assert!(store.clip(&clip).unwrap().unwrap().is_queued());
 
     // Undo while queued cancels the upload: the queue loses it, with no queue to edit.
@@ -440,19 +651,34 @@ fn publishing_undoes_only_while_queued() {
 fn work_that_left_the_machine_is_not_undone() {
     let (dir, mut store) = library();
     let mut tx = store.begin(Room::Unquantized, "save for later").unwrap();
-    tx.put_doc("saved", "rec-1", &json!({"record": "rec-1"}), "").unwrap();
+    tx.put_doc("saved", "rec-1", &json!({"record": "rec-1"}), "")
+        .unwrap();
     tx.commit().unwrap();
     let journal_before = journal(store.root());
 
-    store.record_outward(Room::Unquantized, "a purchase").unwrap();
-    assert_eq!(journal(store.root()), journal_before, "a purchase is never a journal entry");
-    assert_eq!(store.history(Room::Unquantized).unwrap().undo_text(), "Can't undo a purchase.");
-    assert!(matches!(store.undo(Room::Unquantized), Err(Error::Refused(s)) if s == "Can't undo a purchase."));
+    store
+        .record_outward(Room::Unquantized, "a purchase")
+        .unwrap();
+    assert_eq!(
+        journal(store.root()),
+        journal_before,
+        "a purchase is never a journal entry"
+    );
+    assert_eq!(
+        store.history(Room::Unquantized).unwrap().undo_text(),
+        "Can't undo a purchase."
+    );
+    assert!(
+        matches!(store.undo(Room::Unquantized), Err(Error::Refused(s)) if s == "Can't undo a purchase.")
+    );
     assert!(store.doc("saved", "rec-1").unwrap().is_some());
 
     // Other rooms carry on.
     let clip = import(&mut store, dir.path(), Room::Library, "a.wav");
-    assert_eq!(store.history(Room::Library).unwrap().undo_text(), "Undo import 'a'");
+    assert_eq!(
+        store.history(Room::Library).unwrap().undo_text(),
+        "Undo import 'a'"
+    );
     assert!(store.undo(Room::Library).unwrap().is_some());
     assert!(store.clip(&clip).unwrap().is_none());
 }
@@ -461,12 +687,23 @@ fn work_that_left_the_machine_is_not_undone() {
 fn no_table_cascades() {
     let (_dir, store) = library();
     let conn = rusqlite::Connection::open(store.root().join("library.sqlite")).unwrap();
-    let mut stmt = conn.prepare("SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL").unwrap();
-    let schema: Vec<(String, String)> =
-        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().map(Result::unwrap).collect();
-    assert!(schema.iter().any(|(_, sql)| sql.contains("REFERENCES")), "the test needs foreign keys to look at");
+    let mut stmt = conn
+        .prepare("SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL")
+        .unwrap();
+    let schema: Vec<(String, String)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+    assert!(
+        schema.iter().any(|(_, sql)| sql.contains("REFERENCES")),
+        "the test needs foreign keys to look at"
+    );
     for (name, sql) in &schema {
-        assert!(!sql.to_uppercase().contains("CASCADE"), "{name} cascades: {sql}");
+        assert!(
+            !sql.to_uppercase().contains("CASCADE"),
+            "{name} cascades: {sql}"
+        );
     }
 }
 
