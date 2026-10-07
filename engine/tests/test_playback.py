@@ -6,8 +6,10 @@ uses another clock than the reader's monotonic one; the meters don't show
 each stem on its own bus; a mute or solo isn't heard within one block of the
 command's arrival (the block after it fades, PRANA's one-block ramp, and
 every block after that is silent); a reader ever sees a torn clock; a
-session.load that fails changes what plays; a feature of a later stage is
-silently ignored instead of refused as "unsupported".
+session.load during playback stops it, moves the playhead or plays a block
+of the old graph after it has answered; a session.load that fails changes
+what plays; a feature of a later stage is silently ignored instead of
+refused as "unsupported".
 """
 import math
 import os
@@ -238,6 +240,28 @@ class Playback(unittest.TestCase):
         with self.assertRaises(EngineError) as e:
             self.c.call("transport.loop", {"on": True, "start": end, "end": start})
         self.assertEqual(e.exception.code, "bad_args")
+
+    def test_a_load_while_playing_swaps_without_stopping(self):
+        self.play()
+        self.c.events.clear()
+        before = self.shm.clock()
+        graph = stem_session(self.path, self.frames)
+        graph["tracks"][0]["gain_db"] = -20 * math.log10(2)
+        r = self.c.call("session.load", {"graph": graph, "off": []})  # no playhead: keep it
+        self.assertEqual(r["nodes"], 9)
+        k = self.shm.clock()["callbacks"]
+        self.shm.wait_callbacks(3)
+        after = self.shm.clock()
+        self.assertEqual(after["state"], 1)
+        self.assertGreater(after["sample_pos"], before["sample_pos"])
+        entries = self.shm.meters_since(k)
+        # session.load answers once the swap is done, so every block after its answer plays the
+        # new graph: vocals at half, the rest as they were.
+        for e in entries:
+            self.assertAlmostEqual(self.level(e, BUS["vocals"])[0], AMP["vocals"] / 2, delta=0.003)
+            self.assertAlmostEqual(self.level(e, BUS["bass"])[0], AMP["bass"], delta=0.003)
+        self.assertEqual([e["callback"] for e in entries], list(range(k + 1, k + 1 + len(entries))))
+        self.assertEqual([e for e in self.c.events if e["ev"] == "transport" and e["state"] == "stopped"], [])
 
     def test_unload(self):
         self.play()
