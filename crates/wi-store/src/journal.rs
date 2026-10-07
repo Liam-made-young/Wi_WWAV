@@ -32,8 +32,14 @@
 //! Work that left the machine is never a journal entry. Publishing is
 //! journaled (it only sets `published_at`), but once the server has the work
 //! (`remote_id` is set), the undo that would clear `published_at` is refused:
-//! "Can't undo a publish. Unpublish 'World Ending'…". A purchase is recorded
-//! as an outward act, and the room's Edit menu reads "Can't undo a purchase."
+//! "Can't undo a publish. Unpublish 'World Ending'…". `remote_id` is written
+//! only by the server's acknowledgement, which also writes it into every
+//! snapshot of the clip, so no undo or redo ever takes it back. A purchase is
+//! recorded as an outward act, and the room's Edit menu reads "Can't undo a
+//! purchase." until a change is made, or redone, on top of it.
+//!
+//! Snapshots are JSON text, and serde_json is built with `float_roundtrip`,
+//! so a REAL (a measured BPM) comes back as the same f64, bit for bit.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -452,6 +458,7 @@ impl<'s> Txn<'s> {
                 )?
                 .execute(params![id, seq, tbl, row_id, snapshot(before), snapshot(after)])?;
         }
+        crate::clips::drop_stale_parts(&self.tx)?;
         self.tx.commit()?;
         Ok(Some(id))
     }
@@ -510,10 +517,13 @@ fn discard_redo(conn: &Connection, room: Room, mine: &BTreeMap<Target, Touch>) -
     Ok(())
 }
 
+/// Notes work that left the machine, with the room's newest done change: ⌘Z
+/// there is held until a change is made, or redone, on top of it.
 pub(crate) fn record_outward(conn: &Connection, room: Room, what: &str) -> Result<()> {
+    let after = first(conn, room, "done", true)?.map(|e| e.id);
     conn.execute(
-        "INSERT INTO outward (id, room, what) VALUES (?1, ?2, ?3)",
-        params![fresh_id(conn)?, room.as_str(), what],
+        "INSERT INTO outward (id, room, what, after_txn) VALUES (?1, ?2, ?3, ?4)",
+        params![fresh_id(conn)?, room.as_str(), what, after],
     )?;
     Ok(())
 }
@@ -583,15 +593,21 @@ fn first(conn: &Connection, room: Room, state: &str, newest: bool) -> Result<Opt
 
 fn next_undo(conn: &Connection, room: Room) -> Result<Next> {
     let newest = first(conn, room, "done", true)?;
-    let outward: Option<(String, String)> = conn
+    let outward: Option<(Option<String>, String)> = conn
         .query_row(
-            "SELECT id, what FROM outward WHERE room = ?1 ORDER BY id DESC LIMIT 1",
+            "SELECT after_txn, what FROM outward WHERE room = ?1 ORDER BY id DESC LIMIT 1",
             [room.as_str()],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()?;
-    if let Some((at, what)) = outward {
-        if newest.as_ref().map_or(true, |e| at > e.id) {
+    if let Some((after, what)) = outward {
+        // Held while the newest done change is still one made before it.
+        let held = match (&newest, &after) {
+            (None, _) => true,
+            (Some(e), Some(after)) => e.id <= *after,
+            (Some(_), None) => false,
+        };
+        if held {
             return Ok(Next::Held(format!("Can't undo {what}.")));
         }
     }
@@ -625,30 +641,84 @@ fn next_redo(conn: &Connection, room: Room) -> Result<Next> {
     Ok(Next::Ready(entry))
 }
 
-/// The title of a clip the server has whose `published_at` this undo would
-/// change: publishing is undoable only while the upload is queued.
+/// The title of a clip the server has whose publish this undo would take
+/// back: the entry itself set `published_at` on the clip. Publishing is
+/// undoable only while the upload is queued. A change the entry made to the
+/// clip otherwise (a rename, a tag, its import) publishes nothing, so it isn't
+/// refused here; if it can't come back before the publish, rule 1 holds it.
 fn unpublishes_what_the_server_has(conn: &Connection, entry: &Entry) -> Result<Option<String>> {
     let mut stmt = conn.prepare_cached(
-        "SELECT row_id, before FROM txn_row WHERE txn_id = ?1 AND tbl = 'clips' ORDER BY seq DESC",
+        "SELECT row_id, before, after FROM txn_row WHERE txn_id = ?1 AND tbl = 'clips' ORDER BY seq",
     )?;
-    // Walking back, the last snapshot seen for a row is how it was before the change.
-    let mut was: BTreeMap<String, Option<Row>> = BTreeMap::new();
-    for r in stmt.query_map([&entry.id], |r| {
-        Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
-    })? {
-        let (row_id, before) = r?;
-        was.insert(row_id, parse(before)?);
+    let published = |row: Option<Row>| {
+        row.and_then(|mut r| r.remove("published_at"))
+            .unwrap_or(Value::Null)
+    };
+    // Each row's published_at before the entry (its first `before`) and after
+    // it (its last `after`).
+    let mut span: BTreeMap<String, (Value, Value)> = BTreeMap::new();
+    let found = stmt.query_map([&entry.id], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, Option<String>>(1)?,
+            r.get::<_, Option<String>>(2)?,
+        ))
+    })?;
+    for r in found {
+        let (row_id, before, after) = r?;
+        let after = published(parse(after)?);
+        match span.get_mut(&row_id) {
+            Some((_, last)) => *last = after,
+            None => {
+                span.insert(row_id, (published(parse(before)?), after));
+            }
+        }
     }
-    for (row_id, before) in was {
-        let Some(now) = read_row(conn, "clips", &row_id)? else {
+    for (row_id, (then, set)) in span {
+        if then == set {
             continue;
+        }
+        let Some(now) = read_row(conn, "clips", &row_id)? else {
+            continue; // the entry removed the clip: undo restores it as it was
         };
-        let then = before.as_ref().map_or(&Value::Null, |b| &b["published_at"]);
-        if !now["remote_id"].is_null() && &now["published_at"] != then {
-            return Ok(Some(now["title"].as_str().unwrap_or_default().to_string()));
+        if !now.get("remote_id").map_or(true, Value::is_null) {
+            let title = now.get("title").and_then(Value::as_str).unwrap_or_default();
+            return Ok(Some(title.to_string()));
         }
     }
     Ok(None)
+}
+
+/// The server has the clip: every journal snapshot of its row now says so,
+/// so no undo or redo (of its delete, say) can write back a `remote_id` from
+/// before, put the clip back in the queue, or make its publish undoable.
+pub(crate) fn acknowledge(conn: &Connection, clip_id: &str, remote_id: &str) -> Result<()> {
+    let snapshots = conn
+        .prepare_cached(
+            "SELECT txn_id, seq, before, after FROM txn_row WHERE tbl = 'clips' AND row_id = ?1",
+        )?
+        .query_map([clip_id], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, Option<String>>(3)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let stamp = |snapshot: Option<String>| -> Result<Option<String>> {
+        Ok(parse(snapshot)?.map(|mut row| {
+            row.insert("remote_id".into(), remote_id.into());
+            Value::Object(row).to_string()
+        }))
+    };
+    let mut update = conn.prepare_cached(
+        "UPDATE txn_row SET before = ?3, after = ?4 WHERE txn_id = ?1 AND seq = ?2",
+    )?;
+    for (txn, seq, before, after) in snapshots {
+        update.execute(params![txn, seq, stamp(before)?, stamp(after)?])?;
+    }
+    Ok(())
 }
 
 pub(crate) fn history(conn: &Connection, room: Room) -> Result<History> {
@@ -683,6 +753,7 @@ fn step(conn: &mut Connection, room: Room, back: bool) -> Result<Option<String>>
         "UPDATE txn SET state = ?1 WHERE id = ?2",
         params![if back { "undone" } else { "done" }, entry.id],
     )?;
+    crate::clips::drop_stale_parts(&tx)?;
     tx.commit()?;
     Ok(Some(entry.label))
 }

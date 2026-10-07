@@ -80,6 +80,25 @@ fn pick<T: Copy>(rng: &mut StdRng, from: &[T]) -> T {
     from[rng.gen_range(0..from.len())]
 }
 
+/// A BPM as a reader measures it: any f64, most of which take all 17
+/// significant digits to write down (121.60764625443461), so the journal's
+/// JSON must carry them exactly.
+fn measured(rng: &mut StdRng) -> f64 {
+    rng.gen_range(40.0..250.0)
+}
+
+/// [`ByExtension`], with a measured BPM.
+struct Measured(f64);
+
+impl Inspector for Measured {
+    fn inspect(&self, path: &std::path::Path) -> Result<Inspection> {
+        Ok(Inspection {
+            bpm: Some(self.0),
+            ..ByExtension.inspect(path)?
+        })
+    }
+}
+
 fn tag_kind(rng: &mut StdRng) -> TagKind {
     pick(
         rng,
@@ -105,10 +124,13 @@ fn random_edit(tx: &mut Txn, rng: &mut StdRng, known: &mut Known) -> Result<()> 
             );
             tx.set_colour(&clip, colour)
         }
-        3 => tx.set_bpm(
-            &clip,
-            pick(rng, &[None, Some(86.0), Some(128.0), Some(130.5)]),
-        ),
+        3 => {
+            let bpm = match rng.gen_range(0..5) {
+                4 => Some(measured(rng)),
+                n => [None, Some(86.0), Some(128.0), Some(130.5)][n],
+            };
+            tx.set_bpm(&clip, bpm)
+        }
         4 => tx.set_key(&clip, pick(rng, &[None, Some("A minor"), Some("C major")])),
         5 | 6 => tx.add_tag(&clip, pick(rng, &TAGS), tag_kind(rng)),
         7 => tx.remove_tag(&clip, pick(rng, &TAGS), tag_kind(rng)),
@@ -165,12 +187,14 @@ fn random_edit(tx: &mut Txn, rng: &mut StdRng, known: &mut Known) -> Result<()> 
         _ => {
             // A render: a new clip that points back at its sequence.
             let id = wwav_ids::ulid();
+            let bpm = rng.gen_bool(0.5).then(|| measured(rng));
             let render = NewClip {
                 file: format!("media/{id}.wwav"),
                 id,
                 sha256: "0".repeat(64),
                 bytes: 44,
                 info: Inspection {
+                    bpm,
                     key: Some(pick(rng, &KEYS).to_string()),
                     verdict: "4 stems, and the master".to_string(),
                     ..Inspection::new(Kind::Wwav, pick(rng, &TITLES))
@@ -228,8 +252,10 @@ struct Tally {
 fn random_run(seed: u64, steps: usize) -> Tally {
     let (dir, mut store) = library();
     let root = store.root().to_path_buf();
+    let mut rng = StdRng::seed_from_u64(seed);
     // The first state already holds clips, bought, so no undo removes them:
-    // every value the run changes on them must come back exactly.
+    // every value the run changes on them, a measured BPM among them, must
+    // come back exactly.
     for (n, title) in TITLES.iter().enumerate() {
         let src = source_file(dir.path(), &format!("{title}.wwav"), &[n as u8; 32]);
         let receipt = Receipt {
@@ -239,12 +265,12 @@ fn random_run(seed: u64, steps: usize) -> Tally {
             sha256: hex::encode(<sha2::Sha256 as sha2::Digest>::digest([n as u8; 32])),
             json: json!({}),
         };
+        let bpm = measured(&mut rng);
         store
-            .record_purchase(Room::Unquantized, &src, &receipt, &ByExtension)
+            .record_purchase(Room::Unquantized, &src, &receipt, &Measured(bpm))
             .unwrap();
     }
     let first = dump(&root);
-    let mut rng = StdRng::seed_from_u64(seed);
     let mut tally = Tally::default();
 
     for step in 0..steps {
@@ -286,7 +312,8 @@ fn random_run(seed: u64, steps: usize) -> Tally {
                 pick(&mut rng, &["wav", "wwav", "png"])
             );
             let src = source_file(dir.path(), &name, &bytes);
-            store.import(room, &src, &ByExtension).unwrap();
+            let bpm = measured(&mut rng);
+            store.import(room, &src, &Measured(bpm)).unwrap();
             tally.commits += 1;
         } else {
             let before = dump(&root);
@@ -645,6 +672,42 @@ fn publishing_undoes_only_while_queued() {
     let still = store.clip(&clip).unwrap().unwrap();
     assert!(still.published_at.is_some());
     assert_eq!(still.remote_id.as_deref(), Some("trk_42"));
+}
+
+#[test]
+fn an_import_the_server_has_waits_on_its_publish() {
+    let (dir, mut store) = library();
+    let clip = import(&mut store, dir.path(), Room::Library, "World Ending.wav");
+    let mut tx = store.begin(Room::Space, "publish 'World Ending'").unwrap();
+    tx.publish(&clip).unwrap();
+    tx.commit().unwrap();
+    assert!(store.mark_uploaded(&clip, "trk_1").unwrap());
+    // The import published nothing; the publish it waits on can't be undone.
+    assert_eq!(
+        store.history(Room::Library).unwrap().undo_text(),
+        "Can't undo import 'World Ending' yet. Undo publish 'World Ending' in Space first."
+    );
+    assert_eq!(
+        store.history(Room::Space).unwrap().undo_text(),
+        "Can't undo a publish. Unpublish 'World Ending'…"
+    );
+
+    // One change that both brought a clip in and published it is a publish.
+    let src = source_file(dir.path(), "Low Tide.wav", b"Low Tide");
+    let new = store.bring_in(&src, &ByExtension).unwrap();
+    let mut tx = store.begin(Room::Space, "drop 'Low Tide'").unwrap();
+    let low = tx.add_clip(new).unwrap();
+    tx.publish(&low).unwrap();
+    tx.commit().unwrap();
+    assert_eq!(
+        store.history(Room::Space).unwrap().undo_text(),
+        "Undo drop 'Low Tide'"
+    );
+    assert!(store.mark_uploaded(&low, "trk_2").unwrap());
+    let held = "Can't undo a publish. Unpublish 'Low Tide'…";
+    assert_eq!(store.history(Room::Space).unwrap().undo_text(), held);
+    assert!(matches!(store.undo(Room::Space), Err(Error::Refused(s)) if s == held));
+    assert!(store.clip(&low).unwrap().unwrap().is_up());
 }
 
 #[test]

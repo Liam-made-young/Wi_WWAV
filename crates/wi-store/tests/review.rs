@@ -1,7 +1,6 @@
 //! An independent reviewer's adversarial tests for wi-store (docs/PLAN.md F5,
-//! S1.7 store side, S1.8, S1.9 query half). Tests that expose a real defect
-//! are kept `#[ignore]`d with the finding named, so the suite stays green
-//! until the builder fixes them; `cargo test -p wi-store -- --ignored` runs them.
+//! S1.7 store side, S1.8, S1.9 query half). Each test that exposed a defect
+//! names its finding; all of them are fixed and run with the rest.
 
 mod common;
 
@@ -30,7 +29,6 @@ fn edit(store: &mut Store, room: Room, label: &str, f: impl FnOnce(&mut Txn) -> 
 /// its publish becomes undoable again: "work that has left the machine can't
 /// be undone" (2.7, 9.6) no longer holds.
 #[test]
-#[ignore = "defect: undo of a delete restores a stale remote_id (review finding 1)"]
 fn a_clip_the_server_has_stays_up_through_undo_and_redo_of_its_delete() {
     let (dir, mut store) = library();
     let clip = import(&mut store, dir.path(), Room::Library, "World Ending.wav");
@@ -79,7 +77,6 @@ fn a_clip_the_server_has_stays_up_through_undo_and_redo_of_its_delete() {
 /// when the clip had none). The journal stays exact, but the edit is neither
 /// kept nor refused with a sentence.
 #[test]
-#[ignore = "defect: a non-finite BPM is silently stored as no BPM (review finding)"]
 fn a_non_finite_bpm_is_kept_or_refused_never_silently_cleared() {
     let (dir, mut store) = library();
     let clip = import(&mut store, dir.path(), Room::Library, "Low Tide.wav");
@@ -251,7 +248,6 @@ fn contended_run(seed: u64, steps: usize) -> (usize, usize, usize) {
 }
 
 #[test]
-#[ignore = "defect: undoing an unpin can pin a deleted clip (review finding); the per-step invariant catches it at seed 105"]
 fn a_contended_random_run_undoes_to_the_first_state_and_redoes_to_the_last() {
     let seeds: u64 = std::env::var("REVIEW_SEEDS")
         .ok()
@@ -432,7 +428,6 @@ fn nothing_typed_into_search_is_an_error() {
 /// kept, so publishing again "resumes" an upload that was cancelled and skips
 /// parts the new upload never sent.
 #[test]
-#[ignore = "gap: a cancelled upload's parts survive into the next publish (review finding)"]
 fn a_cancelled_upload_leaves_no_parts_for_the_next_publish_to_skip() {
     let (dir, mut store) = library();
     let clip = import(&mut store, dir.path(), Room::Library, "World Ending.wav");
@@ -545,7 +540,6 @@ fn a_fifth_pin_never_fits_through_undo_and_redo_across_rooms() {
 /// Finding (low): a NUL in what was typed (a paste) reaches FTS5 inside the
 /// quoted query, which ends the string there: "unterminated string".
 #[test]
-#[ignore = "defect: a NUL in the search text is an SQLite error (review finding)"]
 fn a_nul_in_the_search_text_is_not_an_error() {
     let (dir, mut store) = library();
     import(&mut store, dir.path(), Room::Library, "Low Tide.wav");
@@ -558,7 +552,6 @@ fn a_nul_in_the_search_text_is_not_an_error() {
 /// The consequence of finding 1: after the redo/undo of a delete, the publish
 /// of a clip the server has can be undone, and the Edit menu offers it.
 #[test]
-#[ignore = "defect: undo of a delete restores a stale remote_id (review finding 1)"]
 fn a_publish_the_server_has_is_never_undone() {
     let (dir, mut store) = library();
     let clip = import(&mut store, dir.path(), Room::Library, "World Ending.wav");
@@ -583,7 +576,6 @@ fn a_publish_the_server_has_is_never_undone() {
 /// A random run where uploads land at random moments: once the server has a
 /// clip, every later state that holds the clip must say so.
 #[test]
-#[ignore = "defect: undo of a delete restores a stale remote_id (review finding 1)"]
 fn a_clip_the_server_acknowledged_never_forgets_it_in_a_random_run() {
     for seed in 0..20u64 {
         let (dir, mut store) = library();
@@ -644,7 +636,6 @@ fn a_clip_the_server_acknowledged_never_forgets_it_in_a_random_run() {
 /// older change, but ⌘Z right after it reads "Can't undo a purchase." instead
 /// of undoing the redo just made.
 #[test]
-#[ignore = "defect: a redo made after a purchase can't be undone (review finding)"]
 fn a_redo_made_after_a_purchase_undoes() {
     let (_dir, mut store) = library();
     edit(&mut store, Room::Unquantized, "save for later", |tx| {
@@ -670,7 +661,6 @@ fn a_redo_made_after_a_purchase_undoes() {
 /// is refused once the server has the clip, with the publish sentence, though
 /// that change published nothing. It then blocks that room's whole history.
 #[test]
-#[ignore = "defect: an edit made before a publish is refused as a publish (review finding)"]
 fn an_edit_made_before_the_publish_still_undoes_after_the_upload() {
     let (dir, mut store) = library();
     let clip = import(&mut store, dir.path(), Room::Library, "Low Tide.wav");
@@ -704,7 +694,6 @@ fn an_edit_made_before_the_publish_still_undoes_after_the_upload() {
 /// leans on it), so after another room deletes that clip, ⌘Z of the unpin
 /// pins a clip that isn't in the library: a slot names nothing.
 #[test]
-#[ignore = "defect: undoing an unpin can pin a deleted clip (review finding)"]
 fn undoing_an_unpin_never_pins_a_clip_another_room_deleted() {
     let (dir, mut store) = library();
     let clip = import(&mut store, dir.path(), Room::Library, "Low Tide.wav");
@@ -732,7 +721,6 @@ fn undoing_an_unpin_never_pins_a_clip_another_room_deleted() {
 
 /// The same for a smart folder.
 #[test]
-#[ignore = "defect: undoing an unpin can pin a deleted smart folder (review finding)"]
 fn undoing_an_unpin_never_pins_a_folder_another_room_deleted() {
     let (_dir, mut store) = library();
     let mut tx = store.begin(Room::Library, "new smart folder").unwrap();
@@ -771,7 +759,6 @@ fn undoing_an_unpin_never_pins_a_folder_another_room_deleted() {
 /// Clean up press in between moves it to the trash, and `add_clip` then
 /// records a clip whose file isn't there; emptying the trash loses the sound.
 #[test]
-#[ignore = "defect: clean-up can trash a file between bring_in and add_clip (review finding)"]
 fn clean_up_never_takes_a_file_that_is_about_to_be_recorded() {
     let (dir, mut store) = library();
     let src = source_file(dir.path(), "Low Tide.wav", b"RIFF....WAVE");
@@ -795,7 +782,6 @@ fn clean_up_never_takes_a_file_that_is_about_to_be_recorded() {
 /// Finding (low): a backup dated before the seven kept is written and then
 /// pruned at once, and the path returned names a file that isn't there.
 #[test]
-#[ignore = "defect: backup returns a pruned path (review finding)"]
 fn the_path_a_backup_returns_exists() {
     let (dir, store) = library();
     let backups = dir.path().join("backups");
@@ -806,4 +792,104 @@ fn the_path_a_backup_returns_exists() {
     }
     let path = store.backup(&backups, "2026-09-30").unwrap(); // the clock stepped back
     assert!(path.exists(), "{} was returned but pruned", path.display());
+}
+
+// --- F5: values the journal can't carry exactly -------------------------------
+
+/// A BPM a reader measured, such as 121.60764625443461. One f64 in six from
+/// 40 to 250 doesn't survive serde_json's default parsing (the workspace
+/// doesn't enable `float_roundtrip`), so the snapshot written back is a
+/// different number.
+const MEASURED_BPM: f64 = 121.607_646_254_434_61;
+
+fn measured_clip(store: &mut Store) -> String {
+    let id = wwav_ids::ulid();
+    let clip = NewClip {
+        file: format!("media/{id}.wwav"),
+        id,
+        sha256: "0".repeat(64),
+        bytes: 1,
+        info: Inspection {
+            bpm: Some(MEASURED_BPM),
+            ..Inspection::new(Kind::Wwav, "Low Tide")
+        },
+        from_sequence: None,
+    };
+    let mut tx = store.begin(Room::Library, "import 'Low Tide'").unwrap();
+    let id = tx.add_clip(clip).unwrap();
+    tx.commit().unwrap();
+    id
+}
+
+/// Finding (F5): undo writes back `before` parsed from JSON text, and
+/// serde_json's default float parsing is not exact, so a measured BPM comes
+/// back one ulp off: undo-all does not return the first state byte for byte.
+#[test]
+fn undo_puts_a_measured_bpm_back_bit_for_bit() {
+    let (_dir, mut store) = library();
+    let root = store.root().to_path_buf();
+    let clip = measured_clip(&mut store);
+    let first = dump(&root);
+    edit(&mut store, Room::Console, "set bpm", |tx| {
+        tx.set_bpm(&clip, Some(128.0))
+    });
+    assert_eq!(
+        store.undo(Room::Console).unwrap().as_deref(),
+        Some("set bpm")
+    );
+    assert_eq!(
+        store.clip(&clip).unwrap().unwrap().bpm.map(f64::to_bits),
+        Some(MEASURED_BPM.to_bits()),
+        "undo must put the measured BPM back exactly"
+    );
+    assert_eq!(first, dump(&root), "undo-all must return the first state");
+}
+
+/// The same through a delete: undo of a delete re-inserts the snapshot, and
+/// redo of an import inserts its `after`, each parsed from text.
+#[test]
+fn undo_of_a_delete_and_redo_of_an_import_keep_a_measured_bpm() {
+    let (_dir, mut store) = library();
+    let root = store.root().to_path_buf();
+    let clip = measured_clip(&mut store);
+    let last = dump(&root);
+    edit(&mut store, Room::Space, "delete clip", |tx| {
+        tx.delete_clip(&clip)
+    });
+    store.undo(Room::Space).unwrap();
+    assert_eq!(last, dump(&root), "undo of the delete");
+    store.undo(Room::Library).unwrap();
+    store.redo(Room::Library).unwrap();
+    assert_eq!(last, dump(&root), "redo-all must return the last state");
+}
+
+// --- opening -------------------------------------------------------------------
+
+/// Finding (medium): `migrate` reads `user_version` outside the transaction
+/// that runs the migration, so two handles opening a new library at once (the
+/// app and its uploader thread on first launch) both run V1, and the second
+/// fails: "table sequences already exists". A later data migration would run
+/// twice.
+#[test]
+fn two_handles_can_open_a_new_library_at_once() {
+    use std::sync::{Arc, Barrier};
+    for _ in 0..20 {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("Wi_WWAV");
+        let start = Arc::new(Barrier::new(2));
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let (root, start) = (root.clone(), start.clone());
+                std::thread::spawn(move || {
+                    start.wait();
+                    Store::open(&root).map(drop).map_err(|e| e.to_string())
+                })
+            })
+            .collect();
+        for h in handles {
+            if let Err(e) = h.join().unwrap() {
+                panic!("a second handle opening a new library failed: {e}");
+            }
+        }
+    }
 }

@@ -23,9 +23,9 @@ mod records;
 mod schema;
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, ErrorCode};
 
 pub use clips::{
     ByExtension, Clip, Colour, Inspection, Inspector, Kind, NewClip, Placement, UPLOAD_QUEUE,
@@ -103,6 +103,27 @@ impl Room {
     }
 }
 
+/// How long a handle waits for another to finish writing.
+const BUSY: Duration = Duration::from_secs(5);
+
+/// Puts `library.sqlite` in WAL mode and returns the mode it is in. When two
+/// handles open a new library at once, both ask; SQLite answers one "busy"
+/// without waiting (waiting there could deadlock), so it waits here and asks
+/// again, by which time the other has made the file WAL.
+fn wal(conn: &Connection) -> Result<String> {
+    let deadline = Instant::now() + BUSY;
+    loop {
+        match conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0)) {
+            Err(rusqlite::Error::SqliteFailure(e, _))
+                if e.code == ErrorCode::DatabaseBusy && Instant::now() < deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            mode => return Ok(mode?),
+        }
+    }
+}
+
 /// The library: one folder, one database.
 pub struct Store {
     conn: Connection,
@@ -119,8 +140,8 @@ impl Store {
             std::fs::create_dir_all(root.join(folder))?;
         }
         let mut conn = Connection::open(root.join("library.sqlite"))?;
-        conn.busy_timeout(Duration::from_secs(5))?;
-        let mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))?;
+        conn.busy_timeout(BUSY)?;
+        let mode = wal(&conn)?;
         if mode != "wal" {
             return Err(Error::Corrupt(format!("journal_mode is {mode}, not wal")));
         }

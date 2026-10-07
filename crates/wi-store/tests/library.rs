@@ -208,6 +208,31 @@ fn the_readers_verdict_is_kept_word_for_word() {
     assert_eq!(clip.duration_ms, 238_000);
 }
 
+/// A reader that found no tempo it could trust.
+struct Unmeasured;
+
+impl Inspector for Unmeasured {
+    fn inspect(&self, path: &Path) -> Result<Inspection> {
+        Ok(Inspection {
+            bpm: Some(f64::NAN),
+            ..ByExtension.inspect(path)?
+        })
+    }
+}
+
+#[test]
+fn a_bpm_the_reader_couldnt_measure_is_none() {
+    let (dir, mut store) = library();
+    let src = source_file(dir.path(), "noise.wav", b"RIFF");
+    let clip = store.import(Room::Library, &src, &Unmeasured).unwrap();
+    assert_eq!(clip.bpm, None);
+    let mut tx = store.begin(Room::Library, "set bpm").unwrap();
+    assert_eq!(
+        refused(tx.set_bpm(&clip.id, Some(f64::NAN))),
+        "A BPM is a number, such as 128."
+    );
+}
+
 #[test]
 fn songs_films_and_small_files_are_copied_and_the_rest_left_in_place() {
     const GB: u64 = 1_000_000_000;
@@ -586,6 +611,94 @@ fn clean_up_lists_what_nothing_names_then_trashes_and_empties_it() {
     assert_eq!(emptied.bytes, unused.bytes);
     assert!(files_in(&root.join("trash")).is_empty());
     assert!(store.unused_media().unwrap().paths.is_empty());
+}
+
+#[test]
+fn clean_up_leaves_files_on_their_way_in() {
+    let (_dir, mut store) = library();
+    let root = store.root().to_path_buf();
+    assert_eq!(
+        refused(store.reserve_media("../x")),
+        "A file in the library ends in letters and digits, as .wwav, not '.../x'."
+    );
+
+    // A render: the engine writes to a name the library reserved for it.
+    let (id, file) = store.reserve_media("WWAV").unwrap();
+    assert_eq!(file, format!("media/{id}.wwav"));
+    std::fs::write(root.join(&file), b"render").unwrap();
+    // An import's copy in flight, and the half copy a crash left.
+    let (_, copying) = store.reserve_media("wav").unwrap();
+    let in_flight = format!("media/.{}.part", &copying["media/".len()..]);
+    std::fs::write(root.join(&in_flight), b"half").unwrap();
+    let crashed = "media/.01JC5Q8V3M2T7R9X4K6W0YHZNB.wav.part".to_string();
+    std::fs::write(root.join(&crashed), b"left").unwrap();
+    assert_eq!(
+        store.unused_media().unwrap().paths,
+        std::slice::from_ref(&crashed)
+    );
+
+    let mut tx = store.begin(Room::Console, "render 'Low Tide'").unwrap();
+    tx.add_clip(NewClip {
+        id: id.clone(),
+        file: file.clone(),
+        sha256: sha256(b"render"),
+        bytes: 6,
+        info: Inspection::new(Kind::Wwav, "Low Tide"),
+        from_sequence: None,
+    })
+    .unwrap();
+    tx.commit().unwrap();
+
+    // A day on, a reservation nothing recorded is a crash's leftover.
+    let conn = Connection::open(root.join("library.sqlite")).unwrap();
+    conn.execute(
+        "UPDATE media_pending SET made_ms = made_ms - 2 * 24 * 60 * 60 * 1000",
+        [],
+    )
+    .unwrap();
+    let unused = store.unused_media().unwrap();
+    let mut expected = vec![crashed, in_flight];
+    expected.sort();
+    assert_eq!(unused.paths, expected);
+    assert_eq!(store.move_to_trash(&unused).unwrap(), unused);
+    let reserved: i64 = conn
+        .query_row("SELECT count(*) FROM media_pending", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(reserved, 0, "the stale reservation ends with the press");
+    assert!(
+        root.join(&file).exists(),
+        "the render is recorded and stays"
+    );
+    assert!(store.unused_media().unwrap().paths.is_empty());
+}
+
+#[test]
+fn upload_parts_are_kept_only_while_the_clip_is_queued() {
+    let (dir, mut store) = library();
+    let x = import(&mut store, dir.path(), "x.wav").id;
+    assert!(
+        !store.record_upload_part(&x, 1, "etag-1").unwrap(),
+        "an unpublished clip has no upload to resume"
+    );
+    let mut tx = store.begin(Room::Space, "publish").unwrap();
+    tx.publish(&x).unwrap();
+    tx.commit().unwrap();
+    assert!(store.record_upload_part(&x, 1, "etag-1").unwrap());
+    edit(&mut store, "rename clip", |tx| tx.rename_clip(&x, "x2")).unwrap();
+    assert_eq!(store.upload_parts(&x).unwrap().len(), 1, "still queued");
+
+    // A delete takes it out of the queue, and ends the upload it was in.
+    edit(&mut store, "delete clip", |tx| tx.delete_clip(&x)).unwrap();
+    assert!(store.upload_parts(&x).unwrap().is_empty());
+    assert!(!store.record_upload_part(&x, 2, "etag-2").unwrap());
+    // Undo puts it back in the queue, to go up from the start.
+    store.undo(Room::Library).unwrap();
+    assert!(store.clip(&x).unwrap().unwrap().is_queued());
+    assert!(store.upload_parts(&x).unwrap().is_empty());
+
+    assert!(store.record_upload_part(&x, 1, "etag-1b").unwrap());
+    store.discard_upload_parts(&x).unwrap();
+    assert!(store.upload_parts(&x).unwrap().is_empty());
 }
 
 #[test]

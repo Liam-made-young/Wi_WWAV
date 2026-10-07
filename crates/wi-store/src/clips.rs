@@ -8,12 +8,12 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use crate::journal::{object, Row};
+use crate::journal::{self, object, Row};
 use crate::organise::Pin;
 use crate::{refused, Result, Room, Store, Txn};
 
@@ -182,6 +182,7 @@ pub struct Inspection {
     pub kind: Kind,
     pub title: String,
     pub artist: String,
+    /// None, or a value that isn't finite, means the reader couldn't measure one.
     pub bpm: Option<f64>,
     pub key: Option<String>,
     pub duration_ms: i64,
@@ -274,7 +275,8 @@ impl Placement {
 }
 
 /// A file ready to become a clip: copied into place and hashed. A render
-/// writes `media/<id>.<ext>` itself and fills one in, with `from_sequence`.
+/// takes its name from [`Store::reserve_media`], writes the file there itself
+/// and fills one in, with `from_sequence`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct NewClip {
     pub id: String,
@@ -333,6 +335,21 @@ fn missing_clip<T>() -> Result<T> {
     refused("That clip isn't in the library any more.")
 }
 
+/// Upload parts are kept only while their clip is queued. When a clip leaves
+/// the queue without the server having it (⌘Z of the publish, a delete), the
+/// upload it was part of is over, and the next publish starts a new one.
+pub(crate) fn drop_stale_parts(conn: &Connection) -> Result<()> {
+    conn.prepare_cached(&format!(
+        "DELETE FROM upload_part WHERE clip_id NOT IN (SELECT id FROM clips WHERE {UPLOAD_QUEUE})"
+    ))?
+    .execute([])?;
+    Ok(())
+}
+
+/// How long a reservation in `media/` holds: one older than this is what a
+/// crash left, and Clean up media… may take its file.
+pub(crate) const RESERVATION_MS: i64 = 24 * 60 * 60 * 1000;
+
 impl Store {
     /// Reads `src` and brings the file into the library, unrecorded: copied
     /// to `media/` under a new ULID, or left in place (see [`Placement`]).
@@ -344,8 +361,15 @@ impl Store {
         let (file, (sha256, bytes)) = match Placement::for_file(info.kind, size) {
             Placement::Copy => {
                 let name = file_name(&id, src);
-                let hashed = copy_hashed(src, &self.root.join("media"), &name)?;
-                (format!("media/{name}"), hashed)
+                let file = format!("media/{name}");
+                // Reserved before the first byte lands, so Clean up media…
+                // never takes it before `add_clip` records it.
+                self.reserve(&file)?;
+                let hashed = copy_hashed(src, &self.root.join("media"), &name);
+                if hashed.is_err() {
+                    self.release(&file)?;
+                }
+                (file, hashed?)
             }
             Placement::LeaveInPlace => {
                 let path = src.canonicalize()?;
@@ -366,6 +390,35 @@ impl Store {
             info,
             from_sequence: None,
         })
+    }
+
+    /// A new name in `media/` for a file about to be written there, such as a
+    /// render: returns the clip id and the file (`media/<id>.<ext>`), reserved
+    /// so Clean up media… leaves it alone until [`Txn::add_clip`] records it.
+    pub fn reserve_media(&self, ext: &str) -> Result<(String, String)> {
+        if ext.is_empty() || !ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return refused(format!(
+                "A file in the library ends in letters and digits, as .wwav, not '.{ext}'."
+            ));
+        }
+        let id = wwav_ids::ulid();
+        let file = format!("media/{id}.{}", ext.to_ascii_lowercase());
+        self.reserve(&file)?;
+        Ok((id, file))
+    }
+
+    fn reserve(&self, file: &str) -> Result<()> {
+        self.conn
+            .prepare_cached("INSERT OR REPLACE INTO media_pending (file, made_ms) VALUES (?1, ?2)")?
+            .execute(params![file, wwav_ids::now_ms() as i64])?;
+        Ok(())
+    }
+
+    fn release(&self, file: &str) -> Result<()> {
+        self.conn
+            .prepare_cached("DELETE FROM media_pending WHERE file = ?1")?
+            .execute([file])?;
+        Ok(())
     }
 
     /// Brings one file in and records it as one change: "import 'Low Tide'".
@@ -403,12 +456,25 @@ impl Store {
     }
 
     /// Notes that part `n` of a clip's upload is up, so a resumed upload
-    /// skips it. Not a journal entry: it records what the server has.
-    pub fn record_upload_part(&mut self, clip_id: &str, n: u32, etag: &str) -> Result<()> {
-        self.conn.execute(
-            "INSERT OR REPLACE INTO upload_part (clip_id, n, etag) VALUES (?1, ?2, ?3)",
+    /// skips it. Not a journal entry: it records what the server has. Returns
+    /// false (and records nothing) when the clip isn't queued any more, so
+    /// wi-core knows to abort that upload.
+    pub fn record_upload_part(&mut self, clip_id: &str, n: u32, etag: &str) -> Result<bool> {
+        let recorded = self.conn.execute(
+            &format!(
+                "INSERT OR REPLACE INTO upload_part (clip_id, n, etag)
+                 SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM clips WHERE id = ?1 AND {UPLOAD_QUEUE})"
+            ),
             params![clip_id, n, etag],
         )?;
+        Ok(recorded == 1)
+    }
+
+    /// Forgets the parts recorded for a clip's upload, so the next attempt
+    /// starts a new one (when the server says the old one is gone, say).
+    pub fn discard_upload_parts(&mut self, clip_id: &str) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM upload_part WHERE clip_id = ?1", [clip_id])?;
         Ok(())
     }
 
@@ -423,14 +489,20 @@ impl Store {
 
     /// The server has the clip: it leaves the queue, and from now on undoing
     /// its publish is refused. Returns false (and records nothing) when the
-    /// clip was unpublished first, so wi-core knows to take it down again.
-    /// Not a journal entry.
+    /// clip was unpublished or deleted first, so wi-core knows to take it down
+    /// again. Not a journal entry, but every journal snapshot of the clip
+    /// learns its `remote_id`, so no undo or redo forgets the server has it.
     pub fn mark_uploaded(&mut self, clip_id: &str, remote_id: &str) -> Result<bool> {
-        let tx = self.conn.transaction()?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let changed = tx.execute(
             &format!("UPDATE clips SET remote_id = ?1 WHERE id = ?2 AND {UPLOAD_QUEUE}"),
             params![remote_id, clip_id],
         )?;
+        if changed == 1 {
+            journal::acknowledge(&tx, clip_id, remote_id)?;
+        }
         tx.execute("DELETE FROM upload_part WHERE clip_id = ?1", [clip_id])?;
         tx.commit()?;
         Ok(changed == 1)
@@ -448,7 +520,7 @@ pub(crate) fn clip_row(new: NewClip) -> Row {
         "bytes": new.bytes,
         "title": info.title,
         "artist": info.artist,
-        "bpm": info.bpm,
+        "bpm": info.bpm.filter(|bpm| bpm.is_finite()),
         "key": info.key,
         "duration_ms": info.duration_ms,
         "verdict": info.verdict,
@@ -467,6 +539,10 @@ impl Txn<'_> {
             }
         }
         let id = new.id.clone();
+        // Recorded now, so its reservation in media/ ends with this change.
+        self.conn()
+            .prepare_cached("DELETE FROM media_pending WHERE file = ?1")?
+            .execute([&new.file])?;
         self.insert("clips", clip_row(new))?;
         Ok(id)
     }
@@ -493,6 +569,9 @@ impl Txn<'_> {
     }
 
     pub fn set_bpm(&mut self, id: &str, bpm: Option<f64>) -> Result<()> {
+        if bpm.is_some_and(|bpm| !bpm.is_finite()) {
+            return refused("A BPM is a number, such as 128.");
+        }
         self.set_clip(id, "bpm", bpm.into())
     }
 

@@ -5,7 +5,7 @@
 //! key cascades: a cascade is a change SQLite makes behind the journal's back,
 //! and "an unjournaled row is an unrestorable one" (docs/SPEC.md 9.6).
 
-use rusqlite::Connection;
+use rusqlite::{Connection, TransactionBehavior};
 
 use crate::{refused, Result};
 
@@ -129,17 +129,26 @@ CREATE INDEX txn_row_target ON txn_row(tbl, row_id);
 
 -- Work that left the machine: never undone, but the Edit menu says so.
 CREATE TABLE outward (
-  id   TEXT PRIMARY KEY,               -- ULID, ordered with the journal's
-  room TEXT NOT NULL,
-  what TEXT NOT NULL                   -- "a purchase" -> "Can't undo a purchase."
+  id        TEXT PRIMARY KEY,          -- ULID, ordered with the journal's
+  room      TEXT NOT NULL,
+  what      TEXT NOT NULL,             -- "a purchase" -> "Can't undo a purchase."
+  after_txn TEXT                       -- the room's newest done entry when it happened (NULL: none),
+                                       -- so a redo made after it still undoes
 );
 
 -- Not journaled: what the server has, what was bought, what the scanner found.
 CREATE TABLE upload_part (
-  clip_id TEXT NOT NULL,               -- no REFERENCES: a deleted clip may come back and resume
+  clip_id TEXT NOT NULL,               -- no REFERENCES: kept only while the clip is queued
   n       INTEGER NOT NULL,
   etag    TEXT NOT NULL,
   PRIMARY KEY (clip_id, n)
+);
+
+-- Files on their way into media/ (an import being copied, a render being
+-- written) that no clip names yet: Clean up media… leaves them alone.
+CREATE TABLE media_pending (
+  file    TEXT PRIMARY KEY,            -- media/<id>.<ext>
+  made_ms INTEGER NOT NULL             -- a reservation older than a day is a crash's leftover
 );
 
 CREATE TABLE purchases (
@@ -167,16 +176,21 @@ CREATE TABLE plugin_scans (
 );
 "#;
 
+/// Runs the migrations this library hasn't had. Each runs in a write
+/// transaction that reads `user_version` again first, so two handles opening
+/// a new library at once (the app and its uploader) never run one twice.
 pub(crate) fn migrate(conn: &mut Connection) -> Result<()> {
-    let have: usize = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    if have > SCHEMA_VERSION {
-        return refused("This library was made by a newer Wi_WWAV. Update the app to open it.");
-    }
-    for (done, sql) in MIGRATIONS.iter().enumerate().skip(have) {
-        let tx = conn.transaction()?;
+    loop {
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let have: usize = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if have > SCHEMA_VERSION {
+            return refused("This library was made by a newer Wi_WWAV. Update the app to open it.");
+        }
+        let Some(sql) = MIGRATIONS.get(have) else {
+            return Ok(()); // up to date; dropping `tx` ends it
+        };
         tx.execute_batch(sql)?;
-        tx.pragma_update(None, "user_version", done + 1)?;
+        tx.pragma_update(None, "user_version", have + 1)?;
         tx.commit()?;
     }
-    Ok(())
 }
