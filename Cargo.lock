@@ -26,6 +26,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
+name = "mock-engine"
+version = "0.1.0"
+
+[[package]]
 name = "wasi"
 version = "0.11.1+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -37,6 +41,10 @@ version = "0.1.0"
 
 [[package]]
 name = "wwav-dsp"
+version = "0.1.0"
+
+[[package]]
+name = "wwav-engine-cli"
 version = "0.1.0"
 
 [[package]]

@@ -8,6 +8,8 @@ members = [
   "crates/wwav-dsp",
   "crates/wwav-tokens",
   "crates/wi-store",
+  "crates/mock-engine",
+  "crates/wwav-engine-cli",
 ]
 
 [workspace.package]
