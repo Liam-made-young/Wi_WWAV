@@ -105,7 +105,7 @@ target_compile_options(wwav-engine-unit PRIVATE -ffp-contract=off -Wall -Wextra)
 add_test(NAME engine_unit COMMAND wwav-engine-unit)
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
-foreach(suite protocol playback render restart streaming)
+foreach(suite protocol playback render restart streaming review)
   add_test(NAME engine_${suite}
     COMMAND ${Python3_EXECUTABLE} -B -m unittest -v test_${suite}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
