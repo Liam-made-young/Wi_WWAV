@@ -32,16 +32,27 @@ pub(crate) fn helper_path(i: &Inner) -> PathBuf {
 /// The helper for an app binary at `exe`.
 pub(crate) fn helper_beside(exe: &std::path::Path, os: &str) -> PathBuf {
     let dir = exe.parent().unwrap_or(std::path::Path::new("."));
-    let in_bundle = dir.file_name().is_some_and(|n| n == "MacOS") && dir.parent().and_then(|c| c.file_name()).is_some_and(|n| n == "Contents");
+    let in_bundle = dir.file_name().is_some_and(|n| n == "MacOS")
+        && dir
+            .parent()
+            .and_then(|c| c.file_name())
+            .is_some_and(|n| n == "Contents");
     if in_bundle {
         return dir.parent().unwrap_or(dir).join("Helpers/wi-mcp");
     }
-    dir.join(if os == "windows" { "wi-mcp.exe" } else { "wi-mcp" })
+    dir.join(if os == "windows" {
+        "wi-mcp.exe"
+    } else {
+        "wi-mcp"
+    })
 }
 
 /// A path as one word of a shell line: plain when it can be, else in quotes.
 fn shell_word(s: &str) -> String {
-    if !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c)) {
+    if !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c))
+    {
         s.to_string()
     } else {
         format!("'{}'", s.replace('\'', "'\\''"))
@@ -71,7 +82,9 @@ pub(crate) fn get(i: &Inner) -> Result<Value, CoreError> {
 /// reads it on every list and every call.
 pub(crate) fn set_tool(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     let name = a.str("name")?;
-    let on = a.opt_bool("on")?.ok_or_else(|| CoreError::new("bad_args", "heat.claude.setTool needs on, true or false."))?;
+    let on = a.opt_bool("on")?.ok_or_else(|| {
+        CoreError::new("bad_args", "heat.claude.setTool needs on, true or false.")
+    })?;
     wi_heat_store::set_tool(&mut i.store(), name, on).map_err(core_error)?;
     wrote_outside(i, &["heatSetting"]);
     Ok(json!({}))

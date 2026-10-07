@@ -56,7 +56,9 @@ fn with_replica<T>(i: &Inner, f: impl FnOnce(&mut Replica) -> T) -> Result<T, Co
 /// records themselves (their addresses are in the Keychain, and another Mac
 /// has no use for this one's), and what isn't a record.
 fn local_only(kind: &str) -> bool {
-    ["calendar", "calendarEvent", "heatState", "heatSetting"].iter().any(|k| kind.eq_ignore_ascii_case(k))
+    ["calendar", "calendarEvent", "heatState", "heatSetting"]
+        .iter()
+        .any(|k| kind.eq_ignore_ascii_case(k))
 }
 
 fn is_grade(kind: &str) -> bool {
@@ -146,7 +148,9 @@ fn sync_course(r: &mut Replica, id: &str, now: Option<&Value>, named: bool) -> b
             wrote
         }
         // Private and named by nothing, or gone: what went up is deleted, once.
-        None if r.value("course", id, "code").is_some() && r.value("course", id, "deleted") != Some(&json!(true)) => {
+        None if r.value("course", id, "code").is_some()
+            && r.value("course", id, "deleted") != Some(&json!(true)) =>
+        {
             r.write("course", id, "public", json!(false));
             r.write("course", id, "deleted", json!(true));
             true
@@ -169,14 +173,27 @@ fn held_now(i: &Inner, grade_ids: &BTreeSet<String>) -> Result<Held, CoreError> 
     for id in grade_ids {
         grades.insert(id.clone(), store.doc("grade", id)?.map(|d| d.json));
     }
-    let courses = store.docs("course")?.into_iter().map(|d| (d.key, d.json)).collect();
+    let courses = store
+        .docs("course")?
+        .into_iter()
+        .map(|d| (d.key, d.json))
+        .collect();
     let named = store
         .docs("grade")?
         .into_iter()
         .filter(|d| d.json.get("public") == Some(&json!(true)))
-        .filter_map(|d| d.json.get("courseId").and_then(Value::as_str).map(String::from))
+        .filter_map(|d| {
+            d.json
+                .get("courseId")
+                .and_then(Value::as_str)
+                .map(String::from)
+        })
         .collect();
-    Ok(Held { grades, courses, named })
+    Ok(Held {
+        grades,
+        courses,
+        named,
+    })
 }
 
 /// Brings the replica's grades and courses to what `held` says, for the
@@ -187,7 +204,12 @@ fn sync_held(r: &mut Replica, held: &Held) -> bool {
         moved |= sync_grade(r, id, grade.as_ref());
     }
     let mut courses: BTreeSet<String> = held.courses.keys().cloned().collect();
-    courses.extend(r.snapshot().keys().filter(|k| is_course(&k.0)).map(|k| k.1.clone()));
+    courses.extend(
+        r.snapshot()
+            .keys()
+            .filter(|k| is_course(&k.0))
+            .map(|k| k.1.clone()),
+    );
     for id in courses {
         moved |= sync_course(r, &id, held.courses.get(&id), held.named.contains(&id));
     }
@@ -209,13 +231,24 @@ fn save(i: &Inner, r: &Replica) -> Result<(), CoreError> {
 
 /// Local edits made in Heat, field by field, waiting to go up.
 pub(crate) fn wrote(i: &Inner, changes: &[(&str, &str, &str, &Value)]) -> Result<(), CoreError> {
-    let grades: BTreeSet<String> = changes.iter().filter(|c| is_grade(c.0)).map(|c| c.1.to_string()).collect();
+    let grades: BTreeSet<String> = changes
+        .iter()
+        .filter(|c| is_grade(c.0))
+        .map(|c| c.1.to_string())
+        .collect();
     let held = changes.iter().any(|c| held_back(c.0));
-    let synced: Vec<_> = changes.iter().filter(|c| !held_back(c.0) && !local_only(c.0)).collect();
+    let synced: Vec<_> = changes
+        .iter()
+        .filter(|c| !held_back(c.0) && !local_only(c.0))
+        .collect();
     if synced.is_empty() && !held {
         return Ok(());
     }
-    let now = if held { Some(held_now(i, &grades)?) } else { None };
+    let now = if held {
+        Some(held_now(i, &grades)?)
+    } else {
+        None
+    };
     with_replica(i, |r| {
         for (kind, id, field, value) in synced {
             r.write(kind, id, field, (*value).clone());
@@ -233,13 +266,24 @@ pub(crate) fn wrote(i: &Inner, changes: &[(&str, &str, &str, &Value)]) -> Result
 /// core's own Heat writes and for the MCP helper's, which only the app syncs
 /// (docs/SPEC.md 8.7).
 pub(crate) fn wrote_entry(i: &Inner, docs: &[DocChange]) -> Result<(), CoreError> {
-    let grades: BTreeSet<String> = docs.iter().filter(|d| is_grade(&d.kind)).map(|d| d.key.clone()).collect();
+    let grades: BTreeSet<String> = docs
+        .iter()
+        .filter(|d| is_grade(&d.kind))
+        .map(|d| d.key.clone())
+        .collect();
     let held = docs.iter().any(|d| held_back(&d.kind));
-    let others: Vec<&DocChange> = docs.iter().filter(|d| !held_back(&d.kind) && !local_only(&d.kind)).collect();
+    let others: Vec<&DocChange> = docs
+        .iter()
+        .filter(|d| !held_back(&d.kind) && !local_only(&d.kind))
+        .collect();
     if others.is_empty() && !held {
         return Ok(());
     }
-    let now = if held { Some(held_now(i, &grades)?) } else { None };
+    let now = if held {
+        Some(held_now(i, &grades)?)
+    } else {
+        None
+    };
     with_replica(i, |r| {
         for d in &others {
             let (kind, id) = (d.kind.as_str(), d.key.as_str());
@@ -279,7 +323,11 @@ pub(crate) fn wrote_made(i: &Inner, made: &[(&'static str, Value)]) -> Result<()
         .iter()
         .map(|(k, v)| DocChange {
             kind: (*k).to_string(),
-            key: v.get("id").and_then(Value::as_str).unwrap_or_default().to_string(),
+            key: v
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
             before: None,
             after: Some(v.clone()),
         })
@@ -305,14 +353,18 @@ pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
         now.grades.entry(k.1.clone()).or_insert(None);
     }
     let mut kinds: BTreeSet<String> = snapshot.keys().map(|k| k.0.clone()).collect();
-    kinds.extend(i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind").unwrap_or_default());
+    kinds.extend(
+        i.kv.query_strings("SELECT DISTINCT kind FROM docs ORDER BY kind")
+            .unwrap_or_default(),
+    );
     let mut writes: Vec<(String, String, String, Value)> = Vec::new();
     for kind in kinds.iter().filter(|k| !held_back(k) && !local_only(k)) {
         let docs = i.store().docs(kind)?;
         let mut present = BTreeSet::new();
         for d in docs {
             present.insert(d.key.clone());
-            let gone = snapshot.get(&(kind.clone(), d.key.clone(), "deleted".into())) == Some(&json!(true));
+            let gone = snapshot.get(&(kind.clone(), d.key.clone(), "deleted".into()))
+                == Some(&json!(true));
             if gone {
                 writes.push((kind.clone(), d.key.clone(), "deleted".into(), json!(false)));
             }
@@ -323,7 +375,11 @@ pub(crate) fn journal_moved(i: &Inner) -> Result<(), CoreError> {
                 }
             }
         }
-        let ids: BTreeSet<&String> = snapshot.keys().filter(|k| &k.0 == kind).map(|k| &k.1).collect();
+        let ids: BTreeSet<&String> = snapshot
+            .keys()
+            .filter(|k| &k.0 == kind)
+            .map(|k| &k.1)
+            .collect();
         for id in ids.into_iter().filter(|id| !present.contains(*id)) {
             if snapshot.get(&(kind.clone(), id.clone(), "deleted".into())) != Some(&json!(true)) {
                 writes.push((kind.clone(), id.clone(), "deleted".into(), json!(true)));
@@ -394,7 +450,10 @@ pub(crate) fn sync_now(i: &Inner) -> Result<Value, CoreError> {
     match result {
         Ok(()) => {
             let sentence = format!("Synced {}", clock_time());
-            let _ = i.kv.set("heat.syncedAt", &json!(jiff::Timestamp::now().as_millisecond()));
+            let _ = i.kv.set(
+                "heat.syncedAt",
+                &json!(jiff::Timestamp::now().as_millisecond()),
+            );
             i.bus.status("sync", &sentence);
             Ok(json!({"sentence": sentence, "changed": touched.len()}))
         }
@@ -503,7 +562,10 @@ fn apply(i: &Inner, touched: &BTreeSet<(String, String)>) -> Result<(), CoreErro
     }
     let snapshot = with_replica(i, |r| r.snapshot())?;
     let mut records = Vec::new();
-    for (kind, id) in touched.iter().filter(|(kind, _)| !held_back(kind) && !local_only(kind)) {
+    for (kind, id) in touched
+        .iter()
+        .filter(|(kind, _)| !held_back(kind) && !local_only(kind))
+    {
         let fields: BTreeMap<&str, &Value> = snapshot
             .range((kind.clone(), id.clone(), String::new())..)
             .take_while(|(k, _)| &k.0 == kind && &k.1 == id)

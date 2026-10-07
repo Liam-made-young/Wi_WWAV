@@ -99,7 +99,10 @@ impl Clock {
     /// `2026-10-07T23:59:00-04:00`.
     pub fn iso(&self, ms: f64) -> String {
         match Timestamp::from_millisecond(ms as i64) {
-            Ok(t) => t.to_zoned(self.zone.clone()).strftime("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+            Ok(t) => t
+                .to_zoned(self.zone.clone())
+                .strftime("%Y-%m-%dT%H:%M:%S%:z")
+                .to_string(),
             Err(_) => String::new(),
         }
     }
@@ -111,7 +114,10 @@ impl Clock {
 
     pub fn date_of(&self, ms: f64) -> String {
         match Timestamp::from_millisecond(ms as i64) {
-            Ok(t) => t.to_zoned(self.zone.clone()).strftime("%Y-%m-%d").to_string(),
+            Ok(t) => t
+                .to_zoned(self.zone.clone())
+                .strftime("%Y-%m-%d")
+                .to_string(),
             Err(_) => String::new(),
         }
     }
@@ -147,7 +153,11 @@ pub(crate) fn round(x: f64, places: i32) -> f64 {
 
 /// Every record of `kind`, as stored, in the order they were made.
 pub fn all(store: &Store, kind: &str) -> Result<Vec<Value>> {
-    Ok(store.docs_oldest_first(kind)?.into_iter().map(|d| d.json).collect())
+    Ok(store
+        .docs_oldest_first(kind)?
+        .into_iter()
+        .map(|d| d.json)
+        .collect())
 }
 
 /// One record of `kind`, as stored.
@@ -169,7 +179,11 @@ pub(crate) fn search_text(kind: &str, r: &Value) -> String {
         kind::SPACE => vec![field("name")],
         _ => vec![],
     };
-    parts.into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ")
+    parts
+        .into_iter()
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// A new record's id.
@@ -204,7 +218,10 @@ pub(crate) fn commit(
     let mut txn = store.begin_by(ROOM, label, actor)?;
     f(&mut txn)?;
     let id = txn.commit()?;
-    Ok(Committed { undo: id.as_ref().map(|_| format!("Undo {label}")), txn: id })
+    Ok(Committed {
+        undo: id.as_ref().map(|_| format!("Undo {label}")),
+        txn: id,
+    })
 }
 
 /// Runs `f` as one labelled change by `actor`, and returns the Edit menu's
@@ -236,17 +253,35 @@ pub struct Outcome {
 
 impl Outcome {
     pub(crate) fn new(result: Value, c: Committed) -> Outcome {
-        Outcome { result, undo: c.undo, txn: c.txn, outside: Vec::new(), with_undo: true }
+        Outcome {
+            result,
+            undo: c.undo,
+            txn: c.txn,
+            outside: Vec::new(),
+            with_undo: true,
+        }
     }
 
     /// A write that changed nothing the journal keeps.
     pub(crate) fn unchanged(result: Value) -> Outcome {
-        Outcome { result, undo: None, txn: None, outside: Vec::new(), with_undo: true }
+        Outcome {
+            result,
+            undo: None,
+            txn: None,
+            outside: Vec::new(),
+            with_undo: true,
+        }
     }
 
     /// A write outside the journal, answered with `result` alone.
     pub(crate) fn outside(result: Value, kinds: &[&'static str]) -> Outcome {
-        Outcome { result, undo: None, txn: None, outside: kinds.to_vec(), with_undo: false }
+        Outcome {
+            result,
+            undo: None,
+            txn: None,
+            outside: kinds.to_vec(),
+            with_undo: false,
+        }
     }
 
     pub(crate) fn also(mut self, kinds: &[&'static str]) -> Outcome {
@@ -271,7 +306,12 @@ pub fn tool_switches(store: &Store) -> Result<BTreeMap<String, bool>> {
     let saved = one(store, kind::SETTING, "claude.tools")?.unwrap_or(Value::Null);
     Ok(mcp::TOOLS
         .iter()
-        .map(|t| (t.to_string(), saved.get(*t).and_then(Value::as_bool).unwrap_or(true)))
+        .map(|t| {
+            (
+                t.to_string(),
+                saved.get(*t).and_then(Value::as_bool).unwrap_or(true),
+            )
+        })
         .collect())
 }
 
@@ -294,9 +334,9 @@ pub const STATE_KEY: &str = "state";
 /// Heat's state outside the journal: `{currentTaskId?, timer, planDrafts}`,
 /// and the focus timer's whole state under `focus` (docs/HEAT.md).
 pub fn state(store: &Store) -> Result<Value> {
-    Ok(one(store, kind::STATE, STATE_KEY)?.unwrap_or_else(|| {
-        json!({"timer": {"phase": "idle", "round": 1, "endsAt": null}, "planDrafts": []})
-    }))
+    Ok(one(store, kind::STATE, STATE_KEY)?.unwrap_or_else(
+        || json!({"timer": {"phase": "idle", "round": 1, "endsAt": null}, "planDrafts": []}),
+    ))
 }
 
 pub(crate) fn set_state(store: &mut Store, state: &Value) -> Result<()> {

@@ -456,7 +456,9 @@ impl<'s> Txn<'s> {
         let id = fresh_id(&self.tx)?;
         let (actor, tool, reason) = match &self.actor {
             Actor::You => ("you", None, None),
-            Actor::Claude { tool, reason } => ("claude", Some(tool.as_str()), Some(reason.as_str())),
+            Actor::Claude { tool, reason } => {
+                ("claude", Some(tool.as_str()), Some(reason.as_str()))
+            }
         };
         self.tx.execute(
             "INSERT INTO txn (id, label, room, state, actor, tool, reason) VALUES (?1, ?2, ?3, 'done', ?4, ?5, ?6)",
@@ -742,7 +744,10 @@ pub(crate) fn acknowledge(conn: &Connection, clip_id: &str, remote_id: &str) -> 
 pub enum Actor {
     #[default]
     You,
-    Claude { tool: String, reason: String },
+    Claude {
+        tool: String,
+        reason: String,
+    },
 }
 
 /// One journal entry as Settings → Claude lists it.
@@ -760,8 +765,16 @@ pub struct EntryInfo {
 }
 
 /// The newest entries first, only Claude's when `claude_only`.
-pub(crate) fn entries(conn: &Connection, claude_only: bool, limit: usize) -> Result<Vec<EntryInfo>> {
-    let filter = if claude_only { "WHERE actor = 'claude'" } else { "" };
+pub(crate) fn entries(
+    conn: &Connection,
+    claude_only: bool,
+    limit: usize,
+) -> Result<Vec<EntryInfo>> {
+    let filter = if claude_only {
+        "WHERE actor = 'claude'"
+    } else {
+        ""
+    };
     let mut stmt = conn.prepare_cached(&format!(
         "SELECT id, label, room, state, actor, tool, reason FROM txn {filter} ORDER BY id DESC LIMIT ?1"
     ))?;
@@ -789,7 +802,14 @@ pub(crate) fn entries(conn: &Connection, claude_only: bool, limit: usize) -> Res
             _ => Actor::You,
         };
         let at_ms = wwav_ids::ulid_ms(&id).unwrap_or(0);
-        out.push(EntryInfo { id, label, room, done: state == "done", actor, at_ms });
+        out.push(EntryInfo {
+            id,
+            label,
+            room,
+            done: state == "done",
+            actor,
+            at_ms,
+        });
     }
     Ok(out)
 }
@@ -831,7 +851,11 @@ fn docs_of(conn: &Connection, txn: &str) -> Result<Vec<DocChange>> {
     )?;
     let rows = stmt
         .query_map([txn], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, Option<String>>(2)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+            ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     // A row touched twice in one change: the first `before`, the last `after`.
@@ -856,34 +880,70 @@ fn docs_of(conn: &Connection, txn: &str) -> Result<Vec<DocChange>> {
 
 fn entry_docs_from(
     conn: &Connection,
-    (id, label, room, actor, tool, reason): (String, String, String, String, Option<String>, Option<String>),
+    (id, label, room, actor, tool, reason): (
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+    ),
 ) -> Result<EntryDocs> {
     let room = Room::parse(&room)
         .ok_or_else(|| Error::Corrupt(format!("a journal entry names no room: {room}")))?;
     let actor = match actor.as_str() {
-        "claude" => Actor::Claude { tool: tool.unwrap_or_default(), reason: reason.unwrap_or_default() },
+        "claude" => Actor::Claude {
+            tool: tool.unwrap_or_default(),
+            reason: reason.unwrap_or_default(),
+        },
         _ => Actor::You,
     };
     let docs = docs_of(conn, &id)?;
-    Ok(EntryDocs { id, label, room, actor, docs })
+    Ok(EntryDocs {
+        id,
+        label,
+        room,
+        actor,
+        docs,
+    })
 }
 
-type EntryRow = (String, String, String, String, Option<String>, Option<String>);
+type EntryRow = (
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+);
 
 fn entry_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<EntryRow> {
-    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?))
+    Ok((
+        r.get(0)?,
+        r.get(1)?,
+        r.get(2)?,
+        r.get(3)?,
+        r.get(4)?,
+        r.get(5)?,
+    ))
 }
 
 /// The entries newer than `after` (all of them for None), oldest first, each
 /// with the records it changed.
-pub(crate) fn entries_after(conn: &Connection, after: Option<&str>, limit: usize) -> Result<Vec<EntryDocs>> {
+pub(crate) fn entries_after(
+    conn: &Connection,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<Vec<EntryDocs>> {
     let mut stmt = conn.prepare_cached(
         "SELECT id, label, room, actor, tool, reason FROM txn WHERE id > ?1 ORDER BY id LIMIT ?2",
     )?;
     let rows = stmt
         .query_map(params![after.unwrap_or(""), limit as i64], entry_row)?
         .collect::<rusqlite::Result<Vec<_>>>()?;
-    rows.into_iter().map(|row| entry_docs_from(conn, row)).collect()
+    rows.into_iter()
+        .map(|row| entry_docs_from(conn, row))
+        .collect()
 }
 
 /// One entry with the records it changed.
@@ -912,18 +972,29 @@ pub(crate) fn undo_entry(conn: &mut Connection, id: &str) -> Result<String> {
         .query_row(
             "SELECT id, label, room, state FROM txn WHERE id = ?1",
             [id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?)),
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, String>(3)?,
+                ))
+            },
         )
         .optional()?;
     let Some((id, label, room, state)) = found else {
-        return Err(Error::Refused("That change isn't in the journal any more.".into()));
+        return Err(Error::Refused(
+            "That change isn't in the journal any more.".into(),
+        ));
     };
     if state != "done" {
         return Err(Error::Refused(format!("{label} is already undone.")));
     }
     let entry = to_entry((id, label, room))?;
     if let Some(title) = unpublishes_what_the_server_has(&tx, &entry)? {
-        return Err(Error::Refused(format!("Can't undo a publish. Unpublish '{title}'…")));
+        return Err(Error::Refused(format!(
+            "Can't undo a publish. Unpublish '{title}'…"
+        )));
     }
     if overlapping(&tx, &entry, "done", true)?.is_some() {
         return Err(Error::Refused(

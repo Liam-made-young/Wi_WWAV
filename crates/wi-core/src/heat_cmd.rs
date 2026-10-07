@@ -90,13 +90,21 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             };
             snapshot::snapshot(&i.store(), &i.clock(), &window).map_err(core_error)
         }
-        "heat.whatItWouldTake" => snapshot::what_it_would_take(&i.store(), a.str("courseId")?, a.str("letter")?).map_err(core_error),
-        "heat.review.week" => snapshot::review_week(&i.store(), &i.clock(), a.str("weekStart")?).map_err(core_error),
+        "heat.whatItWouldTake" => {
+            snapshot::what_it_would_take(&i.store(), a.str("courseId")?, a.str("letter")?)
+                .map_err(core_error)
+        }
+        "heat.review.week" => {
+            snapshot::review_week(&i.store(), &i.clock(), a.str("weekStart")?).map_err(core_error)
+        }
         "heat.publicView" => snapshot::public_view(&i.store(), &i.clock()).map_err(core_error),
 
         // ----- records -----
         "heat.put" => {
-            let (kind, record) = (a.str("kind")?, a.get("record").cloned().unwrap_or(Value::Null));
+            let (kind, record) = (
+                a.str("kind")?,
+                a.get("record").cloned().unwrap_or(Value::Null),
+            );
             write(i, |s, c| ops::put_record(s, c, kind, &record))
         }
         "heat.patch" => {
@@ -108,7 +116,12 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             write(i, |s, c| ops::delete_record(s, c, kind, id))
         }
         "heat.done" => {
-            let (id, done) = (a.str("taskId")?, a.opt_bool("done")?.ok_or_else(|| CoreError::new("bad_args", "heat.done needs done, true or false."))?);
+            let (id, done) = (
+                a.str("taskId")?,
+                a.opt_bool("done")?.ok_or_else(|| {
+                    CoreError::new("bad_args", "heat.done needs done, true or false.")
+                })?,
+            );
             let date = a.opt_str("date");
             write(i, |s, c| ops::done(s, c, id, done, date))
         }
@@ -134,7 +147,11 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             write(i, |s, c| timer::plan_make(s, c, date, ends))
         }
         "heat.plan.accept" => {
-            let ids = if a.get("taskIds").is_some() { Some(a.strings("taskIds")?) } else { None };
+            let ids = if a.get("taskIds").is_some() {
+                Some(a.strings("taskIds")?)
+            } else {
+                None
+            };
             let date = match a.opt_str("date") {
                 Some(d) => d.to_string(),
                 None => i.clock().today(),
@@ -150,7 +167,12 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             let id = a.opt_str("taskId");
             write(i, |s, c| timer::set_current(s, c, id))
         }
-        "heat.focus.start" | "heat.focus.pause" | "heat.focus.resume" | "heat.focus.interrupt" | "heat.focus.stop" | "heat.focus.finish" => {
+        "heat.focus.start"
+        | "heat.focus.pause"
+        | "heat.focus.resume"
+        | "heat.focus.interrupt"
+        | "heat.focus.stop"
+        | "heat.focus.finish" => {
             let step = cmd.trim_start_matches("heat.focus.");
             let (task, length) = (a.opt_str("taskId"), a.opt_f64("length")?);
             write(i, |s, c| timer::focus(s, c, step, task, length))
@@ -178,7 +200,9 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
         }
         "heat.public.set" => {
             let (kind, id) = (a.str("kind")?, a.str("id")?);
-            let public = a.opt_bool("public")?.ok_or_else(|| CoreError::new("bad_args", "heat.public.set needs public, true or false."))?;
+            let public = a.opt_bool("public")?.ok_or_else(|| {
+                CoreError::new("bad_args", "heat.public.set needs public, true or false.")
+            })?;
             write(i, |s, c| ops::set_public(s, c, kind, id, public))
         }
         "heat.share.now" => {
@@ -210,7 +234,10 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
         "heat.claude.get" => claude::get(i),
         "heat.claude.setTool" => claude::set_tool(i, a),
 
-        _ => Err(CoreError::new("unknown_command", format!("There is no command called '{cmd}'."))),
+        _ => Err(CoreError::new(
+            "unknown_command",
+            format!("There is no command called '{cmd}'."),
+        )),
     }
 }
 

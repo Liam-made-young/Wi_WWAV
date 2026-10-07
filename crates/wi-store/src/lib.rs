@@ -204,7 +204,9 @@ impl Store {
     /// between. A commit made through this handle never changes it, so the
     /// core's own writes are not news to it (docs/SPEC.md 8.8).
     pub fn data_version(&self) -> Result<i64> {
-        Ok(self.conn.query_row("PRAGMA data_version", [], |r| r.get(0))?)
+        Ok(self
+            .conn
+            .query_row("PRAGMA data_version", [], |r| r.get(0))?)
     }
 
     /// Undoes one entry out of order and returns its label (Settings →

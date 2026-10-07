@@ -237,3 +237,10 @@ reads and `plan_day` write no entry; a repeated `source_id` or `thread_id`
 makes no second row; a switched-off tool is missing and refused; 200 kills at
 random moments; 1,000 interleaved writes with the core writing too, none lost.
 The views are checked in Playwright through the dev bridge against a real core.
+
+The core's side of S2.2–S2.6 and S2.9–S2.11 is `crates/wi-core/tests/core/heat_*.rs`:
+every check goes through the `heat.*` commands on a core standing at a fixed
+time in New York (`Core::set_now`); sync and the public view run against
+`tools/mock-server`; calendars are read from a feed server in the test; and the
+watcher is checked against a real `wi-mcp` process writing to the same
+library.

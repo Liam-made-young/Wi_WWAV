@@ -316,7 +316,10 @@ pub fn snap(core: &Core, date: &str) -> Value {
 
 /// Records of one kind in a snapshot.
 pub fn records(snapshot: &Value, kind: &str) -> Vec<Value> {
-    snapshot["records"][kind].as_array().cloned().unwrap_or_default()
+    snapshot["records"][kind]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// A command refused: its code and sentence.
@@ -345,7 +348,11 @@ pub fn heat_core_on(setup: &Setup, now: &str, server: &str) -> Core {
     let mut config = setup.config(server, no_browser());
     config.now = Some(ny(now));
     let core = Core::open(&setup.library(), config).unwrap();
-    ok(&core, "app.settings.set", json!({"patch": {"heat": {"timeZone": "America/New_York"}}}));
+    ok(
+        &core,
+        "app.settings.set",
+        json!({"patch": {"heat": {"timeZone": "America/New_York"}}}),
+    );
     core
 }
 
@@ -395,7 +402,12 @@ impl FeedServer {
                 });
             }
         });
-        FeedServer { port, state, hits, stop }
+        FeedServer {
+            port,
+            state,
+            hits,
+            stop,
+        }
     }
 
     /// What the next requests are answered with.
@@ -409,7 +421,10 @@ impl FeedServer {
 
     /// The private address of the feed, with a token in it as D2L's carry.
     pub fn address(&self, token: &str) -> String {
-        format!("http://127.0.0.1:{}/d2l/le/calendar/feed/user/feed.ics?token={token}", self.port)
+        format!(
+            "http://127.0.0.1:{}/d2l/le/calendar/feed/user/feed.ics?token={token}",
+            self.port
+        )
     }
 }
 
@@ -461,9 +476,19 @@ impl McpHelper {
             .expect("wi-mcp starts");
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
-        let mut h = McpHelper { child, stdin, stdout, next: 1 };
+        let mut h = McpHelper {
+            child,
+            stdin,
+            stdout,
+            next: 1,
+        };
         h.request("initialize", json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1"}}));
-        writeln!(h.stdin, "{}", json!({"jsonrpc": "2.0", "method": "notifications/initialized"})).unwrap();
+        writeln!(
+            h.stdin,
+            "{}",
+            json!({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        )
+        .unwrap();
         h
     }
 
@@ -471,7 +496,12 @@ impl McpHelper {
         use std::io::Write;
         let id = self.next;
         self.next += 1;
-        writeln!(self.stdin, "{}", json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})).unwrap();
+        writeln!(
+            self.stdin,
+            "{}",
+            json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})
+        )
+        .unwrap();
         self.stdin.flush().unwrap();
         let mut line = String::new();
         self.stdout.read_line(&mut line).unwrap();
@@ -485,7 +515,10 @@ impl McpHelper {
         let reply = self.request("tools/call", json!({"name": tool, "arguments": args}));
         let result = &reply["result"];
         if result["isError"] == true {
-            Err(result["content"][0]["text"].as_str().unwrap_or_default().to_string())
+            Err(result["content"][0]["text"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string())
         } else {
             Ok(result["structuredContent"].clone())
         }
@@ -493,7 +526,12 @@ impl McpHelper {
 
     pub fn tools(&mut self) -> Vec<String> {
         let reply = self.request("tools/list", json!({}));
-        reply["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect()
+        reply["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap().to_string())
+            .collect()
     }
 }
 

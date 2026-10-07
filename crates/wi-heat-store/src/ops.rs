@@ -14,7 +14,10 @@ use wi_store::{Actor, Store};
 
 use crate::derive::World;
 use crate::schema::{self, edit_label, spec_of, words};
-use crate::{all, commit, kind, num, one, put, refused, search_text, set_setting, setting, ulid, Clock, Committed, Outcome, Result};
+use crate::{
+    all, commit, kind, num, one, put, refused, search_text, set_setting, setting, ulid, Clock,
+    Committed, Outcome, Result,
+};
 
 /// 3.15's sentence for a grade's switch.
 pub const GRADE_SWITCH: &str = "Grades are private by default. Your school keeps them as education records. Turning this on shows this grade to anyone who opens your sun.";
@@ -35,7 +38,10 @@ fn the_person() -> Actor {
 /// Puts a record the way the journal keeps it: the key is the record's own.
 fn put_value(txn: &mut wi_store::Txn<'_>, k: &str, record: &Value) -> Result<()> {
     if k == kind::DAILY_NOTE {
-        let date = record.get("date").and_then(Value::as_str).ok_or_else(|| crate::Error::Refused("A daily note needs its day.".into()))?;
+        let date = record
+            .get("date")
+            .and_then(Value::as_str)
+            .ok_or_else(|| crate::Error::Refused("A daily note needs its day.".into()))?;
         txn.put_doc(k, date, record, &search_text(k, record))?;
         return Ok(());
     }
@@ -65,7 +71,9 @@ fn write_record(
         (None, None) => format!("add {}", words(sp.name)),
         (None, Some(old)) => edit_label(sp.name, old, &record),
     };
-    let c = commit(store, &label, the_person(), |txn| put_value(txn, sp.name, &record))?;
+    let c = commit(store, &label, the_person(), |txn| {
+        put_value(txn, sp.name, &record)
+    })?;
     Ok((c, record, done.clamped))
 }
 
@@ -81,12 +89,26 @@ pub fn put_record(store: &mut Store, clock: &Clock, k: &str, record: &Value) -> 
         Some(key) => one(store, k, key)?,
         None => None,
     };
-    let (c, record, _) = write_record(store, clock, sp, existing.as_ref(), input.clone(), &world, None)?;
+    let (c, record, _) = write_record(
+        store,
+        clock,
+        sp,
+        existing.as_ref(),
+        input.clone(),
+        &world,
+        None,
+    )?;
     Ok(Outcome::new(json!({ "record": record }), c))
 }
 
 /// `heat.patch`: some fields of a record changed, the rest untouched.
-pub fn patch_record(store: &mut Store, clock: &Clock, k: &str, id: &str, set: &Map<String, Value>) -> Result<Outcome> {
+pub fn patch_record(
+    store: &mut Store,
+    clock: &Clock,
+    k: &str,
+    id: &str,
+    set: &Map<String, Value>,
+) -> Result<Outcome> {
     let sp = schema::writable(k)?;
     if set.contains_key("public") {
         return refused("The Public switch has its own command.");
@@ -117,8 +139,15 @@ pub fn delete_record(store: &mut Store, _clock: &Clock, k: &str, id: &str) -> Re
     // Records that pointed at this one, rewritten without the pointer.
     let mut rewritten: Vec<(&'static str, Value)> = Vec::new();
     let shares = all(store, kind::SHARE)?;
-    let without = |records: &[Value], field: &str, kind_of: &'static str, id: &str, out: &mut Vec<(&'static str, Value)>| {
-        for r in records.iter().filter(|r| r.get(field).and_then(Value::as_str) == Some(id)) {
+    let without = |records: &[Value],
+                   field: &str,
+                   kind_of: &'static str,
+                   id: &str,
+                   out: &mut Vec<(&'static str, Value)>| {
+        for r in records
+            .iter()
+            .filter(|r| r.get(field).and_then(Value::as_str) == Some(id))
+        {
             let mut r = r.clone();
             if let Some(m) = r.as_object_mut() {
                 m.remove(field);
@@ -128,36 +157,90 @@ pub fn delete_record(store: &mut Store, _clock: &Clock, k: &str, id: &str) -> Re
     };
     match k {
         kind::TASK => {
-            gone.extend(world.blocks.iter().filter(|b| b.task_id.as_deref() == Some(id)).map(|b| (kind::BLOCK, b.id.clone())));
-            gone.extend(world.occurrences.iter().filter(|o| o.task_id == id).map(|o| (kind::OCCURRENCE, o.id.clone())));
+            gone.extend(
+                world
+                    .blocks
+                    .iter()
+                    .filter(|b| b.task_id.as_deref() == Some(id))
+                    .map(|b| (kind::BLOCK, b.id.clone())),
+            );
+            gone.extend(
+                world
+                    .occurrences
+                    .iter()
+                    .filter(|o| o.task_id == id)
+                    .map(|o| (kind::OCCURRENCE, o.id.clone())),
+            );
             gone.extend(
                 shares
                     .iter()
                     .filter(|s| s["kind"] == "now" && s["sourceId"] == id)
                     .filter_map(|s| s["id"].as_str().map(|i| (kind::SHARE, i.to_string()))),
             );
-            without(&world.raw_tasks, "parentTaskId", kind::TASK, id, &mut rewritten);
+            without(
+                &world.raw_tasks,
+                "parentTaskId",
+                kind::TASK,
+                id,
+                &mut rewritten,
+            );
         }
         kind::HABIT => {
-            gone.extend(world.blocks.iter().filter(|b| b.habit_id.as_deref() == Some(id)).map(|b| (kind::BLOCK, b.id.clone())));
+            gone.extend(
+                world
+                    .blocks
+                    .iter()
+                    .filter(|b| b.habit_id.as_deref() == Some(id))
+                    .map(|b| (kind::BLOCK, b.id.clone())),
+            );
         }
         kind::COURSE => {
-            gone.extend(world.grades.iter().filter(|g| g.course_id == id).map(|g| (kind::GRADE, g.id.clone())));
+            gone.extend(
+                world
+                    .grades
+                    .iter()
+                    .filter(|g| g.course_id == id)
+                    .map(|g| (kind::GRADE, g.id.clone())),
+            );
             without(&world.raw_tasks, "courseId", kind::TASK, id, &mut rewritten);
         }
         kind::PROJECT => {
-            gone.extend(world.milestones.iter().filter(|m| m.project_id.as_deref() == Some(id)).map(|m| (kind::MILESTONE, m.id.clone())));
+            gone.extend(
+                world
+                    .milestones
+                    .iter()
+                    .filter(|m| m.project_id.as_deref() == Some(id))
+                    .map(|m| (kind::MILESTONE, m.id.clone())),
+            );
             gone.extend(
                 shares
                     .iter()
                     .filter(|s| s["kind"] == "timeline" && s["sourceId"] == id)
                     .filter_map(|s| s["id"].as_str().map(|i| (kind::SHARE, i.to_string()))),
             );
-            without(&world.raw_tasks, "projectId", kind::TASK, id, &mut rewritten);
-            without(&all(store, kind::NOTE)?, "projectId", kind::NOTE, id, &mut rewritten);
+            without(
+                &world.raw_tasks,
+                "projectId",
+                kind::TASK,
+                id,
+                &mut rewritten,
+            );
+            without(
+                &all(store, kind::NOTE)?,
+                "projectId",
+                kind::NOTE,
+                id,
+                &mut rewritten,
+            );
         }
         kind::MILESTONE => {
-            without(&world.raw_tasks, "milestoneId", kind::TASK, id, &mut rewritten);
+            without(
+                &world.raw_tasks,
+                "milestoneId",
+                kind::TASK,
+                id,
+                &mut rewritten,
+            );
         }
         kind::SPACE => {
             let busy = world.tasks.iter().any(|t| t.space_id == id)
@@ -172,7 +255,11 @@ pub fn delete_record(store: &mut Store, _clock: &Clock, k: &str, id: &str) -> Re
         }
         _ => {}
     }
-    let label = if k == kind::BLOCK { "remove block".to_string() } else { format!("delete {}", words(k)) };
+    let label = if k == kind::BLOCK {
+        "remove block".to_string()
+    } else {
+        format!("delete {}", words(k))
+    };
     let c = commit(store, &label, the_person(), |txn| {
         for (kind_of, record) in &rewritten {
             put_value(txn, kind_of, record)?;
@@ -213,7 +300,13 @@ pub fn delete_record(store: &mut Store, _clock: &Clock, k: &str, id: &str) -> Re
 
 /// `heat.done`: a task checked off, or back. A recurring task gets or loses
 /// the tick of one day instead; its series never flips to done (3.6).
-pub fn done(store: &mut Store, clock: &Clock, task_id: &str, make_done: bool, date: Option<&str>) -> Result<Outcome> {
+pub fn done(
+    store: &mut Store,
+    clock: &Clock,
+    task_id: &str,
+    make_done: bool,
+    date: Option<&str>,
+) -> Result<Outcome> {
     let world = World::load(store)?;
     let Some(i) = world.task_index(task_id) else {
         return refused("No task has that id.");
@@ -227,20 +320,41 @@ pub fn done(store: &mut Store, clock: &Clock, task_id: &str, make_done: bool, da
         }
     }
     if recurs(&task) {
-        let mine: Vec<_> = world.occurrences.iter().filter(|o| o.task_id == task_id).collect();
+        let mine: Vec<_> = world
+            .occurrences
+            .iter()
+            .filter(|o| o.task_id == task_id)
+            .collect();
         if make_done {
             let (occurrence, message) = match date {
-                Some(day) if mine.iter().any(|o| o.date == day) => return Ok(Outcome::unchanged(json!({ "task": raw }))),
+                Some(day) if mine.iter().any(|o| o.date == day) => {
+                    return Ok(Outcome::unchanged(json!({ "task": raw })))
+                }
                 Some(day) => (
                     json!({"id": ulid(), "taskId": task_id, "date": day, "doneAt": num(now)}),
                     None,
                 ),
-                None => match check_off(&task, &world.sessions, &world.occurrences, now, tz, &mut ulid) {
-                    CheckOff::Occurrence { occurrence, message } => (serde_json::to_value(&occurrence).unwrap_or(Value::Null), message),
+                None => match check_off(
+                    &task,
+                    &world.sessions,
+                    &world.occurrences,
+                    now,
+                    tz,
+                    &mut ulid,
+                ) {
+                    CheckOff::Occurrence {
+                        occurrence,
+                        message,
+                    } => (
+                        serde_json::to_value(&occurrence).unwrap_or(Value::Null),
+                        message,
+                    ),
                     _ => return refused("This series has ended. Nothing is left to check."),
                 },
             };
-            let c = commit(store, "mark done", the_person(), |txn| put(txn, kind::OCCURRENCE, &occurrence))?;
+            let c = commit(store, "mark done", the_person(), |txn| {
+                put(txn, kind::OCCURRENCE, &occurrence)
+            })?;
             let mut result = json!({ "task": raw });
             if let Some(m) = message {
                 result["took"] = json!(m);
@@ -250,7 +364,10 @@ pub fn done(store: &mut Store, clock: &Clock, task_id: &str, make_done: bool, da
         // Not done: the tick on `date`, or the newest tick there is.
         let target = match date {
             Some(day) => mine.iter().find(|o| o.date == day).map(|o| o.id.clone()),
-            None => mine.iter().max_by(|a, b| a.date.cmp(&b.date)).map(|o| o.id.clone()),
+            None => mine
+                .iter()
+                .max_by(|a, b| a.date.cmp(&b.date))
+                .map(|o| o.id.clone()),
         };
         let Some(target) = target else {
             return Ok(Outcome::unchanged(json!({ "task": raw })));
@@ -268,7 +385,14 @@ pub fn done(store: &mut Store, clock: &Clock, task_id: &str, make_done: bool, da
         if task.done {
             return Ok(Outcome::unchanged(json!({ "task": raw })));
         }
-        if let CheckOff::Done { message, .. } = check_off(&task, &world.sessions, &world.occurrences, now, tz, &mut ulid) {
+        if let CheckOff::Done { message, .. } = check_off(
+            &task,
+            &world.sessions,
+            &world.occurrences,
+            now,
+            tz,
+            &mut ulid,
+        ) {
             took = Some(message);
         }
         record.insert("done".into(), json!(true));
@@ -291,7 +415,11 @@ pub fn done(store: &mut Store, clock: &Clock, task_id: &str, make_done: bool, da
     } else {
         Vec::new()
     };
-    let label = if make_done { "mark done" } else { "mark not done" };
+    let label = if make_done {
+        "mark done"
+    } else {
+        "mark not done"
+    };
     let c = commit(store, label, the_person(), |txn| {
         put(txn, kind::TASK, &record)?;
         for id in &lines {
@@ -340,13 +468,29 @@ pub fn estimate(
     if let Some(m) = est_min {
         candidate.insert("estMin".into(), m.map_or(Value::Null, num));
     }
-    let (c, record, clamped) = write_record(store, clock, sp, Some(&old), candidate, &world, Some("estimate"))?;
+    let (c, record, clamped) = write_record(
+        store,
+        clock,
+        sp,
+        Some(&old),
+        candidate,
+        &world,
+        Some("estimate"),
+    )?;
     let clamped = clamped || difficulty.is_some_and(|d| d.round().clamp(1.0, 5.0) != d);
-    Ok(Outcome::new(json!({ "task": record, "clamped": clamped }), c))
+    Ok(Outcome::new(
+        json!({ "task": record, "clamped": clamped }),
+        c,
+    ))
 }
 
 /// `heat.tookTime`: Get Info's "Took", so the total reads `minutes`.
-pub fn took_time(store: &mut Store, _clock: &Clock, task_id: &str, minutes: f64) -> Result<Outcome> {
+pub fn took_time(
+    store: &mut Store,
+    _clock: &Clock,
+    task_id: &str,
+    minutes: f64,
+) -> Result<Outcome> {
     if !minutes.is_finite() || minutes < 0.0 {
         return refused("Minutes can't be less than 0.");
     }
@@ -357,7 +501,9 @@ pub fn took_time(store: &mut Store, _clock: &Clock, task_id: &str, minutes: f64)
     let set = set_took(&world.tasks[i], &world.sessions, minutes);
     let mut record = world.raw_tasks[i].clone();
     record["adjustMin"] = num(set.adjust_min);
-    let c = commit(store, "change time taken", the_person(), |txn| put(txn, kind::TASK, &record))?;
+    let c = commit(store, "change time taken", the_person(), |txn| {
+        put(txn, kind::TASK, &record)
+    })?;
     Ok(Outcome::new(json!({ "task": record }), c))
 }
 
@@ -376,7 +522,11 @@ pub fn put_block(store: &mut Store, clock: &Clock, args: &Map<String, Value>) ->
             m.insert(field.into(), v.clone());
         }
     }
-    let number = |field: &str| args.get(field).and_then(Value::as_f64).or_else(|| m.get(field).and_then(Value::as_f64));
+    let number = |field: &str| {
+        args.get(field)
+            .and_then(Value::as_f64)
+            .or_else(|| m.get(field).and_then(Value::as_f64))
+    };
     let (Some(start), Some(minutes)) = (number("start"), number("minutes")) else {
         return refused("A block needs a start and a length in minutes.");
     };
@@ -397,7 +547,12 @@ fn inbox_line(count: usize) -> String {
 }
 
 /// `heat.capture.add`: a line kept for the Inbox, and the count line.
-pub fn capture_add(store: &mut Store, _clock: &Clock, text: &str, link: Option<&Value>) -> Result<Outcome> {
+pub fn capture_add(
+    store: &mut Store,
+    _clock: &Clock,
+    text: &str,
+    link: Option<&Value>,
+) -> Result<Outcome> {
     let text = text.trim();
     if text.is_empty() {
         return refused("Type something to capture.");
@@ -406,14 +561,29 @@ pub fn capture_add(store: &mut Store, _clock: &Clock, text: &str, link: Option<&
     if let Some(link) = link.filter(|l| !l.is_null()) {
         record["link"] = link.clone();
     }
-    let waiting = all(store, kind::CAPTURE)?.iter().filter(|c| c.get("triagedAt").map_or(true, Value::is_null)).count() + 1;
-    let c = commit(store, "capture", the_person(), |txn| put(txn, kind::CAPTURE, &record))?;
-    Ok(Outcome::new(json!({ "capture": record, "inbox": inbox_line(waiting) }), c))
+    let waiting = all(store, kind::CAPTURE)?
+        .iter()
+        .filter(|c| c.get("triagedAt").map_or(true, Value::is_null))
+        .count()
+        + 1;
+    let c = commit(store, "capture", the_person(), |txn| {
+        put(txn, kind::CAPTURE, &record)
+    })?;
+    Ok(Outcome::new(
+        json!({ "capture": record, "inbox": inbox_line(waiting) }),
+        c,
+    ))
 }
 
 /// `heat.capture.triage`: a capture made into a task, note or project (or
 /// marked as an upload), and out of the Inbox.
-pub fn capture_triage(store: &mut Store, clock: &Clock, id: &str, to: &str, record: Option<&Map<String, Value>>) -> Result<Outcome> {
+pub fn capture_triage(
+    store: &mut Store,
+    clock: &Clock,
+    id: &str,
+    to: &str,
+    record: Option<&Map<String, Value>>,
+) -> Result<Outcome> {
     let Some(capture) = one(store, kind::CAPTURE, id)? else {
         return refused("No capture has that id.");
     };
@@ -440,7 +610,14 @@ pub fn capture_triage(store: &mut Store, clock: &Clock, id: &str, to: &str, reco
             if let Some(link) = capture.get("link") {
                 fields.entry("link").or_insert(link.clone());
             }
-            let done = schema::finish(spec_of(kind::TASK).expect("task"), None, fields, &world, clock, &mut ulid)?;
+            let done = schema::finish(
+                spec_of(kind::TASK).expect("task"),
+                None,
+                fields,
+                &world,
+                clock,
+                &mut ulid,
+            )?;
             Some((kind::TASK, Value::Object(done.record)))
         }
         "note" => {
@@ -448,7 +625,14 @@ pub fn capture_triage(store: &mut Store, clock: &Clock, id: &str, to: &str, reco
             if let Some(link) = capture.get("link") {
                 fields.entry("link").or_insert(link.clone());
             }
-            let done = schema::finish(spec_of(kind::NOTE).expect("note"), None, fields, &world, clock, &mut ulid)?;
+            let done = schema::finish(
+                spec_of(kind::NOTE).expect("note"),
+                None,
+                fields,
+                &world,
+                clock,
+                &mut ulid,
+            )?;
             Some((kind::NOTE, Value::Object(done.record)))
         }
         "project" => {
@@ -456,7 +640,14 @@ pub fn capture_triage(store: &mut Store, clock: &Clock, id: &str, to: &str, reco
             if let (Some(space), true) = (first_space, !fields.contains_key("spaceId")) {
                 fields.insert("spaceId".into(), json!(space));
             }
-            let done = schema::finish(spec_of(kind::PROJECT).expect("project"), None, fields, &world, clock, &mut ulid)?;
+            let done = schema::finish(
+                spec_of(kind::PROJECT).expect("project"),
+                None,
+                fields,
+                &world,
+                clock,
+                &mut ulid,
+            )?;
             Some((kind::PROJECT, Value::Object(done.record)))
         }
         // The file came into the library when it was dropped; this only
@@ -469,7 +660,10 @@ pub fn capture_triage(store: &mut Store, clock: &Clock, id: &str, to: &str, reco
     triaged["resultType"] = json!(to);
     let result_id = match &made {
         Some((_, r)) => r["id"].as_str().map(str::to_string),
-        None => record.and_then(|r| r.get("id")).and_then(Value::as_str).map(str::to_string),
+        None => record
+            .and_then(|r| r.get("id"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
     };
     if let Some(rid) = &result_id {
         triaged["resultId"] = json!(rid);
@@ -489,7 +683,13 @@ pub fn capture_triage(store: &mut Store, clock: &Clock, id: &str, to: &str, reco
 
 /// `heat.score`: the person types a score into a grade, pending or not. Only
 /// the person does: no tool of Claude's has an argument for it (3.8).
-pub fn score(store: &mut Store, _clock: &Clock, grade_id: &str, score: f64, out_of: Option<f64>) -> Result<Outcome> {
+pub fn score(
+    store: &mut Store,
+    _clock: &Clock,
+    grade_id: &str,
+    score: f64,
+    out_of: Option<f64>,
+) -> Result<Outcome> {
     if !score.is_finite() || score < 0.0 {
         return refused("A score is a number, 0 or more.");
     }
@@ -505,13 +705,21 @@ pub fn score(store: &mut Store, _clock: &Clock, grade_id: &str, score: f64, out_
         }
         record["outOf"] = num(total);
     }
-    let c = commit(store, "enter score", the_person(), |txn| put(txn, kind::GRADE, &record))?;
+    let c = commit(store, "enter score", the_person(), |txn| {
+        put(txn, kind::GRADE, &record)
+    })?;
     Ok(Outcome::new(json!({ "grade": record }), c))
 }
 
 /// `heat.public.set`: the Public switch of one record (3.15). Nothing else
 /// turns it on: not put, not patch, not any tool of Claude's.
-pub fn set_public(store: &mut Store, _clock: &Clock, k: &str, id: &str, public: bool) -> Result<Outcome> {
+pub fn set_public(
+    store: &mut Store,
+    _clock: &Clock,
+    k: &str,
+    id: &str,
+    public: bool,
+) -> Result<Outcome> {
     if k == kind::MAIL {
         return refused("Mail is never public.");
     }
@@ -523,8 +731,14 @@ pub fn set_public(store: &mut Store, _clock: &Clock, k: &str, id: &str, public: 
     };
     let mut record = old.clone();
     record["public"] = json!(public);
-    let label = if public { "make public" } else { "make private" };
-    let c = commit(store, label, the_person(), |txn| put_value(txn, sp.name, &record))?;
+    let label = if public {
+        "make public"
+    } else {
+        "make private"
+    };
+    let c = commit(store, label, the_person(), |txn| {
+        put_value(txn, sp.name, &record)
+    })?;
     let mut result = json!({ "record": record });
     if k == kind::GRADE {
         result["sentence"] = json!(GRADE_SWITCH);
@@ -548,17 +762,28 @@ pub fn share_now(store: &mut Store, clock: &Clock, task_id: &str, text: &str) ->
     }
     let shares = all(store, kind::SHARE)?;
     // Showing a new line replaces the one on show.
-    let id = shares.iter().find(|s| s["kind"] == "now").and_then(|s| s["id"].as_str()).map_or_else(ulid, str::to_string);
+    let id = shares
+        .iter()
+        .find(|s| s["kind"] == "now")
+        .and_then(|s| s["id"].as_str())
+        .map_or_else(ulid, str::to_string);
     let share = json!({
         "id": id, "kind": "now", "sourceId": task_id, "text": text, "targetId": "sun",
         "clearsAt": num(clock.now_ms + NOW_LINES_LAST_MS),
     });
-    let c = commit(store, "show Now making", the_person(), |txn| put(txn, kind::SHARE, &share))?;
+    let c = commit(store, "show Now making", the_person(), |txn| {
+        put(txn, kind::SHARE, &share)
+    })?;
     Ok(Outcome::new(json!({ "share": share }), c))
 }
 
 /// `heat.share.timeline`: a project's timeline on its solar system.
-pub fn share_timeline(store: &mut Store, _clock: &Clock, project_id: &str, target_id: &str) -> Result<Outcome> {
+pub fn share_timeline(
+    store: &mut Store,
+    _clock: &Clock,
+    project_id: &str,
+    target_id: &str,
+) -> Result<Outcome> {
     let world = World::load(store)?;
     if !world.projects.iter().any(|p| p.id == project_id) {
         return refused("Pick a project to show.");
@@ -574,7 +799,9 @@ pub fn share_timeline(store: &mut Store, _clock: &Clock, project_id: &str, targe
         .and_then(|s| s["id"].as_str())
         .map_or_else(ulid, str::to_string);
     let share = json!({"id": id, "kind": "timeline", "sourceId": project_id, "targetId": target});
-    let c = commit(store, "show timeline", the_person(), |txn| put(txn, kind::SHARE, &share))?;
+    let c = commit(store, "show timeline", the_person(), |txn| {
+        put(txn, kind::SHARE, &share)
+    })?;
     Ok(Outcome::new(json!({ "share": share }), c))
 }
 
@@ -583,7 +810,11 @@ pub fn share_hide(store: &mut Store, _clock: &Clock, id: &str) -> Result<Outcome
     let Some(share) = one(store, kind::SHARE, id)? else {
         return refused("That isn't on your public Heat view.");
     };
-    let label = if share["kind"] == "now" { "hide Now making" } else { "hide timeline" };
+    let label = if share["kind"] == "now" {
+        "hide Now making"
+    } else {
+        "hide timeline"
+    };
     let c = commit(store, label, the_person(), |txn| {
         txn.delete_doc(kind::SHARE, id)?;
         Ok(())
@@ -593,7 +824,12 @@ pub fn share_hide(store: &mut Store, _clock: &Clock, id: &str) -> Result<Outcome
 
 /// `heat.review.complete`: the note the person wrote, kept. Heat never writes
 /// it for them (3.14).
-pub fn review_complete(store: &mut Store, _clock: &Clock, week_start: &str, note: &str) -> Result<Outcome> {
+pub fn review_complete(
+    store: &mut Store,
+    _clock: &Clock,
+    week_start: &str,
+    note: &str,
+) -> Result<Outcome> {
     if !schema::is_day(week_start) {
         return refused("A week starts on a day, written YYYY-MM-DD.");
     }
@@ -604,15 +840,24 @@ pub fn review_complete(store: &mut Store, _clock: &Clock, week_start: &str, note
     // One note for each week: pressing the button again changes it.
     let id = format!("review-{week_start}");
     let old = one(store, kind::NOTE, &id)?;
-    let mut record = old.clone().unwrap_or_else(|| json!({"id": id, "public": false}));
-    record["title"] = json!(format!("Weekly review, week of {}", wi_heat::model::format::short_month_day(week_start)));
+    let mut record = old
+        .clone()
+        .unwrap_or_else(|| json!({"id": id, "public": false}));
+    record["title"] = json!(format!(
+        "Weekly review, week of {}",
+        wi_heat::model::format::short_month_day(week_start)
+    ));
     record["markdown"] = json!(markdown);
-    let c = commit(store, "weekly review", the_person(), |txn| put(txn, kind::NOTE, &record))?;
+    let c = commit(store, "weekly review", the_person(), |txn| {
+        put(txn, kind::NOTE, &record)
+    })?;
     Ok(Outcome::new(json!({ "note": record }), c))
 }
 
 fn values<T: serde::Serialize>(v: &[T]) -> Vec<Value> {
-    v.iter().filter_map(|r| serde_json::to_value(r).ok()).collect()
+    v.iter()
+        .filter_map(|r| serde_json::to_value(r).ok())
+        .collect()
 }
 
 /// With a Public switch off, for a record built here.
@@ -662,7 +907,9 @@ pub fn import(store: &mut Store, _clock: &Clock, json_in: &Value) -> Result<Outc
         .iter()
         .filter_map(|t| serde_json::to_value(t).ok())
         .map(|mut t| {
-            if matches!(t["source"].as_str(), Some("mail" | "calendar")) && t.get("sourceId").is_none() {
+            if matches!(t["source"].as_str(), Some("mail" | "calendar"))
+                && t.get("sourceId").is_none()
+            {
                 t["sourceId"] = t["id"].clone();
             }
             t
@@ -698,8 +945,16 @@ pub fn ensure_defaults(store: &mut Store) -> Result<Vec<(&'static str, Value)>> 
         let mut ids = ["classes", "wwav", "personal"].into_iter();
         let spaces: Vec<Space> = default_spaces(&mut || ids.next().unwrap_or("space").to_string());
         for space in spaces {
-            let record = private(kind::SPACE, serde_json::to_value(&space).unwrap_or(Value::Null));
-            store.set_doc(kind::SPACE, &space.id, &record, &search_text(kind::SPACE, &record))?;
+            let record = private(
+                kind::SPACE,
+                serde_json::to_value(&space).unwrap_or(Value::Null),
+            );
+            store.set_doc(
+                kind::SPACE,
+                &space.id,
+                &record,
+                &search_text(kind::SPACE, &record),
+            )?;
             made.push((kind::SPACE, record));
         }
     }

@@ -230,10 +230,15 @@ impl Inner {
 
     /// Now and the person's time zone: Settings → Heat's, else the system's.
     fn clock(&self) -> wi_heat_store::Clock {
-        let now = lock(&self.fixed_now).unwrap_or_else(|| jiff::Timestamp::now().as_millisecond() as f64);
+        let now =
+            lock(&self.fixed_now).unwrap_or_else(|| jiff::Timestamp::now().as_millisecond() as f64);
         let zone = settings::read(self)
             .ok()
-            .and_then(|s| s["heat"]["timeZone"].as_str().and_then(|name| jiff::tz::TimeZone::get(name).ok()))
+            .and_then(|s| {
+                s["heat"]["timeZone"]
+                    .as_str()
+                    .and_then(|name| jiff::tz::TimeZone::get(name).ok())
+            })
             .unwrap_or_else(jiff::tz::TimeZone::system);
         wi_heat_store::Clock::at(now, zone)
     }

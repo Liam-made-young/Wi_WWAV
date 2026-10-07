@@ -67,12 +67,17 @@ pub fn clock_text(clock: &Clock, ms: f64) -> String {
 
 /// A day's first moment and the next day's, for bounding events.
 fn day_bounds(clock: &Clock, from: &str, to: &str) -> (f64, f64) {
-    (zone::start_of_day(from, &clock.zone), zone::start_of_day(&zone::add_days(to, 1.0), &clock.zone))
+    (
+        zone::start_of_day(from, &clock.zone),
+        zone::start_of_day(&zone::add_days(to, 1.0), &clock.zone),
+    )
 }
 
 /// Whether a record's `date` falls in the days asked for.
 fn in_window(record: &Value, from: &str, to: &str) -> bool {
-    record["date"].as_str().is_some_and(|d| d >= from && d <= to)
+    record["date"]
+        .as_str()
+        .is_some_and(|d| d >= from && d <= to)
 }
 
 /// A month around a day: from a week before the 1st to a week after the last.
@@ -92,8 +97,16 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
         None => today.clone(),
     };
     let (default_from, default_to) = default_range(&date);
-    let from = window.from.clone().filter(|d| is_day(d)).unwrap_or(default_from);
-    let to = window.to.clone().filter(|d| is_day(d)).unwrap_or(default_to);
+    let from = window
+        .from
+        .clone()
+        .filter(|d| is_day(d))
+        .unwrap_or(default_from);
+    let to = window
+        .to
+        .clone()
+        .filter(|d| is_day(d))
+        .unwrap_or(default_to);
     let world = World::load(store)?;
     let (now, tz) = (clock.now_ms, &clock.zone);
 
@@ -105,7 +118,11 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
         match k {
             kind::BLOCK => list.retain(|b| in_window(b, &from, &to)),
             kind::OCCURRENCE => list.retain(|o| in_window(o, &from, &to)),
-            kind::SHARE => list.retain(|s| s.get("clearsAt").and_then(Value::as_f64).map_or(true, |t| t > now)),
+            kind::SHARE => list.retain(|s| {
+                s.get("clearsAt")
+                    .and_then(Value::as_f64)
+                    .map_or(true, |t| t > now)
+            }),
             _ => {}
         }
         records.insert(k.to_string(), Value::Array(list));
@@ -114,7 +131,10 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
     let events: Vec<Value> = all(store, kind::EVENT)?
         .into_iter()
         .filter(|e| {
-            let (s, t) = (e["start"].as_f64().unwrap_or(0.0), e["end"].as_f64().unwrap_or(0.0));
+            let (s, t) = (
+                e["start"].as_f64().unwrap_or(0.0),
+                e["end"].as_f64().unwrap_or(0.0),
+            );
             s < hi && t.max(s) >= lo
         })
         .collect();
@@ -154,8 +174,13 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
         sessions: world.sessions.clone(),
         habits: world.habits.clone(),
     };
-    let view_now = if date == today { now } else { zone::at_minute(&date, 0.0, tz) };
-    let (mut planned, mut due_today, mut recurring, mut hot_unplanned) = (vec![], vec![], vec![], vec![]);
+    let view_now = if date == today {
+        now
+    } else {
+        zone::at_minute(&date, 0.0, tz)
+    };
+    let (mut planned, mut due_today, mut recurring, mut hot_unplanned) =
+        (vec![], vec![], vec![], vec![]);
     for section in plan_sections(&data, view_now, tz, None) {
         match section {
             PlanSection::Planned { items, .. } => planned = items.iter().map(|r| json!(r.block.id)).collect::<Vec<_>>(),
@@ -181,7 +206,12 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
     let open = recurrence::open_tasks(&world.tasks, &world.occurrences, now, tz);
     let hot: Vec<&Task> = heat::by_heat(&open, now)
         .into_iter()
-        .filter(|t| matches!(heat::heat_of(*t, now).level, HeatLevel::Hot | HeatLevel::Overdue))
+        .filter(|t| {
+            matches!(
+                heat::heat_of(*t, now).level,
+                HeatLevel::Hot | HeatLevel::Overdue
+            )
+        })
         .take(5)
         .collect();
 
@@ -197,12 +227,19 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
     let capture_ids = |v: &[Capture]| -> Vec<Value> { v.iter().map(|c| json!(c.id)).collect() };
     // Done reads newest first.
     let mut done_list = lists.done.clone();
-    done_list.sort_by(|a, b| b.done_at.unwrap_or(0.0).total_cmp(&a.done_at.unwrap_or(0.0)));
+    done_list.sort_by(|a, b| {
+        b.done_at
+            .unwrap_or(0.0)
+            .total_cmp(&a.done_at.unwrap_or(0.0))
+    });
 
     // Calendar's recurring pills: each open series' occurrences in the days
     // asked for, and whether each is ticked.
-    let ticked: std::collections::HashSet<(&str, &str)> =
-        world.occurrences.iter().map(|o| (o.task_id.as_str(), o.date.as_str())).collect();
+    let ticked: std::collections::HashSet<(&str, &str)> = world
+        .occurrences
+        .iter()
+        .map(|o| (o.task_id.as_str(), o.date.as_str()))
+        .collect();
     let occurrences: Vec<Value> = world
         .tasks
         .iter()
@@ -229,7 +266,10 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
         extra.sort_unstable();
         kinds.extend(extra);
         for t in kinds {
-            if let Some(a) = ctx.averages.get(&wi_heat::model::estimate::type_key(&space.id, t)) {
+            if let Some(a) = ctx
+                .averages
+                .get(&wi_heat::model::estimate::type_key(&space.id, t))
+            {
                 averages.push(json!({
                     "space": space.id, "type": t, "minutes": num(a.minutes), "count": num(a.count),
                     "line": copy::average_time(t, &format_minutes(a.minutes), a.count),
@@ -373,20 +413,36 @@ const SHOWN: [(&str, &[&str]); 9] = [
 pub fn public_view(store: &Store, clock: &Clock) -> Result<Value> {
     let now = clock.now_ms;
     let shares = all(store, kind::SHARE)?;
-    let live = |s: &Value| s.get("clearsAt").and_then(Value::as_f64).map_or(true, |t| t > now);
+    let live = |s: &Value| {
+        s.get("clearsAt")
+            .and_then(Value::as_f64)
+            .map_or(true, |t| t > now)
+    };
     let now_line = shares
         .iter()
         .find(|s| s["kind"] == "now" && live(s) && s["text"].is_string())
         .map(|s| json!({"text": s["text"]}))
         .unwrap_or(Value::Null);
-    let projects: Vec<Project> = all(store, kind::PROJECT)?.iter().filter_map(|p| serde_json::from_value(p.clone()).ok()).collect();
-    let milestones: Vec<Milestone> = all(store, kind::MILESTONE)?.iter().filter_map(|m| serde_json::from_value(m.clone()).ok()).collect();
+    let projects: Vec<Project> = all(store, kind::PROJECT)?
+        .iter()
+        .filter_map(|p| serde_json::from_value(p.clone()).ok())
+        .collect();
+    let milestones: Vec<Milestone> = all(store, kind::MILESTONE)?
+        .iter()
+        .filter_map(|m| serde_json::from_value(m.clone()).ok())
+        .collect();
     let mut timelines = Vec::new();
     for s in shares.iter().filter(|s| s["kind"] == "timeline") {
-        let Some(project) = projects.iter().find(|p| Some(p.id.as_str()) == s["sourceId"].as_str()) else {
+        let Some(project) = projects
+            .iter()
+            .find(|p| Some(p.id.as_str()) == s["sourceId"].as_str())
+        else {
             continue;
         };
-        let mut beads: Vec<&Milestone> = milestones.iter().filter(|m| m.project_id.as_deref() == Some(project.id.as_str())).collect();
+        let mut beads: Vec<&Milestone> = milestones
+            .iter()
+            .filter(|m| m.project_id.as_deref() == Some(project.id.as_str()))
+            .collect();
         beads.sort_by(|a, b| a.date.cmp(&b.date).then(a.order.total_cmp(&b.order)));
         timelines.push(json!({
             "projectId": project.id,
@@ -414,11 +470,17 @@ pub fn public_view(store: &Store, clock: &Clock) -> Result<Value> {
             // A grade names its course, and a focus record its task, by the
             // course's code and the task's title: nothing else of theirs.
             if k == kind::GRADE {
-                let code = courses.iter().find(|c| c["id"] == d.json["courseId"]).map(|c| c["code"].clone());
+                let code = courses
+                    .iter()
+                    .find(|c| c["id"] == d.json["courseId"])
+                    .map(|c| c["code"].clone());
                 item.insert("course".into(), code.unwrap_or(Value::Null));
             }
             if k == kind::FOCUS {
-                let title = tasks.iter().find(|t| t["id"] == d.json["taskId"]).map(|t| t["title"].clone());
+                let title = tasks
+                    .iter()
+                    .find(|t| t["id"] == d.json["taskId"])
+                    .map(|t| t["title"].clone());
                 item.insert("task".into(), title.unwrap_or(Value::Null));
             }
             list.push(Value::Object(item));

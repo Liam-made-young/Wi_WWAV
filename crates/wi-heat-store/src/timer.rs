@@ -7,20 +7,28 @@
 
 use serde_json::{json, Value};
 use wi_heat::model::focus::{
-    focus_step, initial_focus, is_focus_length, FocusEffect, FocusEvent, FocusSettings, FocusState, FocusTarget, Phase, TargetKind,
+    focus_step, initial_focus, is_focus_length, FocusEffect, FocusEvent, FocusSettings, FocusState,
+    FocusTarget, Phase, TargetKind,
 };
 use wi_heat::model::plan::{accept_draft, Draft};
 use wi_heat::model::records::Room;
 use wi_store::{Actor, Store};
 
 use crate::derive::{self, World};
-use crate::{commit, kind, num, one, put, refused, set_setting, set_state, setting, state, ulid, Clock, Outcome, Result};
+use crate::{
+    commit, kind, num, one, put, refused, set_setting, set_state, setting, state, ulid, Clock,
+    Outcome, Result,
+};
 
 /// The timer's state as the views read it: the summary 3.16 gives
 /// (`{phase, round, endsAt}`), and what a paused or waiting timer needs too.
 /// `taskId` is the task the round is on (a habit's round has none).
 fn timer_summary(f: &FocusState) -> Value {
-    let task = f.target.as_ref().filter(|t| t.kind == TargetKind::Task).map_or(Value::Null, |t| json!(t.id));
+    let task = f
+        .target
+        .as_ref()
+        .filter(|t| t.kind == TargetKind::Task)
+        .map_or(Value::Null, |t| json!(t.id));
     json!({
         "phase": f.phase,
         "round": num(f.round),
@@ -64,12 +72,19 @@ pub fn public_state(state: &Value) -> Value {
 /// The time the day ends at, in minutes after midnight: the last one set,
 /// else 11 PM.
 pub fn day_ends(store: &Store) -> Result<f64> {
-    Ok(setting(store, "dayEnds")?.and_then(|v| v.as_f64()).unwrap_or(derive::DAY_ENDS_MIN))
+    Ok(setting(store, "dayEnds")?
+        .and_then(|v| v.as_f64())
+        .unwrap_or(derive::DAY_ENDS_MIN))
 }
 
 /// `heat.plan.make`: Plan my day's rule, as drafts waiting to be accepted.
 /// Writes only `heatState.planDrafts` (8.8).
-pub fn plan_make(store: &mut Store, clock: &Clock, date: Option<&str>, ends: Option<f64>) -> Result<Outcome> {
+pub fn plan_make(
+    store: &mut Store,
+    clock: &Clock,
+    date: Option<&str>,
+    ends: Option<f64>,
+) -> Result<Outcome> {
     let today = clock.today();
     let date = date.unwrap_or(&today).to_string();
     if !crate::schema::is_day(&date) {
@@ -91,7 +106,11 @@ pub fn plan_make(store: &mut Store, clock: &Clock, date: Option<&str>, ends: Opt
     let mut st = state(store)?;
     st["planDrafts"] = Value::Array(plan.drafts_stored.clone());
     set_state(store, &st)?;
-    let unplanned: Vec<Value> = plan.unplanned.iter().filter_map(|u| u.get("task_id").cloned()).collect();
+    let unplanned: Vec<Value> = plan
+        .unplanned
+        .iter()
+        .filter_map(|u| u.get("task_id").cloned())
+        .collect();
     Ok(Outcome::outside(
         json!({"drafts": plan.drafts_stored, "unplanned": unplanned, "minutesLeft": num(plan.minutes_left)}),
         &[kind::STATE],
@@ -100,12 +119,21 @@ pub fn plan_make(store: &mut Store, clock: &Clock, date: Option<&str>, ends: Opt
 
 /// `heat.plan.accept`: every draft of `date` becomes a block (Return), or just
 /// the ones named (a click).
-pub fn plan_accept(store: &mut Store, _clock: &Clock, date: &str, task_ids: Option<&[String]>) -> Result<Outcome> {
+pub fn plan_accept(
+    store: &mut Store,
+    _clock: &Clock,
+    date: &str,
+    task_ids: Option<&[String]>,
+) -> Result<Outcome> {
     let mut st = state(store)?;
     let drafts: Vec<Draft> = st
         .get("planDrafts")
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(|d| serde_json::from_value(d.clone()).ok()).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|d| serde_json::from_value(d.clone()).ok())
+                .collect()
+        })
         .unwrap_or_default();
     let world = World::load(store)?;
     let wanted = |d: &Draft| {
@@ -121,7 +149,11 @@ pub fn plan_accept(store: &mut Store, _clock: &Clock, date: &str, task_ids: Opti
         .iter()
         .map(|d| serde_json::to_value(accept_draft(d, &mut ulid)).unwrap_or(Value::Null))
         .collect();
-    let label = if task_ids.is_some() { "accept draft" } else { "plan my day" };
+    let label = if task_ids.is_some() {
+        "accept draft"
+    } else {
+        "plan my day"
+    };
     let c = commit(store, label, Actor::You, |txn| {
         for b in &blocks {
             put(txn, kind::BLOCK, b)?;
@@ -149,7 +181,10 @@ struct Carried {
 }
 
 fn carry_out(store: &Store, clock: &Clock, effects: &[FocusEffect]) -> Result<Carried> {
-    let mut out = Carried { logged: None, habit: None };
+    let mut out = Carried {
+        logged: None,
+        habit: None,
+    };
     for effect in effects {
         match effect {
             FocusEffect::Log { session } => {
@@ -189,10 +224,20 @@ fn log_round(store: &mut Store, carried: &Carried) -> Result<crate::Committed> {
 
 fn target_of(world: &World, id: &str) -> Result<FocusTarget> {
     if let Some(t) = world.tasks.iter().find(|t| t.id == id) {
-        return Ok(FocusTarget { kind: TargetKind::Task, id: t.id.clone(), title: t.title.clone(), minutes: None });
+        return Ok(FocusTarget {
+            kind: TargetKind::Task,
+            id: t.id.clone(),
+            title: t.title.clone(),
+            minutes: None,
+        });
     }
     if let Some(h) = world.habits.iter().find(|h| h.id == id) {
-        return Ok(FocusTarget { kind: TargetKind::Habit, id: h.id.clone(), title: h.title.clone(), minutes: h.minutes });
+        return Ok(FocusTarget {
+            kind: TargetKind::Habit,
+            id: h.id.clone(),
+            title: h.title.clone(),
+            minutes: h.minutes,
+        });
     }
     refused("No task has that id.")
 }
@@ -213,11 +258,20 @@ pub fn set_current(store: &mut Store, clock: &Clock, task_id: Option<&str>) -> R
     let mut st = state(store)?;
     st["currentTaskId"] = task_id.map_or(Value::Null, |i| json!(i));
     let mut fs = load_focus(&st);
-    let step = focus_step(&fs, &FocusEvent::SetTarget { target }, clock.now_ms, FocusSettings::default());
+    let step = focus_step(
+        &fs,
+        &FocusEvent::SetTarget { target },
+        clock.now_ms,
+        FocusSettings::default(),
+    );
     fs = step.state;
     keep_focus(&mut st, &fs);
     let carried = carry_out(store, clock, &step.effects)?;
-    let committed = if carried.logged.is_some() || carried.habit.is_some() { Some(log_round(store, &carried)?) } else { None };
+    let committed = if carried.logged.is_some() || carried.habit.is_some() {
+        Some(log_round(store, &carried)?)
+    } else {
+        None
+    };
     set_state(store, &st)?;
     Ok(match committed {
         Some(c) => {
@@ -231,7 +285,13 @@ pub fn set_current(store: &mut Store, clock: &Clock, task_id: Option<&str>) -> R
 
 /// `heat.focus.*`: the timer, one press at a time. Nothing starts without a
 /// call (3.5): the machine only moves on the events below.
-pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>, length: Option<f64>) -> Result<Outcome> {
+pub fn focus(
+    store: &mut Store,
+    clock: &Clock,
+    step: &str,
+    task_id: Option<&str>,
+    length: Option<f64>,
+) -> Result<Outcome> {
     let now = clock.now_ms;
     let world = World::load(store)?;
     let was = state(store)?;
@@ -242,7 +302,10 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
         "start" | "resume" => {
             let target = match task_id {
                 Some(id) => Some(target_of(&world, id)?),
-                None => match st["currentTaskId"].as_str().filter(|id| world.tasks.iter().any(|t| t.id == *id && !t.done)) {
+                None => match st["currentTaskId"]
+                    .as_str()
+                    .filter(|id| world.tasks.iter().any(|t| t.id == *id && !t.done))
+                {
                     Some(id) => Some(target_of(&world, id)?),
                     None => fs.target.clone(),
                 },
@@ -253,7 +316,9 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
             if let Some(minutes) = length {
                 if fs.phase != Phase::Focus {
                     if !is_focus_length(minutes) {
-                        return refused("A focus is 25 or 50 minutes, or any whole number from 10 to 90.");
+                        return refused(
+                            "A focus is 25 or 50 minutes, or any whole number from 10 to 90.",
+                        );
                     }
                     events.push(FocusEvent::SetLength { minutes });
                 }
@@ -262,7 +327,10 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
             if fs.running && fs.phase != Phase::Idle {
                 events.clear();
             } else {
-                events.push(FocusEvent::Press { target: target.clone(), room: Some(Room::Heat) });
+                events.push(FocusEvent::Press {
+                    target: target.clone(),
+                    room: Some(Room::Heat),
+                });
             }
             // Focus on a selection makes it the current task (3.5).
             if let Some(t) = target.filter(|t| t.kind == TargetKind::Task) {
@@ -271,7 +339,10 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
         }
         "pause" => {
             if fs.running {
-                events.push(FocusEvent::Press { target: None, room: None });
+                events.push(FocusEvent::Press {
+                    target: None,
+                    room: None,
+                });
             }
         }
         "interrupt" => events.push(FocusEvent::PulledAway),
@@ -290,7 +361,11 @@ pub fn focus(store: &mut Store, clock: &Clock, step: &str, task_id: Option<&str>
     }
     keep_focus(&mut st, &fs);
     let carried = carry_out(store, clock, &effects)?;
-    let committed = if carried.logged.is_some() || carried.habit.is_some() { Some(log_round(store, &carried)?) } else { None };
+    let committed = if carried.logged.is_some() || carried.habit.is_some() {
+        Some(log_round(store, &carried)?)
+    } else {
+        None
+    };
     // A press that moves nothing (a second finish) writes nothing and tells no one.
     let moved = st != was;
     if moved {

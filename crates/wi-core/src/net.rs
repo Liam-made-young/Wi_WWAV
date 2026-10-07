@@ -216,7 +216,10 @@ impl Net {
                     .map_err(|_| Fail::Offline)?;
                 Ok(bytes)
             }
-            Err(ureq::Error::Status(status, _)) => Err(Fail::Status { status, body: Value::Null }),
+            Err(ureq::Error::Status(status, _)) => Err(Fail::Status {
+                status,
+                body: Value::Null,
+            }),
             Err(ureq::Error::Transport(_)) => Err(Fail::Offline),
         }
     }

@@ -29,7 +29,12 @@ pub const MINUTES: (f64, f64) = (5.0, 600.0);
 pub const DEFAULT_DIFFICULTY: f64 = 3.0;
 
 /// Runs one tool. `args` passed the tool's schema in `wi-mcp`.
-pub fn call(store: &mut Store, clock: &Clock, tool: &str, args: &Map<String, Value>) -> Result<Value> {
+pub fn call(
+    store: &mut Store,
+    clock: &Clock,
+    tool: &str,
+    args: &Map<String, Value>,
+) -> Result<Value> {
     match tool {
         "list_tasks" => list_tasks(store, clock, args),
         "add_task" => add_task(store, clock, args),
@@ -44,7 +49,10 @@ pub fn call(store: &mut Store, clock: &Clock, tool: &str, args: &Map<String, Val
 }
 
 fn text<'a>(args: &'a Map<String, Value>, key: &str) -> Option<&'a str> {
-    args.get(key).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty())
+    args.get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
 }
 
 fn whole(args: &Map<String, Value>, key: &str) -> Option<i64> {
@@ -99,9 +107,15 @@ pub fn list_tasks(store: &Store, clock: &Clock, args: &Map<String, Value>) -> Re
 pub fn add_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> Result<Value> {
     let world = World::load(store)?;
     if let Some(source) = text(args, "source_id") {
-        if let Some(i) = world.raw_tasks.iter().position(|t| t["sourceId"].as_str() == Some(source)) {
+        if let Some(i) = world
+            .raw_tasks
+            .iter()
+            .position(|t| t["sourceId"].as_str() == Some(source))
+        {
             let ctx = world.estimates();
-            return Ok(json!({"task": derive::task_view(&world, &ctx, i, clock), "created": false, "undo_label": null}));
+            return Ok(
+                json!({"task": derive::task_view(&world, &ctx, i, clock), "created": false, "undo_label": null}),
+            );
         }
     }
     let space = match text(args, "space") {
@@ -147,8 +161,13 @@ pub fn add_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
         task["claudeReason"] = json!(reason);
     }
     // A thread Claude already recorded points at the task it made.
-    let thread = text(args, "mail_thread_id")
-        .and_then(|t| world.mail.iter().find(|m| m["gmailThreadId"].as_str() == Some(t)).cloned());
+    let thread = text(args, "mail_thread_id").and_then(|t| {
+        world
+            .mail
+            .iter()
+            .find(|m| m["gmailThreadId"].as_str() == Some(t))
+            .cloned()
+    });
     let undo = change(store, "Claude's task", claude("add_task", args), |txn| {
         put(txn, kind::TASK, &task)?;
         if let Some(mut thread) = thread {
@@ -160,7 +179,9 @@ pub fn add_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
     let world = World::load(store)?;
     let i = world.task_index(&id).expect("the task was just written");
     let ctx = world.estimates();
-    Ok(json!({"task": derive::task_view(&world, &ctx, i, clock), "created": true, "undo_label": undo}))
+    Ok(
+        json!({"task": derive::task_view(&world, &ctx, i, clock), "created": true, "undo_label": undo}),
+    )
 }
 
 /// `update_task`: Claude's difficulty, minutes or both, clamped, with the
@@ -188,10 +209,17 @@ pub fn update_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) 
         task["difficulty"] = num(d as f64);
     }
     task["estReason"] = json!(text(args, "reason").unwrap_or_default());
-    let undo = change(store, "Claude's estimate", claude("update_task", args), |txn| put(txn, kind::TASK, &task))?;
+    let undo = change(
+        store,
+        "Claude's estimate",
+        claude("update_task", args),
+        |txn| put(txn, kind::TASK, &task),
+    )?;
     let world = World::load(store)?;
     let ctx = world.estimates();
-    Ok(json!({"task": derive::task_view(&world, &ctx, i, clock), "clamped": clamped, "undo_label": undo}))
+    Ok(
+        json!({"task": derive::task_view(&world, &ctx, i, clock), "clamped": clamped, "undo_label": undo}),
+    )
 }
 
 /// `plan_day`: Plan my day's rule, as drafts the person accepts or clears.
@@ -216,7 +244,9 @@ pub fn plan_day(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
     crate::set_state(store, &state)?;
     // Claude reads the first twenty that didn't fit; the window's footer counts them all.
     let unplanned: Vec<&Value> = plan.unplanned.iter().take(20).collect();
-    Ok(json!({"drafts": plan.drafts, "unplanned": unplanned, "minutes_left": num(plan.minutes_left)}))
+    Ok(
+        json!({"drafts": plan.drafts, "unplanned": unplanned, "minutes_left": num(plan.minutes_left)}),
+    )
 }
 
 /// `get_grades`: the term's courses with their items and Heat's own
@@ -248,11 +278,12 @@ pub fn add_pending_grade(store: &mut Store, args: &Map<String, Value>) -> Result
     let world = World::load(store)?;
     let course = world.course(text(args, "course").unwrap_or_default())?;
     let item = text(args, "item").unwrap_or_default();
-    if let Some(existing) = world
-        .raw_grades
-        .iter()
-        .find(|g| g["courseId"].as_str() == Some(&course.id) && g["title"].as_str().is_some_and(|t| t.trim().eq_ignore_ascii_case(item)))
-    {
+    if let Some(existing) = world.raw_grades.iter().find(|g| {
+        g["courseId"].as_str() == Some(&course.id)
+            && g["title"]
+                .as_str()
+                .is_some_and(|t| t.trim().eq_ignore_ascii_case(item))
+    }) {
         return Ok(json!({"grade": existing, "created": false, "undo_label": null}));
     }
     let mut grade = json!({
@@ -273,9 +304,12 @@ pub fn add_pending_grade(store: &mut Store, args: &Map<String, Value>) -> Result
     if let Some(at) = text(args, "posted_at") {
         grade["postedAt"] = num(parse_instant(at)?);
     }
-    let undo = change(store, "Claude's pending grade", claude("add_pending_grade", args), |txn| {
-        put(txn, kind::GRADE, &grade)
-    })?;
+    let undo = change(
+        store,
+        "Claude's pending grade",
+        claude("add_pending_grade", args),
+        |txn| put(txn, kind::GRADE, &grade),
+    )?;
     Ok(json!({"grade": grade, "created": true, "undo_label": undo}))
 }
 
@@ -302,9 +336,12 @@ pub fn log_focus(store: &mut Store, clock: &Clock, args: &Map<String, Value>) ->
         "source": "claude",
         "public": false,
     });
-    let undo = change(store, "Claude's focus log", claude("log_focus", args), |txn| {
-        put(txn, kind::FOCUS, &session)
-    })?;
+    let undo = change(
+        store,
+        "Claude's focus log",
+        claude("log_focus", args),
+        |txn| put(txn, kind::FOCUS, &session),
+    )?;
     let world = World::load(store)?;
     let actual = derive::actual_min(&world, task_id);
     Ok(json!({"focus_record": session, "actual_min": num(round(actual, 0)), "undo_label": undo}))
@@ -321,9 +358,15 @@ pub fn record_mail_thread(store: &mut Store, args: &Map<String, Value>) -> Resul
         }
     }
     let received = parse_instant(text(args, "received_at").unwrap_or_default())?;
-    let existing = world.mail.iter().find(|m| m["gmailThreadId"].as_str() == Some(thread_id)).cloned();
+    let existing = world
+        .mail
+        .iter()
+        .find(|m| m["gmailThreadId"].as_str() == Some(thread_id))
+        .cloned();
     let created = existing.is_none();
-    let mut thread = existing.unwrap_or_else(|| json!({"id": wwav_ids::ulid(), "gmailThreadId": thread_id, "recordedBy": "claude"}));
+    let mut thread = existing.unwrap_or_else(
+        || json!({"id": wwav_ids::ulid(), "gmailThreadId": thread_id, "recordedBy": "claude"}),
+    );
     thread["subject"] = json!(text(args, "subject").unwrap_or_default());
     thread["from"] = json!(text(args, "from").unwrap_or_default());
     thread["receivedAt"] = num(received);
@@ -335,8 +378,11 @@ pub fn record_mail_thread(store: &mut Store, args: &Map<String, Value>) -> Resul
     if let Some(task) = text(args, "task_id") {
         thread["taskId"] = json!(task);
     }
-    let undo = change(store, "Claude's mail note", claude("record_mail_thread", args), |txn| {
-        put(txn, kind::MAIL, &thread)
-    })?;
+    let undo = change(
+        store,
+        "Claude's mail note",
+        claude("record_mail_thread", args),
+        |txn| put(txn, kind::MAIL, &thread),
+    )?;
     Ok(json!({"thread": thread, "created": created, "undo_label": undo}))
 }

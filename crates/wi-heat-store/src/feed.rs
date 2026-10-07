@@ -22,7 +22,9 @@ use wi_store::{Actor, Store};
 
 use crate::derive::World;
 use crate::schema::is_day;
-use crate::{all, commit, kind, num, one, refused, search_text, set_setting, setting, ulid, Clock, Result};
+use crate::{
+    all, commit, kind, num, one, refused, search_text, set_setting, setting, ulid, Clock, Result,
+};
 
 /// The tag a task gets when its item has been missing from two syncs.
 pub const GONE_TAG: &str = NO_LONGER_IN_BRIGHTSPACE;
@@ -41,16 +43,28 @@ pub fn school_sheet(store: &Store) -> Result<Value> {
 
 /// `heat.school.set` for the part that isn't the address: checked, kept.
 pub fn set_school(store: &mut Store, args: &Map<String, Value>) -> Result<()> {
-    let text = |k: &str| args.get(k).and_then(Value::as_str).unwrap_or("").trim().to_string();
+    let text = |k: &str| {
+        args.get(k)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string()
+    };
     let pattern = match text("codePattern") {
         p if p.is_empty() => DEFAULT_COURSE_PATTERN.to_string(),
         p => p,
     };
     if School::new(&text("host"), &pattern, TimeZone::UTC).is_err() {
-        return refused("The course pattern isn't one Heat can read. The default is ^([A-Z]{3})\\s?(\\d{3}).");
+        return refused(
+            "The course pattern isn't one Heat can read. The default is ^([A-Z]{3})\\s?(\\d{3}).",
+        );
     }
     let day = |k: &str| -> Result<Value> {
-        match args.get(k).and_then(Value::as_str).filter(|s| !s.is_empty()) {
+        match args
+            .get(k)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+        {
             None => Ok(Value::Null),
             Some(d) if is_day(d) => Ok(json!(d)),
             Some(_) => refused("The term's days are written YYYY-MM-DD."),
@@ -73,7 +87,10 @@ pub fn set_school(store: &mut Store, args: &Map<String, Value>) -> Result<()> {
 pub fn school(store: &Store, zone: &TimeZone) -> Result<School> {
     let sheet = school_sheet(store)?;
     let host = sheet["host"].as_str().unwrap_or("");
-    let pattern = sheet["codePattern"].as_str().filter(|p| !p.is_empty()).unwrap_or(DEFAULT_COURSE_PATTERN);
+    let pattern = sheet["codePattern"]
+        .as_str()
+        .filter(|p| !p.is_empty())
+        .unwrap_or(DEFAULT_COURSE_PATTERN);
     match School::new(host, pattern, zone.clone()) {
         Ok(s) => Ok(s),
         Err(_) => refused("The course pattern in Settings → Heat isn't one Heat can read."),
@@ -97,17 +114,26 @@ pub fn new_calendar(store: &Store, name: &str, kind_of: &str) -> Result<Value> {
         return refused("A calendar is a Brightspace calendar or another iCal address.");
     }
     if kind_of == "brightspace" && calendars(store)?.iter().any(|c| c["kind"] == "brightspace") {
-        return refused("There is a Brightspace calendar already. Remove it first, then add the new link.");
+        return refused(
+            "There is a Brightspace calendar already. Remove it first, then add the new link.",
+        );
     }
     let id = ulid();
-    Ok(json!({"id": id, "name": name, "kind": kind_of, "keychainRef": format!("Heat calendar {id}"), "lastSyncedAt": null}))
+    Ok(
+        json!({"id": id, "name": name, "kind": kind_of, "keychainRef": format!("Heat calendar {id}"), "lastSyncedAt": null}),
+    )
 }
 
 /// Keeps a calendar record. Outside the journal: its address isn't an edit,
 /// and its `lastSyncedAt` moves each sync.
 pub fn save_calendar(store: &mut Store, record: &Value) -> Result<()> {
     let id = record["id"].as_str().unwrap_or_default();
-    store.set_doc(kind::CALENDAR, id, record, record["name"].as_str().unwrap_or(""))?;
+    store.set_doc(
+        kind::CALENDAR,
+        id,
+        record,
+        record["name"].as_str().unwrap_or(""),
+    )?;
     Ok(())
 }
 
@@ -139,7 +165,9 @@ pub fn mark_synced(store: &mut Store, id: &str, at_ms: f64) -> Result<()> {
 
 /// A feed item the person deleted: the next sync doesn't make it again.
 pub fn dismiss(store: &mut Store, uid: &str) -> Result<()> {
-    let mut map = setting(store, "feedDismissed")?.and_then(|v| v.as_object().cloned()).unwrap_or_default();
+    let mut map = setting(store, "feedDismissed")?
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
     map.insert(uid.to_string(), json!(true));
     set_setting(store, "feedDismissed", &Value::Object(map))
 }
@@ -153,7 +181,10 @@ fn stamp(ms: f64) -> Option<Timestamp> {
 }
 
 fn squash(s: &str) -> String {
-    s.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_uppercase()
+    s.chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_uppercase()
 }
 
 /// "Fall 2026", from a day: the term a first sync makes when there is none.
@@ -182,14 +213,28 @@ pub struct FeedChanges {
 /// One read of the Brightspace feed, brought into the tasks: new items made,
 /// dates followed, a Google Calendar duplicate taking the UID, and an item
 /// missing from two syncs in a row tagged and never deleted (3.11).
-pub fn apply_brightspace(store: &mut Store, clock: &Clock, calendar_id: &str, items: &[FeedItem]) -> Result<FeedChanges> {
+pub fn apply_brightspace(
+    store: &mut Store,
+    clock: &Clock,
+    calendar_id: &str,
+    items: &[FeedItem],
+) -> Result<FeedChanges> {
     let world = World::load(store)?;
     let state_key = format!("feed.{calendar_id}");
     let saved = setting(store, &state_key)?.unwrap_or_else(|| json!({}));
-    let missed: Map<String, Value> = saved.get("missed").and_then(Value::as_object).cloned().unwrap_or_default();
-    let dismissed: Map<String, Value> = setting(store, "feedDismissed")?.and_then(|v| v.as_object().cloned()).unwrap_or_default();
+    let missed: Map<String, Value> = saved
+        .get("missed")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let dismissed: Map<String, Value> = setting(store, "feedDismissed")?
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
     let code_of = |course_id: &Option<String>| -> Option<String> {
-        course_id.as_ref().and_then(|id| world.courses.iter().find(|c| &c.id == id)).map(|c| c.code.clone())
+        course_id
+            .as_ref()
+            .and_then(|id| world.courses.iter().find(|c| &c.id == id))
+            .map(|c| c.code.clone())
     };
 
     // The tasks the feed follows: its own (by UID), and tasks that came through
@@ -211,13 +256,22 @@ pub fn apply_brightspace(store: &mut Store, clock: &Clock, calendar_id: &str, it
             course: code_of(&t.course_id),
             due: t.due.and_then(stamp),
             done: t.done,
-            missed: uid.as_deref().and_then(|u| missed.get(u)).and_then(Value::as_u64).unwrap_or(0).min(255) as u8,
+            missed: uid
+                .as_deref()
+                .and_then(|u| missed.get(u))
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(255) as u8,
             gone: raw["tag"] == GONE_TAG,
         });
         at.push(i);
     }
     let followed = |uid: &str, known: &[Known]| known.iter().any(|k| k.uid.as_deref() == Some(uid));
-    let items: Vec<FeedItem> = items.iter().filter(|it| !dismissed.contains_key(&it.uid) || followed(&it.uid, &known)).cloned().collect();
+    let items: Vec<FeedItem> = items
+        .iter()
+        .filter(|it| !dismissed.contains_key(&it.uid) || followed(&it.uid, &known))
+        .cloned()
+        .collect();
     let Some(now) = stamp(clock.now_ms) else {
         return refused("Heat can't read the clock.");
     };
@@ -237,7 +291,9 @@ pub fn apply_brightspace(store: &mut Store, clock: &Clock, calendar_id: &str, it
         }
     }
     for id in &report.took_uid {
-        let Some(k) = known.iter().find(|k| &k.id == id) else { continue };
+        let Some(k) = known.iter().find(|k| &k.id == id) else {
+            continue;
+        };
         let (uid, due) = (k.uid.clone(), k.due);
         if let Some(r) = patch(id, &|r| {
             r["sourceId"] = json!(uid);
@@ -283,7 +339,12 @@ pub fn apply_brightspace(store: &mut Store, clock: &Clock, calendar_id: &str, it
                 .courses
                 .iter()
                 .map(|c| (c.id.as_str(), c.code.as_str()))
-                .chain(made_courses.iter().map(|c| (c["id"].as_str().unwrap_or(""), c["code"].as_str().unwrap_or(""))))
+                .chain(made_courses.iter().map(|c| {
+                    (
+                        c["id"].as_str().unwrap_or(""),
+                        c["code"].as_str().unwrap_or(""),
+                    )
+                }))
                 .find(|(_, c)| squash(c) == want)
                 .map(|(id, _)| id.to_string());
             course_id = match found {
@@ -292,9 +353,9 @@ pub fn apply_brightspace(store: &mut Store, clock: &Clock, calendar_id: &str, it
                     let term = match world.terms.last() {
                         Some(t) => t.id.clone(),
                         None => {
-                            let t = made_term.get_or_insert_with(|| {
-                                json!({"id": ulid(), "name": term_name(&clock.today())})
-                            });
+                            let t = made_term.get_or_insert_with(
+                                || json!({"id": ulid(), "name": term_name(&clock.today())}),
+                            );
                             t["id"].as_str().unwrap_or_default().to_string()
                         }
                     };
@@ -368,7 +429,12 @@ fn when_ms(w: When, clock: &Clock) -> (f64, bool) {
 
 /// The events of one other calendar, replacing what it held: cancelled ones
 /// left out, and only a stretch around today kept. Returns how many are kept.
-pub fn replace_events(store: &mut Store, clock: &Clock, calendar_id: &str, events: &[Event]) -> Result<usize> {
+pub fn replace_events(
+    store: &mut Store,
+    clock: &Clock,
+    calendar_id: &str,
+    events: &[Event],
+) -> Result<usize> {
     let from = clock.now_ms - EVENTS_BACK_DAYS * 86_400_000.0;
     let to = clock.now_ms + EVENTS_AHEAD_DAYS * 86_400_000.0;
     let mut keep: Vec<(String, Value)> = Vec::new();
@@ -376,7 +442,9 @@ pub fn replace_events(store: &mut Store, clock: &Clock, calendar_id: &str, event
         if e.status.as_deref() == Some("CANCELLED") {
             continue;
         }
-        let Some(start) = e.start.or(e.due) else { continue };
+        let Some(start) = e.start.or(e.due) else {
+            continue;
+        };
         let (start_ms, all_day) = when_ms(start, clock);
         let end_ms = match e.end {
             Some(end) => when_ms(end, clock).0,
@@ -387,9 +455,16 @@ pub fn replace_events(store: &mut Store, clock: &Clock, calendar_id: &str, event
         if end_ms < from || start_ms > to {
             continue;
         }
-        let uid = e.uid.clone().unwrap_or_else(|| format!("{}-{}", e.summary, start_ms));
+        let uid = e
+            .uid
+            .clone()
+            .unwrap_or_else(|| format!("{}-{}", e.summary, start_ms));
         let key = format!("{calendar_id}/{uid}");
-        let title = if e.summary.trim().is_empty() { "(No title)".to_string() } else { e.summary.trim().to_string() };
+        let title = if e.summary.trim().is_empty() {
+            "(No title)".to_string()
+        } else {
+            e.summary.trim().to_string()
+        };
         keep.push((
             key.clone(),
             json!({"id": key, "calendarId": calendar_id, "title": title, "start": num(start_ms), "end": num(end_ms), "allDay": all_day}),
@@ -402,7 +477,12 @@ pub fn replace_events(store: &mut Store, clock: &Clock, calendar_id: &str, event
         }
     }
     for (key, record) in &keep {
-        store.set_doc(kind::EVENT, key, record, record["title"].as_str().unwrap_or(""))?;
+        store.set_doc(
+            kind::EVENT,
+            key,
+            record,
+            record["title"].as_str().unwrap_or(""),
+        )?;
     }
     Ok(keep.len())
 }

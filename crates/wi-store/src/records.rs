@@ -103,9 +103,9 @@ impl Store {
     /// read in that order: the sidebar's spaces, a day's captures). Undo puts a
     /// record back under its old number, so it comes back in its old place.
     pub fn docs_oldest_first(&self, kind: &str) -> Result<Vec<Doc>> {
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT kind, key, json, text FROM docs WHERE kind = ?1 ORDER BY n",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT kind, key, json, text FROM docs WHERE kind = ?1 ORDER BY n")?;
         let docs = stmt.query_map([kind], doc_from)?;
         docs.map(|d| to_doc(d?)).collect()
     }
@@ -208,7 +208,9 @@ impl Store {
     /// didn't write.
     pub fn set_doc(&mut self, kind: &str, key: &str, json: &Value, text: &str) -> Result<()> {
         if kind.is_empty() || kind.contains('/') {
-            return refused(format!("A record's kind can't be empty or hold '/': '{kind}'."));
+            return refused(format!(
+                "A record's kind can't be empty or hold '/': '{kind}'."
+            ));
         }
         let id = format!("{kind}/{key}");
         let tx = self.conn.transaction()?;
@@ -218,7 +220,9 @@ impl Store {
             |r| r.get(0),
         )?;
         if journaled {
-            return refused(format!("'{id}' is kept in the journal, so it changes only through a Txn."));
+            return refused(format!(
+                "'{id}' is kept in the journal, so it changes only through a Txn."
+            ));
         }
         tx.execute(
             "INSERT INTO docs (id, kind, key, json, text) VALUES (?1, ?2, ?3, ?4, ?5)
@@ -239,7 +243,9 @@ impl Store {
             |r| r.get(0),
         )?;
         if journaled {
-            return refused(format!("'{id}' is kept in the journal, so it changes only through a Txn."));
+            return refused(format!(
+                "'{id}' is kept in the journal, so it changes only through a Txn."
+            ));
         }
         tx.execute("DELETE FROM docs WHERE id = ?1", [&id])?;
         tx.commit()?;
@@ -278,7 +284,12 @@ impl Txn<'_> {
         let Some(row) = self.get("docs", &format!("{kind}/{key}"))? else {
             return Ok(None);
         };
-        let text = |c: &str| row.get(c).and_then(Value::as_str).unwrap_or_default().to_string();
+        let text = |c: &str| {
+            row.get(c)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        };
         Ok(Some(Doc {
             kind: kind.to_string(),
             key: key.to_string(),

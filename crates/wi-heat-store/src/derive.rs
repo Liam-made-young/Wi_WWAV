@@ -4,7 +4,8 @@
 
 use serde_json::{json, Value};
 use wi_heat::model::records::{
-    Capture, CalendarEvent, Course, FocusSession, Grade, Habit, Milestone, Project, Space, Task, TaskOccurrence, Term, TimeBlock,
+    CalendarEvent, Capture, Course, FocusSession, Grade, Habit, Milestone, Project, Space, Task,
+    TaskOccurrence, Term, TimeBlock,
 };
 use wi_heat::model::{estimate, grades, heat, plan, recurrence, zone};
 use wi_store::Store;
@@ -54,7 +55,9 @@ fn typed<T: serde::de::DeserializeOwned>(kind: &str, raw: Vec<Value>) -> (Vec<T>
             }
             Err(e) => {
                 let id = v.get("id").and_then(Value::as_str).unwrap_or("?");
-                eprintln!("wi-heat-store: Heat's {kind} record {id} doesn't read, so it is left out: {e}");
+                eprintln!(
+                    "wi-heat-store: Heat's {kind} record {id} doesn't read, so it is left out: {e}"
+                );
             }
         }
     }
@@ -100,7 +103,12 @@ impl World {
 
     /// A course by its code ("JPN 201", "jpn201") or id.
     pub fn course(&self, code: &str) -> Result<&Course> {
-        let squash = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_uppercase();
+        let squash = |s: &str| {
+            s.chars()
+                .filter(|c| !c.is_whitespace())
+                .collect::<String>()
+                .to_ascii_uppercase()
+        };
         let want = squash(code);
         self.courses
             .iter()
@@ -120,10 +128,19 @@ pub(crate) fn heat_order(world: &World, clock: &Clock) -> Vec<usize> {
 }
 
 /// One task as `list_tasks` gives it (3.13).
-pub(crate) fn task_view(world: &World, ctx: &estimate::EstimateContext<'_>, i: usize, clock: &Clock) -> Value {
+pub(crate) fn task_view(
+    world: &World,
+    ctx: &estimate::EstimateContext<'_>,
+    i: usize,
+    clock: &Clock,
+) -> Value {
     let task = &world.tasks[i];
     let raw = &world.raw_tasks[i];
-    let space = world.spaces.iter().find(|s| s.id == task.space_id).map(|s| s.name.clone());
+    let space = world
+        .spaces
+        .iter()
+        .find(|s| s.id == task.space_id)
+        .map(|s| s.name.clone());
     let course = task
         .course_id
         .as_ref()
@@ -133,7 +150,11 @@ pub(crate) fn task_view(world: &World, ctx: &estimate::EstimateContext<'_>, i: u
     let by = raw
         .get("estBy")
         .and_then(Value::as_str)
-        .unwrap_or(if task.est_min.is_some() { "you" } else { "default" });
+        .unwrap_or(if task.est_min.is_some() {
+            "you"
+        } else {
+            "default"
+        });
     let mut view = json!({
         "id": task.id,
         "title": task.title,
@@ -201,9 +222,19 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
         sessions: world.sessions.clone(),
         habits: world.habits.clone(),
     };
-    let options = plan::PlanOptions { day_ends_at: Some(day_ends), space_id: None };
+    let options = plan::PlanOptions {
+        day_ends_at: Some(day_ends),
+        space_id: None,
+    };
     let drafts = plan::plan_my_day(&data, now, &clock.zone, &options);
-    let title = |id: &str| world.tasks.iter().find(|t| t.id == id).map(|t| t.title.clone()).unwrap_or_default();
+    let title = |id: &str| {
+        world
+            .tasks
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| t.title.clone())
+            .unwrap_or_default()
+    };
     let drafted: Vec<&str> = drafts.iter().map(|d| d.task_id.as_str()).collect();
     let blocked: Vec<&str> = world
         .blocks
@@ -251,7 +282,10 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
                 })
             })
             .collect(),
-        drafts_stored: drafts.iter().filter_map(|d| serde_json::to_value(d).ok()).collect(),
+        drafts_stored: drafts
+            .iter()
+            .filter_map(|d| serde_json::to_value(d).ok())
+            .collect(),
         unplanned,
         minutes_left: minutes_left.max(0.0),
     })
@@ -259,10 +293,18 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
 
 /// The 15-minute marks from now (never before 7 AM) to the day's end that no
 /// block, timed event or draft covers, in minutes.
-fn free_minutes(world: &World, clock: &Clock, date: &str, now: f64, day_ends: f64, drafts: &[plan::Draft]) -> f64 {
+fn free_minutes(
+    world: &World,
+    clock: &Clock,
+    date: &str,
+    now: f64,
+    day_ends: f64,
+    drafts: &[plan::Draft],
+) -> f64 {
     let mut spans = plan::busy_spans(&world.blocks, &world.events, date, &clock.zone);
     spans.extend(drafts.iter().map(|d| (d.start, d.start + d.minutes)));
-    let mut mark = ((zone::minute_of_day(now, &clock.zone).max(DAY_STARTS_MIN)) / 15.0).ceil() * 15.0;
+    let mut mark =
+        ((zone::minute_of_day(now, &clock.zone).max(DAY_STARTS_MIN)) / 15.0).ceil() * 15.0;
     let mut free = 0.0;
     while mark + 15.0 <= day_ends {
         if spans.iter().all(|(a, b)| mark + 15.0 <= *a || mark >= *b) {
@@ -275,7 +317,12 @@ fn free_minutes(world: &World, clock: &Clock, date: &str, now: f64, day_ends: f6
 
 /// One course as `get_grades` gives it (3.13).
 pub(crate) fn course_view(world: &World, course: &Course) -> Value {
-    let mine: Vec<Grade> = world.grades.iter().filter(|g| g.course_id == course.id).cloned().collect();
+    let mine: Vec<Grade> = world
+        .grades
+        .iter()
+        .filter(|g| g.course_id == course.id)
+        .cloned()
+        .collect();
     let scale = course.scale.clone().unwrap_or_else(grades::default_scale);
     let current = grades::current_pct(course, &mine);
     let decided = grades::decided_pct(course, &mine);
@@ -306,7 +353,9 @@ pub(crate) fn course_view(world: &World, course: &Course) -> Value {
 
 /// The category a grade's title suggests, from the course's keywords.
 pub(crate) fn guess_category(title: &str, course: &Course) -> Value {
-    grades::guess_category(title, &course.categories).map(Value::String).unwrap_or(Value::Null)
+    grades::guess_category(title, &course.categories)
+        .map(Value::String)
+        .unwrap_or(Value::Null)
 }
 
 /// A task's measured minutes: its focus sessions plus Get Info's "Took".

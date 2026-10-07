@@ -13,7 +13,9 @@ use std::time::Duration;
 
 use jiff::Timestamp;
 use serde_json::{json, Value};
-use wi_heat::brightspace::{classes_types, feed_items, sync_line, Counts, SYNC_EVERY, SYNC_ON_OPEN_AFTER};
+use wi_heat::brightspace::{
+    classes_types, feed_items, sync_line, Counts, SYNC_EVERY, SYNC_ON_OPEN_AFTER,
+};
 use wi_heat::ical;
 use wi_heat_store::{feed, Clock};
 
@@ -30,14 +32,22 @@ static ONE_SYNC: Mutex<()> = Mutex::new(());
 fn clean_address(url: &str) -> Result<String, CoreError> {
     let url = url.trim();
     let lower = url.to_ascii_lowercase();
-    let address = if let Some(rest) = lower.strip_prefix("webcals://").map(|_| &url["webcals://".len()..]) {
+    let address = if let Some(rest) = lower
+        .strip_prefix("webcals://")
+        .map(|_| &url["webcals://".len()..])
+    {
         format!("https://{rest}")
-    } else if let Some(rest) = lower.strip_prefix("webcal://").map(|_| &url["webcal://".len()..]) {
+    } else if let Some(rest) = lower
+        .strip_prefix("webcal://")
+        .map(|_| &url["webcal://".len()..])
+    {
         format!("https://{rest}")
     } else {
         url.to_string()
     };
-    let scheme_ok = ["https://", "http://"].iter().any(|s| address.to_ascii_lowercase().starts_with(s));
+    let scheme_ok = ["https://", "http://"]
+        .iter()
+        .any(|s| address.to_ascii_lowercase().starts_with(s));
     if !scheme_ok || address.contains(char::is_whitespace) || address.len() < 12 {
         return Err(CoreError::new(
             "bad_address",
@@ -48,14 +58,20 @@ fn clean_address(url: &str) -> Result<String, CoreError> {
 }
 
 fn keychain_error(why: String) -> CoreError {
-    CoreError::new("keychain", format!("The keychain refused the calendar's address: {why}"))
+    CoreError::new(
+        "keychain",
+        format!("The keychain refused the calendar's address: {why}"),
+    )
 }
 
 /// Keeps a new calendar: the address in the Keychain first, then the record.
 fn make(i: &Inner, name: &str, kind: &str, url: &str) -> Result<Value, CoreError> {
     let address = clean_address(url)?;
     let record = feed::new_calendar(&i.store(), name, kind).map_err(core_error)?;
-    let item = record["keychainRef"].as_str().unwrap_or_default().to_string();
+    let item = record["keychainRef"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
     i.secrets.set(&item, &address).map_err(keychain_error)?;
     if let Err(e) = feed::save_calendar(&mut i.store(), &record) {
         let _ = i.secrets.delete(&item);
@@ -86,8 +102,15 @@ pub(crate) fn remove(i: &Inner, a: &Args) -> Result<Value, CoreError> {
 /// with one, goes to the Keychain like any other.
 pub(crate) fn set_school(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     feed::set_school(&mut i.store(), &a.object()).map_err(core_error)?;
-    if let Some(url) = a.opt_str("icalUrl").map(str::trim).filter(|u| !u.is_empty()) {
-        let existing = feed::calendars(&i.store()).map_err(core_error)?.into_iter().find(|c| c["kind"] == "brightspace");
+    if let Some(url) = a
+        .opt_str("icalUrl")
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+    {
+        let existing = feed::calendars(&i.store())
+            .map_err(core_error)?
+            .into_iter()
+            .find(|c| c["kind"] == "brightspace");
         match existing {
             // A new link for the calendar already here: the same calendar, read again.
             Some(mut cal) => {
@@ -116,7 +139,11 @@ fn sync_one(i: &Inner, cal: &Value, clock: &Clock) -> Result<Counts, String> {
     let item = cal["keychainRef"].as_str().unwrap_or_default();
     let address = match i.secrets.get(item) {
         Ok(Some(a)) => a,
-        _ => return Err(format!("The {name} calendar has no address in the Keychain. Add it again in Settings → Heat.")),
+        _ => {
+            return Err(format!(
+            "The {name} calendar has no address in the Keychain. Add it again in Settings → Heat."
+        ))
+        }
     };
     let bytes = i.net.fetch_feed(&address).map_err(|_| failed())?;
     let events = ical::parse(&bytes, &clock.zone).map_err(|_| failed())?;
@@ -127,11 +154,21 @@ fn sync_one(i: &Inner, cal: &Value, clock: &Clock) -> Result<Counts, String> {
         if cal["kind"] == "brightspace" {
             let school = feed::school(&store, &clock.zone).map_err(|e| e.to_string())?;
             let items = feed_items(&events, &school, &classes_types());
-            let changes = feed::apply_brightspace(&mut store, clock, id, &items).map_err(|e| e.to_string())?;
-            counts = Counts { new_tasks: changes.new_tasks, date_changes: changes.date_changes, new_grades: 0 };
+            let changes = feed::apply_brightspace(&mut store, clock, id, &items)
+                .map_err(|e| e.to_string())?;
+            counts = Counts {
+                new_tasks: changes.new_tasks,
+                date_changes: changes.date_changes,
+                new_grades: 0,
+            };
             if let Some(txn) = &changes.txn {
                 i.note_own(txn);
-                docs = store.entry_docs(txn).ok().flatten().map(|e| e.docs).unwrap_or_default();
+                docs = store
+                    .entry_docs(txn)
+                    .ok()
+                    .flatten()
+                    .map(|e| e.docs)
+                    .unwrap_or_default();
             }
         } else {
             feed::replace_events(&mut store, clock, id, &events).map_err(|e| e.to_string())?;
@@ -151,7 +188,10 @@ pub(crate) fn sync_calendars(i: &Inner, only: Option<&str>) -> Result<String, Co
     if let Some(id) = only {
         cals.retain(|c| c["id"] == id);
         if cals.is_empty() {
-            return Err(CoreError::new("refused", "That calendar isn't in Heat any more."));
+            return Err(CoreError::new(
+                "refused",
+                "That calendar isn't in Heat any more.",
+            ));
         }
     }
     if cals.is_empty() {
@@ -209,7 +249,10 @@ pub(crate) fn start(inner: &Arc<Inner>) -> JoinHandle<()> {
             let mut tried: BTreeMap<String, f64> = BTreeMap::new();
             let mut first_seen: BTreeMap<String, f64> = BTreeMap::new();
             let mut opening = true;
-            let (open_after, every) = (SYNC_ON_OPEN_AFTER.as_secs_f64() * 1000.0, SYNC_EVERY.as_secs_f64() * 1000.0);
+            let (open_after, every) = (
+                SYNC_ON_OPEN_AFTER.as_secs_f64() * 1000.0,
+                SYNC_EVERY.as_secs_f64() * 1000.0,
+            );
             while !i.closing() {
                 let now = i.clock().now_ms;
                 let cals = feed::calendars(&i.store()).unwrap_or_default();
@@ -222,7 +265,10 @@ pub(crate) fn start(inner: &Arc<Inner>) -> JoinHandle<()> {
                         // Added since: given a moment for the Sync that comes with adding it.
                         now - *first_seen.entry(id.clone()).or_insert(now) >= ADDED_GRACE
                     } else {
-                        let newest = [last, tried.get(&id).copied()].into_iter().flatten().fold(f64::MIN, f64::max);
+                        let newest = [last, tried.get(&id).copied()]
+                            .into_iter()
+                            .flatten()
+                            .fold(f64::MIN, f64::max);
                         newest == f64::MIN || now - newest >= every
                     };
                     if due && !i.closing() {
