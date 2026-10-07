@@ -1,14 +1,15 @@
-// The three views inside the case (docs/SPEC.md 2.3). Each is built once and
-// lives until you quit: a view that isn't current is hidden, never
+// The four rooms inside the case (docs/SPEC.md 2.3). Each is built once and
+// lives until you quit: a room that isn't current is hidden, never
 // unmounted, so switching back finds its scroll, selection, open sheet and
-// half-typed text where you left them. A view change is a 140 ms
+// half-typed text where you left them. A room change is a 140 ms
 // cross-fade, and a cut under Reduce Motion (shell.css).
 //
-// Until their stages fill them, each view is its register's ground and its
+// Until their stages fill them, each room is its register's ground and its
 // empty line.
 
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { ConsoleView } from '../console/ConsoleView';
+import { HeatView, type HeatHandle, type HeatProps } from '../heat/HeatView';
 import { SpaceView } from '../space/SpaceView';
 import { REGISTERS, ROOM_NAMES, ROOMS, type RoomId } from './rooms';
 
@@ -16,9 +17,11 @@ interface Props {
   current: RoomId;
   /** The task the strip's task half opened Heat on. */
   heatTask: string | null;
+  /** Heat's own: the task to open, the keyboard handle, and what it tells the status bar. */
+  heat: Pick<HeatProps, 'open' | 'onStatus' | 'onSettings'> & { handle: Ref<HeatHandle> };
 }
 
-export function Rooms({ current, heatTask }: Props) {
+export function Rooms({ current, heatTask, heat }: Props) {
   return (
     <main className="rooms">
       {ROOMS.map((id) => (
@@ -32,22 +35,18 @@ export function Rooms({ current, heatTask }: Props) {
           aria-hidden={id !== current}
           inert={id !== current}
         >
-          {BODIES[id]}
+          {id === 'heat' ? (
+            <HeatView ref={heat.handle} open={heat.open} onStatus={heat.onStatus} onSettings={heat.onSettings} />
+          ) : (
+            BODIES[id]
+          )}
         </section>
       ))}
     </main>
   );
 }
 
-const EMPTY = 'Nothing here right now.';
-
-const BODIES: Record<RoomId, ReactNode> = {
-  heat: (
-    <div className="room-empty">
-      <h1 className="heat-heading">Today</h1>
-      <p>{EMPTY}</p>
-    </div>
-  ),
+const BODIES: Record<Exclude<RoomId, 'heat'>, ReactNode> = {
   space: <SpaceView />,
   console: <ConsoleView />,
 };

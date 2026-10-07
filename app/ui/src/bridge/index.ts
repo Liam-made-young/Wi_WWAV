@@ -67,7 +67,19 @@ function inTauri(): boolean {
 // SocketLike is the part of WebSocket the transport uses, with plainer
 // handler types than the DOM's, so a test's fake fits it too.
 const openSocket = () => new WebSocket(BRIDGE_URL) as unknown as SocketLike;
-const bridge = createBridge(inTauri() ? tauriTransport() : socketTransport(openSocket));
+const real = inTauri() ? tauriTransport() : socketTransport(openSocket);
+
+// `npm run dev` with VITE_FAKE_CORE=1 answers from Heat's fake core instead
+// (heat/fake/install.ts, loaded by main.tsx before anything renders).
+let standIn: Transport | null = null;
+export function installStandIn(transport: Transport) {
+  standIn = transport;
+}
+
+const bridge = createBridge({
+  call: (cmd, args) => (standIn ?? real).call(cmd, args),
+  listen: (deliver) => (standIn ?? real).listen(deliver),
+});
 
 export const call = bridge.call;
 export const on = bridge.on;

@@ -1,0 +1,493 @@
+/* Today (docs/SPEC.md 3.5, 7.2): the time column, the plan list and the
+   Pomodoro LCD, on the desk register. Colours, sizes and durations are
+   tokens; heat colours are fills and borders, never text. */
+
+.heat-today {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) 112px;
+  height: 100%;
+  min-width: 0;
+}
+
+.heat-today-head {
+  padding: var(--space-s2) var(--space-s4) var(--space-s2);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-today-head .heat-heading {
+  margin: 0;
+}
+
+.heat-subtitle {
+  margin: 0;
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink2);
+}
+
+.heat-today-body {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  min-height: 0;
+}
+
+/* ---- The time column ------------------------------------------------------ */
+
+.heat-column {
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--desk-well);
+  border-right: 1px solid var(--desk-deck-edge);
+}
+
+.heat-column-inner {
+  position: relative;
+}
+
+.heat-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+}
+
+.heat-hour::after {
+  content: '';
+  position: absolute;
+  left: 48px;
+  right: 0;
+  top: 50%;
+  border-top: 1px dotted color-mix(in srgb, var(--desk-ink) 12%, var(--desk-well));
+}
+
+.heat-hour-label {
+  position: absolute;
+  left: var(--space-s2);
+  top: 2px;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+/* Grey and hatched, read-only, behind the blocks. */
+.heat-event {
+  position: absolute;
+  left: 48px;
+  right: 6px;
+  overflow: hidden;
+  padding: 0 var(--space-s2);
+  border-left: 3px solid color-mix(in srgb, var(--desk-ink) 45%, var(--desk-well));
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--desk-ink) 9%, var(--desk-well)) 0 5px,
+    color-mix(in srgb, var(--desk-ink) 17%, var(--desk-well)) 5px 10px
+  );
+  color: var(--desk-ink);
+  font-size: var(--type-desk-small);
+  line-height: 16px;
+}
+
+.heat-event-title {
+  white-space: nowrap;
+}
+
+.heat-block {
+  position: absolute;
+  left: 52px;
+  right: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-s2);
+  overflow: hidden;
+  padding: 0 var(--space-s2);
+  border: 1px solid var(--desk-deck-edge);
+  border-left: 3px solid var(--block, var(--desk-ink3));
+  border-radius: 3px;
+  background: var(--desk-well);
+  color: var(--desk-ink);
+  font-size: var(--type-desk-small);
+  line-height: 18px;
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+
+.heat-block[data-level='cool'] {
+  --block: var(--heat-cool);
+}
+
+.heat-block[data-level='warm'] {
+  --block: var(--heat-warm);
+}
+
+.heat-block[data-level='hot'] {
+  --block: var(--heat-hot);
+}
+
+.heat-block[data-level='overdue'] {
+  --block: var(--heat-overdue);
+}
+
+.heat-block-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-block-length {
+  flex: none;
+  color: var(--desk-ink2);
+}
+
+/* The block now is in wears the Aqua ring; a finished one dims to half, with its check. */
+.heat-block[data-current='true'] {
+  box-shadow: 0 0 0 2px var(--desk-highlight);
+}
+
+.heat-block[data-finished='true'] {
+  opacity: 0.5;
+}
+
+.heat-block[data-selected='true'] {
+  background: var(--desk-select);
+  color: var(--desk-select-ink);
+}
+
+.heat-block[data-selected='true'] .heat-block-length {
+  color: var(--desk-select-ink);
+}
+
+.heat-block[data-dragging='true'] {
+  opacity: 0.8;
+  z-index: 3;
+}
+
+.heat-block-grip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+/* A draft is dashed, and waits for Return. */
+.heat-block-draft {
+  border-style: dashed;
+  border-left-style: dashed;
+  background: color-mix(in srgb, var(--desk-highlight) 10%, var(--desk-well));
+  cursor: pointer;
+}
+
+.heat-guide {
+  position: absolute;
+  left: 48px;
+  right: 0;
+  z-index: 4;
+  border-top: 2px solid var(--desk-highlight);
+  pointer-events: none;
+}
+
+.heat-guide span {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  padding: 0 var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+}
+
+.heat-now-mark {
+  position: absolute;
+  left: 40px;
+  right: 0;
+  z-index: 5;
+  border-top: 1px solid var(--heat-hot);
+  pointer-events: none;
+}
+
+.heat-now-mark::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--heat-hot);
+}
+
+/* ---- The plan list -------------------------------------------------------- */
+
+.heat-plan {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.heat-plan-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-s1) var(--space-s3);
+}
+
+.heat-plan-rows {
+  flex: 1 0 auto;
+}
+
+.heat-section-title {
+  margin: var(--space-s2) var(--space-s3) var(--space-s1);
+  font-size: var(--type-desk-small);
+  font-weight: normal;
+  color: var(--desk-source-list-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.heat-section-hint {
+  margin: 0 var(--space-s3) var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-empty {
+  margin: var(--space-s3);
+  color: var(--desk-ink2);
+}
+
+.heat-drafts:focus-visible {
+  outline-offset: -3px;
+}
+
+/* Rows: 26 px, striped white and Aqua; selected rows fill with deep Aqua. */
+.heat-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  column-gap: var(--space-s2);
+  align-items: center;
+  min-height: 26px;
+  padding: 0 var(--space-s3);
+  cursor: default;
+}
+
+/* Stripes sit in :where() so a selected row's fill, which comes later, always beats them. */
+.heat-row:where(:nth-of-type(even)) {
+  background: var(--desk-stripe);
+}
+
+.heat-row[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.heat-row[aria-selected='true'] .heat-row-sub,
+.heat-row[aria-selected='true'] .heat-row-why,
+.heat-row[aria-selected='true'] .heat-row-time {
+  color: var(--desk-select-ink);
+}
+
+.heat-row[data-current='true'] {
+  box-shadow: inset 0 0 0 2px var(--desk-highlight);
+}
+
+.heat-row[data-finished='true'],
+.heat-row[data-done='true'] .heat-row-title {
+  opacity: 0.6;
+}
+
+.heat-row-time {
+  min-width: 66px;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  white-space: nowrap;
+}
+
+.heat-row-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-row-sub {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  white-space: nowrap;
+}
+
+.heat-row-why {
+  grid-column: 2 / -1;
+  padding-bottom: 2px;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-row-draft {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  border-top: 1px dashed var(--desk-deck-edge);
+  cursor: pointer;
+}
+
+/* The tick, a 24 pt target with a 16 pt box; the keyboard's way is ⌘↩. */
+.heat-tick {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: var(--type-desk-small);
+  font-weight: bold;
+}
+
+.heat-tick::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+.heat-tick {
+  position: relative;
+}
+
+.heat-tick[data-on='true']::before {
+  background: color-mix(in srgb, currentColor 15%, transparent);
+}
+
+/* The daily note: one line until clicked. */
+.heat-note {
+  flex: none;
+  padding: var(--space-s2) var(--space-s3) var(--space-s3);
+}
+
+.heat-note-line {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 var(--space-s2);
+  overflow: hidden;
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--desk-ink) 5%, var(--desk-well));
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--desk-ink2);
+}
+
+.heat-note-field {
+  display: block;
+  width: 100%;
+  resize: vertical;
+}
+
+/* ---- The Pomodoro panel: an olive LCD ------------------------------------- */
+
+.heat-pomo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s4);
+  padding: var(--space-s2) var(--space-s3);
+  background: linear-gradient(var(--desk-case-metal));
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+.heat-lcd {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 92px;
+  padding: var(--space-s2) var(--space-s3);
+  border-radius: var(--radius-chip);
+  color: var(--desk-lcd-ink);
+  background: linear-gradient(var(--desk-lcd-ground));
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--desk-lcd-ink) 30%, transparent),
+    0 1px 0 var(--gloss);
+}
+
+.heat-lcd-digits {
+  display: block;
+  font-family: var(--type-mono-family);
+  font-size: 32px;
+  line-height: 36px;
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-lcd-line,
+.heat-lcd-note {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-desk-body);
+  line-height: 17px;
+  color: var(--desk-lcd-dim);
+}
+
+.heat-lcd-note {
+  font-size: var(--type-desk-small);
+  min-height: 15px;
+}
+
+.heat-lcd-meter {
+  position: absolute;
+  left: var(--space-s3);
+  right: var(--space-s3);
+  bottom: var(--space-s2);
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--desk-lcd-ink) 14%, transparent);
+}
+
+.heat-lcd-fill {
+  display: block;
+  height: 100%;
+  background: var(--desk-lcd-ink);
+}
+
+.heat-pomo-keys {
+  flex: none;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: var(--space-s1);
+}
+
+.heat-lengths {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s1);
+}
+
+.heat-length {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--desk-ink);
+}
+
+.heat-length[aria-checked='true'] {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.heat-length-custom input {
+  width: 64px;
+}
+
+/* The chime switch sits in the LCD's corner. */
+.heat-chime {
+  position: absolute;
+  top: var(--space-s1);
+  right: var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-lcd-ink);
+}

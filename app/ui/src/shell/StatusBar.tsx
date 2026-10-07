@@ -11,6 +11,8 @@ export interface ScreenStatus {
   count: string | null;
   /** The screen's one secondary act, on ⇧Return. */
   act: string | null;
+  /** The screen's own save line, when it has one: Heat's "Saved on this Mac · Synced 3:41 PM". */
+  save?: string | null;
 }
 
 interface Props {
@@ -23,11 +25,15 @@ export function StatusBar({ screen, undo, status }: Props) {
   const left = [screen.count, screen.act && `${keys('⇧')}Return ${screen.act}`, undo && `${keys('⌘Z')} ${undo}`].filter(
     Boolean,
   );
-  const right = [status.upload, status.sync, status.save].filter(Boolean);
+  const right = (screen.save ? [status.upload, screen.save] : [status.upload, status.sync, status.save]).filter(
+    Boolean,
+  );
   return (
-    <footer className="case-status" data-text="secondary">
-      <span className="status-left">{left.join(' · ')}</span>
-      <span className="status-right" role="status">
+    <footer className="case-status">
+      <span className="status-left" data-text="secondary">
+        {left.join(' · ')}
+      </span>
+      <span className="status-right" role="status" data-text="secondary">
         {right.join(' · ')}
       </span>
     </footer>

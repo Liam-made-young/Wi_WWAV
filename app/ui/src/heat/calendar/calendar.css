@@ -1,0 +1,410 @@
+/* Calendar (docs/SPEC.md 3.7): the month grid, the week and day grids on the
+   PKM's 44 px an hour, the heat flags and the unscheduled tray. Today is a
+   red circle; heat colours are borders and flags, the words stay ink. */
+
+.heat-cal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.heat-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  padding: 0 var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-cal-head .heat-heading {
+  margin: 0;
+  padding: var(--space-s2) 0;
+}
+
+.heat-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s1);
+}
+
+.heat-nav {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--desk-ink);
+}
+
+.heat-cal-modes {
+  margin-left: var(--space-s2);
+}
+
+.heat-cal-modes .segment {
+  width: 64px;
+}
+
+.heat-cal-modes .segment[aria-checked='true'] {
+  color: var(--desk-select-ink);
+}
+
+.heat-cal-modes .segment[aria-checked='true']::before {
+  background: linear-gradient(var(--desk-gel-selected));
+  border-color: var(--desk-select);
+}
+
+/* ---- Month ------------------------------------------------------------------ */
+
+.heat-month {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.heat-month-heads {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  background: linear-gradient(var(--desk-case-metal));
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-month-head {
+  padding: 2px var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.heat-month-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: minmax(104px, 1fr);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.heat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px var(--space-s1) var(--space-s1);
+  background: var(--desk-well);
+  border-right: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+  border-bottom: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+}
+
+.heat-cell[data-out='true'] {
+  background: var(--desk-stripe);
+}
+
+.heat-cell[data-selected='true'] {
+  box-shadow: inset 0 0 0 2px var(--desk-highlight);
+}
+
+.heat-cell-day {
+  align-self: flex-end;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--space-s1);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink);
+}
+
+.heat-cell[data-out='true'] .heat-cell-day {
+  color: var(--desk-ink2);
+}
+
+/* Today is a red circle. */
+.heat-cell[data-today='true'] .heat-cell-day,
+.heat-cal-dayhead[data-today='true'] .heat-cal-num {
+  color: var(--desk-select-ink);
+  background: var(--heat-overdue);
+  font-weight: bold;
+}
+
+.heat-pill {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  padding: 0 var(--space-s2);
+  overflow: hidden;
+  border: 1px solid var(--desk-deck-edge);
+  border-left: 3px solid var(--pill, var(--desk-ink3));
+  border-radius: 3px;
+  background: var(--desk-well);
+  color: var(--desk-ink);
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-desk-small);
+}
+
+.heat-pill[data-level='cool'],
+.heat-flag[data-level='cool'] {
+  --pill: var(--heat-cool);
+}
+
+.heat-pill[data-level='warm'],
+.heat-flag[data-level='warm'] {
+  --pill: var(--heat-warm);
+}
+
+.heat-pill[data-level='hot'],
+.heat-flag[data-level='hot'] {
+  --pill: var(--heat-hot);
+}
+
+.heat-pill[data-level='overdue'],
+.heat-flag[data-level='overdue'] {
+  --pill: var(--heat-overdue);
+}
+
+.heat-pill[aria-pressed='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+}
+
+.heat-pill[data-done='true'] {
+  opacity: 0.6;
+}
+
+.heat-more {
+  min-height: 24px;
+  padding: 0 var(--space-s2);
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+/* ---- Week and Day ------------------------------------------------------------ */
+
+.heat-week {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 150px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.heat-tray {
+  overflow-y: auto;
+  background: var(--desk-source-list-ground);
+  border-right: 1px solid var(--desk-deck-edge);
+}
+
+.heat-tray-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 2px;
+  min-height: 26px;
+  padding: 3px var(--space-s2);
+  cursor: default;
+}
+
+.heat-tray-row[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.heat-tray-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-tray-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.heat-tray-sub {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-tray-row[aria-selected='true'] .heat-tray-sub {
+  color: var(--desk-select-ink);
+}
+
+.heat-tray-empty {
+  margin: var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-cal-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.heat-cal-heads,
+.heat-cal-allday,
+.heat-cal-grid {
+  display: grid;
+  grid-template-columns: 44px repeat(var(--cols), minmax(0, 1fr));
+}
+
+.heat-cal-heads {
+  background: linear-gradient(var(--desk-case-metal));
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-cal-gutter {
+  padding: var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+}
+
+.heat-cal-dayhead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-s1);
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--desk-deck-edge);
+  background: none;
+  color: var(--desk-ink);
+}
+
+.heat-cal-dayhead[data-selected='true'] {
+  box-shadow: inset 0 -3px 0 var(--desk-highlight);
+}
+
+.heat-cal-num {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-desk-body);
+}
+
+.heat-cal-allday {
+  border-bottom: 1px solid var(--desk-deck-edge);
+  background: var(--desk-well);
+}
+
+.heat-cal-allday .heat-cal-gutter {
+  color: var(--desk-ink2);
+}
+
+.heat-cal-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 30px;
+  max-height: 104px;
+  padding: 2px;
+  overflow-y: auto;
+  border-left: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+}
+
+.heat-allday-event {
+  padding: 0 var(--space-s2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-desk-small);
+  line-height: 18px;
+  border-left: 3px solid color-mix(in srgb, var(--desk-ink) 45%, var(--desk-well));
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--desk-ink) 9%, var(--desk-well)) 0 5px,
+    color-mix(in srgb, var(--desk-ink) 17%, var(--desk-well)) 5px 10px
+  );
+}
+
+.heat-milestone {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s1);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-desk-small);
+  line-height: 18px;
+}
+
+.heat-milestone[data-done='true'] .heat-bead-glass {
+  background: var(--heat-cool);
+}
+
+.heat-milestone .heat-bead-glass {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--desk-ink);
+  border-radius: 50%;
+  background: var(--desk-well);
+}
+
+.heat-cal-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--desk-well);
+}
+
+.heat-cal-hours {
+  position: relative;
+}
+
+.heat-cal-col {
+  position: relative;
+  border-left: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well)) 1px,
+    transparent 1px
+  );
+  background-size: 100% 44px;
+}
+
+.heat-cal-col .heat-event {
+  left: 0;
+  right: 0;
+}
+
+.heat-cal-col .heat-block {
+  left: 2px;
+  right: 6px;
+}
+
+/* A deadline: a small heat-coloured flag at its time, on the column's right edge. */
+.heat-flag {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  max-width: 92%;
+  padding: 0 var(--space-s1) 0 var(--space-s2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 1px solid var(--desk-deck-edge);
+  border-right: 0;
+  border-left: 3px solid var(--pill, var(--desk-ink3));
+  border-radius: 3px 0 0 3px;
+  background: var(--desk-well);
+  color: var(--desk-ink);
+  font-size: var(--type-desk-small);
+  line-height: 16px;
+  cursor: default;
+}
