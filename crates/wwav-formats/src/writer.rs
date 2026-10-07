@@ -24,7 +24,7 @@ use std::path::Path;
 use crate::json::{self, Value};
 use crate::meta::{Lineage, SongMeta, Wrmx};
 use crate::wwav::{read_at, Fmt, Verdict, Wwav, ALIGN, FRAME, RATE, STEM_FRAME, WSTM_HEADER};
-use crate::{msg, Error};
+use crate::{msg, not_same, Error};
 
 /// A RIFF file's size field is 32 bits: no file is longer.
 const MAX_FILE: u64 = u32::MAX as u64;
@@ -246,6 +246,7 @@ fn copy(src: &mut File, at: u64, n: u64, out: &mut impl Write) -> Result<(), Err
 /// keeps its song_id and every byte of its identity; wstm goes, and so
 /// does a remix's wrmx, which only sets the stems up. Returns its size.
 pub fn master_only(src: &Path, out: &Path) -> Result<u64, Error> {
+    not_same(src, out)?;
     let w = Wwav::open(src)?;
     let verdict = w.verdict();
     if verdict != Verdict::Stems {
@@ -282,6 +283,7 @@ pub fn master_only(src: &Path, out: &Path) -> Result<u64, Error> {
 /// (Wi passes no bpm, key or splitter) with the master's frames; wlin makes
 /// it an original by `creator`. Returns the file's size.
 pub fn wrap_wav(src: &Path, out: &Path, meta: &SongMeta, creator: &str) -> Result<u64, Error> {
+    not_same(src, out)?;
     let w = match Wwav::open(src) {
         Err(Error::Msg(m)) if m.ends_with(": not a WAV") => {
             return Err(msg("This isn’t a WAV file"))

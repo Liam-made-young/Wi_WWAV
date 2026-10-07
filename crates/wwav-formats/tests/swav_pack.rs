@@ -150,6 +150,15 @@ fn pack_refuses_what_swav_pack_refuses() {
     let ours = wwav(&["swav", "pack", s(&src), "-o", s(&src)]);
     same_run(said(&ours), said(&reference), "writing over the film");
     same_bytes(&src, &corpus().join("fast.mp4"));
+    // or over another name for it: os.path.samefile knows a hard link
+    let link = src.with_extension("swav");
+    std::fs::hard_link(&src, &link).unwrap();
+    for cmd in [&["swav", "pack"][..], &["swav", "unpack"][..]] {
+        let reference = python(&swav_pack(), &[cmd[1], s(&src), "-o", s(&link)]);
+        let ours = wwav(&[cmd, &[s(&src), "-o", s(&link)]].concat());
+        same_run(said(&ours), said(&reference), "writing over a hard link");
+        same_bytes(&src, &corpus().join("fast.mp4"));
+    }
 }
 
 #[test]

@@ -296,6 +296,22 @@ fn master_only_is_the_song_without_its_stems() {
     }
 }
 
+#[test]
+fn a_writer_never_writes_over_what_it_reads() {
+    let dir = tmp("over-itself");
+    let song = dir.join("song.wwav");
+    std::fs::copy(corpus().join("original.wwav"), &song).unwrap();
+    let wav = dir.join("plain.wav");
+    std::fs::copy(corpus().join("plain.wav"), &wav).unwrap();
+    let link = dir.join("link.wwav");
+    std::fs::hard_link(&song, &link).unwrap();
+    assert!(master_only(&song, &song).is_err());
+    assert!(master_only(&song, &link).is_err());
+    assert!(wrap_wav(&wav, &wav, &corpus_song(), "").is_err());
+    same_bytes(&song, &corpus().join("original.wwav"));
+    same_bytes(&wav, &corpus().join("plain.wav"));
+}
+
 /// Wi's wrapWav on each input, under Node: Ok(bytes) or Err(message).
 fn wi_wrap(inputs: &[(&str, std::path::PathBuf)], dir: &Path) -> Vec<Result<Vec<u8>, String>> {
     let script = dir.join("wrap.mjs");
