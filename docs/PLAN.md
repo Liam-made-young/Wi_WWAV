@@ -14,6 +14,29 @@ Where each check runs:
 
 ---
 
+## Work in progress (resume here)
+
+Rules for this work, from the founder (7 Oct 2026): the main agent plus at most one Sonnet subagent at a time while the spec is rewritten; at most two Sonnet subagents at once while coding.
+
+**The scope cut of `docs/SPEC.md`.** The decisions are in `docs/SCOPE_CUT.md` (the brief). Chapters are rewritten one at a time into `docs/spec2/` (one file per chapter group), then assembled into `docs/SPEC.md`.
+
+- [x] Brief written (`docs/SCOPE_CUT.md`)
+- [x] 1–2: The idea; One app, three views (`docs/spec2/ch01-02.md`)
+- [ ] 3: Heat, the profile view (`ch03.md`)
+- [ ] 4: Space, the social view (`ch04.md`)
+- [ ] 5: Console, the creation view (`ch05.md`)
+- [ ] 6–7: Files; Look, sound and feel (`ch06-07.md`)
+- [ ] 8: Under the hood (`ch08.md`)
+- [ ] 9–10: Business and gates; Roadmap, open decisions, glossary (`ch09-10.md`)
+- [ ] Assemble: front matter, join, resolve `{{old:X.Y}}` references, contents table
+- [ ] Review: every brief decision present, nothing cut left, references resolve
+- [ ] Commit and push to `claude/relaxed-cori-x2igz9`
+- [ ] Re-scope the milestones below to the new spec (drop Unquantized rows, add MCP and public-view rows)
+
+**Then coding**, in this order: shell and library → Heat with the MCP server → Console audio, VST effects, MIDI → Space in three.js → Console video and `.swav` → Demucs. Partial work for the shell stage sits on branches `build/core`, `build/tauri` and `build/shell` (not merged; check against the new spec first).
+
+---
+
 ## Foundation (the format spine and the shared parts)
 
 Built first because every room reads and writes `.wwav` and `.swav`.
