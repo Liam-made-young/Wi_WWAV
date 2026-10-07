@@ -253,22 +253,12 @@ fn random_run(seed: u64, steps: usize) -> Tally {
     let (dir, mut store) = library();
     let root = store.root().to_path_buf();
     let mut rng = StdRng::seed_from_u64(seed);
-    // The first state already holds clips, bought, so no undo removes them:
-    // every value the run changes on them, a measured BPM among them, must
-    // come back exactly.
+    // The first state already holds clips no journal entry made, so no undo
+    // removes them: every value the run changes on them, a measured BPM among
+    // them, must come back exactly.
     for (n, title) in TITLES.iter().enumerate() {
-        let src = source_file(dir.path(), &format!("{title}.wwav"), &[n as u8; 32]);
-        let receipt = Receipt {
-            remote_id: format!("pur_{n}"),
-            file_name: format!("{title}.wwav"),
-            bytes: 32,
-            sha256: hex::encode(<sha2::Sha256 as sha2::Digest>::digest([n as u8; 32])),
-            json: json!({}),
-        };
         let bpm = measured(&mut rng);
-        store
-            .record_purchase(Room::Unquantized, &src, &receipt, &Measured(bpm))
-            .unwrap();
+        seed_clip(&root, title, &[n as u8; 32], bpm);
     }
     let first = dump(&root);
     let mut tally = Tally::default();
@@ -713,26 +703,24 @@ fn an_import_the_server_has_waits_on_its_publish() {
 #[test]
 fn work_that_left_the_machine_is_not_undone() {
     let (dir, mut store) = library();
-    let mut tx = store.begin(Room::Unquantized, "save for later").unwrap();
+    let mut tx = store.begin(Room::Space, "save for later").unwrap();
     tx.put_doc("saved", "rec-1", &json!({"record": "rec-1"}), "")
         .unwrap();
     tx.commit().unwrap();
     let journal_before = journal(store.root());
 
-    store
-        .record_outward(Room::Unquantized, "a purchase")
-        .unwrap();
+    store.record_outward(Room::Space, "a message").unwrap();
     assert_eq!(
         journal(store.root()),
         journal_before,
-        "a purchase is never a journal entry"
+        "a message is never a journal entry"
     );
     assert_eq!(
-        store.history(Room::Unquantized).unwrap().undo_text(),
-        "Can't undo a purchase."
+        store.history(Room::Space).unwrap().undo_text(),
+        "Can't undo a message."
     );
     assert!(
-        matches!(store.undo(Room::Unquantized), Err(Error::Refused(s)) if s == "Can't undo a purchase.")
+        matches!(store.undo(Room::Space), Err(Error::Refused(s)) if s == "Can't undo a message.")
     );
     assert!(store.doc("saved", "rec-1").unwrap().is_some());
 

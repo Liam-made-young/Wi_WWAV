@@ -54,7 +54,7 @@ fn opening_makes_the_library_folder() {
     let (_dir, store) = library();
     let root = store.root();
     assert!(root.join("library.sqlite").is_file());
-    for folder in ["media", "sessions", "purchases", "trash"] {
+    for folder in ["media", "sessions", "trash"] {
         assert!(root.join(folder).is_dir(), "{folder}/ is missing");
     }
     let conn = Connection::open(root.join("library.sqlite")).unwrap();
@@ -914,43 +914,6 @@ fn search_finds_clips_by_their_words_and_a_rule() {
     })
     .unwrap();
     assert_eq!(ids("high", &any, &store), [low]);
-}
-
-#[test]
-fn a_purchase_lands_with_its_receipt_and_cant_be_undone() {
-    let (dir, mut store) = library();
-    let bytes = b"RIFF World Ending";
-    let src = source_file(dir.path(), "World Ending.wwav", bytes); // saved under its delivered name
-    let receipt = Receipt {
-        remote_id: "pur_1".into(),
-        file_name: "World Ending.wwav".into(),
-        bytes: bytes.len() as u64,
-        sha256: sha256(bytes),
-        json: json!({"price_cents": 900, "seller": "LMY"}),
-    };
-    let mut wrong = receipt.clone();
-    wrong.sha256 = "0".repeat(64);
-    assert_eq!(
-        refused(store.record_purchase(Room::Unquantized, &src, &wrong, &ByExtension)),
-        "'World Ending.wwav' doesn't match its receipt's sha256, so it wasn't kept."
-    );
-    assert!(store.purchases().unwrap().is_empty());
-
-    let bought = store
-        .record_purchase(Room::Unquantized, &src, &receipt, &ByExtension)
-        .unwrap();
-    assert_eq!(bought.receipt, receipt);
-    let clip = store.clip(&bought.clip_id).unwrap().unwrap();
-    assert_eq!(clip.file, format!("purchases/{}.wwav", clip.id));
-    assert_eq!(clip.kind, Kind::Wwav);
-    assert_eq!(clip.title, "World Ending");
-    assert_eq!(std::fs::read(store.path_of(&clip)).unwrap(), bytes);
-    assert_eq!(store.purchases().unwrap(), [bought]);
-    assert_eq!(
-        store.history(Room::Unquantized).unwrap().undo_text(),
-        "Can't undo a purchase."
-    );
-    assert!(store.unused_media().unwrap().paths.is_empty());
 }
 
 #[test]

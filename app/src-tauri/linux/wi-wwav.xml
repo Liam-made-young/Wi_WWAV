@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The three kinds Wi_WWAV opens, for the desktop's MIME database, so a
+     file manager knows them by extension and offers the app. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="audio/x-wwav">
+    <comment>WWAV song</comment>
+    <sub-class-of type="audio/x-wav"/>
+    <glob pattern="*.wwav"/>
+  </mime-type>
+  <mime-type type="video/x-swav">
+    <comment>SWAV film</comment>
+    <sub-class-of type="video/mp4"/>
+    <glob pattern="*.swav"/>
+  </mime-type>
+  <mime-type type="application/x-wwavsession">
+    <comment>Wi_WWAV session</comment>
+    <glob pattern="*.wwavsession"/>
+  </mime-type>
+</mime-info>

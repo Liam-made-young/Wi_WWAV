@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wi_WWAV, exported</title>
+<style>
+/*TOKENS*/
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: var(--body)/1.4 var(--text); }
+main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+h1 { font: var(--title)/1.2 var(--name); font-weight: 400; margin: 0 0 6px; }
+h2 { font-size: var(--small); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin: 32px 0 8px; }
+p { margin: 0 0 8px; color: var(--ink-2); }
+ol { list-style: none; margin: 0; padding: 0; }
+li { padding: 12px 0; border-top: 1px solid var(--hairline); }
+.what { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.title { color: var(--ink); }
+.by, .facts { color: var(--ink-3); font-size: var(--small); }
+audio, video { width: 100%; margin-top: 8px; }
+video { border-radius: var(--radius); background: var(--deep); }
+.open { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; margin: 8px 0;
+        border-radius: var(--radius); background: var(--clay); color: var(--ink); cursor: pointer; }
+.open:focus-within { outline: 2px solid var(--accent); }
+.open input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.stems { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+.stem { display: flex; flex-direction: column; gap: 4px; }
+.stem label { font-size: var(--small); color: var(--ink-2); }
+.stem input[type=range] { width: 100%; }
+.stem[data-stem=vocals] input[type=range] { accent-color: var(--vocals); }
+.stem[data-stem=drums] input[type=range] { accent-color: var(--drums); }
+.stem[data-stem=other] input[type=range] { accent-color: var(--other); }
+.stem[data-stem=bass] input[type=range] { accent-color: var(--bass); }
+.stem .buttons { display: flex; gap: 4px; }
+button { min-height: 44px; min-width: 44px; padding: 0 12px; border: 1px solid var(--hairline);
+         border-radius: var(--radius); background: var(--deep); color: var(--ink); font: inherit; cursor: pointer; }
+button[aria-pressed=true] { background: var(--clay); border-color: var(--ink-3); }
+.transport { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+meter { flex: 1; height: 8px; }
+.end { margin-top: 24px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<main>
+<h1>Everything you made</h1>
+<p id="when"></p>
+<p>This folder plays with no connection and no account. Songs play their masters here; open the folder once, and every song comes apart into its four stems.</p>
+
+<h2>Songs</h2>
+<label class="open">Open this folder
+  <input id="folder" type="file" webkitdirectory multiple>
+</label>
+<p id="opened" role="status"></p>
+<ol id="songs"></ol>
+
+<h2>Films</h2>
+<ol id="films"></ol>
+
+<p class="end">That's everything.</p>
+</main>
+<script type="application/json" id="library">/*LIBRARY*/{}</script>
+<script>
+'use strict';
+const LIB = JSON.parse(document.getElementById('library').textContent);
+const STEMS = ['vocals', 'drums', 'other', 'bass'];
+const NAMES = { vocals: 'Vocals', drums: 'Drums', other: 'Other', bass: 'Bass' };
+
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'text') e.textContent = v;
+    else e.setAttribute(k, v);
+  }
+  for (const k of kids) e.append(k);
+  return e;
+}
+
+function time(s) {
+  const m = Math.floor(s / 60);
+  return m + ':' + String(Math.round(s % 60)).padStart(2, '0');
+}
+
+document.getElementById('when').textContent =
+  'Exported ' + new Date(LIB.exported).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' }) + '.';
+
+// ---- the list ----
+
+const rows = new Map();
+for (const s of LIB.songs) {
+  const facts = [s.key, s.bpm ? Math.round(s.bpm) + ' BPM' : null, time(s.duration)].filter(Boolean).join(' · ');
+  const audio = el('audio', { controls: '', preload: 'metadata', src: s.file, 'data-master': s.id });
+  const li = el('li', { 'data-song': s.id },
+    el('div', { class: 'what' },
+      el('span', { class: 'title', text: s.title }),
+      el('span', { class: 'by', text: s.artist }),
+      el('span', { class: 'facts', text: facts })),
+    audio);
+  rows.set(s.id, li);
+  document.getElementById('songs').append(li);
+}
+for (const f of LIB.films) {
+  document.getElementById('films').append(
+    el('li', { 'data-film': f.id },
+      el('div', { class: 'what' },
+        el('span', { class: 'title', text: f.title }),
+        el('span', { class: 'by', text: f.artist })),
+      el('video', { controls: '', preload: 'metadata', src: f.file, 'data-film': f.id })));
+}
+if (!LIB.films.length) document.getElementById('films').append(el('li', { text: 'No films.' }));
+if (!LIB.songs.length) document.getElementById('songs').append(el('li', { text: 'No songs.' }));
+
+// ---- a .wwav, read from the folder ----
+
+async function bytesAt(file, at, n) {
+  return new DataView(await file.slice(at, at + n).arrayBuffer());
+}
+
+// The chunks after the RIFF header, as wwav_pack.py walks them.
+async function chunks(file) {
+  const head = await bytesAt(file, 0, 12);
+  const tag = (v, o) => String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3));
+  if (file.size < 12 || tag(head, 0) !== 'RIFF' || tag(head, 8) !== 'WAVE') throw new Error('not a WAV');
+  const out = [];
+  let at = 12;
+  while (at + 8 <= file.size) {
+    const h = await bytesAt(file, at, 8);
+    const n = h.getUint32(4, true);
+    out.push({ id: tag(h, 0), at: at + 8, size: Math.min(n, file.size - at - 8) });
+    at += 8 + n + (n & 1);
+  }
+  return out;
+}
+
+// wstm: v1, four stereo 16-bit stems at 44.1 kHz, frames interleaved
+// VOC_L VOC_R DRM_L DRM_R OTH_L OTH_R BAS_L BAS_R.
+async function readStems(file, ctx) {
+  const wstm = (await chunks(file)).find((c) => c.id === 'wstm');
+  if (!wstm || wstm.size < 16) throw new Error('no wstm');
+  const h = await bytesAt(file, wstm.at, 16);
+  const version = h.getUint16(0, true), stems = h.getUint8(2), channels = h.getUint8(3), bits = h.getUint8(4);
+  const pad = h.getUint16(6, true), rate = h.getUint32(8, true), frames = h.getUint32(12, true);
+  if (version !== 1 || stems !== 4 || channels !== 2 || bits !== 16 || rate !== 44100) throw new Error('wstm isn’t v1');
+  const start = wstm.at + 16 + pad;
+  if (wstm.size < 16 + pad + frames * 16) throw new Error('wstm is cut off');
+  const buffers = STEMS.map(() => ctx.createBuffer(2, Math.max(frames, 1), rate));
+  const chans = buffers.map((b) => [b.getChannelData(0), b.getChannelData(1)]);
+  const RUN = 65536;
+  for (let f0 = 0; f0 < frames; f0 += RUN) {
+    const n = Math.min(RUN, frames - f0);
+    const v = new Int16Array(await file.slice(start + f0 * 16, start + (f0 + n) * 16).arrayBuffer());
+    for (let i = 0; i < n; i++) {
+      for (let s = 0; s < 4; s++) {
+        chans[s][0][f0 + i] = v[i * 8 + s * 2] / 32768;
+        chans[s][1][f0 + i] = v[i * 8 + s * 2 + 1] / 32768;
+      }
+    }
+  }
+  return buffers;
+}
+
+// ---- a song apart: four faders, mute and solo ----
+
+let ctx = null;
+const players = new Map();
+
+function Song(song, buffers) {
+  const out = ctx.createGain();
+  const meter = ctx.createAnalyser();
+  meter.fftSize = 2048;
+  out.connect(meter);
+  meter.connect(ctx.destination);
+  const stems = STEMS.map((name, i) => {
+    const gain = ctx.createGain();
+    gain.connect(out);
+    return { name, buffer: buffers[i], gain, level: 1, mute: false, solo: false, source: null };
+  });
+  let playing = false, startedAt = 0, offset = 0;
+  const duration = buffers[0].duration;
+
+  function apply() {
+    const soloed = stems.some((s) => s.solo);
+    for (const s of stems) {
+      const audible = !s.mute && (!soloed || s.solo);
+      s.gain.gain.setValueAtTime(audible ? s.level : 0, ctx.currentTime);
+    }
+  }
+
+  function play() {
+    if (playing) return;
+    ctx.resume();
+    for (const s of stems) {
+      s.source = ctx.createBufferSource();
+      s.source.buffer = s.buffer;
+      s.source.connect(s.gain);
+      s.source.start(0, offset % duration);
+    }
+    startedAt = ctx.currentTime - offset;
+    playing = true;
+    apply();
+    tick();
+  }
+
+  function pause() {
+    if (!playing) return;
+    for (const s of stems) s.source.stop();
+    offset = ctx.currentTime - startedAt;
+    playing = false;
+  }
+
+  const level = el('meter', { min: '0', max: '1', value: '0', 'data-level': '0', 'aria-label': song.title + ' output level' });
+  const data = new Float32Array(meter.fftSize);
+  function tick() {
+    meter.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (const x of data) sum += x * x;
+    const rms = Math.sqrt(sum / data.length);
+    level.value = Math.min(1, rms * 2);
+    level.setAttribute('data-level', rms.toFixed(5));
+    if (playing) requestAnimationFrame(tick);
+  }
+
+  const toggle = el('button', { type: 'button', text: 'Play', 'data-play': song.id });
+  toggle.onclick = () => {
+    playing ? pause() : play();
+    toggle.textContent = playing ? 'Pause' : 'Play';
+  };
+
+  const strip = el('div', { class: 'stems' });
+  for (const s of stems) {
+    const fader = el('input', { type: 'range', min: '0', max: '1', step: '0.01', value: '1', 'aria-label': NAMES[s.name] + ' level' });
+    fader.oninput = () => { s.level = Number(fader.value); apply(); };
+    const mute = el('button', { type: 'button', text: 'M', 'aria-pressed': 'false', 'aria-label': 'Mute ' + NAMES[s.name], 'data-mute': s.name });
+    mute.onclick = () => { s.mute = !s.mute; mute.setAttribute('aria-pressed', String(s.mute)); apply(); };
+    const solo = el('button', { type: 'button', text: 'S', 'aria-pressed': 'false', 'aria-label': 'Solo ' + NAMES[s.name], 'data-solo': s.name });
+    solo.onclick = () => { s.solo = !s.solo; solo.setAttribute('aria-pressed', String(s.solo)); apply(); };
+    strip.append(el('div', { class: 'stem', 'data-stem': s.name },
+      el('label', { text: NAMES[s.name] }), fader, el('div', { class: 'buttons' }, mute, solo)));
+  }
+  return { node: el('div', { class: 'apart', 'data-apart': song.id }, el('div', { class: 'transport' }, toggle, level), strip) };
+}
+
+document.getElementById('folder').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  const status = document.getElementById('opened');
+  // A file's path below the chosen folder, whatever the folder is called.
+  const byPath = new Map(files.map((f) => [f.webkitRelativePath.split('/').slice(1).join('/'), f]));
+  ctx = ctx || new AudioContext();
+  let apart = 0, master = 0;
+  for (const song of LIB.songs) {
+    const row = rows.get(song.id);
+    const file = byPath.get(song.file);
+    if (!song.stems || !file || players.has(song.id)) { master++; continue; }
+    try {
+      const player = Song(song, await readStems(file, ctx));
+      players.set(song.id, player);
+      row.append(player.node);
+      apart++;
+    } catch (err) {
+      row.append(el('p', { text: 'This one plays as its master only: ' + err.message + '.' }));
+      master++;
+    }
+  }
+  status.textContent = apart === 1 ? '1 song is apart.' : apart + ' songs are apart.';
+  if (master) status.textContent += ' ' + (master === 1 ? '1 plays' : master + ' play') + ' as the master only.';
+});
+</script>
+</body>
+</html>

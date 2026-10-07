@@ -1,17 +1,14 @@
-//! The other records `library.sqlite` holds (docs/SPEC.md 9.6): the rooms'
-//! own records, Console sessions as sequences, purchases with their receipts,
-//! and what the plugin scanner found.
-
-use std::path::Path;
+//! The other records `library.sqlite` holds (docs/SPEC.md 9.6): the views'
+//! own records, Console sessions as sequences, and what the plugin scanner
+//! found.
 
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 
-use crate::clips::{clip_row, copy_hashed, file_name, Inspector, NewClip};
-use crate::journal::{self, insert_row, object};
-use crate::{refused, Error, Result, Room, Store, Txn};
+use crate::journal::object;
+use crate::{refused, Error, Result, Store, Txn};
 
-/// One of a room's records, such as Heat's Task or TimeBlock (3.15), kept as
+/// One of a view's records, such as Heat's Task or TimeBlock (3.15), kept as
 /// JSON under its kind and its own id. `text` is what search reads.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Doc {
@@ -41,24 +38,6 @@ pub struct Sequence {
     pub id: String,
     pub title: String,
     pub package: String,
-}
-
-/// What the server says was bought: the file's name as delivered, its size
-/// and sha256, and the whole receipt.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Receipt {
-    pub remote_id: String,
-    pub file_name: String,
-    pub bytes: u64,
-    pub sha256: String,
-    pub json: Value,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Purchase {
-    pub id: String,
-    pub clip_id: String,
-    pub receipt: Receipt,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -145,95 +124,6 @@ impl Store {
             })
         })?;
         Ok(seqs.collect::<rusqlite::Result<_>>()?)
-    }
-
-    /// Keeps a bought file, as delivered, in `purchases/` under a new ULID,
-    /// with its receipt, if its sha256 matches the receipt's. The clip and
-    /// the receipt are not journal entries: a purchase can't be undone, and
-    /// the room's Edit menu says so.
-    pub fn record_purchase(
-        &mut self,
-        room: Room,
-        src: &Path,
-        receipt: &Receipt,
-        inspector: &dyn Inspector,
-    ) -> Result<Purchase> {
-        let info = inspector.inspect(src)?;
-        let id = wwav_ids::ulid();
-        let name = file_name(&id, src);
-        let dir = self.root.join("purchases");
-        let (sha256, bytes) = copy_hashed(src, &dir, &name)?;
-        if sha256 != receipt.sha256 {
-            std::fs::remove_file(dir.join(&name))?;
-            return refused(format!(
-                "'{}' doesn't match its receipt's sha256, so it wasn't kept.",
-                receipt.file_name
-            ));
-        }
-        let clip = NewClip {
-            id: id.clone(),
-            file: format!("purchases/{name}"),
-            sha256,
-            bytes,
-            info,
-            from_sequence: None,
-        };
-        let purchase = Purchase {
-            id: wwav_ids::ulid(),
-            clip_id: id,
-            receipt: receipt.clone(),
-        };
-        let tx = self.conn.transaction()?;
-        insert_row(&tx, "clips", &clip_row(clip))?;
-        tx.execute(
-            "INSERT INTO purchases (id, clip_id, remote_id, file_name, bytes, sha256, receipt)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![
-                purchase.id,
-                purchase.clip_id,
-                receipt.remote_id,
-                receipt.file_name,
-                receipt.bytes as i64,
-                receipt.sha256,
-                receipt.json.to_string()
-            ],
-        )?;
-        journal::record_outward(&tx, room, "a purchase")?;
-        tx.commit()?;
-        Ok(purchase)
-    }
-
-    pub fn purchases(&self) -> Result<Vec<Purchase>> {
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT id, clip_id, remote_id, file_name, bytes, sha256, receipt FROM purchases ORDER BY id",
-        )?;
-        let rows = stmt.query_map([], |r| {
-            Ok((
-                r.get(0)?,
-                r.get(1)?,
-                r.get(2)?,
-                r.get(3)?,
-                r.get::<_, i64>(4)?,
-                r.get(5)?,
-                r.get::<_, String>(6)?,
-            ))
-        })?;
-        rows.map(|row| {
-            let (id, clip_id, remote_id, file_name, bytes, sha256, json) = row?;
-            let json = serde_json::from_str(&json)?;
-            Ok(Purchase {
-                id,
-                clip_id,
-                receipt: Receipt {
-                    remote_id,
-                    file_name,
-                    bytes: bytes as u64,
-                    sha256,
-                    json,
-                },
-            })
-        })
-        .collect()
     }
 
     /// Replaces what is known about each plugin file in `scans` with this

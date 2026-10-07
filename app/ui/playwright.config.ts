@@ -7,7 +7,9 @@ export default defineConfig({
   fullyParallel: false,
   reporter: [['list']],
   use: { baseURL: 'http://localhost:5173', viewport: { width: 1280, height: 800 } },
-  // Starts the dev server when none is running, so `npm run e2e` stands alone.
-  webServer: { command: 'npm run dev', url: 'http://localhost:5173', reuseExistingServer: true, timeout: 60_000 },
+  // Starts the mock server, the dev bridge (the real core, with mock-engine)
+  // and Vite pointed at that bridge, on a fresh library, so `npm run e2e`
+  // stands alone (e2e/support/global-setup.ts).
+  globalSetup: './e2e/support/global-setup.ts',
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } }],
 });
