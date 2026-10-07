@@ -101,10 +101,10 @@ pub struct Entry {
 /// tests/corpus/manifest.json's files.
 pub fn manifest() -> Vec<Entry> {
     let text = std::fs::read(corpus().join("manifest.json")).unwrap();
-    let Some(Value::Dict(top)) = json::loads(&text, true) else {
+    let Some(Value::Dict(ref top)) = json::loads(&text, true) else {
         panic!("manifest.json isn't an object")
     };
-    let Some(Value::List(files)) = json::get(&top, "files") else {
+    let Some(Value::List(files)) = json::get(top, "files") else {
         panic!("manifest.json has no files")
     };
     files

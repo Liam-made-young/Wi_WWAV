@@ -11,6 +11,7 @@
 //!   its format from the subformat.
 //! - wmet, wlin and wrmx are read with python's json.loads.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -79,34 +80,49 @@ pub struct Chunk {
     pub cut: bool,
 }
 
-/// The chunks after a RIFF header, as `wwav_pack.py chunks()` yields them.
-pub fn chunks(f: &mut (impl Read + Seek), size: u64) -> io::Result<Vec<Chunk>> {
-    let mut out = Vec::new();
-    let mut at = 12;
-    while at + 8 <= size {
+/// A walk over the chunks after a RIFF header, as `wwav_pack.py chunks()`
+/// yields them, reading one header at a time: nothing is kept, so a file
+/// of millions of chunks takes no more memory than one of three.
+#[derive(Clone, Copy, Debug)]
+pub struct ChunkWalk {
+    size: u64,
+    at: u64,
+}
+
+impl ChunkWalk {
+    /// A walk over a file of `size` bytes, from byte 12.
+    pub fn new(size: u64) -> ChunkWalk {
+        ChunkWalk { size, at: 12 }
+    }
+
+    /// The next chunk, or None after the last.
+    pub fn next_chunk(&mut self, f: &mut (impl Read + Seek)) -> io::Result<Option<Chunk>> {
+        if self.at + 8 > self.size {
+            return Ok(None);
+        }
         let mut h = [0; 8];
-        f.seek(SeekFrom::Start(at))?;
+        f.seek(SeekFrom::Start(self.at))?;
         f.read_exact(&mut h)?;
         let n = u32::from_le_bytes([h[4], h[5], h[6], h[7]]) as u64;
         let id = [h[0], h[1], h[2], h[3]];
-        if at + 8 + n > size {
-            out.push(Chunk {
+        let at = self.at + 8;
+        if at + n > self.size {
+            self.at = self.size; // the walk ends with what's there of it
+            return Ok(Some(Chunk {
                 id,
-                at: at + 8,
-                size: size - at - 8,
+                at,
+                size: self.size - at,
                 cut: true,
-            });
-            break;
+            }));
         }
-        out.push(Chunk {
+        self.at = at + n + (n & 1);
+        Ok(Some(Chunk {
             id,
-            at: at + 8,
+            at,
             size: n,
             cut: false,
-        });
-        at += 8 + n + (n & 1);
+        }))
     }
-    Ok(out)
 }
 
 pub(crate) fn read_at(f: &mut (impl Read + Seek), at: u64, n: u64) -> io::Result<Vec<u8>> {
@@ -162,8 +178,11 @@ pub struct Wwav {
     pub size: u64,
     /// The size the RIFF header gives.
     pub riff: u32,
-    /// Every chunk, in file order.
+    /// The first chunk of each id, in the order the ids first appear: the
+    /// chunks the tool reads (its `self.at`).
     pub chunks: Vec<Chunk>,
+    /// The walk's last chunk, which may be cut off.
+    pub last: Option<Chunk>,
     /// The last fmt chunk's, if it had 16 bytes.
     pub fmt: Option<Fmt>,
     /// The first wmet, wlin and wrmx as JSON; None when missing, not UTF-8,
@@ -186,12 +205,18 @@ impl Wwav {
         if head.len() < 12 || &head[..4] != b"RIFF" || &head[8..] != b"WAVE" {
             return Err(msg(format!("{shown}: not a WAV")));
         }
-        let chunks = chunks(&mut file, size)?;
-        let first = |id: &[u8; 4]| chunks.iter().find(|c| &c.id == id).copied();
-        let mut fmt = None;
-        for c in chunks.iter().filter(|c| &c.id == b"fmt ") {
-            fmt = Fmt::parse(&read_at(&mut file, c.at, c.size.min(40))?, 26);
+        let (mut chunks, mut seen, mut last, mut fmt) = (Vec::new(), HashSet::new(), None, None);
+        let mut walk = ChunkWalk::new(size);
+        while let Some(c) = walk.next_chunk(&mut file)? {
+            if seen.insert(c.id) {
+                chunks.push(c);
+            }
+            if &c.id == b"fmt " {
+                fmt = Fmt::parse(&read_at(&mut file, c.at, c.size.min(40))?, 26);
+            }
+            last = Some(c);
         }
+        let first = |id: &[u8; 4]| chunks.iter().find(|c| &c.id == id).copied();
         let mut json = |id| -> io::Result<Option<Value>> {
             let Some(c) = first(id) else { return Ok(None) };
             let v = json::loads(&read_at(&mut file, c.at, c.size)?, true);
@@ -223,6 +248,7 @@ impl Wwav {
             size,
             riff,
             chunks,
+            last,
             fmt,
             wmet,
             wlin,
@@ -301,12 +327,7 @@ impl Wwav {
             format!("says {}, file is {}", self.riff, self.size as i64 - 8)
         };
         let mut out = format!("{shown}: {} bytes (RIFF size {riff})\n", self.size);
-        let mut seen: Vec<[u8; 4]> = Vec::new();
         for c in &self.chunks {
-            if seen.contains(&c.id) {
-                continue;
-            }
-            seen.push(c.id);
             let name: String = c.id.iter().map(|&b| b as char).collect(); // latin-1
             out += &format!("  {name}  at {}, {} bytes", c.at, c.size);
             match &c.id {

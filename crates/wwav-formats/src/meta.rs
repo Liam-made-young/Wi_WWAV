@@ -5,6 +5,7 @@
 //! written twice is the same bytes.
 
 use crate::json::{num, quote};
+use crate::text::py_strip;
 
 /// A song's `type` (6.1). A film's is `Original` in 0.1; 6.10 adds `Remix`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -46,6 +47,34 @@ pub struct SongMeta {
 }
 
 impl SongMeta {
+    /// This metadata as `wwav_pack.py unpack` then `pack` give it back, so
+    /// an original written with it comes back byte for byte (6.13.1).
+    /// unpack writes title, artist, key and created to song.txt a line
+    /// each, and pack reads each line trimmed (python's `strip()`): so
+    /// here line breaks become spaces and the ends are trimmed. pack keeps
+    /// a bpm over 20 and under 400, and num() writes it whole or to 2
+    /// decimals: so here it is rounded to 2 decimals, then kept only in
+    /// that range (0 otherwise). song_id, kind and splitter stay as they
+    /// are; an original also needs a title, a created date and a 32-hex
+    /// song_id, which [`WwavWriter::create`](crate::writer::WwavWriter::create)
+    /// checks.
+    pub fn normalized(&self) -> SongMeta {
+        let line = |s: &str| py_strip(&s.replace(['\r', '\n'], " ")).to_string();
+        let rounded: f64 = format!("{:.2}", self.bpm).parse().unwrap_or(0.0);
+        SongMeta {
+            title: line(&self.title),
+            artist: line(&self.artist),
+            key: line(&self.key),
+            created: line(&self.created),
+            bpm: if 20.0 < rounded && rounded < 400.0 {
+                rounded
+            } else {
+                0.0
+            },
+            ..self.clone()
+        }
+    }
+
     /// The wmet text for a master of `frames` frames.
     pub fn wmet(&self, frames: u64) -> String {
         let mut parts = vec![

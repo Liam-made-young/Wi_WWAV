@@ -134,6 +134,42 @@ fn arguments_read_as_argparse_reads_them() {
         &["--help"],
         &[],
         &["frobnicate"],
+        // -h takes no value: "=" or a glued "-" is a usage error, a glued
+        // letter is another option (-ho needs -o's value), and options it
+        // doesn't know before it are refused only after the help
+        &["info", "--help=x"],
+        &["info", "-h=x"],
+        &["info", "--help="],
+        &["info", "-h="],
+        &["info", "--he=x"],
+        &["info", "-h-x"],
+        &["info", "-h-"],
+        &["info", "-hh=x"],
+        &["info", "-hx"],
+        &["info", "-hhx"],
+        &["info", "--hel"],
+        &["pack", "-ho"],
+        &["pack", "-ho", "x"],
+        &["pack", "-hox"],
+        &["info", "--bogus", "-h"],
+        &["info", "-x", "-h"],
+        &["info", "a", "b", "-h"],
+        &["pack", "01 Song", "--bogus", "-h"],
+        &["pack", "-o", "-h"],
+        &["pack", "--c", "-h"],
+        &["--help=x"],
+        &["-h=x"],
+        &["-hx"],
+        &["-h-x"],
+        &["--bogus", "-h"],
+        &["--bogus", "info", "song.wwav"],
+        &["frobnicate", "-h"],
+        &["--", "-h"],
+        &["--"],
+        &["--", "info", "song.wwav"],
+        &["info", "--", "song.wwav"],
+        &["info", "song.wwav", "--"],
+        &["info", "--", "--"],
     ];
     for (i, args) in wwav_cases.iter().enumerate() {
         same_as_tool(i, &wwav_pack(), &[], args);
@@ -148,6 +184,8 @@ fn arguments_read_as_argparse_reads_them() {
         &["info", "film.mp4"],
         &["unpack", "film.mp4"],
         &["-h"],
+        &["pack", "film.mp4", "--title=x", "-h="],
+        &["info", "film.mp4", "--t", "-h"],
     ];
     for (i, args) in swav_cases.iter().enumerate() {
         same_as_tool(100 + i, &swav_pack(), &["swav"], args);

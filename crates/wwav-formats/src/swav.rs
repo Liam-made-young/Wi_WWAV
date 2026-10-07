@@ -13,6 +13,7 @@
 //! gets its real size written first. Readers take the first wmet and wlin;
 //! NaN and Infinity aren't JSON here.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
@@ -23,7 +24,7 @@ use crate::meta::{Kind, Lineage};
 use crate::pack::object_or_empty;
 use crate::text::{basename, key_values, splitext, today};
 use crate::wwav::read_at;
-use crate::{msg, not_same, Error};
+use crate::{msg, not_same, Error, Staged};
 
 const OWN: [&[u8; 4]; 2] = [b"wmet", b"wlin"];
 
@@ -242,7 +243,22 @@ fn copy(f: &mut File, n: u64, o: &mut impl Write, shown: &Path) -> Result<(), Er
 /// same export ("a film made from a song is its child"); every 0.x reader
 /// reads it, and `swav_pack.py unpack` warns that film.txt can't keep its
 /// parent. The command line's pack ([`pack_original`]) stays an original.
+///
+/// A film whose last box has size 0 gets its real size written in, so
+/// unpacking gives back that patched film, not the one handed in: an
+/// encoder whose film must come back byte for byte (S0.6) writes real box
+/// sizes, as ffmpeg's MP4 muxer does unless it is streaming.
 pub fn pack(film: &Path, out: &Path, meta: &FilmMeta, lineage: &Lineage) -> Result<u64, Error> {
+    pack_with(film, out, || Ok((meta.clone(), lineage.clone()))).map(|(_, total)| total)
+}
+
+/// pack, with wmet and wlin made by `identity` once the film has passed
+/// the tool's checks, as swav_pack.py reads film.txt only then.
+fn pack_with(
+    film: &Path,
+    out: &Path,
+    identity: impl FnOnce() -> Result<(FilmMeta, Lineage), Error>,
+) -> Result<(FilmMeta, u64), Error> {
     not_same(film, out)?;
     let mut s = Swav::open(film)?;
     if s.boxes.iter().any(|b| OWN.contains(&&b.kind)) {
@@ -251,7 +267,8 @@ pub fn pack(film: &Path, out: &Path, meta: &FilmMeta, lineage: &Lineage) -> Resu
             film.display()
         )));
     }
-    let tail = tail(meta, lineage);
+    let (meta, lineage) = identity()?;
+    let tail = tail(&meta, &lineage);
     // A last box of size 0 runs "to the end of the file", which would
     // swallow the new boxes: write its real size in first.
     let last = *s.boxes.last().ok_or_else(|| msg("no boxes"))?;
@@ -262,16 +279,16 @@ pub fn pack(film: &Path, out: &Path, meta: &FilmMeta, lineage: &Lineage) -> Resu
             film.display()
         )));
     }
-    let mut o = BufWriter::with_capacity(1 << 20, File::create(out)?);
-    copy(&mut s.file, s.size, &mut o, film)?;
+    let mut o = Staged::create(out)?;
+    copy(&mut s.file, s.size, &mut *o, film)?;
     if patch {
         o.seek(SeekFrom::Start(last.at))?;
         o.write_all(&(last.size as u32).to_be_bytes())?;
         o.seek(SeekFrom::End(0))?;
     }
     o.write_all(&tail)?;
-    o.flush()?;
-    Ok(s.size + tail.len() as u64)
+    o.commit()?;
+    Ok((meta, s.size + tail.len() as u64))
 }
 
 /// film.txt beside a film: `film.mp4` -> `film.txt`.
@@ -283,7 +300,7 @@ pub fn txt_path(film: &str) -> String {
 /// the command line's --title, --artist and --creator (empty means unset).
 fn original(
     film: &str,
-    info: &std::collections::HashMap<String, String>,
+    info: &HashMap<String, String>,
     title: &str,
     artist: &str,
     creator: &str,
@@ -322,15 +339,25 @@ pub fn pack_original(
     artist: &str,
     creator: &str,
 ) -> Result<(FilmMeta, u64), Error> {
-    let (meta, lineage) = original(
-        film,
-        &key_values(Path::new(&txt_path(film))),
-        title,
-        artist,
-        creator,
-    );
-    let total = pack(Path::new(film), Path::new(out), &meta, &lineage)?;
-    Ok((meta, total))
+    pack_with(Path::new(film), Path::new(out), || {
+        let info = key_values(Path::new(&txt_path(film)))?;
+        Ok(original(film, &info, title, artist, creator))
+    })
+}
+
+/// `{**a, **b}`: each key's value, b's where both have it, and the keys in
+/// the order they first appear.
+fn merged<'a>(
+    a: &'a [(String, Value)],
+    b: &'a [(String, Value)],
+) -> (HashMap<&'a str, &'a Value>, Vec<&'a str>) {
+    let (mut values, mut keys) = (HashMap::new(), Vec::new());
+    for (k, v) in a.iter().chain(b) {
+        if values.insert(k.as_str(), v).is_none() {
+            keys.push(k.as_str());
+        }
+    }
+    (values, keys)
 }
 
 /// What unpack wrote, and the tool's warning if packing again won't give
@@ -380,39 +407,33 @@ pub fn unpack(path: &str, out: &str) -> Result<Unpacked, Error> {
 
     // film.txt holds one trimmed line per value, and pack writes originals:
     // say when packing this again won't give back what was dropped, and why
-    let (again_meta, again_lin) = original(out, &key_values(Path::new(&txt)), "", "", "");
+    let (again_meta, again_lin) = original(out, &key_values(Path::new(&txt))?, "", "", "");
     let again = tail(&again_meta, &again_lin);
     let rest = read_at(&mut s.file, end, s.size - end)?;
     let mut warning = None;
     if end < s.size && rest != again {
-        let merge = |a: &[(String, Value)], b: &[(String, Value)]| {
-            let mut m: Vec<(String, Value)> = a.to_vec();
-            for (k, v) in b {
-                match m.iter_mut().find(|(mk, _)| mk == k) {
-                    Some(item) => item.1 = v.clone(),
-                    None => m.push((k.clone(), v.clone())),
-                }
-            }
-            m
-        };
-        let parsed = |t: String| match json::loads(t.as_bytes(), false) {
-            Some(Value::Dict(d)) => d,
-            _ => Vec::new(),
-        };
-        let old = merge(lin, meta);
-        let new = merge(&parsed(again_lin.wlin()), &parsed(again_meta.wmet()));
-        let mut keys: Vec<&String> = old.iter().map(|(k, _)| k).collect();
-        keys.extend(
-            new.iter()
-                .map(|(k, _)| k)
-                .filter(|k| !old.iter().any(|(o, _)| o == *k)),
+        let (again_lin, again_meta) = (
+            json::loads(again_lin.wlin().as_bytes(), false),
+            json::loads(again_meta.wmet().as_bytes(), false),
         );
-        let value =
-            |d: &[(String, Value)], k: &str| json::get(d, k).cloned().unwrap_or(Value::Null);
-        let changed: Vec<&str> = keys
+        fn items(v: &Option<Value>) -> &[(String, Value)] {
+            match v {
+                Some(Value::Dict(d)) => d,
+                _ => &[],
+            }
+        }
+        let (old, old_keys) = merged(lin, meta);
+        let (new, new_keys) = merged(items(&again_lin), items(&again_meta));
+        let null = Value::Null;
+        // dict.fromkeys([*old, *new])
+        let keys = old_keys
             .into_iter()
-            .filter(|k| !json::py_eq(&value(&old, k), &value(&new, k)))
-            .map(String::as_str)
+            .chain(new_keys.into_iter().filter(|k| !old.contains_key(k)));
+        let changed: Vec<&str> = keys
+            .filter(|k| {
+                let (was, now) = (old.get(k).copied(), new.get(k).copied());
+                !json::py_eq(was.unwrap_or(&null), now.unwrap_or(&null))
+            })
             .collect();
         let what = if changed.is_empty() {
             "wmet and wlin as written".to_string()

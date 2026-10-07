@@ -153,7 +153,7 @@ for line in open(sys.argv[1]):
     let lines = python_lines(code, &input);
     for (s, line) in strings.iter().zip(lines) {
         // python's answers come back as a JSON list, so newlines survive
-        let Some(Value::List(v)) = json::loads(line.as_bytes(), false) else {
+        let Some(Value::List(ref v)) = json::loads(line.as_bytes(), false) else {
             panic!("{line}")
         };
         let text = |i: usize| match &v[i] {

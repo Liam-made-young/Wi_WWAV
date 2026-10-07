@@ -294,6 +294,9 @@ def make(out):
         {"wi": "the master only: wmet has no version",
          "because": "Wi's reader matches the version with an ASCII-only \\d, as the device does; wwav_pack.py's \\d "
                     "takes any script's digits."})
+    deep = b"[" * 600 + b"]" * 600
+    add("deep-wmet.wwav", with_wmet(wmet[:-1] + b', "x": ' + deep + b"}"),
+        "A wmet holding a list nested 600 deep: JSON every reader reads, however deep.", STEMS)
     add("frames-wmet.wwav", with_wmet(wmet.replace(b'"frames": %d' % FRAMES, b'"frames": %d' % (FRAMES + 1))),
         "wmet's frames one more than the master's.",
         f"the master only: frame counts differ (data {FRAMES}, wstm {FRAMES}, wmet {FRAMES + 1})")
@@ -392,6 +395,8 @@ def make(out):
         "A wlin that isn't JSON.", PLAIN_MP4)
     add("not-at-end.swav", swav + struct.pack(">I4s", 8, b"free"),
         "plain.swav with a box after wlin: it reads, but unpack refuses to move the film.", SWAV)
+    add("deep.swav", plain + box(b"wmet", swav_wmet[:-1] + ', "x": ' + "[" * 600 + "]" * 600 + "}") + box(b"wlin", swav_wlin),
+        "A wmet holding a list nested 600 deep: JSON every reader reads, however deep.", SWAV)
     child_wlin = ('{"parent_id": "%s", "root_id": "%s", "generation": 1, "creator": "%s", "device_id": ""}'
                   % (SONG_ID, SONG_ID, CREATOR))
     add("child.swav", plain + box(b"wmet", swav_wmet) + box(b"wlin", child_wlin),
