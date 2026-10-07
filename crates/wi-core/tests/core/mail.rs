@@ -361,3 +361,34 @@ fn a_mail_that_cant_go_says_why_and_can_be_tried_again_or_thrown_away() {
         "No action in the outbox has that id."
     );
 }
+
+#[test]
+fn what_you_wrote_and_where_a_thread_sits_stay_out_of_an_export() {
+    let setup = Setup::new();
+    let core = core_with(&setup, setup.dir.path().join("no-claude-here"));
+    record(&setup, "th-1", "Quiz 4", "The quiz moves to Thursday.");
+    ok(
+        &core,
+        "heat.mail.reply",
+        json!({"threadId": "th-1", "body": "UNIQUE-REPLY-WORDS"}),
+    );
+    ok(
+        &core,
+        "heat.mail.archive",
+        json!({"threadId": "th-1", "archived": true}),
+    );
+    let out = setup.dir.path().join("export");
+    ok(&core, "export.everything", json!({"to": out}));
+    let exported = std::fs::read_to_string(out.join("heat.json")).unwrap();
+    assert!(
+        exported.contains("Quiz 4"),
+        "the thread's record is exported"
+    );
+    assert!(
+        !exported.contains("UNIQUE-REPLY-WORDS"),
+        "a mail you wrote is in the export"
+    );
+    for kind in ["mailAction", "mailState", "mailText"] {
+        assert!(!exported.contains(kind), "{kind} is in the export");
+    }
+}
