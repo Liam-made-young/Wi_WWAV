@@ -13,6 +13,7 @@ import {
   ringAngle,
   ringOf,
   ringRadius,
+  ringTurn,
   seatPoint,
   splitWorlds,
   systemBox,
@@ -91,17 +92,41 @@ describe('seats and rings', () => {
 
   // The fix to iOS (docs/QUESTIONS.md #72): iOS turns each ring half a
   // seat further than the last, which puts ring 2 a whole seat round and
-  // lines it up with ring 0. Here no ring lines up with any other.
-  test('no two full rings line up into spokes', () => {
+  // lines it up with ring 0. Here ring 1 keeps iOS's half seat and ring 2
+  // turns 1⅙ seats: a third of a seat from ring 1, which its worlds could
+  // touch, and a sixth from ring 0, which they can only line up with.
+  test('full rings turn 0, ½ and 1⅙ seats, so no two line up into spokes', () => {
+    expect([0, 1, 2].map((r) => ringTurn(r, 7))).toEqual([0, 0.5, expect.closeTo(7 / 6, 12)]);
     for (const seed of ['album-100', 'album-243', 'world-ending', 'x']) {
       const angles = Array.from({ length: 21 }, (_, s) => ringAngle(s, 21, seed));
       for (let i = 0; i < 21; i++) {
         for (let j = 0; j < 21; j++) {
           if (ringOf(i) === ringOf(j)) continue;
-          expect(gap(angles[i], angles[j])).toBeGreaterThan(SEAT / 3 - 1e-9);
+          const neighbours = Math.abs(ringOf(i) - ringOf(j)) === 1;
+          expect(gap(angles[i], angles[j])).toBeGreaterThan((neighbours ? SEAT / 3 : SEAT / 6) - 1e-9);
         }
       }
     }
+  });
+
+  // A part-full ring is spread round the whole circle, so on iOS it can
+  // line up with the full rings inside it (eleven worlds put ring 1's four
+  // on ring 0's rays). Here it turns to the middle of the room they leave.
+  test('a part-full ring never shares a ray with the rings inside it', () => {
+    expect(ringTurn(1, 4)).toBe(0.625); // iOS: ½, on ring 0's rays
+    expect(ringTurn(1, 3)).toBe(0.5); // as on iOS, already between them
+    let least = Infinity;
+    for (let n = 8; n <= 22; n++) {
+      const angles = Array.from({ length: n }, (_, s) => ringAngle(s, n, 'album-7'));
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          if (ringOf(i) !== ringOf(j)) least = Math.min(least, gap(angles[i], angles[j]));
+        }
+      }
+    }
+    // The tightest is nineteen worlds: ring 2's five come within 1/30 of a
+    // seat of ring 0's rays, to keep 1/15 from ring 1's.
+    expect(least).toBeCloseTo(SEAT / 30, 9);
   });
 
   test('seats are deterministic and never overlap', () => {

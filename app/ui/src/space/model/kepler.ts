@@ -88,12 +88,19 @@ export function placeOrbit(orbit: Orbit, t: number, phaseOffset = 0): Point3 {
 // from where the worlds are, so it holds no state.
 export const SEPARATION_RATE = 0.55;
 
+// iOS draws every orbit squashed to 0.88 of its height and judges
+// closeness there, on its screen. The model keeps the plane unsquashed
+// (the camera supplies the tilt), so it squashes y the same way here, and
+// the iPhone and the Mac nudge the same worlds by the same amounts.
+export const VIEW_TILT = 0.88;
+
 export function separationOffsets(points: Point[], radii: number[], dt = 1 / 30): number[] {
   const offsets = points.map(() => 0);
+  const screen = points.map((p) => ({ x: p.x, y: CENTER.y + (p.y - CENTER.y) * VIEW_TILT }));
   for (let i = 0; i < points.length; i++) {
     for (let j = i + 1; j < points.length; j++) {
-      const pi = points[i];
-      const pj = points[j];
+      const pi = screen[i];
+      const pj = screen[j];
       const dx = pj.x - pi.x;
       const dy = pj.y - pi.y;
       const distance = sqrt(dx * dx + dy * dy);

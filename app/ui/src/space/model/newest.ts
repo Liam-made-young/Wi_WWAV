@@ -21,7 +21,9 @@ export interface NewestFilter {
 }
 
 // Newest first, then by id, as the server's feed orders (createdAt DESC,
-// id DESC). ISO times in one zone compare as strings.
+// id DESC). Times are compared as the instants they name, so a time with
+// milliseconds or an offset sorts where it belongs; ids as numbers when
+// both are numbers.
 export function filterNewest(items: NewestItem[], filter: NewestFilter, added: Set<number>): NewestItem[] {
   const { media, addedOnly, key, bpm } = filter;
   return items
@@ -29,7 +31,22 @@ export function filterNewest(items: NewestItem[], filter: NewestFilter, added: S
     .filter((i) => !addedOnly || added.has(i.galaxyId))
     .filter((i) => !key || i.key === key)
     .filter((i) => !bpm || (i.bpm !== null && i.bpm >= bpm.min && i.bpm <= bpm.max))
-    .sort((a, b) => (a.createdAt === b.createdAt ? cmp(b.id, a.id) : cmp(b.createdAt, a.createdAt)));
+    .sort((a, b) => byTime(b.createdAt, a.createdAt) || byId(b.id, a.id));
+}
+
+// An unreadable time falls back to its text, so the order is still total.
+function byTime(a: string, b: string): number {
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return cmp(a, b);
+  return ta - tb;
+}
+
+const NUMERIC = /^\d+$/;
+
+function byId(a: string, b: string): number {
+  if (NUMERIC.test(a) && NUMERIC.test(b)) return Number(a) - Number(b) || cmp(a, b);
+  return cmp(a, b);
 }
 
 function cmp(a: string, b: string): number {
