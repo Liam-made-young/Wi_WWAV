@@ -322,13 +322,15 @@ Reply Engine::sessionLoad(const juce::var& args) {
   Json slots;
   for (int i = 0; i < g->nodes(); i++) slots.set(g->nodeId(i).c_str(), i);
   const int nodes = g->nodes();
-  if (playhead >= 0) {
-    Command c;
-    c.kind = Command::Locate;
-    c.a = playhead;
-    transportEvent(audio_->apply(c));
-  }
+  // The locate is queued before the swap, so the new graph never plays a
+  // block at the old playhead: its streamed clips were read ahead at the new
+  // one. The block that takes the locate plays either graph at the new place.
+  Command locate;
+  locate.kind = Command::Locate;
+  locate.a = playhead;
+  if (playhead >= 0) audio_->post(locate);
   retire(audio_->swap(std::move(g)));
+  if (playhead >= 0) transportEvent(audio_->waitApplied());
   return Reply::done(Json().set("nodes", nodes).set("latency", Json().var()).set("meter_slots", slots.var()).var());
 }
 

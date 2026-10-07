@@ -96,6 +96,20 @@ class Streaming(unittest.TestCase):
         self.assertGreater(k, located)
         self.assert_no_gaps(self.collect(k, 0.5))
 
+    def test_a_load_with_a_playhead_during_playback_plays_on_from_there(self):
+        # A restart while playing, or the app moving the playhead with a new graph: every block
+        # after the answer plays the new session from the new playhead, already read ahead.
+        self.load(playhead=0)
+        self.c.call("transport.play")
+        time.sleep(0.3)
+        self.load(playhead=30 * RATE)
+        k = self.shm.clock()["callbacks"]
+        clock = self.shm.clock()
+        self.assertEqual(clock["state"], 1)
+        self.assertGreaterEqual(clock["sample_pos"], 30 * RATE)
+        self.assertLess(clock["sample_pos"], 30 * RATE + RATE // 10)
+        self.assert_no_gaps(self.collect(k, 0.5))
+
     def test_render_of_streamed_stems(self):
         self.load(playhead=0)
         out = tempfile.mkdtemp(prefix="wwav-out-")

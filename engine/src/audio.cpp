@@ -321,6 +321,10 @@ void AudioEngine::post(Command c) {
 
 Transport AudioEngine::apply(Command c) {
   post(c);
+  return waitApplied();
+}
+
+Transport AudioEngine::waitApplied() {
   // A block is 0.1 s at most; a device that stops calling back gets a second.
   const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(1);
   while (running_ && applied_.load(std::memory_order_acquire) < sent_ && std::chrono::steady_clock::now() < until)

@@ -61,8 +61,10 @@ class AudioEngine final : private juce::AudioIODeviceCallback, private juce::Tim
 
   // Queues a command; with no device running, applies it now.
   void post(Command c);
-  // The same, then waits until the audio thread has applied it; returns the
-  // transport as that block left it.
+  // Waits until the audio thread has applied every command posted so far;
+  // returns the transport as that block left it.
+  Transport waitApplied();
+  // post, then waitApplied.
   Transport apply(Command c);
   // The transport as the last command left it.
   Transport transport() const;
