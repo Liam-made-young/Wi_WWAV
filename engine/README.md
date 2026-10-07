@@ -51,9 +51,10 @@ wwav-engine --socket <dir>/engine.sock --shm /wwav-<pid>-<n> [--device <name|nul
 
 It prints `wwav-engine listening <socket>` once it is ready, and nothing
 else on stdout; logs go to stderr. When its stdin reaches end of file it
-stops the audio and exits. `--device null` opens no hardware: a timer thread
-calls the graph every block at the nominal rate. `--test` turns on the
-`debug.*` ops.
+stops the audio and exits; if tearing down hangs (a hung audio thread, say),
+it leaves anyway 0.75 s after it began, inside the contract's second.
+`--device null` opens no hardware: a timer thread calls the graph every block
+at the nominal rate. `--test` turns on the `debug.*` ops.
 
 `tests/wwav_client.py` does all of that from Python, and is the quickest
 way to try an op:
@@ -139,11 +140,11 @@ only while a device opens or closes.
 | Suite | Proves |
 |---|---|
 | `engine_unit` | a reader never sees a torn clock against a writer at full rate (F8); the command queue keeps order; crumbs are standard FNV-1a 64; unity gain is exact; tracks fold into buses and buses into the master; the WAVE headers; probing WAV and `.wwav` files and the reference reader's verdicts; a streamed clip never returns wrong audio while its reader races it |
-| `engine_protocol` | the listening line and nothing else on stdout; the socket is 0600; `hello` and the protocol refusal; a 16 MiB frame round-trips and bad frames close the connection (F8); one client at a time; devices; later stages answer `unsupported` |
+| `engine_protocol` | the listening line and nothing else on stdout; the socket is 0600; `hello` and the protocol refusal; a 16 MiB frame round-trips and bad frames close the connection (F8); one client at a time, and one that stops reading can't keep the next one out; devices; later stages answer `unsupported` |
 | `engine_playback` | a `.wwav` made by `wwav_pack.py` plays: the clock runs at the session rate on the reader's monotonic clock, each stem shows on its own bus, and a mute or solo is heard within one block of arriving (S0.3); a `session.load` during playback swaps the graph without stopping or moving the playhead; the transport and its events; loops; refusals |
 | `engine_render` | the stems sum to the master and each stem is exactly the one packed; renders are identical across runs and engines; 16-bit; playback stops for a render; pings are answered during one |
-| `engine_restart` | after `kill -9` during playback a new engine is back, loaded and stopped at the last `sample_pos`, within 2 s (S0.2, Linux part; it takes about 30 ms here); closing stdin exits within 1 s, even mid-render; `shutdown`; the crumb names the crashed node; `debug.crash` and `debug.hang` |
-| `engine_streaming` | a 35 MB `.wwav` streams with no silent block after a load, a locate or a play, recovers within 0.1 s of a locate during playback, and renders exactly |
+| `engine_restart` | after `kill -9` during playback a new engine is back, loaded and stopped at the last `sample_pos`, within 2 s (S0.2, Linux part; it takes about 30 ms here); closing stdin exits within 1 s, even mid-render or with the audio thread hung; `shutdown`; the crumb names the crashed node; `debug.crash` and `debug.hang` |
+| `engine_streaming` | a 35 MB `.wwav` streams with no silent block after a load (also one with a new playhead during playback), a locate or a play, recovers within 0.1 s of a locate during playback, and renders exactly |
 | `engine_scan_usage` | `wwav-scan` says it scans nothing yet |
 
 ## Not done yet
