@@ -4,6 +4,7 @@
 //
 //   main thread   JUCE's message loop: ping, debug.* "message", the device manager
 //   socket        reads frames, answers hello and param.set, hands every other op on
+//   writer        sends every frame out (server.cpp), so no other thread waits on the client
 //   worker        runs ops in the order they came: devices, sessions, the
 //                 transport, renders. Long ones (a load, a render) hold up
 //                 neither ping, which the main thread answers, nor param.set.
