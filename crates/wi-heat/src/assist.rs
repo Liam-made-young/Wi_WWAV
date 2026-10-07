@@ -1,3 +1,10 @@
+//! Kept after the 7 Oct cut (`docs/SCOPE_CUT.md`): the app holds no key and
+//! calls no model, and wi-core no longer makes these requests. Claude reaches
+//! Heat through the MCP server's tools instead, and those tools reuse the
+//! rules here: what each job may send, what an answer may say, and how an
+//! answer is checked before it becomes a change. What follows is the module as
+//! it was written for the `/api/assist` calls.
+//!
 //! The client side of Claude in Heat (`docs/SPEC.md` 2.11, 3.12, 9.8). Calls
 //! go to mi-wwav.com's `/api/assist/:task`, one endpoint per job, which holds
 //! the prompts and the founder's key and maps each tier to a model. This
