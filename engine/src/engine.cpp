@@ -32,7 +32,46 @@ class Json {
   juce::DynamicObject::Ptr o_ = new juce::DynamicObject();
 };
 
-std::string text(const juce::var& v) { return v.toString().toStdString(); }
+// A string field. A string holding U+0000 arrives as binary data (server.cpp)
+// and reads as "", which names nothing.
+std::string text(const juce::var& v) { return v.isBinaryData() ? std::string() : v.toString().toStdString(); }
+
+// param.set's args checked against `g`, into the command for the audio thread.
+Reply checkParam(const Graph* g, const juce::var& args, Command* c) {
+  if (!g) return Reply::fail("no_session", "No session is loaded.");
+  if (!args["node"].isString()) return Reply::fail("bad_args", "param.set needs node, a node's id.");
+  const std::string node = text(args["node"]), name = text(args["param"]);
+  const int index = g->find(node);
+  if (index < 0) return Reply::fail("no_such_node", "No node " + node + ".");
+  if (name == "send.reverb" || name == "send.delay")
+    return Reply::fail("unsupported", "Sends feed the built-in reverb and delay returns, which come in a later stage.");
+  Param p;
+  if (!paramOf(name, &p) || !g->takes(index, p))
+    return Reply::fail("no_such_param",
+                       node + " has no param \"" + name + "\". " +
+                           (index == g->masterNode() ? "The master takes gain_db and mute."
+                                                     : "Tracks and buses take gain_db, pan, mute and solo."));
+  if (args.hasProperty("at"))
+    return Reply::fail("unsupported",
+                       "A change at a set sample comes with automation, in a later stage. Without at, it is heard "
+                       "from the next block.");
+  const juce::var v = args["value"];
+  double value = 0.0;
+  if (p == Param::Mute || p == Param::Solo) {
+    if (!v.isBool()) return Reply::fail("bad_args", name + " is true or false.");
+    value = (bool)v ? 1.0 : 0.0;
+  } else if (p == Param::GainDb) {
+    if (!numberOf(v, &value) || value > 24.0) return Reply::fail("bad_args", "gain_db is a number of dB up to +24.");
+  } else if (!numberOf(v, &value) || value < -1.0 || value > 1.0) {
+    return Reply::fail("bad_args", "pan is a number from -1 to 1.");
+  }
+  c->kind = Command::SetParam;
+  c->param = p;
+  c->node = index;
+  c->value = (float)value;
+  c->gen = g->gen;
+  return Reply::done();
+}
 
 std::atomic<bool> quitting{false};
 std::atomic<bool> deadline{false};
@@ -104,7 +143,10 @@ bool Engine::start(std::string* error) {
   *error = shm_.open(args_.shm);
   if (!error->empty()) return false;
   shm_.writeHeader((uint32_t)args_.rate, (uint32_t)args_.block, (uint64_t)getpid(), monotonicNs());
-  audio_ = std::make_unique<AudioEngine>(shm_, devices_);
+  audio_ = std::make_unique<AudioEngine>(shm_, devices_, [this](Transport t) {
+    fprintf(stderr, "wwav-engine: the device changed its rate away from the session's; stopped\n");
+    transportEvent(t);
+  });
   reader_ = std::make_unique<Reader>();
   worker_ = std::make_unique<Worker>();
   // --device null, a named device, or the system's default. One that won't
@@ -127,6 +169,10 @@ void Engine::stop() {
   if (worker_) worker_->stop();
   if (audio_) {
     audio_->close();
+    {
+      std::lock_guard<std::mutex> lock(paramMutex_);
+      live_ = nullptr;
+    }
     retire(audio_->swap(nullptr));
   }
   reader_.reset();
@@ -222,17 +268,32 @@ void Engine::request(uint64_t conn, const juce::var& id, const std::string& op, 
     return;
   }
 
+  if (op == "param.set") return paramSetNow(conn, id, args);
+  if (op == "session.load") {
+    size_t from;
+    {
+      std::lock_guard<std::mutex> lock(paramMutex_);
+      loadsPending_++;
+      from = changes_.size();
+    }
+    worker_->post([this, args, from, answer] {
+      Reply r = sessionLoad(args, from);
+      {
+        std::lock_guard<std::mutex> lock(paramMutex_);
+        if (--loadsPending_ == 0) changes_.clear();
+      }
+      answer(r);
+    });
+    return;
+  }
+
   std::function<Reply()> run;
   if (op == "device.list")
     run = [this] { return deviceList(); };
   else if (op == "device.open")
     run = [this, args] { return deviceOpen(args); };
-  else if (op == "session.load")
-    run = [this, args] { return sessionLoad(args); };
   else if (op == "session.unload")
     run = [this] { return sessionUnload(); };
-  else if (op == "param.set")
-    run = [this, args] { return paramSet(args); };
   else if (op == "transport.play" || op == "transport.stop" || op == "transport.locate" || op == "transport.loop")
     run = [this, op, args] { return transportOp(op, args); };
   else if (op == "render")
@@ -296,6 +357,17 @@ Reply Engine::deviceOpen(const juce::var& args) {
   noteDevice();
   if (!opened) return Reply::fail(code, message);
   const DeviceInfo& d = audio_->device();
+  // A device that hasn't the rate asked for opens at one it has (JUCE picks
+  // it). With a session loaded that would play it fast or slow: close it.
+  if (Graph* g = audio_->graph(); g && d.rate != g->sampleRate) {
+    const std::string got = d.name + "\" opened at " + std::to_string(d.rate);
+    audio_->close();
+    noteDevice();
+    return Reply::fail("rate_mismatch", "The device \"" + got + " Hz, not the session's " +
+                                            std::to_string(g->sampleRate) +
+                                            " Hz, so it was closed again. Unload the session first, or pick a "
+                                            "device that runs at that rate.");
+  }
   return Reply::done(Json()
                          .set("name", juce::String(d.name))
                          .set("sample_rate", d.rate)
@@ -307,15 +379,22 @@ Reply Engine::deviceOpen(const juce::var& args) {
 
 // ---- the session ------------------------------------------------------------------
 
-Reply Engine::sessionLoad(const juce::var& args) {
+Reply Engine::sessionLoad(const juce::var& args, size_t changesFrom) {
   int64_t playhead = -1;
-  if (args.hasProperty("playhead") && (!wholeOf(args["playhead"], &playhead) || playhead < 0))
+  if (args.hasProperty("playhead") && (!wholeOf(args["playhead"], &playhead) || playhead < 0 || playhead > kMaxSample))
     return Reply::fail("bad_args", "session.load's playhead is a sample from 0.");
   Failure f;
-  std::unique_ptr<Graph> g = buildGraph(args["graph"], args["off"], audio_->running() ? audio_->device().rate : 0, &f);
+  std::unique_ptr<Graph> g;
+  try {
+    g = buildGraph(args["graph"], args["off"], audio_->running() ? audio_->device().rate : 0, &f);
+  } catch (const std::bad_alloc&) {
+    return Reply::fail("too_big", "There isn't the memory to hold this session's clips.");
+  }
   if (!g) return Reply::fail(f.code, f.message);
   g->gen = ++gen_;
-  // Streamed clips start with their window full where the playhead will be.
+  // Streamed clips start with their window full where the playhead will be,
+  // and where a loop jumps back to.
+  g->wantLoop(loopOn_ ? loopFrom_ : -1);
   g->prefill(playhead >= 0 ? playhead : audio_->playhead());
   for (ClipSource* s : g->streamed()) reader_->add(s);
 
@@ -329,52 +408,75 @@ Reply Engine::sessionLoad(const juce::var& args) {
   locate.kind = Command::Locate;
   locate.a = playhead;
   if (playhead >= 0) audio_->post(locate);
-  retire(audio_->swap(std::move(g)));
+  std::unique_ptr<Graph> old;
+  {
+    std::lock_guard<std::mutex> lock(paramMutex_);
+    // param.sets that came after this load: its JSON doesn't have them.
+    bool changed = false;
+    for (size_t i = changesFrom; i < changes_.size(); i++) {
+      const int node = g->find(changes_[i].node);
+      if (node < 0 || !g->takes(node, changes_[i].param)) continue;  // a node this graph doesn't have
+      g->set(node, changes_[i].param, changes_[i].value);
+      changed = true;
+    }
+    if (changed) g->settle();  // it starts at those levels, as the old graph had ramped to them
+    live_ = g.get();
+    old = audio_->swap(std::move(g));
+  }
+  retire(std::move(old));
   if (playhead >= 0) transportEvent(audio_->waitApplied());
   return Reply::done(Json().set("nodes", nodes).set("latency", Json().var()).set("meter_slots", slots.var()).var());
 }
 
 Reply Engine::sessionUnload() {
-  retire(audio_->swap(nullptr));
+  std::unique_ptr<Graph> old;
+  {
+    std::lock_guard<std::mutex> lock(paramMutex_);
+    live_ = nullptr;
+    old = audio_->swap(nullptr);
+  }
+  retire(std::move(old));
   return Reply::done();
 }
 
-Reply Engine::paramSet(const juce::var& args) {
-  Graph* g = audio_->graph();
-  if (!g) return Reply::fail("no_session", "No session is loaded.");
-  const std::string node = text(args["node"]), name = text(args["param"]);
-  const int index = g->find(node);
-  if (index < 0) return Reply::fail("no_such_node", "No node " + node + ".");
-  if (name == "send.reverb" || name == "send.delay")
-    return Reply::fail("unsupported", "Sends feed the built-in reverb and delay returns, which come in a later stage.");
-  Param p;
-  if (!paramOf(name, &p) || !g->takes(index, p))
-    return Reply::fail("no_such_param",
-                       node + " has no param \"" + name + "\". " +
-                           (index == g->masterNode() ? "The master takes gain_db and mute."
-                                                     : "Tracks and buses take gain_db, pan, mute and solo."));
-  if (args.hasProperty("at"))
-    return Reply::fail("unsupported",
-                       "A change at a set sample comes with automation, in a later stage. Without at, it is heard "
-                       "from the next block.");
-  const juce::var v = args["value"];
-  double value = 0.0;
-  if (p == Param::Mute || p == Param::Solo) {
-    if (!v.isBool()) return Reply::fail("bad_args", name + " is true or false.");
-    value = (bool)v ? 1.0 : 0.0;
-  } else if (p == Param::GainDb) {
-    if (!numberOf(v, &value) || value > 24.0) return Reply::fail("bad_args", "gain_db is a number of dB up to +24.");
-  } else if (!numberOf(v, &value) || value < -1.0 || value > 1.0) {
-    return Reply::fail("bad_args", "pan is a number from -1 to 1.");
+// The socket thread. Checked against the playing graph and queued for the
+// audio thread at once; heard from the next block (docs/ENGINE.md 3.4).
+void Engine::paramSetNow(uint64_t conn, const juce::var& id, const juce::var& args) {
+  const std::string node = text(args["node"]);
+  {
+    // Not held while the reply is written: a client that stops reading must
+    // not hold up a graph swap.
+    std::unique_lock<std::mutex> lock(paramMutex_);
+    if (!deferred_.count(node) && !(loadsPending_ > 0 && (!live_ || live_->find(node) < 0))) {
+      Command c;
+      Reply r = checkParam(live_, args, &c);
+      if (!r.ok || audio_->postParam(c)) {
+        if (r.ok && loadsPending_ > 0) changes_.push_back(Change{node, c.param, c.value});
+        lock.unlock();
+        return server_.reply(conn, id, r);
+      }
+      // No device is calling back: the worker applies it, in order with the rest.
+    }
+    // A node only a pending load has, one with a change already waiting, or
+    // no device: the worker answers it after what is ahead of it.
+    deferred_[node]++;
   }
+  worker_->post([this, conn, id, args, node] {
+    Reply r = paramSet(args);
+    {
+      std::lock_guard<std::mutex> relock(paramMutex_);
+      if (--deferred_[node] == 0) deferred_.erase(node);
+    }
+    server_.reply(conn, id, r);
+  });
+}
+
+// The worker: a param.set that had to wait for what was ahead of it.
+Reply Engine::paramSet(const juce::var& args) {
   Command c;
-  c.kind = Command::SetParam;
-  c.param = p;
-  c.node = index;
-  c.value = (float)value;
-  c.gen = g->gen;
-  audio_->post(c);
-  return Reply::done();
+  Reply r = checkParam(audio_->graph(), args, &c);
+  if (r.ok) audio_->post(c);
+  return r;
 }
 
 Reply Engine::transportOp(const std::string& op, const juce::var& args) {
@@ -392,15 +494,19 @@ Reply Engine::transportOp(const std::string& op, const juce::var& args) {
     c.kind = Command::Stop;
   } else if (op == "transport.locate") {
     c.kind = Command::Locate;
-    if (!wholeOf(args["sample"], &c.a) || c.a < 0)
+    if (!wholeOf(args["sample"], &c.a) || c.a < 0 || c.a > kMaxSample)
       return Reply::fail("bad_args", "transport.locate needs a sample from 0.");
   } else {
     c.kind = Command::Loop;
     if (!args["on"].isBool()) return Reply::fail("bad_args", "transport.loop needs on: true or false.");
     c.on = (bool)args["on"];
-    if (c.on && (!wholeOf(args["start"], &c.a) || !wholeOf(args["end"], &c.b) || c.a < 0 || c.b <= c.a))
+    if (c.on &&
+        (!wholeOf(args["start"], &c.a) || !wholeOf(args["end"], &c.b) || c.a < 0 || c.b <= c.a || c.b > kMaxSample))
       return Reply::fail("bad_args", "A loop needs a start from 0 and an end after it.");
     audio_->apply(c);
+    loopOn_ = c.on;
+    loopFrom_ = c.a;
+    if (Graph* g = audio_->graph()) g->wantLoop(loopOn_ ? loopFrom_ : -1);
     return Reply::done();
   }
   const Transport t = audio_->apply(c);
@@ -415,9 +521,9 @@ Reply Engine::render(const juce::var& args) {
   const std::string dir = text(args["out_dir"]);
   int64_t start = 0, len = 0;
   if (dir.empty() || dir[0] != '/') return Reply::fail("bad_args", "render needs out_dir, an absolute path.");
-  if (args.hasProperty("start") && (!wholeOf(args["start"], &start) || start < 0))
+  if (args.hasProperty("start") && (!wholeOf(args["start"], &start) || start < 0 || start > kMaxSample))
     return Reply::fail("bad_args", "render's start is a sample from 0.");
-  if (!wholeOf(args["len"], &len) || len <= 0)
+  if (!wholeOf(args["len"], &len) || len <= 0 || len > kMaxSample)
     return Reply::fail("bad_args", "render needs len, a number of frames above 0.");
   bool want[2] = {true, true};  // master, stems
   const char* keys[2] = {"master", "stems"};

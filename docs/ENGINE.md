@@ -60,9 +60,11 @@ u32 little-endian   length of the payload in bytes (1 .. 16 MiB)
 payload             one JSON object, UTF-8
 ```
 
-A frame over 16 MiB, a payload that isn't a JSON object, or a short read
-closes the connection. Large data (plugin state over 256 KB, audio) is never
-sent in a frame: it goes through a file whose path is in the frame.
+A frame over 16 MiB, a payload that isn't exactly one JSON object (RFC 8259:
+valid UTF-8, nothing after it) or that nests more than 127 levels deep
+(serde_json's limit), or a short read closes the connection. Large data
+(plugin state over 256 KB, audio) is never sent in a frame: it goes through
+a file whose path is in the frame.
 
 Three kinds of payload:
 

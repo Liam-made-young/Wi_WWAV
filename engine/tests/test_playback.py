@@ -190,6 +190,9 @@ class Playback(unittest.TestCase):
             ({"node": TRACK_IDS[0], "param": "pan", "value": 2.0}, "bad_args"),
             ({"node": TRACK_IDS[0], "param": "send.reverb", "value": 0.5}, "unsupported"),
             ({"node": TRACK_IDS[0], "param": "gain_db", "value": -3.0, "at": 48000}, "unsupported"),
+            ({"node": 5, "param": "mute", "value": True}, "bad_args"),
+            ({"param": "mute", "value": True}, "bad_args"),
+            ({"node": "x\u0000", "param": "mute", "value": True}, "bad_args"),
         ]
         for args, code in cases:
             with self.subTest(args=args):
@@ -237,9 +240,13 @@ class Playback(unittest.TestCase):
         self.assertGreaterEqual(min(seen), start)
         self.assertLess(max(seen), end)
         self.c.call("transport.loop", {"on": False, "start": 0, "end": 0})
-        with self.assertRaises(EngineError) as e:
-            self.c.call("transport.loop", {"on": True, "start": end, "end": start})
-        self.assertEqual(e.exception.code, "bad_args")
+        for op, args in [("transport.loop", {"on": True, "start": end, "end": start}),
+                         ("transport.loop", {"on": True, "start": 0, "end": 2 ** 50 + 1}),
+                         ("transport.locate", {"sample": 2 ** 60})]:
+            with self.subTest(op=op, args=args):
+                with self.assertRaises(EngineError) as e:
+                    self.c.call(op, args)
+                self.assertEqual(e.exception.code, "bad_args")
 
     def test_a_load_while_playing_swaps_without_stopping(self):
         self.play()
@@ -332,7 +339,12 @@ class Playback(unittest.TestCase):
         for t in clip_48k["tracks"]:
             t["kind"] = "audio"
             t["clips"][0]["source"] = "master"
+        long_id = stem_session(self.path, self.frames)
+        long_id["tracks"][0]["id"] = "\x7f" * 1025  # its answer would list it as \u007f, six times as long
+        far = stem_session(self.path, self.frames)
+        far["tracks"][0]["clips"][0]["len"] = 2 ** 50 + 1
         cases = [("duplicate ids", dup, "bad_session"), ("an unknown role", role, "bad_session"),
+                 ("an id over 1 KiB", long_id, "bad_session"), ("a clip past 2^50 frames", far, "bad_session"),
                  ("a stem of a plain WAV", stem_of_plain, "bad_clip"),
                  ("a session rate the device isn't at", at_48k, "rate_mismatch"),
                  ("a clip at another rate", clip_48k, "unsupported")]

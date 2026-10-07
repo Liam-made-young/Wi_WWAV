@@ -12,7 +12,13 @@ namespace {
 // would overflow to infinity long before it was a sound.
 constexpr double kMaxGainDb = 24.0;
 
-std::string text(const juce::var& v) { return v.toString().toStdString(); }
+// A track id is a ULID (26 bytes). session.load's answer lists every track's
+// id, so a cap on them keeps that answer far below a frame's 16 MiB.
+constexpr size_t kMaxId = 1024;
+
+// A string field. A string holding U+0000 arrives as binary data (server.cpp)
+// and reads as "", which names nothing.
+std::string text(const juce::var& v) { return v.isBinaryData() ? std::string() : v.toString().toStdString(); }
 
 bool failWith(Failure* f, const char* code, const std::string& message) {
   f->code = code;
@@ -78,9 +84,9 @@ bool readClip(const juce::var& c, int rate, const std::string& track, Clip* out,
   if (!c.isObject() || path.empty() || path[0] != '/')
     return failWith(f, "bad_session", what + " needs an absolute path.");
   int64_t at, in, len;
-  if (!wholeOf(c["at"], &at) || at < 0 || !wholeOf(c["in"], &in) || in < 0)
+  if (!wholeOf(c["at"], &at) || at < 0 || at > kMaxSample || !wholeOf(c["in"], &in) || in < 0 || in > kMaxSample)
     return failWith(f, "bad_session", what + " needs at and in as whole numbers of frames from 0.");
-  if (!wholeOf(c["len"], &len) || len <= 0)
+  if (!wholeOf(c["len"], &len) || len <= 0 || len > kMaxSample)
     return failWith(f, "bad_session", what + " needs len as a whole number of frames above 0.");
   double gain = 0.0;
   if (c.hasProperty("gain_db") && (!numberOf(c["gain_db"], &gain) || gain > kMaxGainDb))
@@ -106,6 +112,8 @@ bool readTrack(const juce::var& t, int rate, const std::set<std::string>& off, s
                Failure* f) {
   const std::string id = text(t["id"]), kind = text(t["kind"]);
   if (!t.isObject() || id.empty()) return failWith(f, "bad_session", "Every track needs an id.");
+  if (id.size() > kMaxId)
+    return failWith(f, "bad_session", "A track's id is " + std::to_string(kMaxId) + " bytes at most.");
   if (ids->count(id)) return failWith(f, "bad_session", "Two tracks have the id " + id + ".");
   if (id == "master" || id.rfind("bus:", 0) == 0)
     return failWith(f, "bad_session", "A track can't be called " + id + "; the buses and the master are.");
