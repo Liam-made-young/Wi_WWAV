@@ -31,6 +31,16 @@ base(
       for (const off of await flow.locator('button:disabled').all()) {
         await expect(off.locator('xpath=following-sibling::p[@class="why"]')).toHaveText(/\.$/);
       }
+      // Nothing from the cut: no astronaut, no rocket, no Google sign-in.
+      await expect(flow).not.toContainText(/astronaut|rocket|Connect Google|Sign in with Google/i);
+      if (title === 'Claim your galaxy') {
+        await expect(flow.getByRole('button', { name: 'Make my galaxy' })).toBeVisible();
+      }
+      if (title === 'Add your calendars') await expect(flow).toContainText('so the app needs no Google sign-in');
+      if (title === 'Connect Claude') {
+        await expect(flow).toContainText('Claude Desktop or Claude Code');
+        await expect(flow.locator('.tools li')).toHaveCount(8);
+      }
       if (title === 'Import your folder') {
         await flow.getByRole('textbox').fill(folder.replace(/\/[^/]+$/, ''));
         await flow.getByRole('button', { name: 'Look inside' }).click();
