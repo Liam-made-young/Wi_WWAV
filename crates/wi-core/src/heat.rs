@@ -2,14 +2,17 @@
 //! does the HTTP and the storage. The app calls no model: Claude reaches Heat
 //! through the MCP server (2.11), so there is no `assist.call` here.
 //!
-//! Every field of a record written in Heat goes into this library's
-//! [`Replica`] with a stamp, and waits to go up. A round pushes what waits
-//! to `/api/heat/changes` and pulls what changed since the cursor; the
+//! Every field of a record written in any view goes into this library's
+//! [`Replica`] with a stamp, and waits to go up (a milestone planned from
+//! Space is Heat's as much as one planned in Heat). A round pushes what
+//! waits to `/api/heat/changes` and pulls what changed since the cursor; the
 //! replica keeps the newer stamp field by field, so a slow older write never
 //! overwrites a newer one. Records another device changed are written into
-//! the library as one journal entry ("changes from your other devices"), so
-//! undo stays exact; an undo in Heat is a new local change and syncs like
-//! one. Grades stay on this Mac (Open, 9.8, at its recommendation).
+//! the library as one journal entry ("changes from your other devices"), in
+//! a journal room no view's ⌘Z acts on, so undo stays exact and a sync never
+//! takes the person's redo; an undo in any view is a new local change and
+//! syncs like one. Grades stay on this Mac (Open, 9.8, at its
+//! recommendation).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};

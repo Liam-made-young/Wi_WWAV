@@ -52,7 +52,8 @@ fn py_number(v: Option<&Py>) -> Option<f64> {
 }
 
 /// The formats crate's readers, plugged into wi-store: a `.wwav`'s verdict
-/// and its wmet; a film's verdict; plain WAV's length and 2.5's sentence.
+/// and its wmet; a film's verdict; a plain WAV's length and verdict, and
+/// other plain audio's 2.5 sentence.
 pub struct Formats;
 
 impl Inspector for Formats {
@@ -101,6 +102,12 @@ impl Inspector for Formats {
             "wav" => {
                 let mut found = ByExtension.inspect(path)?;
                 if let Ok(w) = Wwav::open(path) {
+                    // Get Info says what `wwav_pack.py info` says of the file:
+                    // "the master only: no wmet and wlin, so a plain WAV", or
+                    // that PRANA lists no 48 kHz or 24-bit one. Other plain
+                    // audio (MP3, FLAC…) is beyond the reference and keeps
+                    // 2.5's sentence.
+                    found.verdict = w.verdict().to_string();
                     if let Some(f) = w.fmt.filter(|f| f.rate > 0) {
                         let frame = (f.channels as u64 * f.bits as u64 / 8).max(1);
                         let frames = w.first(b"data").map_or(0, |c| c.size / frame);

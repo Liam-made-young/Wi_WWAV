@@ -73,9 +73,16 @@ fn two_libraries_of_one_account_meet_field_by_field() {
         record(&air, "task", "t1").unwrap(),
         json!({"title": "Grammar quiz 4", "done": false, "notes": "", "id": "t1"})
     );
-    // It arrived as one change, which ⌘Z in Heat names.
+    // It arrived as one journal entry, kept where no view's ⌘Z acts: Heat's
+    // own undo has nothing of Air's to take back, so a sync never makes ⌘Z
+    // undo the other Mac's work.
     assert_eq!(
         ok(&air, "history.get", json!({"room": "heat"}))["undo"],
+        Value::Null
+    );
+    let store = wi_store::Store::open(air.library()).unwrap();
+    assert_eq!(
+        store.history(wi_store::Room::Sync).unwrap().undo_text(),
         "Undo changes from your other devices"
     );
 

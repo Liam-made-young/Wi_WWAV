@@ -143,7 +143,7 @@ fn a_song_loads_its_four_stems_and_plays_from_the_clock() {
     );
     assert!(clocks
         .iter()
-        .all(|c| c["state"] == "playing" && c["rate"] == 48000.0));
+        .all(|c| c["state"] == "playing" && c["rate"] == 44100.0));
     let samples: Vec<i64> = clocks
         .iter()
         .map(|c| c["sample"].as_i64().unwrap())
@@ -152,8 +152,10 @@ fn a_song_loads_its_four_stems_and_plays_from_the_clock() {
     let playing = ok(&core, "player.pause", json!({}))["state"].clone();
     assert_eq!(playing["playing"], false);
 
+    // A seek is in the song's own samples: a .wwav is 44.1 kHz, so 5 ms is
+    // 220.5 of them, which rounds to 221.
     let state = ok(&core, "player.seek", json!({"seconds": 0.005}))["state"].clone();
-    assert!(eventually(T, || core.engine().clock().unwrap().sample_pos == 240));
+    assert!(eventually(T, || core.engine().clock().unwrap().sample_pos == 221));
     assert!((state["position"].as_f64().unwrap() - 0.005).abs() < 1e-3);
 }
 
@@ -278,7 +280,13 @@ fn plain_audio_plays_as_the_master_only() {
     let core = setup.core();
     let ids = import(&core, &[&corpus("mono.wav")]);
     let clip = ok(&core, "library.get", json!({"id": ids[0]}));
-    assert_eq!(clip["verdict"], "Plain audio comes in as master only.");
+    // Get Info says what the reference tool says of a plain WAV (a mono one
+    // is not a master PRANA lists); the sentence about master only is 2.5's,
+    // for the import and for audio the reference can't read.
+    assert_eq!(
+        clip["verdict"],
+        "not listed: the master isn't 44.1 kHz 16-bit stereo PCM"
+    );
     let state = ok(&core, "player.load", json!({"clip": ids[0]}))["state"].clone();
     assert_eq!(state["stems"], json!([]));
     let refused = core
@@ -290,6 +298,44 @@ fn plain_audio_plays_as_the_master_only() {
     );
     ok(&core, "player.play", json!({}));
     assert!(eventually(T, || core.engine().clock().unwrap().state == 1));
+}
+
+/// docs/SPEC.md 8.4: "Sessions run at 48 kHz, or 44.1 kHz when opened from a
+/// .wwav". The engine refuses a clip at another rate than its session's and
+/// a session at another rate than its device's, so the device follows the
+/// song (the real engine says rate_mismatch where the mock accepts it, which
+/// is why this reads the device's rate rather than waiting for a refusal).
+#[test]
+fn the_device_follows_the_songs_rate() {
+    let setup = Setup::new();
+    let core = setup.core();
+    let ids = import(&core, &[&corpus("original.wwav"), &corpus("48k.wav")]);
+    let rate = |core: &Core| ok(core, "engine.status", json!({}))["sampleRate"].clone();
+    assert_eq!(rate(&core), 48000, "the null device starts at 48 kHz");
+
+    let song = ok(&core, "player.load", json!({"clip": ids[0]}))["state"].clone();
+    assert_eq!(rate(&core), 44100, "a .wwav runs at 44.1 kHz");
+    assert!((song["duration"].as_f64().unwrap() - 600.0 / 44100.0).abs() < 1e-9);
+    ok(&core, "player.play", json!({}));
+    assert!(eventually(T, || {
+        let c = core.engine().clock().unwrap();
+        c.state == 1 && c.rate == 44100.0
+    }));
+
+    let wav = ok(&core, "player.load", json!({"clip": ids[1]}))["state"].clone();
+    assert_eq!(rate(&core), 48000, "a 48 kHz WAV runs at 48 kHz");
+    assert!((wav["duration"].as_f64().unwrap() - 600.0 / 48000.0).abs() < 1e-9);
+    ok(&core, "player.play", json!({}));
+    assert!(eventually(T, || {
+        let c = core.engine().clock().unwrap();
+        c.state == 1 && c.rate == 48000.0
+    }));
+
+    // A seek is in the song's own samples, not the device's old rate's.
+    ok(&core, "player.load", json!({"clip": ids[0]}));
+    let state = ok(&core, "player.seek", json!({"seconds": 0.005}))["state"].clone();
+    assert!((state["position"].as_f64().unwrap() - 0.005).abs() < 1.0 / 44100.0);
+    assert_eq!(core.engine().clock().unwrap().sample_pos, 221);
 }
 
 #[test]

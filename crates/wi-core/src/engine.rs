@@ -2,9 +2,13 @@
 //!
 //! The session lives in the app; the engine only renders. The supervisor
 //! starts `wwav-engine` (or `mock-engine`) through wwav-wire, greets it,
-//! opens the device and loads whatever session is current. Then it watches
-//! two things: a ping every second, which must answer within one, and the
-//! shared-memory clock, which must keep moving while it says playing.
+//! opens the device and loads whatever session is current. A start that
+//! fails is tried again a few times, since a busy device or a crash in the
+//! first second is often over by the next try. Then it watches three things:
+//! a ping every second, which must answer within one; the shared-memory
+//! clock, which must keep moving while it says playing; and, after a play
+//! the engine acknowledged, that the audio thread runs a block at all, since
+//! a hung audio thread never writes "playing".
 //!
 //! When the engine dies (its socket closes) or hangs (the supervisor kills
 //! it), the supervisor reads the crumb to name the device that was running,
@@ -128,6 +132,10 @@ struct State {
     slots: BTreeMap<String, usize>,
     last_clock: Option<ClockFields>,
     hung: Option<Hang>,
+    /// A play the engine acknowledged: which engine, how many blocks its
+    /// audio thread had run, and when. A thread that has run none since, a
+    /// moment later, is hung, though the clock never said playing.
+    awaiting: Option<(u64, u64, Instant)>,
 }
 
 type Listener = Arc<dyn Fn(&EngineEvent) + Send + Sync>;
@@ -197,6 +205,7 @@ impl Engine {
                 slots: BTreeMap::new(),
                 last_clock: None,
                 hung: None,
+                awaiting: None,
             }),
             changed: Condvar::new(),
             notices: Mutex::new(tx),
@@ -312,7 +321,11 @@ impl Engine {
         timeout: Duration,
     ) -> Result<Map<String, Value>, CoreError> {
         self.wait_running(START_WAIT)?;
-        self.shared.call(op, args, timeout)
+        let result = self.shared.call(op, args, timeout);
+        if op == "transport.play" && result.is_ok() {
+            self.shared.expect_blocks();
+        }
+        result
     }
 
     /// Makes `session` the one the engine plays, at `playhead`, and returns
@@ -578,19 +591,97 @@ impl Shared {
         p.client().call(op, args, timeout).map_err(call_error)
     }
 
+    /// A play was acknowledged: from now the audio thread must run a block
+    /// within [`STALL`], whatever the clock says. (The clock only says
+    /// playing once the audio thread writes it, so a thread that hung while
+    /// stopped would never show it.)
+    fn expect_blocks(&self) {
+        let blocks = {
+            let p = self.process.read().unwrap_or_else(|e| e.into_inner());
+            p.as_ref()
+                .and_then(|p| p.shm().region().clock.read())
+                .map(|c| c.callbacks)
+        };
+        let mut st = lock(&self.st);
+        st.awaiting = blocks.map(|b| (st.generation, b, Instant::now()));
+    }
+
+    /// Brings an engine up, trying again after each failure up to `tries`
+    /// times, waiting `wait(n)` after the nth.
+    fn bring_up_again(
+        self: &Arc<Self>,
+        playhead: i64,
+        tries: u32,
+        wait: impl Fn(u32) -> Duration,
+    ) -> Result<(), String> {
+        let mut n = 0;
+        loop {
+            n += 1;
+            match self.bring_up(playhead) {
+                Ok(()) => return Ok(()),
+                Err(e) if n >= tries || self.closing() => return Err(e),
+                Err(_) => thread::sleep(wait(n)),
+            }
+        }
+    }
+
+    /// The device runs at the session's rate. The engine refuses a session at
+    /// any other rate than its device's, and a clip at any other than its
+    /// session's, so a song at 44.1 kHz needs the device opened at 44.1 kHz
+    /// first (docs/SPEC.md 8.4: "48 kHz, or 44.1 kHz when opened from a
+    /// .wwav"). `device.open` refuses while a session at the old rate is
+    /// loaded, so it is unloaded first; the load that follows puts the new
+    /// one in. If the device can't run at the new rate, it is put back at
+    /// the old one, so the next song can still play.
+    fn follow_rate(&self, rate: u32) -> Result<(), CoreError> {
+        let (device, had, block) = {
+            let st = lock(&self.st);
+            (st.device.clone(), st.rate, st.block)
+        };
+        if had == 0 || had == rate {
+            return Ok(());
+        }
+        self.call("session.unload", Value::Null, CALL_TIMEOUT)?;
+        let open = |rate: u32| {
+            self.call(
+                "device.open",
+                json!({"name": device, "sample_rate": rate, "block": block}),
+                CALL_TIMEOUT,
+            )
+        };
+        match open(rate) {
+            Ok(opened) => {
+                let mut st = lock(&self.st);
+                st.device = opened.get("name").and_then(Value::as_str).map(String::from);
+                st.rate = opened
+                    .get("sample_rate")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0) as u32;
+                st.block = opened.get("block").and_then(Value::as_u64).unwrap_or(0) as u32;
+                Ok(())
+            }
+            Err(e) => {
+                let _ = open(had);
+                Err(e)
+            }
+        }
+    }
+
     /// `session.load` of the session as it stands.
     fn load_now(&self, playhead: i64) -> Result<BTreeMap<String, usize>, CoreError> {
-        let args = {
+        let (args, rate) = {
             let st = lock(&self.st);
             let Some(s) = &st.session else {
                 return Ok(BTreeMap::new());
             };
-            json!({
+            let args = json!({
                 "graph": with_states(&s.graph, &st.states),
                 "playhead": playhead.max(0),
                 "off": st.off,
-            })
+            });
+            (args, s.graph.sample_rate)
         };
+        self.follow_rate(rate)?;
         let result = self.call("session.load", args, LOAD_TIMEOUT)?;
         let slots: BTreeMap<String, usize> = result
             .get("meter_slots")
@@ -661,6 +752,7 @@ impl Shared {
             let mut st = lock(&self.st);
             st.generation += 1;
             st.last_clock = None;
+            st.awaiting = None;
             st.generation
         };
         let pump = self.clone();
@@ -711,7 +803,13 @@ impl Shared {
     }
 
     fn supervise(self: Arc<Self>, notices: Receiver<Notice>) {
-        if let Err(why) = self.bring_up(0) {
+        // A busy device, or a crash in the first second, is often over by the
+        // next try: 0.2, 0.5, 1 and 2 s apart, five tries in all.
+        let waits = [200, 500, 1000, 2000];
+        let first = self.bring_up_again(0, waits.len() as u32 + 1, |n| {
+            Duration::from_millis(waits[(n as usize - 1).min(waits.len() - 1)])
+        });
+        if let Err(why) = first {
             self.set_phase(Phase::Stopped, Some(format!("It couldn't start: {why}")));
         }
         for notice in notices {
@@ -806,15 +904,7 @@ impl Shared {
         );
         self.set_phase(Phase::Restarting, None);
 
-        let mut tries = 0;
-        let up = loop {
-            tries += 1;
-            match self.bring_up(playhead) {
-                Ok(()) => break Ok(()),
-                Err(e) if tries >= 3 || self.closing() => break Err(e),
-                Err(_) => thread::sleep(Duration::from_millis(200)),
-            }
-        };
+        let up = self.bring_up_again(playhead, 3, |_| Duration::from_millis(200));
         if let Err(why) = up {
             self.set_phase(
                 Phase::Stopped,
@@ -886,6 +976,18 @@ impl Shared {
                         last_meter = Some(m.callback);
                         self.bus.send_meters(&meter_bytes(&m));
                     }
+                }
+            }
+            // After a play the engine acknowledged, its audio thread must
+            // run a block. One that hung while stopped never will.
+            let awaited = lock(&self.st).awaiting;
+            if let Some((g, blocks, since)) = awaited {
+                let alive = region.clock.read().map(|c| c.callbacks) != Some(blocks);
+                if g != generation || alive {
+                    lock(&self.st).awaiting = None;
+                } else if since.elapsed() >= STALL {
+                    lock(&self.st).awaiting = None;
+                    self.notify(Notice::Hung(generation, Hang::Clock));
                 }
             }
             if last_clock_at.elapsed() < CLOCK_EVERY {

@@ -187,8 +187,10 @@ fn token_css() -> String {
 
 fn page(songs: &[Value], films: &[Value], exported: &str) -> String {
     let data = json!({"songs": songs, "films": films, "exported": exported});
-    // Inline JSON can't close its own script element.
-    let data = data.to_string().replace("</", "<\\/");
+    // Inline JSON can't close its own script element, and can't start a
+    // comment or a nested script that the HTML parser would act on: every
+    // "<" is written as the escape JSON.parse reads back.
+    let data = data.to_string().replace('<', "\\u003c");
     PAGE.replace("/*TOKENS*/", &token_css())
         .replace("/*LIBRARY*/{}", &data)
 }

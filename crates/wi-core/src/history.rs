@@ -87,12 +87,12 @@ fn step(i: &Inner, a: &Args, back: bool) -> Result<Value, CoreError> {
         }
         Err(e) => return Err(e.into()),
     };
-    // Any row may have changed: every view refetches.
+    // Any row may have changed: every view refetches. A record is Heat's
+    // whichever view changed it (Space plans a milestone in Heat from your
+    // sun), so an undo or redo anywhere may have changed what syncs.
     i.bus.emit("library", json!({"ids": []}));
     records_changed(i, all_kinds(i));
-    if room == Room::Heat {
-        heat::journal_moved(i)?;
-    }
+    heat::journal_moved(i)?;
     i.poke();
     Ok(json!({"label": label}))
 }
@@ -242,17 +242,18 @@ pub(crate) fn records_mutate(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     let room = a.room()?;
     let ops = read_ops(i, a)?;
     write_records(i, room, label, &ops)?;
-    if room == Room::Heat {
-        let changes: Vec<(&str, &str, &str, &Value)> = ops
-            .iter()
-            .flat_map(|o| {
-                o.fields
-                    .iter()
-                    .map(move |(f, v)| (o.kind.as_str(), o.id.as_str(), f.as_str(), v))
-            })
-            .collect();
-        heat::wrote(i, &changes)?;
-    }
+    // Records sync whichever view wrote them: a milestone planned from Space
+    // is as much Heat's as one planned in Heat (3.15, 8.7). Grades stay on
+    // this Mac wherever they were written (heat::local_only).
+    let changes: Vec<(&str, &str, &str, &Value)> = ops
+        .iter()
+        .flat_map(|o| {
+            o.fields
+                .iter()
+                .map(move |(f, v)| (o.kind.as_str(), o.id.as_str(), f.as_str(), v))
+        })
+        .collect();
+    heat::wrote(i, &changes)?;
     let kinds: BTreeSet<String> = ops.iter().map(|o| o.kind.clone()).collect();
     records_changed(i, kinds.into_iter().collect());
     let store = i.store();
@@ -266,7 +267,12 @@ pub(crate) fn records_mutate(i: &Inner, a: &Args) -> Result<Value, CoreError> {
 }
 
 /// Records changed elsewhere (another device), each as it now stands (None:
-/// deleted), applied as one journal entry so undo stays exact.
+/// deleted), applied as one journal entry so undo stays exact. The entry is
+/// kept in [`Room::Sync`], which no view's ⌘Z reaches: in Heat's own journal
+/// it would be a new change, throwing away the redo the person has waiting
+/// and making ⌘Z undo the other device's work instead of theirs. The journal's
+/// rules still see it: it takes the redo of any change that touched the same
+/// records, and holds an undo that would put such a record back.
 pub(crate) fn apply_remote(
     i: &Inner,
     label: &str,
@@ -284,7 +290,7 @@ pub(crate) fn apply_remote(
     if ops.is_empty() {
         return Ok(());
     }
-    write_records(i, Room::Heat, label, &ops)?;
+    write_records(i, Room::Sync, label, &ops)?;
     let kinds: BTreeSet<String> = ops.iter().map(|o| o.kind.clone()).collect();
     records_changed(i, kinds.into_iter().collect());
     Ok(())

@@ -262,8 +262,12 @@ impl Net {
                 self.save_tokens(&t).map_err(|_| Fail::SignedOut)?;
                 Ok(t)
             }
-            // The refresh token has expired too: sign in again.
-            (400..=499, _) => {
+            // The refresh token is refused (missing, invalid or expired): sign in
+            // again. Any other answer, a 429 included, says nothing about the
+            // token: the server limits /api/auth/refresh per address, shared
+            // with sign-in, so a busy school or home network can be refused
+            // while every token is good. Keep the account and try again later.
+            (400 | 401 | 403, _) => {
                 let _ = self.forget();
                 Err(Fail::SignedOut)
             }

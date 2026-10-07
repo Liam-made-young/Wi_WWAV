@@ -1,7 +1,8 @@
-//! An independent reviewer's adversarial tests. Each test here exposes a
-//! defect the builder's own tests missed; each is `#[ignore]`d until the
-//! finding it names is fixed, so `cargo test -p wi-core -- --ignored review`
-//! shows what is still open.
+//! An independent reviewer's adversarial tests. Each exposed a defect the
+//! builder's own tests missed, and ran `#[ignore]`d until the finding it
+//! names was fixed. They all run now. One needs the real engine to say
+//! anything: `review_a_wwav_plays_on_the_real_engine` runs against the JUCE
+//! build named by WWAV_ENGINE, and says so and passes without it.
 
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -40,7 +41,6 @@ fn saw(rx: &std::sync::mpsc::Receiver<wi_core::Event>, name: &str, timeout: Dura
 /// pressing play afterwards does nothing, forever, and the engine is never
 /// restarted (docs/ENGINE.md §3.1, §5; S0.2, S3.4).
 #[test]
-#[ignore = "review finding: an audio-thread hang while stopped is never detected"]
 fn review_an_audio_hang_while_stopped_is_noticed_once_play_is_pressed() {
     let setup = Setup::new();
     let core = setup.core();
@@ -70,7 +70,6 @@ fn review_an_audio_hang_while_stopped_is_noticed_once_play_is_pressed() {
 /// Here the engine's first launch exits at once (a busy device, a crash
 /// in the first second); the second would have worked.
 #[test]
-#[ignore = "review finding: one failed first start leaves the engine stopped for the session"]
 fn review_an_engine_that_fails_its_first_start_is_tried_again() {
     let setup = Setup::new();
     let flaky = setup.dir.path().join("flaky-engine");
@@ -105,7 +104,6 @@ fn review_an_engine_that_fails_its_first_start_is_tried_again() {
 /// resampler (F9) is built"), so no .wwav plays. Run with
 /// WWAV_ENGINE=/path/to/wwav-engine.
 #[test]
-#[ignore = "review finding: no .wwav loads in the player on the real engine (48 kHz session)"]
 fn review_a_wwav_plays_on_the_real_engine() {
     let Some(engine) = std::env::var_os("WWAV_ENGINE") else {
         eprintln!("WWAV_ENGINE isn't set: nothing to run against");
@@ -138,7 +136,6 @@ fn review_a_wwav_plays_on_the_real_engine() {
 /// file's rate, so a 48 kHz WAV's duration is 8.8 % long (and seek clamps
 /// to that), while the library's own clip says the right length.
 #[test]
-#[ignore = "review finding: the player's duration ignores a plain WAV's sample rate"]
 fn review_a_48k_wav_has_the_same_duration_in_the_player_as_in_the_library() {
     let setup = Setup::new();
     let core = setup.core();
@@ -179,7 +176,6 @@ fn reference_verdict(path: &Path) -> String {
 /// wwav_pack.py info" fails for every .wav, and Get Info hides that PRANA
 /// won't list a 48 kHz or 24-bit WAV at all.
 #[test]
-#[ignore = "review finding: Get Info's verdict for a .wav isn't wwav_pack.py's"]
 fn review_get_info_says_what_wwav_pack_says_of_a_plain_wav() {
     let setup = Setup::new();
     let core = setup.core();
@@ -264,7 +260,6 @@ fn planets_of(server: &MockServer, clip: &str) -> Vec<Value> {
 /// work is up but in no system, the drop's whole point is lost, and the
 /// status bar never says "Up.".
 #[test]
-#[ignore = "review finding: a failed placement after publish is never retried"]
 fn review_a_placement_that_fails_once_is_retried() {
     let server = MockServer::start();
     let setup = Setup::new();
@@ -295,11 +290,16 @@ fn review_a_placement_that_fails_once_is_retried() {
 /// Finding: dropping a song that is already up onto a second system
 /// answers `{queued: true}` and then nothing happens: `publish()` keeps
 /// the first `published_at`, `remote_id` is set, so the queue never holds
-/// it again and the new system's tag is never placed (2.5 "Dropping a clip
-/// on one publishes it there").
+/// it again and the new system's tag is never placed.
+///
+/// The reviewer expected the song in both systems. The server gives a song
+/// one planet (`/api/v2/systems/:id/planets` answers 409 `already_placed`
+/// for a song that is a planet anywhere, in the live server and the mock),
+/// so the second drop can't add a world. What was wrong is the silence: it
+/// now says so at once, and nothing queues. Dropping on the same system
+/// again is the same drop, and ⌘Z has nothing new to take back.
 #[test]
-#[ignore = "review finding: a second drop of a song that is up does nothing"]
-fn review_a_second_drop_of_a_song_that_is_up_lands_in_the_second_system() {
+fn review_a_second_drop_of_a_song_that_is_up_says_it_is_already_a_world() {
     let server = MockServer::start();
     let setup = Setup::new();
     let core = sign_in(&setup, &server);
@@ -314,16 +314,27 @@ fn review_a_second_drop_of_a_song_that_is_up_lands_in_the_second_system() {
     assert!(up, "{said:?}");
     assert_eq!(planets_of(&server, &id).len(), 1);
 
-    assert_eq!(drop_on(&core, &id, WORLD_ENDING), json!({"queued": true}));
-    let landed = eventually(Duration::from_secs(10), || {
-        planets_of(&server, &id).len() == 2
-    });
-    assert!(
-        landed,
-        "the second drop answered queued but the song is only in {:?}; the queue holds {}",
-        planets_of(&server, &id),
-        ok(&core, "publish.queue", json!({}))
+    let refused = core
+        .invoke(
+            "publish.drop",
+            json!({"clip": id, "target": {"kind": "system", "id": WORLD_ENDING}, "label": "publish"}),
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, "already_placed");
+    assert_eq!(
+        refused.message,
+        "'Tést \"Song\"' is already a world in another system. A song is one world, so it can't be in two."
     );
+    assert_eq!(
+        ok(&core, "publish.queue", json!({}))["sentence"],
+        "Nothing waits to go up."
+    );
+    assert_eq!(planets_of(&server, &id).len(), 1);
+
+    // The same system again is no new work.
+    assert_eq!(drop_on(&core, &id, COVERS), json!({"queued": true}));
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(planets_of(&server, &id).len(), 1);
 }
 
 /// Finding: any 400/403/404/409/413/422 marks the upload `refused` in
@@ -332,7 +343,6 @@ fn review_a_second_drop_of_a_song_that_is_up_lands_in_the_second_system() {
 /// library. The server's own temporary 403 ("Daily upload limit reached.
 /// Try again tomorrow.", server.md) is one such refusal.
 #[test]
-#[ignore = "review finding: one refusal blocks a clip's upload forever, even after ⌘Z and a new drop"]
 fn review_a_refusal_ends_when_the_work_is_dropped_again() {
     let server = MockServer::start();
     let setup = Setup::new();
@@ -377,7 +387,6 @@ fn review_a_refusal_ends_when_the_work_is_dropped_again() {
 /// 409 as permanent refusals, so it never starts again: a 300 MB song
 /// stops at the part it reached, for good.
 #[test]
-#[ignore = "review finding: a forgotten multipart upload is refused instead of started again"]
 fn review_a_forgotten_multipart_upload_starts_again() {
     let server = MockServer::start_counting();
     let setup = Setup::new();
@@ -432,7 +441,6 @@ fn review_a_forgotten_multipart_upload_starts_again() {
 /// refresh signs the person out, and the upload queue and Heat sync stop
 /// until they sign in again in the browser.
 #[test]
-#[ignore = "review finding: a 429 on refresh signs the person out"]
 fn review_a_rate_limited_refresh_keeps_the_account() {
     let server = MockServer::start();
     let setup = Setup::new();
@@ -459,14 +467,13 @@ fn review_a_rate_limited_refresh_keeps_the_account() {
 // ---------------------------------------------------------------- export
 
 /// Finding: index.html inlines the library as JSON in a <script> element
-/// and escapes only "</". A title holding "<!--<script>" (a purchase, a
-/// friend's .wwav's wmet) puts the HTML parser in the script's
+/// and escapes only "</". A title holding "<!--<script>" (a friend's
+/// .wwav's wmet, a rename) puts the HTML parser in the script's
 /// double-escaped state, the element's own </script> no longer ends it,
 /// and the whole page becomes one script element: nothing plays, offline
 /// or not (checked in Chromium: the page shows no songs and its script
 /// never runs).
 #[test]
-#[ignore = "review finding: a title with <!--<script> breaks the exported index.html"]
 fn review_the_export_page_survives_any_title() {
     let setup = Setup::new();
     let core = setup.core();
@@ -502,7 +509,6 @@ fn review_the_export_page_survives_any_title() {
 /// ⌘Z then reverts the other device's work instead of their own (2.7:
 /// "⌘Z acts on the room you are in").
 #[test]
-#[ignore = "review finding: a background Heat sync clears the person's redo"]
 fn review_a_sync_from_another_device_keeps_the_redo() {
     let server = MockServer::start();
     let (a, b) = (Setup::new(), Setup::new());
@@ -542,7 +548,6 @@ fn review_a_sync_from_another_device_keeps_the_redo() {
 /// milestone from your sun, 2.6) never syncs, and an undo of it in that
 /// room isn't seen either, so the other Mac never gets it.
 #[test]
-#[ignore = "review finding: Heat records changed from another room never sync"]
 fn review_a_milestone_planned_from_space_syncs() {
     let server = MockServer::start();
     let (a, b) = (Setup::new(), Setup::new());

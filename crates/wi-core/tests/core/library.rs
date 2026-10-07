@@ -127,8 +127,13 @@ fn a_plain_wav_comes_in_as_master_only_and_says_so() {
     let clips = r["clips"].as_array().unwrap();
     assert_eq!(clips.len(), 6);
     assert_eq!(r["skipped"].as_array().unwrap().len(), 1, "{r}");
+    // Get Info's verdict for a plain WAV is the reference tool's. None of
+    // these three (mono, 48 kHz, 24-bit) is a master PRANA lists.
     for c in clips.iter().filter(|c| c["kind"] == "audio") {
-        assert_eq!(c["verdict"], "Plain audio comes in as master only.");
+        assert_eq!(
+            c["verdict"],
+            "not listed: the master isn't 44.1 kHz 16-bit stereo PCM"
+        );
     }
     assert_eq!(clips.iter().filter(|c| c["kind"] == "audio").count(), 3);
     assert_eq!(

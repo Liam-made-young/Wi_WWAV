@@ -10,6 +10,14 @@
 //! sign gave is kept across retries, and the publish carries `settings:
 //! {origin: "wi_wwav", clipId}`, so a retry never posts twice (#70).
 //! Failures back off from 2 s to 5 min with jitter.
+//!
+//! A drop is also a place: the clip is tagged `system <id>`, and once the
+//! server has it, the worker puts it in that system. What it has put where
+//! is kept (`placed/<clip>`), so a clip that is up with a system it hasn't
+//! been put in yet waits like a clip that isn't up: a placement that fails
+//! is retried, and a second drop of a song that is up lands in the second
+//! system. A refusal is an attempt's answer, not a verdict: dropping the
+//! work again, and relaunching, try again.
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -82,6 +90,68 @@ pub(crate) struct Status {
     sentence: Option<String>,
 }
 
+/// The systems a clip was dropped on (`system <id>` tags).
+fn systems(i: &Inner, clip: &Clip) -> Vec<String> {
+    i.store()
+        .tags_of(&clip.id)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|t| t.kind == TagKind::System)
+        .filter_map(|t| t.name.strip_prefix("system ").map(String::from))
+        .collect()
+}
+
+fn placed_key(clip: &str) -> String {
+    format!("placed/{clip}")
+}
+
+/// The systems the server has put the clip in.
+fn placed(i: &Inner, clip: &str) -> Vec<String> {
+    i.kv.get(&placed_key(clip))
+        .ok()
+        .flatten()
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default()
+}
+
+fn mark_placed(i: &Inner, clip: &str, system: &str) {
+    let mut now = placed(i, clip);
+    if !now.iter().any(|s| s == system) {
+        now.push(system.to_string());
+        let _ = i.kv.set(&placed_key(clip), &json!(now));
+    }
+}
+
+/// The clips that are up, with a system they were dropped on that the
+/// server hasn't put them in yet. Dropping a clip back (⌘Z) removes its tag,
+/// so what is asked for is always what the library says now.
+fn unplaced(i: &Inner) -> Vec<Clip> {
+    let ids =
+        i.kv.query_strings(
+            "SELECT DISTINCT c.id FROM clips c
+               JOIN clip_tags ct ON ct.clip_id = c.id
+               JOIN tags t ON t.id = ct.tag_id
+              WHERE c.remote_id IS NOT NULL AND t.kind = 'system' AND t.name LIKE 'system %'
+              ORDER BY c.id",
+        )
+        .unwrap_or_default();
+    ids.into_iter()
+        .filter_map(|id| i.store().clip(&id).ok().flatten())
+        .filter(|c| {
+            let done = placed(i, &c.id);
+            systems(i, c).iter().any(|s| !done.contains(s))
+        })
+        .collect()
+}
+
+/// What the worker has to do: the clips waiting to go up, then the clips
+/// that are up and waiting to be put in a system.
+fn waiting(i: &Inner) -> Vec<Clip> {
+    let mut list = i.store().upload_queue().unwrap_or_default();
+    list.extend(unplaced(i));
+    list
+}
+
 fn say(i: &Inner, sentence: String) {
     i.bus.status("upload", &sentence);
     lock(&i.uploads).sentence = Some(sentence);
@@ -110,8 +180,16 @@ enum Ended {
 }
 
 fn work(i: &Inner) {
+    // A refusal is one attempt's answer: a new launch gives each work another.
+    for clip in waiting(i) {
+        if let Ok(mut u) = read_upload(i, &clip.id) {
+            if u.refused.take().is_some() {
+                let _ = write_upload(i, &clip.id, &u);
+            }
+        }
+    }
     while !i.closing() {
-        let queue = i.store().upload_queue().unwrap_or_default();
+        let queue = waiting(i);
         if queue.is_empty() || !i.net.signed_in() {
             i.nap(IDLE);
             continue;
@@ -144,7 +222,15 @@ fn work(i: &Inner) {
                         u.refused = Some(f.sentence());
                         say(
                             i,
-                            format!("'{}' didn't go up: {}", clip.title, f.sentence()),
+                            if clip.is_up() {
+                                format!(
+                                    "'{}' is up but isn't in its system: {}",
+                                    clip.title,
+                                    f.sentence()
+                                )
+                            } else {
+                                format!("'{}' didn't go up: {}", clip.title, f.sentence())
+                            },
                         );
                     } else {
                         u.failures += 1;
@@ -220,6 +306,25 @@ fn upload(i: &Inner, clip: &Clip) -> Ended {
 }
 
 fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
+    // A clip the server has already is only waiting to be put in a system.
+    let track_id = match &clip.remote_id {
+        Some(track_id) => track_id.clone(),
+        None => match transfer(i, clip)? {
+            Some(track_id) => track_id,
+            None => return Ok(Ended::Up),
+        },
+    };
+    place(i, clip, &track_id)?;
+    let _ = i.kv.delete(&key(&clip.id));
+    history::changed(i, std::slice::from_ref(&clip.id));
+    say(i, format!("Up. {} is in your galaxy.", clip.title));
+    Ok(Ended::Up)
+}
+
+/// The upload and the publish: the clip goes to the server and leaves the
+/// queue. Its `trackId`, or None when the person unpublished it while it
+/// went up and it was taken down again.
+fn transfer(i: &Inner, clip: &Clip) -> Result<Option<String>, Ended> {
     let path = i.store().path_of(clip);
     let size = std::fs::metadata(&path)
         .map_err(|e| {
@@ -234,7 +339,7 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
     let (track_id, s3_key) = if size > SINGLE_MAX {
         match parts(i, clip, &path, size, kind, &mut u)? {
             Some(done) => done,
-            None => return Ok(Ended::Interrupted),
+            None => return Err(Ended::Interrupted),
         }
     } else {
         // Sign just before the PUT. The first sign mints the trackId; a
@@ -289,9 +394,9 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
             body: json!({"error": e.to_string()}),
         })
     })?;
-    let _ = i.kv.delete(&key(&clip.id));
     if !kept {
         // Unpublished while it went up: take it down again.
+        let _ = i.kv.delete(&key(&clip.id));
         api(
             i,
             "POST",
@@ -299,12 +404,9 @@ fn send(i: &Inner, clip: &Clip) -> Result<Ended, Ended> {
             Some(&json!({"trackId": track_id})),
         )?;
         say(i, format!("'{}' isn't published.", clip.title));
-        return Ok(Ended::Up);
+        return Ok(None);
     }
-    place(i, clip, &track_id)?;
-    history::changed(i, std::slice::from_ref(&clip.id));
-    say(i, format!("Up. {} is in your galaxy.", clip.title));
-    Ok(Ended::Up)
+    Ok(Some(track_id))
 }
 
 /// The multipart path: create (or resume) the upload, then each part not
@@ -352,7 +454,10 @@ fn parts(
                 say(i, format!("Uploading {} · part {n} of {total}", clip.title));
                 v
             }
-            // The server forgot the upload (or finished it): start again under the same trackId.
+            // The server forgot the upload (or finished it): start again under
+            // the same trackId, after the usual wait. That is a retry, not a
+            // refusal, so the answer isn't passed on as a 404 or a 409, which
+            // the worker would take for the server saying no for good.
             Err(
                 f @ Fail::Status {
                     status: 404 | 409, ..
@@ -360,7 +465,10 @@ fn parts(
             ) => {
                 u.upload_id = None;
                 let _ = write_upload(i, &clip.id, u);
-                return Err(failed(f));
+                return Err(failed(Fail::Status {
+                    status: 0,
+                    body: json!({"error": format!("The server lost the upload ({}). Starting it again.", f.sentence())}),
+                }));
             }
             Err(f) => return Err(failed(f)),
         };
@@ -404,22 +512,23 @@ fn parts(
     )))
 }
 
-/// Where the drop put it: a system in the galaxy.
+/// Where the drop put it: each system it was dropped on that the server
+/// hasn't put it in yet. Each one the server says yes to (or says it is
+/// already in) is kept, so a retry asks only for what is left.
 fn place(i: &Inner, clip: &Clip, track_id: &str) -> Result<(), Ended> {
-    let tags = i.store().tags_of(&clip.id).unwrap_or_default();
-    for t in tags.into_iter().filter(|t| t.kind == TagKind::System) {
-        if let Some(system) = t.name.strip_prefix("system ") {
-            let body = json!({"kind": "song", "trackId": track_id});
-            match i.net.api(
-                "POST",
-                &format!("/api/v2/systems/{}/planets", encode(system)),
-                Some(&body),
-            ) {
-                Ok(_) => {}
-                Err(f) if f.code() == Some("already_placed") => {}
-                Err(f) => return Err(failed(f)),
-            }
+    let done = placed(i, &clip.id);
+    for system in systems(i, clip).into_iter().filter(|s| !done.contains(s)) {
+        let body = json!({"kind": "song", "trackId": track_id});
+        match i.net.api(
+            "POST",
+            &format!("/api/v2/systems/{}/planets", encode(&system)),
+            Some(&body),
+        ) {
+            Ok(_) => {}
+            Err(f) if f.code() == Some("already_placed") => {}
+            Err(f) => return Err(failed(f)),
         }
+        mark_placed(i, &clip.id, &system);
     }
     Ok(())
 }
@@ -455,10 +564,36 @@ pub(crate) fn drop_on(i: &Inner, a: &Args) -> Result<Value, CoreError> {
                 "Only songs go up for now: mi-wwav.com doesn't take films from the app yet.",
             ));
         }
+        // A song is one world: the server puts it in one system and refuses
+        // it in a second (409 already_placed), so a drop onto another system
+        // couldn't add a world, only wait to be refused. Say so now. (Moving
+        // a world between systems is for the founder to decide.)
+        let elsewhere = store
+            .tags_of(id)?
+            .into_iter()
+            .any(|t| t.kind == TagKind::System && t.name != tag && t.name.starts_with("system "));
+        if elsewhere {
+            return Err(CoreError::new(
+                "already_placed",
+                format!(
+                    "'{}' is already a world in another system. A song is one world, so it can't be in two.",
+                    clip.title
+                ),
+            ));
+        }
         let mut tx = store.begin(room, label)?;
         tx.add_tag(id, &tag, TagKind::System)?;
         tx.publish(id)?;
         tx.commit()?;
+    }
+    // A drop is a new attempt: whatever refused the last one, or made it wait
+    // out a back-off, is over. (What the server already has, the trackId and
+    // an upload under way, is kept.)
+    if let Ok(mut u) = read_upload(i, id) {
+        u.refused = None;
+        u.failures = 0;
+        u.next_at = 0;
+        let _ = write_upload(i, id, &u);
     }
     history::changed(i, &[id.to_string()]);
     i.poke();
@@ -467,7 +602,7 @@ pub(crate) fn drop_on(i: &Inner, a: &Args) -> Result<Value, CoreError> {
 
 /// `publish.queue`: what waits, and the status bar's sentence for it.
 pub(crate) fn queue(i: &Inner) -> Result<Value, CoreError> {
-    let waiting = i.store().upload_queue()?;
+    let waiting = waiting(i);
     let mut rows = Vec::new();
     for c in &waiting {
         let u = read_upload(i, &c.id)?;

@@ -58,6 +58,9 @@ struct Loaded {
     key: Option<String>,
     bpm: Option<f64>,
     frames: u64,
+    /// The file's own sample rate, which the session runs at: 44.1 kHz for a
+    /// .wwav, and a plain WAV's own. The device follows it (docs/SPEC.md 8.4).
+    rate: u32,
     session: EngineSession,
     /// The four stems in PRANA's order, or none for a master-only song.
     stems: Vec<Stem>,
@@ -82,15 +85,22 @@ fn level_db(level: f64) -> f64 {
     }
 }
 
-/// Frames of a WAVE file's master: its data chunk over its frame size.
-fn frames_of(path: &Path) -> Result<u64, CoreError> {
+/// A WAVE file's master: its frames (its data chunk over its frame size) and
+/// the sample rate they are at.
+fn measure(path: &Path) -> Result<(u64, u32), CoreError> {
     let w = wwav_formats::wwav::Wwav::open(path)
         .map_err(|e| CoreError::new("unreadable", e.to_string()))?;
     let fmt = w
         .fmt
         .ok_or_else(|| CoreError::new("unreadable", "This file has no fmt chunk."))?;
+    if fmt.rate == 0 {
+        return Err(CoreError::new(
+            "unreadable",
+            "This file's sample rate is 0 Hz.",
+        ));
+    }
     let frame = (fmt.channels as u64 * fmt.bits as u64 / 8).max(1);
-    Ok(w.first(b"data").map_or(0, |c| c.size / frame))
+    Ok((w.first(b"data").map_or(0, |c| c.size / frame), fmt.rate))
 }
 
 fn stem_name(role: Role) -> &'static str {
@@ -128,14 +138,6 @@ fn track(id: &str, kind: TrackKind, role: Role, path: &str, source: Source, fram
 }
 
 impl Player {
-    fn rate_of(i: &Inner) -> f64 {
-        i.engine
-            .status()
-            .get("sampleRate")
-            .and_then(Value::as_f64)
-            .unwrap_or(48_000.0)
-    }
-
     fn clock(&self, i: &Inner) -> Option<ClockFields> {
         self.on_engine.then(|| i.engine.clock()).flatten()
     }
@@ -147,10 +149,10 @@ impl Player {
                 "position": 0.0, "duration": 0.0, "stems": [], "pausedFor": self.paused_for.map(PausedFor::as_str),
             });
         };
-        let rate = Self::rate_of(i);
+        let rate = l.rate as f64;
         let clock = self.clock(i);
         let sample = clock.map_or(self.kept_at, |c| c.sample_pos.max(0));
-        let duration = l.frames as f64 / wwav_formats::wwav::RATE as f64;
+        let duration = l.frames as f64 / rate;
         let stems: Vec<Value> = l
             .stems
             .iter()
@@ -221,9 +223,8 @@ pub(crate) fn load(i: &Inner, a: &Args) -> Result<Value, CoreError> {
             "Only songs play in the player.",
         ));
     }
-    let frames = frames_of(&path)?;
+    let (frames, rate) = measure(&path)?;
     let file = path.to_string_lossy().into_owned();
-    let rate = i.engine.rate()?;
     let mut names = BTreeMap::new();
     let mut stems = Vec::new();
     let tracks = if clip.kind == Kind::Wwav && clip.verdict == STEMS_VERDICT {
@@ -285,6 +286,7 @@ pub(crate) fn load(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         key: clip.key,
         bpm: clip.bpm,
         frames,
+        rate,
         session,
         stems,
         slots,
@@ -335,8 +337,9 @@ pub(crate) fn seek(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     let Some(l) = &p.loaded else {
         return Err(nothing_loaded());
     };
-    let duration = l.frames as f64 / wwav_formats::wwav::RATE as f64;
-    let sample = (seconds.clamp(0.0, duration) * Player::rate_of(i)).round() as i64;
+    let rate = l.rate as f64;
+    let duration = l.frames as f64 / rate;
+    let sample = (seconds.clamp(0.0, duration) * rate).round() as i64;
     if p.on_engine {
         i.engine
             .call("transport.locate", json!({"sample": sample}), CALL)?;
