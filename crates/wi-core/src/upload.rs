@@ -404,7 +404,7 @@ fn parts(
     )))
 }
 
-/// Where the drop put it: a system in the galaxy, or the shelf with a price.
+/// Where the drop put it: a system in the galaxy.
 fn place(i: &Inner, clip: &Clip, track_id: &str) -> Result<(), Ended> {
     let tags = i.store().tags_of(&clip.id).unwrap_or_default();
     for t in tags.into_iter().filter(|t| t.kind == TagKind::System) {
@@ -419,29 +419,13 @@ fn place(i: &Inner, clip: &Clip, track_id: &str) -> Result<(), Ended> {
                 Err(f) if f.code() == Some("already_placed") => {}
                 Err(f) => return Err(failed(f)),
             }
-        } else if t.name == "shelf" {
-            let terms = i
-                .store()
-                .doc("publish.terms", &clip.id)
-                .ok()
-                .flatten()
-                .map(|d| d.json)
-                .unwrap_or(Value::Null);
-            if let Some(price) = terms["price"].as_f64() {
-                api(
-                    i,
-                    "PUT",
-                    &format!("/api/tracks/{}/set-price", encode(track_id)),
-                    Some(&json!({"price": price})),
-                )?;
-            }
         }
     }
     Ok(())
 }
 
-/// `publish.drop`: one change that tags the clip with its place, keeps its
-/// terms and sets `published_at`. ⌘Z takes all three back while it waits.
+/// `publish.drop`: one change that tags the clip with its place and sets
+/// `published_at`. ⌘Z takes both back while it waits.
 pub(crate) fn drop_on(i: &Inner, a: &Args) -> Result<Value, CoreError> {
     let label = a.label()?;
     let id = a.str("clip")?;
@@ -453,11 +437,10 @@ pub(crate) fn drop_on(i: &Inner, a: &Args) -> Result<Value, CoreError> {
             let id = id.as_str().map_or_else(|| id.to_string(), String::from);
             (Room::Space, format!("system {id}"))
         }
-        (Some("shelf"), _) => (Room::Unquantized, "shelf".to_string()),
         _ => {
             return Err(CoreError::new(
                 "bad_args",
-                "A drop lands on a system {kind: \"system\", id} or a shelf {kind: \"shelf\"}.",
+                "A drop lands on a system {kind: \"system\", id}.",
             ))
         }
     };
@@ -474,9 +457,6 @@ pub(crate) fn drop_on(i: &Inner, a: &Args) -> Result<Value, CoreError> {
         }
         let mut tx = store.begin(room, label)?;
         tx.add_tag(id, &tag, TagKind::System)?;
-        if let Some(terms) = a.get("terms") {
-            tx.put_doc("publish.terms", id, terms, "")?;
-        }
         tx.publish(id)?;
         tx.commit()?;
     }

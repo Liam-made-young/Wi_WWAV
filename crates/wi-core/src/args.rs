@@ -95,12 +95,15 @@ impl<'a> Args<'a> {
         }
     }
 
+    /// The view a change was made in: heat, space or console, or library for
+    /// the drawer over them. (`sync`, where changes from other devices are
+    /// kept, is the core's own; no command names it.)
     pub fn room(&self) -> Result<Room, CoreError> {
         let name = self.str("room")?;
-        Room::parse(name).ok_or_else(|| {
+        Room::parse(name).filter(|r| *r != Room::Sync).ok_or_else(|| {
             CoreError::new(
                 "bad_args",
-                format!("There is no room called '{name}'. Rooms are heat, space, console, unquantized and library."),
+                format!("There is no view called '{name}'. The views are heat, space and console, and library is the drawer over them."),
             )
         })
     }

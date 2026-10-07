@@ -34,9 +34,15 @@
 //! (`remote_id` is set), the undo that would clear `published_at` is refused:
 //! "Can't undo a publish. Unpublish 'World Ending'…". `remote_id` is written
 //! only by the server's acknowledgement, which also writes it into every
-//! snapshot of the clip, so no undo or redo ever takes it back. A purchase is
-//! recorded as an outward act, and the room's Edit menu reads "Can't undo a
-//! purchase." until a change is made, or redone, on top of it.
+//! snapshot of the clip, so no undo or redo ever takes it back. A sent message
+//! is recorded as an outward act, and the room's Edit menu reads "Can't undo a
+//! message." until a change is made, or redone, on top of it.
+//!
+//! Changes that arrive from your other devices are journaled in
+//! [`Room::Sync`], which no view's ⌘Z acts on. They never take the redo of
+//! what the person undid, unless they touched the same values, in which case
+//! rule 3 discards it; and an undo that would put back a value they changed
+//! since waits (rule 1) and says it changed on another device.
 //!
 //! Snapshots are JSON text, and serde_json is built with `float_roundtrip`,
 //! so a REAL (a measured BPM) comes back as the same f64, bit for bit.
@@ -621,9 +627,11 @@ fn next_undo(conn: &Connection, room: Room) -> Result<Next> {
     }
     if let Some(later) = overlapping(conn, &entry, "done", true)? {
         let (label, other, room) = (&entry.label, &later.label, later.room.name());
-        return Ok(Next::Held(format!(
-            "Can't undo {label} yet. Undo {other} in {room} first."
-        )));
+        return Ok(Next::Held(if later.room == Room::Sync {
+            format!("Can't undo {label}: it changed on another device since.")
+        } else {
+            format!("Can't undo {label} yet. Undo {other} in {room} first.")
+        }));
     }
     Ok(Next::Ready(entry))
 }

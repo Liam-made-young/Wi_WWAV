@@ -1,7 +1,7 @@
 //! Export everything, the core's half (docs/PLAN.md S1.10; docs/SPEC.md
 //! 2.9). The offline page itself is played in Chromium by
 //! app/ui/e2e/export-offline.spec.ts. What a fail looks like:
-//! - the export misses a library file, a session, a purchase or a record;
+//! - the export misses a library file, a session or a record;
 //! - any file's sha256 differs from the library's, unsaid;
 //! - it needs a sign-in;
 //! - index.html reaches for the network.
@@ -33,25 +33,8 @@ fn full_library(setup: &Setup) -> (Core, Vec<String>) {
             &note,
         ],
     );
-    // A purchase and a Console session, as the store keeps them.
+    // A Console session, as the store keeps it.
     let mut store = wi_store::Store::open(core.library()).unwrap();
-    let bought = setup.dir.path().join("Low Tide.wwav");
-    std::fs::copy(corpus("master-only.wwav"), &bought).unwrap();
-    let receipt = wi_store::Receipt {
-        remote_id: "track_7".into(),
-        file_name: "Low Tide.wwav".into(),
-        bytes: std::fs::metadata(&bought).unwrap().len(),
-        sha256: sha256(&bought),
-        json: json!({"amountCents": 400, "title": "Low Tide"}),
-    };
-    store
-        .record_purchase(
-            wi_store::Room::Unquantized,
-            &bought,
-            &receipt,
-            &wi_core::Formats,
-        )
-        .unwrap();
     let mut tx = store.begin(wi_store::Room::Console, "new session").unwrap();
     let seq = tx.add_sequence("Sketch").unwrap();
     tx.commit().unwrap();
@@ -106,7 +89,7 @@ fn everything_comes_out_byte_for_byte_signed_out() {
     let to = setup.dir.path().join("Export");
     let r = ok(&core, "export.everything", json!({"to": to, "zip": false}));
     assert_eq!(r["mismatched"], json!([]));
-    assert!(r["files"].as_u64().unwrap() >= 15, "{r}");
+    assert!(r["files"].as_u64().unwrap() >= 14, "{r}");
     assert_eq!(
         r["sentence"],
         format!("Exported everything to {}.", to.display())
@@ -136,16 +119,11 @@ fn everything_comes_out_byte_for_byte_signed_out() {
         assert_eq!(f["sha256"], clip["sha256"]);
         assert_eq!(f["verified"], true);
     }
+    // Nothing was bought, so there is no purchases folder and no receipts.
     assert!(files
         .iter()
-        .any(|f| f["path"].as_str().unwrap().starts_with("purchases/")));
-    let receipts: Value =
-        serde_json::from_str(&std::fs::read_to_string(to.join("receipts.json")).unwrap()).unwrap();
-    assert_eq!(receipts[0]["fileName"], "Low Tide.wwav");
-    assert_eq!(
-        sha256(&to.join(receipts[0]["file"].as_str().unwrap())),
-        receipts[0]["sha256"].as_str().unwrap()
-    );
+        .all(|f| f["path"].as_str().unwrap().starts_with("media/")));
+    assert!(!to.join("purchases").exists() && !to.join("receipts.json").exists());
 
     // The session, with the plugin state it saved.
     let sessions: Vec<_> = std::fs::read_dir(to.join("sessions"))
@@ -243,13 +221,7 @@ fn a_zip_holds_the_same_and_a_changed_file_is_named() {
     let names: Vec<String> = (0..z.len())
         .map(|i| z.by_index(i).unwrap().name().to_string())
         .collect();
-    for want in [
-        "manifest.json",
-        "receipts.json",
-        "heat.json",
-        "galaxy.json",
-        "index.html",
-    ] {
+    for want in ["manifest.json", "heat.json", "galaxy.json", "index.html"] {
         assert!(
             names.iter().any(|n| n == want),
             "the zip has no {want}: {names:?}"

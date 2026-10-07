@@ -4,7 +4,6 @@
 //! ```text
 //! media/ + manifest.json   every library file byte for byte, with its sha256
 //! sessions/                every Console session, with the plugin state it saved
-//! purchases/ + receipts.json  every file bought, as delivered
 //! heat.json                every record, by kind
 //! notes/                   Markdown with frontmatter and [[wikilinks]]
 //! galaxy.json              the galaxy, as last seen from mi-wwav.com
@@ -336,20 +335,16 @@ fn zip_folder(folder: &Path, out: &Path) -> io::Result<()> {
 fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError> {
     let mut count = Counter::default();
     let mut mismatched = Vec::new();
-    let (clips, purchases, sequences, root) = {
+    let (clips, sequences, root) = {
         let store = i.store();
         (
             store.clips()?,
-            store.purchases()?,
             store.sequences()?,
             store.root().to_path_buf(),
         )
     };
-    let bought: BTreeMap<String, &wi_store::Purchase> =
-        purchases.iter().map(|p| (p.clip_id.clone(), p)).collect();
     let total = clips.len();
     let mut manifest = Vec::new();
-    let mut receipts = Vec::new();
     let mut songs = Vec::new();
     let mut films = Vec::new();
     for (n, c) in clips.iter().enumerate() {
@@ -367,12 +362,7 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
         } else {
             name
         };
-        let folder = if bought.contains_key(&c.id) {
-            "purchases"
-        } else {
-            "media"
-        };
-        let rel = format!("{folder}/{name}");
+        let rel = format!("media/{name}");
         i.bus.emit(
             "export",
             json!({"done": n, "total": total, "sentence": format!("Exporting {} of {total}", n + 1)}),
@@ -393,16 +383,6 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
             "id": c.id, "path": rel, "kind": c.kind.as_str(), "title": c.title, "artist": c.artist,
             "sha256": sha256, "bytes": bytes, "verified": verified, "verdict": c.verdict,
         }));
-        if let Some(p) = bought.get(&c.id) {
-            let mut r = p.receipt.json.clone();
-            if let Some(m) = r.as_object_mut() {
-                m.insert("file".into(), json!(rel));
-                m.insert("sha256".into(), json!(p.receipt.sha256));
-                m.insert("bytes".into(), json!(p.receipt.bytes));
-                m.insert("fileName".into(), json!(p.receipt.file_name));
-            }
-            receipts.push(r);
-        }
         match c.kind {
             Kind::Wwav | Kind::Audio => songs.push(json!({
                 "id": c.id, "title": c.title, "artist": c.artist, "file": rel, "key": c.key,
@@ -419,8 +399,6 @@ fn write_all(i: &Inner, out: &Path) -> Result<(Counter, Vec<String>), CoreError>
         &out.join("manifest.json"),
         &pretty(&json!({"files": manifest})),
     )?;
-    count.write(&out.join("receipts.json"), &pretty(&json!(receipts)))?;
-    fs::create_dir_all(out.join("purchases"))?;
     fs::create_dir_all(out.join("sessions"))?;
     for s in &sequences {
         let src = root.join(&s.package);

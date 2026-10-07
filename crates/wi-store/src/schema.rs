@@ -26,7 +26,7 @@ CREATE TABLE clips (
                                                    -- undo puts a row back under its old number
   id            TEXT NOT NULL UNIQUE,              -- ULID, and the file's name
   kind          TEXT NOT NULL CHECK (kind IN ('wwav', 'swav', 'audio', 'video', 'image', 'text')),
-  file          TEXT NOT NULL,       -- media/<id>.<ext>, purchases/<id>.<ext>, or an absolute path left in place
+  file          TEXT NOT NULL,       -- media/<id>.<ext>, or an absolute path left in place
   sha256        TEXT NOT NULL,
   bytes         INTEGER NOT NULL,
   title         TEXT NOT NULL DEFAULT '',
@@ -118,7 +118,7 @@ END;
 -- The undo journal, as docs/SPEC.md 9.6 gives it.
 CREATE TABLE txn     (id    TEXT PRIMARY KEY,   -- ULID, so order is time
                       label TEXT NOT NULL,      -- "move clip" -> "Undo move clip"
-                      room  TEXT NOT NULL,      -- heat | space | console | unquantized | library
+                      room  TEXT NOT NULL,      -- heat | space | console | library | sync
                       state TEXT NOT NULL);     -- done | undone
 CREATE TABLE txn_row (txn_id TEXT NOT NULL REFERENCES txn(id),
                       seq INTEGER NOT NULL, tbl TEXT NOT NULL, row_id TEXT NOT NULL,
@@ -131,12 +131,12 @@ CREATE INDEX txn_row_target ON txn_row(tbl, row_id);
 CREATE TABLE outward (
   id        TEXT PRIMARY KEY,          -- ULID, ordered with the journal's
   room      TEXT NOT NULL,
-  what      TEXT NOT NULL,             -- "a purchase" -> "Can't undo a purchase."
+  what      TEXT NOT NULL,             -- "a message" -> "Can't undo a message."
   after_txn TEXT                       -- the room's newest done entry when it happened (NULL: none),
                                        -- so a redo made after it still undoes
 );
 
--- Not journaled: what the server has, what was bought, what the scanner found.
+-- Not journaled: what the server has, what the scanner found.
 CREATE TABLE upload_part (
   clip_id TEXT NOT NULL,               -- no REFERENCES: kept only while the clip is queued
   n       INTEGER NOT NULL,
@@ -149,16 +149,6 @@ CREATE TABLE upload_part (
 CREATE TABLE media_pending (
   file    TEXT PRIMARY KEY,            -- media/<id>.<ext>
   made_ms INTEGER NOT NULL             -- a reservation older than a day is a crash's leftover
-);
-
-CREATE TABLE purchases (
-  id        TEXT PRIMARY KEY,          -- ULID
-  clip_id   TEXT NOT NULL,             -- no REFERENCES: the receipt outlives a deleted clip
-  remote_id TEXT NOT NULL,
-  file_name TEXT NOT NULL,             -- as delivered
-  bytes     INTEGER NOT NULL,
-  sha256    TEXT NOT NULL,
-  receipt   TEXT NOT NULL              -- the server's receipt, as JSON
 );
 
 CREATE TABLE plugin_scans (

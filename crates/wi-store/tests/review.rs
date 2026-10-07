@@ -508,7 +508,7 @@ fn a_fifth_pin_never_fits_through_undo_and_redo_across_rooms() {
     let clips: Vec<String> = (0..6)
         .map(|n| import(&mut store, dir.path(), Room::Library, &format!("p{n}.wav")))
         .collect();
-    let rooms = [Room::Heat, Room::Space, Room::Console, Room::Unquantized];
+    let rooms = [Room::Heat, Room::Space, Room::Library, Room::Console];
     for (room, clip) in rooms.iter().zip(&clips) {
         edit(&mut store, *room, "pin", |tx| {
             tx.pin(&Pin::Clip(clip.clone())).map(|_| ())
@@ -522,13 +522,13 @@ fn a_fifth_pin_never_fits_through_undo_and_redo_across_rooms() {
     drop(tx);
     // Heat's pin can't be undone before the later pins (they all touch the row).
     assert!(store.undo(Room::Heat).is_err());
-    store.undo(Room::Unquantized).unwrap();
+    store.undo(Room::Console).unwrap();
     edit(&mut store, Room::Library, "pin", |tx| {
         tx.pin(&Pin::Clip(clips[5].clone())).map(|_| ())
     });
-    // The Unquantized pin's redo was built on the old row: it can't come back
+    // The Console pin's redo was built on the old row: it can't come back
     // as a fifth.
-    assert!(matches!(store.redo(Room::Unquantized), Ok(None)));
+    assert!(matches!(store.redo(Room::Console), Ok(None)));
     assert_eq!(
         store.pins().unwrap().iter().filter(|p| p.is_some()).count(),
         4
@@ -632,25 +632,23 @@ fn a_clip_the_server_acknowledged_never_forgets_it_in_a_random_run() {
     }
 }
 
-/// Finding (low): after a purchase in a room, ⌘⇧Z there still redoes an
-/// older change, but ⌘Z right after it reads "Can't undo a purchase." instead
+/// Finding (low): after a sent message in a room, ⌘⇧Z there still redoes an
+/// older change, but ⌘Z right after it reads "Can't undo a message." instead
 /// of undoing the redo just made.
 #[test]
-fn a_redo_made_after_a_purchase_undoes() {
+fn a_redo_made_after_a_message_undoes() {
     let (_dir, mut store) = library();
-    edit(&mut store, Room::Unquantized, "save for later", |tx| {
+    edit(&mut store, Room::Space, "save for later", |tx| {
         tx.put_doc("saved", "r1", &serde_json::json!({}), "")
     });
-    store.undo(Room::Unquantized).unwrap();
-    store
-        .record_outward(Room::Unquantized, "a purchase")
-        .unwrap();
+    store.undo(Room::Space).unwrap();
+    store.record_outward(Room::Space, "a message").unwrap();
     assert_eq!(
-        store.redo(Room::Unquantized).unwrap().as_deref(),
+        store.redo(Room::Space).unwrap().as_deref(),
         Some("save for later")
     );
     assert_eq!(
-        store.history(Room::Unquantized).unwrap().undo_text(),
+        store.history(Room::Space).unwrap().undo_text(),
         "Undo save for later"
     );
 }

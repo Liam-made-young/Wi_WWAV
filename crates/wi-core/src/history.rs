@@ -1,8 +1,9 @@
-//! Labelled undo per room (docs/SPEC.md 2.7, 9.6), and the rooms' journaled
+//! Labelled undo per view (docs/SPEC.md 2.7, 9.6), and the views' journaled
 //! records (docs/COMMANDS.md history.*, records.*). There is one journal in
-//! wi-store; ⌘Z acts on the room it is pressed in, and every change says
+//! wi-store; ⌘Z acts on the view it is pressed in (a `room` in the commands:
+//! heat, space, console, or library for the drawer), and every change says
 //! what it was: "Undo move clip". After any change the core sends `history`
-//! with each room's labels, so the Edit menu never goes stale.
+//! with each view's labels, so the Edit menu never goes stale.
 
 use std::collections::BTreeSet;
 
@@ -12,13 +13,9 @@ use wi_store::{History, Menu, Room};
 use crate::args::Args;
 use crate::{heat, CoreError, Inner};
 
-const ROOMS: [Room; 5] = [
-    Room::Heat,
-    Room::Space,
-    Room::Console,
-    Room::Unquantized,
-    Room::Library,
-];
+/// The rooms ⌘Z is pressed in. Room::Sync, where other devices' changes are
+/// kept, has no menu.
+const ROOMS: [Room; 4] = [Room::Heat, Room::Space, Room::Console, Room::Library];
 
 fn menu_json(room: Room, h: &History) -> Value {
     let ready = |m: &Menu, verb: &str| match m {
@@ -38,8 +35,7 @@ fn menu_json(room: Room, h: &History) -> Value {
     })
 }
 
-/// Sends every room's labels (an undo in one room can hold or free
-/// another's), and the save state: every committed change is saved (9.6).
+/// Sends every view's labels (an undo in one can hold or free another's), and the save state: every committed change is saved (9.6).
 fn send_history(i: &Inner) {
     i.bus.status("save", "Saved on this Mac");
     for room in ROOMS {

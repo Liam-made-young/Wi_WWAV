@@ -2,7 +2,7 @@
 //! through the core; docs/SPEC.md 2.7, 9.6). What a fail looks like:
 //! - a change isn't named in the Edit menu ("Undo tag clip"), or undo
 //!   doesn't answer with its label;
-//! - work that left the machine (a purchase) is offered as undoable;
+//! - work that left the machine (a sent message) is offered as undoable;
 //! - after a random run of edits, undoing everything doesn't return the
 //!   first state byte for byte, or redoing everything the last;
 //! - ⌘Z acts outside the room it is pressed in;
@@ -17,7 +17,7 @@ use crate::common::*;
 use serde_json::{json, Value};
 use wi_core::Core;
 
-const ROOMS: [&str; 5] = ["heat", "space", "console", "unquantized", "library"];
+const ROOMS: [&str; 4] = ["heat", "space", "console", "library"];
 
 /// Every journaled table, row by row, as text: "the state, byte for byte".
 fn dump(core: &Core) -> String {
@@ -261,46 +261,50 @@ fn undo_acts_only_in_its_room_and_is_labelled() {
 }
 
 #[test]
-fn a_purchase_is_never_offered_as_undoable() {
+fn a_sent_message_is_never_offered_as_undoable() {
     let setup = Setup::new();
     let core = setup.core();
     ok(
         &core,
         "records.mutate",
-        json!({"label": "save for later", "room": "unquantized",
-        "ops": [{"op": "put", "kind": "bag", "id": "b1", "value": {"title": "Low Tide"}}]}),
+        json!({"label": "save for later", "room": "space",
+        "ops": [{"op": "put", "kind": "saved", "id": "s1", "value": {"title": "Low Tide"}}]}),
     );
-    // A purchase lands (wi-store records it as work that left the machine).
+    // A message goes out (wi-store records it as work that left the machine).
     let mut store = wi_store::Store::open(core.library()).unwrap();
-    let bought = setup.dir.path().join("Low Tide.wwav");
-    std::fs::copy(corpus("original.wwav"), &bought).unwrap();
-    let receipt = wi_store::Receipt {
-        remote_id: "track_1".into(),
-        file_name: "Low Tide.wwav".into(),
-        bytes: std::fs::metadata(&bought).unwrap().len(),
-        sha256: {
-            use sha2::{Digest, Sha256};
-            hex::encode(Sha256::digest(std::fs::read(&bought).unwrap()))
-        },
-        json: json!({"amount": 400}),
-    };
     store
-        .record_purchase(
-            wi_store::Room::Unquantized,
-            &bought,
-            &receipt,
-            &wi_core::Formats,
-        )
+        .record_outward(wi_store::Room::Space, "a message")
         .unwrap();
-    let h = ok(&core, "history.get", json!({"room": "unquantized"}));
+    let h = ok(&core, "history.get", json!({"room": "space"}));
     assert_eq!(h["undo"], Value::Null);
-    assert_eq!(h["cant"], "Can't undo a purchase.");
+    assert_eq!(h["cant"], "Can't undo a message.");
     assert_eq!(
-        core.invoke("history.undo", json!({"room": "unquantized"}))
+        core.invoke("history.undo", json!({"room": "space"}))
             .unwrap_err()
             .message,
-        "Can't undo a purchase."
+        "Can't undo a message."
     );
+}
+
+#[test]
+fn there_are_three_views_and_the_library_drawer_and_no_fourth_room() {
+    let setup = Setup::new();
+    let core = setup.core();
+    for room in ROOMS {
+        ok(&core, "history.get", json!({"room": room}));
+    }
+    // The shop is gone, and the core's own journal for other devices' changes
+    // is not a place ⌘Z is pressed.
+    for room in ["unquantized", "sync", "kitchen"] {
+        let e = core
+            .invoke("history.get", json!({"room": room}))
+            .unwrap_err();
+        assert_eq!(e.code, "bad_args", "{room}");
+        assert_eq!(
+            e.message,
+            format!("There is no view called '{room}'. The views are heat, space and console, and library is the drawer over them.")
+        );
+    }
 }
 
 #[test]

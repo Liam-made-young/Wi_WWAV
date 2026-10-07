@@ -112,7 +112,7 @@ impl FromSql for Colour {
 pub struct Clip {
     pub id: String,
     pub kind: Kind,
-    /// `media/<id>.<ext>`, `purchases/<id>.<ext>`, or an absolute path for a
+    /// `media/<id>.<ext>`, or an absolute path for a
     /// file left in place. [`Store::path_of`] resolves it.
     pub file: String,
     pub sha256: String,
