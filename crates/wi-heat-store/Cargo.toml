@@ -8,7 +8,9 @@ publish.workspace = true
 description = "Heat's reads and writes on library.sqlite, shared by the core and wi-mcp (docs/HEAT.md)"
 
 [dependencies]
-jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
+# tz-system: `Clock::system()` reads the Mac's zone even when this crate is built alone,
+# as wi-mcp is; without it `TimeZone::system()` answers UTC.
+jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

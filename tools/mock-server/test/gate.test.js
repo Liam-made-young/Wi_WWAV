@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { startMockServer } from '../server.js';
 import { ACCOUNTS, WORKS } from '../fixtures.js';
-import { call, completeCheckout, desktopTokens, putSigned } from '../helpers.js';
+import { call, desktopTokens, putSigned } from '../helpers.js';
+import { presign } from '../routes/uploads.js';
 import { writeWwav } from '../wwav.js';
 
 const FORBIDDEN = new Set(
@@ -105,7 +106,11 @@ async function tour(base, c, state) {
   await c('POST', '/api/publish', { token: lmy, body: { trackId: signed.trackId, s3Key: parts.s3Key } });
   await c('GET', `/api/tracks/${signed.trackId}/lineage`);
   await c('GET', `/api/tracks/${signed.trackId}/is-published`, { token: lmy });
-  await c('PUT', `/api/tracks/${signed.trackId}/set-price`, { token: lmy, body: { price: 3 } });
+  // The R2 stand-in's GET: no route hands out a download URL now that
+  // buying is gone, so the tour signs one itself.
+  const [version] = state.tracks.find((t) => t.trackId === signed.trackId).versions;
+  const download = new URL(presign(state, 'GET', version.s3Key, { seconds: 60 }));
+  await c('GET', download.pathname + download.search);
   await c('POST', `/api/tracks/${WORKS.glassHours.trackId}/fork`, {
     token: lmy,
     body: { mix: { stems: { vocals: { level: 0.5 } } } },
@@ -159,44 +164,13 @@ async function tour(base, c, state) {
   await c('GET', '/api/v2/since', { token: lmy });
   await c('GET', '/api/v2/since', { token: ana });
 
-  // Buying.
-  const glass = state.tracks.find((t) => t.songId === WORKS.glassHours.songId);
-  const bought = (
-    await c('POST', '/api/purchase/create-checkout', { token: lmy, body: { type: 'track', id: glass.id } })
-  ).body;
-  const page = new URL(bought.url).pathname;
-  await c('GET', page);
-  await c('POST', page);
-  await c('GET', `/api/purchase/check?type=track&id=${glass.id}`, { token: lmy });
-  await c('GET', '/api/entitlements', { token: lmy });
-  const file = (await c('GET', `/api/entitlements/track/${glass.id}/file`, { token: lmy })).body;
-  await c('GET', new URL(file.url).pathname + new URL(file.url).search);
-  const onboard = (await c('POST', '/api/connect/onboard', { token: ana })).body;
-  await c('GET', new URL(onboard.url).pathname);
-  await c('POST', new URL(onboard.url).pathname);
-  await c('GET', '/api/connect/status', { token: ana });
-  await c('GET', '/api/store/halls', { token: lmy });
-  await c('GET', '/api/store/new');
-  const jacket = state.listings[0];
-  await c('PUT', '/api/store/bag', { token: lmy, body: { type: 'fashion', id: jacket.id } });
-  await c('GET', '/api/store/bag', { token: lmy });
-  await c('DELETE', `/api/store/bag/fashion/${jacket.id}`, { token: lmy });
-  await c('PUT', '/api/store/bag', { token: lmy, body: { type: 'fashion', id: jacket.id } });
-  const bag = (await c('POST', '/api/store/bag/checkout', { token: lmy })).body;
-  await completeCheckout(base, bag.payments[0].sessionId);
-
-  // Heat, Claude, updates.
+  // Heat and updates.
   await c('POST', '/api/heat/changes', {
     token: lmy,
     body: { device: 'mac-a', changes: [{ kind: 'task', id: 't', field: 'title', value: 'Quiz', seq: 1 }] },
   });
   await c('GET', '/api/heat/changes?cursor=0', { token: lmy });
-  for (const task of ['score', 'clerk']) {
-    await c('POST', `/api/assist/${task}`, {
-      token: lmy,
-      body: { title: 'x', record: { title: 'glass hours', artist: 'Ana' }, question: 'Who plays guitar?' },
-    });
-  }
+  await c('GET', '/api/heat/public/1');
   await c('GET', '/desktop/latest.json');
 
   // Taking it all back: the world leaves its system, the work is

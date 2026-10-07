@@ -125,8 +125,8 @@ pub fn block_length(estimate: f64) -> f64 {
 
 type Span = (f64, f64);
 
-// Today's busy minutes: every block and every timed event, whatever space it is in.
-fn busy_spans(
+/// A day's busy minutes: every block and every timed event, whatever space it is in.
+pub fn busy_spans(
     blocks: &[TimeBlock],
     events: &[CalendarEvent],
     today: &str,

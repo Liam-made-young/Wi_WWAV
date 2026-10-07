@@ -33,12 +33,14 @@ function redeem(ctx, form) {
 describe('password sign-in and the 7-day JWT', () => {
   const ctx = useServer();
 
-  test('login answers a token pair and the user, without tier', async () => {
+  test('login answers a token pair and the user, with no plan on it', async () => {
     const res = await ctx.call('POST', '/api/auth/login', { body: ACCOUNTS.lmy });
     assert.equal(res.status, 200);
     assert.ok(res.body.token && res.body.refreshToken);
     assert.equal(res.body.user.username, 'LMY');
-    assert.equal(res.body.user.tier, undefined);
+    for (const field of ['tier', 'isPro', 'foundingMemberNumber', 'stripeConnectOnboarded']) {
+      assert.equal(res.body.user[field], undefined, field);
+    }
   });
 
   test('a wrong password is "Invalid credentials"', async () => {
@@ -47,11 +49,13 @@ describe('password sign-in and the 7-day JWT', () => {
     assert.deepEqual(res.body, { error: 'Invalid credentials' });
   });
 
-  test('/me answers the account with its tier', async () => {
+  test('/me answers the account, with no plan and no password', async () => {
     const res = await ctx.call('GET', '/api/auth/me', { token: ctx.lmy });
     assert.equal(res.status, 200);
     assert.equal(res.body.username, 'LMY');
-    assert.equal(res.body.tier, 'founding');
+    for (const field of ['tier', 'tierExpiresAt', 'foundingMemberNumber', 'isPro']) {
+      assert.equal(res.body[field], undefined, field);
+    }
     assert.equal(res.body.password, undefined);
   });
 

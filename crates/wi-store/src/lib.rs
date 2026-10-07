@@ -3,17 +3,18 @@
 //!
 //! ```text
 //! ~/Music/Wi_WWAV/
-//!   library.sqlite   clips, tags, sequences, room records, the undo journal
+//!   library.sqlite   clips, tags, sequences, records of the views, the undo journal
 //!   media/           01JA2B7X9Q4M8K3T5V6W0YHZRC.wwav   (ULID-named)
 //!   sessions/        Console sessions
-//!   purchases/       every file you bought, as delivered
 //!   trash/           deleted media, kept until you empty it
 //! ```
 //!
 //! Every change goes through a [`Txn`]: open one with a room and a label,
 //! make the edits, commit. The store snapshots each row it touches, so ⌘Z in
 //! that room can put it back (`journal.rs` has the rules). Work that left the
-//! machine (an upload the server has, a purchase) is never a journal entry.
+//! machine (an upload the server has, a sent message) is never a journal
+//! entry. A room is a view (Heat, Space, Console), the library drawer, or
+//! [`Room::Sync`], where changes from your other devices are kept.
 
 mod clips;
 mod journal;
@@ -30,10 +31,10 @@ use rusqlite::{Connection, ErrorCode};
 pub use clips::{
     ByExtension, Clip, Colour, Inspection, Inspector, Kind, NewClip, Placement, UPLOAD_QUEUE,
 };
-pub use journal::{Actor, EntryInfo, History, Menu, Txn};
+pub use journal::{Actor, DocChange, EntryDocs, EntryInfo, History, Menu, Txn};
 pub use media::Files;
 pub use organise::{Pin, SmartFolder, SmartRule, Tag, TagKind};
-pub use records::{Doc, PluginScan, Purchase, Receipt, ScanStatus, Sequence};
+pub use records::{Doc, PluginScan, ScanStatus, Sequence};
 pub use schema::SCHEMA_VERSION;
 
 #[derive(Debug, thiserror::Error)]
@@ -58,14 +59,19 @@ pub(crate) fn refused<T>(sentence: impl Into<String>) -> Result<T> {
     Err(Error::Refused(sentence.into()))
 }
 
-/// Where a change was made. ⌘Z acts on the room you are in.
+/// Where a change was made. ⌘Z acts on the room you are in: Heat, Space or
+/// the Console (the three views), or the library drawer over any of them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Room {
     Heat,
     Space,
     Console,
-    Unquantized,
     Library,
+    /// Changes that came from your other devices. No view's ⌘Z reaches
+    /// them, so a sync never takes the redo of the person's own undo; but
+    /// the rules treat them as any other room's, so an undo that would put
+    /// back a value they changed since waits, and says why.
+    Sync,
 }
 
 impl Room {
@@ -74,8 +80,8 @@ impl Room {
             Room::Heat => "heat",
             Room::Space => "space",
             Room::Console => "console",
-            Room::Unquantized => "unquantized",
             Room::Library => "library",
+            Room::Sync => "sync",
         }
     }
 
@@ -84,8 +90,8 @@ impl Room {
             Room::Heat,
             Room::Space,
             Room::Console,
-            Room::Unquantized,
             Room::Library,
+            Room::Sync,
         ]
         .into_iter()
         .find(|r| r.as_str() == s)
@@ -97,8 +103,8 @@ impl Room {
             Room::Heat => "Heat",
             Room::Space => "Space",
             Room::Console => "the Console",
-            Room::Unquantized => "Unquantized",
             Room::Library => "the library",
+            Room::Sync => "your other devices",
         }
     }
 }
@@ -132,11 +138,11 @@ pub struct Store {
 }
 
 impl Store {
-    /// Opens the library at `root`, making the folder, its four subfolders
+    /// Opens the library at `root`, making the folder, its three subfolders
     /// and `library.sqlite` if they aren't there, and bringing the schema up
     /// to date.
     pub fn open(root: &Path) -> Result<Store> {
-        for folder in ["media", "sessions", "purchases", "trash"] {
+        for folder in ["media", "sessions", "trash"] {
             std::fs::create_dir_all(root.join(folder))?;
         }
         let mut conn = Connection::open(root.join("library.sqlite"))?;
@@ -176,6 +182,33 @@ impl Store {
         journal::entries(&self.conn, claude_only, limit)
     }
 
+    /// The journal entries newer than `after` (all of them for None), oldest
+    /// first, each with the records it changed. The core reads the ones the
+    /// MCP helper wrote while the app was open (docs/HEAT.md).
+    pub fn entries_after(&self, after: Option<&str>, limit: usize) -> Result<Vec<EntryDocs>> {
+        journal::entries_after(&self.conn, after, limit)
+    }
+
+    /// One journal entry with the records it changed.
+    pub fn entry_docs(&self, id: &str) -> Result<Option<EntryDocs>> {
+        journal::entry_docs(&self.conn, id)
+    }
+
+    /// The newest journal entry's id, or None for a library with no changes.
+    pub fn last_entry(&self) -> Result<Option<String>> {
+        journal::last_entry(&self.conn)
+    }
+
+    /// SQLite's `data_version` for this handle: it differs between two reads
+    /// when another handle, in this process or another, committed in
+    /// between. A commit made through this handle never changes it, so the
+    /// core's own writes are not news to it (docs/SPEC.md 8.8).
+    pub fn data_version(&self) -> Result<i64> {
+        Ok(self
+            .conn
+            .query_row("PRAGMA data_version", [], |r| r.get(0))?)
+    }
+
     /// Undoes one entry out of order and returns its label (Settings →
     /// Claude's Undo). Refused, with a sentence, when a later change touched
     /// the same values.
@@ -199,9 +232,9 @@ impl Store {
         journal::history(&self.conn, room)
     }
 
-    /// Records work that left the machine, such as a payment or a sent
-    /// letter. It is not a journal entry: until the room's next change, its
-    /// Edit menu reads "Can't undo `what`." ("a purchase").
+    /// Records work that left the machine, such as a sent message. It is
+    /// not a journal entry: until the room's next change, its Edit menu
+    /// reads "Can't undo `what`." ("a message").
     pub fn record_outward(&mut self, room: Room, what: &str) -> Result<()> {
         let tx = self.conn.transaction()?;
         journal::record_outward(&tx, room, what)?;

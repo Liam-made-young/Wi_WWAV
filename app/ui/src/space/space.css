@@ -1,0 +1,127 @@
+/* Space wears the night (docs/SPEC.md 4.3, 7.2): #070A18 ground, warm ink,
+   amber suns, and royal blue for exactly three uses. Labels and cards are
+   DOM, flat over the 3D sky (4.5). */
+
+.space {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: var(--night-ground);
+  color: var(--night-ink);
+  font: 13px/1.35 Inter, system-ui, sans-serif;
+}
+
+.space-sky {
+  position: absolute;
+  inset: 0;
+  cursor: default;
+}
+
+.space-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.space-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--night-ink-70);
+  pointer-events: none;
+  translate: -50% 0;
+  text-shadow: 0 0 6px var(--night-ground);
+}
+
+.space-failed {
+  position: absolute;
+  inset: auto 0 50% 0;
+  text-align: center;
+  color: var(--night-ink-70);
+}
+
+.space-breadcrumb {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.crumb {
+  font-size: 13px;
+  color: var(--night-ink);
+}
+.space-sample {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--night-ink-35);
+  border-radius: 10px;
+  color: var(--night-ink-70);
+}
+
+.space-card {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 240px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgb(26 33 66 / 0.72);
+  border: 1px solid var(--night-ink-12);
+  backdrop-filter: blur(10px);
+}
+.card-orb {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #fff8e6, #ffd89a 30%, #f0a23c 60%, #b25f12);
+}
+.card-title {
+  font-style: italic;
+  font-weight: 500;
+  font-size: 17px;
+  margin: 10px 0 2px;
+}
+.card-line,
+.card-empty {
+  color: var(--night-ink-70);
+  margin: 0 0 10px;
+}
+.card-empty {
+  margin: 0;
+}
+
+.night-button {
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--night-ink-35);
+  background: rgb(244 239 230 / 0.06);
+  color: var(--night-ink);
+  font: inherit;
+}
+.night-button:disabled {
+  opacity: 0.5;
+}
+.night-button:focus-visible {
+  outline: var(--night-focus-width) solid var(--night-ink);
+  outline-offset: 2px;
+}
+
+.space-newest {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+}
+
+.space-zoom {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 6px;
+}

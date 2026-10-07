@@ -88,35 +88,6 @@ pub mod night {
     pub const FOCUS_WIDTH_PX: f32 = 2.0;
 }
 
-pub mod room {
-    //! Unquantized, lit rather than painted (8.2; v3's mock, PRANA, Crater).
-    //! Dusk is light, after hours is dark: the walls fall to limousine and
-    //! paper stays paper.
-
-    pub mod field {
-        pub const GROUND: crate::Themed<&[crate::Color]> = crate::Themed { light: &[crate::Color::rgb(0xf7, 0xf4, 0xee), crate::Color::rgb(0xe6, 0xdf, 0xd0)], dark: &[crate::Color::rgb(0x0f, 0x0c, 0x09), crate::Color::rgb(0x0f, 0x0c, 0x09)] };
-        pub const ROSE: crate::Color = crate::Color::rgb(0xfb, 0xed, 0xe8);
-        pub const COOL: crate::Color = crate::Color::rgb(0xdd, 0xe2, 0xe6);
-        pub const DRIFT_SHORTEST_MS: f32 = 53000.0;
-        pub const DRIFT_LONGEST_MS: f32 = 131000.0;
-    }
-
-    pub mod material {
-        pub const SAND: crate::Color = crate::Color::rgb(0xe8, 0xdc, 0xc8);
-        pub const SAND_DEEP: crate::Color = crate::Color::rgb(0xd4, 0xc4, 0xa8);
-        pub const CLAY: crate::Color = crate::Color::rgb(0xb8, 0x98, 0x78);
-        pub const CLAY_DEEP: crate::Color = crate::Color::rgb(0x7a, 0x5e, 0x45);
-    }
-    pub const INK: crate::Color = crate::Color::rgb(0x3d, 0x2e, 0x22);
-    pub const INK2: crate::Color = crate::Color::rgb(0x6b, 0x56, 0x43);
-    pub const PAPER: crate::Color = crate::Color::rgb(0xff, 0xe9, 0xc8);
-    pub const ACCENT: crate::Color = crate::Color::rgb(0xc8, 0x96, 0x68);
-    pub const LAMP: &[crate::Color] = &[crate::Color::rgb(0xe8, 0x91, 0x5b), crate::Color::rgb(0xf4, 0xb4, 0x83)];
-    pub const SKY: &[crate::Color] = &[crate::Color::rgb(0xf8, 0xd0, 0xa4), crate::Color::rgb(0xd4, 0x76, 0x3f)];
-    pub const HAIRLINE_PX: f32 = 1.0;
-    pub const FOCUS_WIDTH_PX: f32 = 2.0;
-}
-
 pub mod stem {
     //! PRANA's stem colours, the same everywhere, in stem order (8.3). Every
     //! stem mark carries a ring in its register's ink; state is shape: muted is
@@ -318,23 +289,6 @@ pub const ALL: &[(&str, crate::Token)] = &[
     ("night.accentUses", crate::Token::Names(night::ACCENT_USES)),
     ("night.sun", crate::Token::Colors(night::SUN)),
     ("night.focusWidth", crate::Token::Number(night::FOCUS_WIDTH_PX)),
-    ("room.field.ground", crate::Token::ThemedColors(room::field::GROUND)),
-    ("room.field.rose", crate::Token::Color(room::field::ROSE)),
-    ("room.field.cool", crate::Token::Color(room::field::COOL)),
-    ("room.field.driftShortest", crate::Token::Number(room::field::DRIFT_SHORTEST_MS)),
-    ("room.field.driftLongest", crate::Token::Number(room::field::DRIFT_LONGEST_MS)),
-    ("room.material.sand", crate::Token::Color(room::material::SAND)),
-    ("room.material.sandDeep", crate::Token::Color(room::material::SAND_DEEP)),
-    ("room.material.clay", crate::Token::Color(room::material::CLAY)),
-    ("room.material.clayDeep", crate::Token::Color(room::material::CLAY_DEEP)),
-    ("room.ink", crate::Token::Color(room::INK)),
-    ("room.ink2", crate::Token::Color(room::INK2)),
-    ("room.paper", crate::Token::Color(room::PAPER)),
-    ("room.accent", crate::Token::Color(room::ACCENT)),
-    ("room.lamp", crate::Token::Colors(room::LAMP)),
-    ("room.sky", crate::Token::Colors(room::SKY)),
-    ("room.hairline", crate::Token::Number(room::HAIRLINE_PX)),
-    ("room.focusWidth", crate::Token::Number(room::FOCUS_WIDTH_PX)),
     ("stem.vocals", crate::Token::Color(stem::VOCALS)),
     ("stem.drums", crate::Token::Color(stem::DRUMS)),
     ("stem.other", crate::Token::Color(stem::OTHER)),

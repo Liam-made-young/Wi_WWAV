@@ -34,9 +34,15 @@
 //! (`remote_id` is set), the undo that would clear `published_at` is refused:
 //! "Can't undo a publish. Unpublish 'World Ending'…". `remote_id` is written
 //! only by the server's acknowledgement, which also writes it into every
-//! snapshot of the clip, so no undo or redo ever takes it back. A purchase is
-//! recorded as an outward act, and the room's Edit menu reads "Can't undo a
-//! purchase." until a change is made, or redone, on top of it.
+//! snapshot of the clip, so no undo or redo ever takes it back. A sent message
+//! is recorded as an outward act, and the room's Edit menu reads "Can't undo a
+//! message." until a change is made, or redone, on top of it.
+//!
+//! Changes that arrive from your other devices are journaled in
+//! [`Room::Sync`], which no view's ⌘Z acts on. They never take the redo of
+//! what the person undid, unless they touched the same values, in which case
+//! rule 3 discards it; and an undo that would put back a value they changed
+//! since waits (rule 1) and says it changed on another device.
 //!
 //! Snapshots are JSON text, and serde_json is built with `float_roundtrip`,
 //! so a REAL (a measured BPM) comes back as the same f64, bit for bit.
@@ -450,7 +456,9 @@ impl<'s> Txn<'s> {
         let id = fresh_id(&self.tx)?;
         let (actor, tool, reason) = match &self.actor {
             Actor::You => ("you", None, None),
-            Actor::Claude { tool, reason } => ("claude", Some(tool.as_str()), Some(reason.as_str())),
+            Actor::Claude { tool, reason } => {
+                ("claude", Some(tool.as_str()), Some(reason.as_str()))
+            }
         };
         self.tx.execute(
             "INSERT INTO txn (id, label, room, state, actor, tool, reason) VALUES (?1, ?2, ?3, 'done', ?4, ?5, ?6)",
@@ -628,9 +636,11 @@ fn next_undo(conn: &Connection, room: Room) -> Result<Next> {
     }
     if let Some(later) = overlapping(conn, &entry, "done", true)? {
         let (label, other, room) = (&entry.label, &later.label, later.room.name());
-        return Ok(Next::Held(format!(
-            "Can't undo {label} yet. Undo {other} in {room} first."
-        )));
+        return Ok(Next::Held(if later.room == Room::Sync {
+            format!("Can't undo {label}: it changed on another device since.")
+        } else {
+            format!("Can't undo {label} yet. Undo {other} in {room} first.")
+        }));
     }
     Ok(Next::Ready(entry))
 }
@@ -734,7 +744,10 @@ pub(crate) fn acknowledge(conn: &Connection, clip_id: &str, remote_id: &str) -> 
 pub enum Actor {
     #[default]
     You,
-    Claude { tool: String, reason: String },
+    Claude {
+        tool: String,
+        reason: String,
+    },
 }
 
 /// One journal entry as Settings → Claude lists it.
@@ -752,8 +765,16 @@ pub struct EntryInfo {
 }
 
 /// The newest entries first, only Claude's when `claude_only`.
-pub(crate) fn entries(conn: &Connection, claude_only: bool, limit: usize) -> Result<Vec<EntryInfo>> {
-    let filter = if claude_only { "WHERE actor = 'claude'" } else { "" };
+pub(crate) fn entries(
+    conn: &Connection,
+    claude_only: bool,
+    limit: usize,
+) -> Result<Vec<EntryInfo>> {
+    let filter = if claude_only {
+        "WHERE actor = 'claude'"
+    } else {
+        ""
+    };
     let mut stmt = conn.prepare_cached(&format!(
         "SELECT id, label, room, state, actor, tool, reason FROM txn {filter} ORDER BY id DESC LIMIT ?1"
     ))?;
@@ -781,9 +802,165 @@ pub(crate) fn entries(conn: &Connection, claude_only: bool, limit: usize) -> Res
             _ => Actor::You,
         };
         let at_ms = wwav_ids::ulid_ms(&id).unwrap_or(0);
-        out.push(EntryInfo { id, label, room, done: state == "done", actor, at_ms });
+        out.push(EntryInfo {
+            id,
+            label,
+            room,
+            done: state == "done",
+            actor,
+            at_ms,
+        });
     }
     Ok(out)
+}
+
+/// One record a journal entry changed: its kind and key, and the record
+/// before and after (None: it wasn't there).
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocChange {
+    pub kind: String,
+    pub key: String,
+    pub before: Option<Value>,
+    pub after: Option<Value>,
+}
+
+/// A journal entry with the records it changed. Whoever watches the journal
+/// (the core noticing the MCP helper's writes) reads these, newer than the
+/// last it saw.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntryDocs {
+    pub id: String,
+    pub label: String,
+    pub room: Room,
+    pub actor: Actor,
+    pub docs: Vec<DocChange>,
+}
+
+/// A `docs` row as the journal snapshots it, as the record it holds.
+fn doc_record(snapshot: Option<Row>) -> Result<Option<Value>> {
+    let Some(row) = snapshot else { return Ok(None) };
+    match row.get("json").and_then(Value::as_str) {
+        Some(text) => Ok(Some(serde_json::from_str(text)?)),
+        None => Err(Error::Corrupt("a journaled docs row has no json".into())),
+    }
+}
+
+fn docs_of(conn: &Connection, txn: &str) -> Result<Vec<DocChange>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT row_id, before, after FROM txn_row WHERE txn_id = ?1 AND tbl = 'docs' ORDER BY seq",
+    )?;
+    let rows = stmt
+        .query_map([txn], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    // A row touched twice in one change: the first `before`, the last `after`.
+    let mut out: Vec<DocChange> = Vec::new();
+    for (row_id, before, after) in rows {
+        let Some((kind, key)) = row_id.split_once('/') else {
+            continue;
+        };
+        let after = doc_record(parse(after)?)?;
+        match out.iter_mut().find(|d| d.kind == kind && d.key == key) {
+            Some(d) => d.after = after,
+            None => out.push(DocChange {
+                kind: kind.to_string(),
+                key: key.to_string(),
+                before: doc_record(parse(before)?)?,
+                after,
+            }),
+        }
+    }
+    Ok(out)
+}
+
+fn entry_docs_from(
+    conn: &Connection,
+    (id, label, room, actor, tool, reason): (
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+    ),
+) -> Result<EntryDocs> {
+    let room = Room::parse(&room)
+        .ok_or_else(|| Error::Corrupt(format!("a journal entry names no room: {room}")))?;
+    let actor = match actor.as_str() {
+        "claude" => Actor::Claude {
+            tool: tool.unwrap_or_default(),
+            reason: reason.unwrap_or_default(),
+        },
+        _ => Actor::You,
+    };
+    let docs = docs_of(conn, &id)?;
+    Ok(EntryDocs {
+        id,
+        label,
+        room,
+        actor,
+        docs,
+    })
+}
+
+type EntryRow = (
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+);
+
+fn entry_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<EntryRow> {
+    Ok((
+        r.get(0)?,
+        r.get(1)?,
+        r.get(2)?,
+        r.get(3)?,
+        r.get(4)?,
+        r.get(5)?,
+    ))
+}
+
+/// The entries newer than `after` (all of them for None), oldest first, each
+/// with the records it changed.
+pub(crate) fn entries_after(
+    conn: &Connection,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<Vec<EntryDocs>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT id, label, room, actor, tool, reason FROM txn WHERE id > ?1 ORDER BY id LIMIT ?2",
+    )?;
+    let rows = stmt
+        .query_map(params![after.unwrap_or(""), limit as i64], entry_row)?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    rows.into_iter()
+        .map(|row| entry_docs_from(conn, row))
+        .collect()
+}
+
+/// One entry with the records it changed.
+pub(crate) fn entry_docs(conn: &Connection, id: &str) -> Result<Option<EntryDocs>> {
+    let row = conn
+        .query_row(
+            "SELECT id, label, room, actor, tool, reason FROM txn WHERE id = ?1",
+            [id],
+            entry_row,
+        )
+        .optional()?;
+    row.map(|row| entry_docs_from(conn, row)).transpose()
+}
+
+/// The newest entry's id: where a watcher starts from.
+pub(crate) fn last_entry(conn: &Connection) -> Result<Option<String>> {
+    Ok(conn.query_row("SELECT max(id) FROM txn", [], |r| r.get(0))?)
 }
 
 /// Undoes one entry out of order, for Settings → Claude's list. Refused when
@@ -795,18 +972,29 @@ pub(crate) fn undo_entry(conn: &mut Connection, id: &str) -> Result<String> {
         .query_row(
             "SELECT id, label, room, state FROM txn WHERE id = ?1",
             [id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?)),
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, String>(3)?,
+                ))
+            },
         )
         .optional()?;
     let Some((id, label, room, state)) = found else {
-        return Err(Error::Refused("That change isn't in the journal any more.".into()));
+        return Err(Error::Refused(
+            "That change isn't in the journal any more.".into(),
+        ));
     };
     if state != "done" {
         return Err(Error::Refused(format!("{label} is already undone.")));
     }
     let entry = to_entry((id, label, room))?;
     if let Some(title) = unpublishes_what_the_server_has(&tx, &entry)? {
-        return Err(Error::Refused(format!("Can't undo a publish. Unpublish '{title}'…")));
+        return Err(Error::Refused(format!(
+            "Can't undo a publish. Unpublish '{title}'…"
+        )));
     }
     if overlapping(&tx, &entry, "done", true)?.is_some() {
         return Err(Error::Refused(

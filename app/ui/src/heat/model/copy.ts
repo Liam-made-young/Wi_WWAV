@@ -190,8 +190,6 @@ export const grades = {
   toEnter: (n: number) => `${plural(n, 'new grade')} to enter`,
   weightsShort: (total: string, rest: string) => `Weights add to ${total}%. The other ${rest}% is unassigned.`,
   weightsOver: (total: string, over: string) => `Weights add to ${total}%. That is ${over}% more than 100.`,
-  syllabusFound: (n: number, total: string) =>
-    `Claude found ${plural(n, 'category', 'categories')} adding to ${total}%. Check them against the syllabus.`,
   need: (letter: string, min: string, need: string, left: string) =>
     `To finish with ${withArticle(letter, false)} (${min}%), you need ${need}% on the remaining ${left}%.`,
   outOfReach: (letter: string, best: string, bestLetter: string) =>
@@ -227,7 +225,6 @@ export const mail = {
   makeTask: 'Make a task',
   openInGmail: 'Open in Gmail',
   fromMail: 'From mail:',
-  testing: 'Google asks you to sign in again every 7 days while Heat is in testing.',
 };
 
 // --- 3.1 and 3.11: syncing -----------------------------------------------------
@@ -245,22 +242,16 @@ export const sync = {
   syncing: 'Syncing…',
   syncNow: 'Sync now',
   gone: 'No longer in Brightspace',
-  signInExpired: 'Google sign-in has expired. Sign in again to read Brightspace mail.',
 };
 
 // --- 2.11 and 3.12: Claude ----------------------------------------------------------
+//
+// Claude reaches Heat through the MCP server and the app calls no model, so
+// there are no consent sheets, limits or "ask Claude" buttons here: only the
+// label a change of Claude's wears.
 
 export const claude = {
   estimate: (time: string) => `Claude's estimate: ${time}. It read the title, the notes and your past averages.`,
-  askToScore: 'Ask Claude to score',
-  consent: "Heat will send this task's title, type and notes, and your average minutes per type. Nothing else.",
-  turnOn: 'Turn on scoring',
-  notNow: 'Not now',
-  off: 'Claude scoring is off. Set difficulty yourself.',
-  tooMany: 'Too many requests. Wait a minute, then try again.',
-  needsConnection: 'Needs a connection',
-  dailyLimit: "Claude's 50 calls for today are used. They come back at midnight.",
-  moreEmails: "More emails left, they'll come in on the next sync.",
 };
 
 // --- 3.13: capture, projects and the weekly review ------------------------------------
@@ -299,7 +290,6 @@ export const connections = {
   lineHint: 'This line will show on your galaxy',
   show: 'Show',
   nowMaking: (text: string) => `Now making: ${text}`,
-  payoutTask: 'Finish payout setup so your shelf can open',
 };
 
 // --- 3.15: data and moving in --------------------------------------------------------

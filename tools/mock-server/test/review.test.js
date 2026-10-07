@@ -1,5 +1,5 @@
-// An adversarial review of the mock (PLAN S1.9, S1.11, S2.7, S4.4, S5.4 and
-// gate 1.3). Each test states what the spec asks for. A test under a
+// An adversarial review of the mock (PLAN S1.9, S1.11, S2.7, S4.4 and gate
+// 1.3). Each test states what the spec asks for. A test under a
 // FINDING comment failed against the first build because of the defect it
 // names (with its severity); the defects are fixed, so these run as
 // ordinary tests and keep them fixed. The rest passed from the start and
@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
 import { useServer } from './setup.js';
 import { WORKS, addAccount } from '../fixtures.js';
-import { call, completeCheckout, pkcePair, putSigned, signInWithoutBrowser, DESKTOP_CLIENT } from '../helpers.js';
+import { call, pkcePair, putSigned, signInWithoutBrowser, DESKTOP_CLIENT } from '../helpers.js';
 import { platformSongId } from '../hash.js';
 import { writeWwav } from '../wwav.js';
 import { attentionKeys } from './gate.test.js';
@@ -49,25 +49,19 @@ describe('review: publish', () => {
   });
 
   // FINDING (medium): a re-PUT to a still-valid signed URL replaces a published version's bytes
-  test("a buyer's download is the exact bytes on the receipt, even if the maker PUTs again", async () => {
+  test('a published version is the exact bytes it was published with, even if the maker PUTs again', async () => {
     const id = songId();
-    const first = writeWwav({ songId: id, title: 'Receipt' });
+    const first = writeWwav({ songId: id, title: 'Kept' });
     const signed = await upload(ctx, ctx.lmy, first);
     await ctx.call('POST', '/api/publish', { token: ctx.lmy, body: { trackId: signed.trackId } });
-    await ctx.call('PUT', `/api/tracks/${signed.trackId}/set-price`, { token: ctx.lmy, body: { price: 3 } });
     const work = ctx.state.tracks.find((t) => t.songId === id);
-    const bought = await ctx.call('POST', '/api/purchase/create-checkout', {
-      token: ctx.ana,
-      body: { type: 'track', id: work.id },
-    });
-    await completeCheckout(ctx.url, bought.body.sessionId);
+    const [version] = work.versions;
     // The signed URL from /sign is still good for the rest of its 300 s.
-    const other = writeWwav({ songId: id, title: 'Receipt, swapped', bpm: 99 });
+    const other = writeWwav({ songId: id, title: 'Kept, swapped', bpm: 99 });
     const reput = await putSigned(signed.signedUrl, other, 'audio/wav');
     assert.equal(reput.status, 200);
-    const file = (await ctx.call('GET', `/api/entitlements/track/${work.id}/file`, { token: ctx.ana })).body;
-    const got = Buffer.from(await (await fetch(file.url)).arrayBuffer());
-    assert.equal(sha(got), file.sha256, 'the download does not match the sha256 on the receipt');
+    const kept = ctx.state.objects.get(version.s3Key);
+    assert.equal(sha(kept.bytes), version.sha256, 'the published version no longer matches its sha256');
   });
 
   // FINDING (low): counted trackIds let another account claim a trackId's FNV-1a platform id first
@@ -306,24 +300,6 @@ describe('review: Heat (S2.7)', () => {
   });
 });
 
-describe('review: a withdrawn work in a bag', () => {
-  const ctx = useServer();
-
-  // FINDING (medium): a withdrawn work in a bag makes GET /api/store/bag answer 404
-  test('a bag that holds a work since withdrawn can still be read', async () => {
-    const buyer = await addAccount(ctx.state, { username: 'Bagger' });
-    const glass = trackOf(ctx, WORKS.glassHours);
-    const add = await ctx.call('PUT', '/api/store/bag', {
-      token: buyer.token,
-      body: { type: 'track', id: glass.id },
-    });
-    assert.equal(add.status, 200);
-    await ctx.call('POST', '/api/unpublish', { token: ctx.ana, body: { trackId: glass.trackId } });
-    const bag = await ctx.call('GET', '/api/store/bag', { token: buyer.token });
-    assert.equal(bag.status, 200, JSON.stringify(bag.body));
-  });
-});
-
 describe("review: Heat push's cursor", () => {
   const ctx = useServer();
   const push = (token, device, changes) => ctx.call('POST', '/api/heat/changes', { token, body: { device, changes } });
@@ -338,127 +314,6 @@ describe("review: Heat push's cursor", () => {
     const next = await ctx.call('GET', `/api/heat/changes?cursor=${pushed.body.cursor}`, { token });
     const seen = [...a0.body.changes, ...next.body.changes].map((c) => c.value);
     assert.ok(seen.includes('from B'), `Mac A never sees B's change: pulled ${JSON.stringify(seen)}`);
-  });
-});
-
-describe('review: buying (S5.4)', () => {
-  const ctx = useServer();
-
-  // FINDING (medium): a lost bag-checkout answer locks the holder out of their own hold for 30 minutes
-  test('a bag checkout whose answer was lost can be recovered by the buyer', async () => {
-    const buyer = await addAccount(ctx.state, { username: 'Lost' });
-    const jacket = ctx.state.listings[0];
-    await ctx.call('PUT', '/api/store/bag', { token: buyer.token, body: { type: 'fashion', id: jacket.id } });
-    await call(ctx.url, 'POST', '/__mock/fail', {
-      body: { method: 'POST', path: '/api/store/bag/checkout', drop: 'after' },
-    });
-    await assert.rejects(ctx.call('POST', '/api/store/bag/checkout', { token: buyer.token }));
-    // The jacket now reads "Held for you"; the buyer tries again.
-    const retry = await ctx.call('POST', '/api/store/bag/checkout', { token: buyer.token });
-    const direct = await ctx.call('POST', '/api/purchase/create-checkout', {
-      token: buyer.token,
-      body: { type: 'fashion', id: jacket.id },
-    });
-    assert.ok(
-      retry.status === 200 || direct.status === 200,
-      `the holder is locked out of their own hold: bag ${retry.status} ${JSON.stringify(retry.body)}, ` +
-        `checkout ${direct.status} ${JSON.stringify(direct.body)}`,
-    );
-  });
-
-  // FINDING (medium): two open sessions for one file both complete, so the buyer pays twice
-  test('a file already bought is not charged for again when a second open session is paid', async () => {
-    const buyer = await addAccount(ctx.state, { username: 'Twice' });
-    const glass = trackOf(ctx, WORKS.glassHours);
-    const body = { type: 'track', id: glass.id };
-    const one = await ctx.call('POST', '/api/purchase/create-checkout', { token: buyer.token, body });
-    const two = await ctx.call('POST', '/api/purchase/create-checkout', { token: buyer.token, body });
-    assert.equal(one.status, 200);
-    assert.equal(two.status, 200);
-    await completeCheckout(ctx.url, one.body.sessionId);
-    const second = await completeCheckout(ctx.url, two.body.sessionId);
-    const completed = ctx.state.purchases.filter(
-      (p) => p.userId === buyer.user.id && p.itemId === glass.id && p.status === 'completed',
-    );
-    assert.equal(completed.length, 1, `charged twice for one file (second webhook answered ${second.status})`);
-  });
-
-  // FINDING (low): per-item fee rounding differs from the session's, losing a cent
-  test("a bag's files pay each seller 90% of the total, to the cent", async () => {
-    const seller = await addAccount(ctx.state, { username: 'Cents' });
-    const ids = [];
-    for (const title of ['Penny A', 'Penny B']) {
-      const { trackId } = await upload(ctx, seller.token, writeWwav({ songId: songId(), title }));
-      await ctx.call('POST', '/api/publish', { token: seller.token, body: { trackId } });
-      // $2.05 rather than the first $1.05: a paid file costs at least $2 now (Open #44). Each
-      // item's fee (20.5 → 21) still rounds apart from the total's (41).
-      await ctx.call('PUT', `/api/tracks/${trackId}/set-price`, { token: seller.token, body: { price: 2.05 } });
-      ids.push(ctx.state.tracks.find((t) => t.trackId === trackId).id);
-    }
-    for (const id of ids) await ctx.call('PUT', '/api/store/bag', { token: ctx.lmy, body: { type: 'track', id } });
-    const out = await ctx.call('POST', '/api/store/bag/checkout', { token: ctx.lmy });
-    const sessionId = out.body.payments[0].sessionId;
-    await completeCheckout(ctx.url, sessionId);
-    const session = ctx.state.sessions.get(sessionId);
-    const paid = ctx.state.transfers.filter((t) => t.transferGroup === `tg_${sessionId}`);
-    assert.equal(paid[0].amountCents + session.feeCents, session.amountTotal, 'the fee and the transfer miss a cent');
-  });
-
-  // FINDING (low): set-price 0.004 lists a $0.00 record that checkout refuses
-  test('a price under a cent is not a $0.00 record on the floor that checkout refuses', async () => {
-    const seller = await addAccount(ctx.state, { username: 'Fraction' });
-    const { trackId } = await upload(ctx, seller.token, writeWwav({ songId: songId(), title: 'Fraction' }));
-    await ctx.call('POST', '/api/publish', { token: seller.token, body: { trackId } });
-    const set = await ctx.call('PUT', `/api/tracks/${trackId}/set-price`, {
-      token: seller.token,
-      body: { price: 0.004 },
-    });
-    const id = ctx.state.tracks.find((t) => t.trackId === trackId).id;
-    const halls = await ctx.call('GET', '/api/store/halls');
-    const items = halls.body.halls.flatMap((h) => h.shops.flatMap((s) => s.crates.flatMap((c) => c.items)));
-    const onFloor = items.find((i) => i.type === 'track' && i.id === id);
-    const buy = await ctx.call('POST', '/api/purchase/create-checkout', {
-      token: ctx.lmy,
-      body: { type: 'track', id },
-    });
-    // A refusal is a third honest answer: set-price refuses a price under the $2 minimum.
-    assert.ok(
-      set.body.isForSale === false ||
-        (set.status === 400 && !onFloor) ||
-        (onFloor && onFloor.priceCents > 0 && buy.status === 200),
-      `set-price said ${JSON.stringify(set.body)}, the floor shows ${onFloor?.priceCents} cents, checkout ${buy.status} ${JSON.stringify(buy.body)}`,
-    );
-  });
-});
-
-describe('review: the one-of-one under a rush', () => {
-  const ctx = useServer();
-
-  test('ten buyers at once for the one-of-one: exactly one holds it', async () => {
-    const buyers = [];
-    for (let i = 0; i < 10; i++) buyers.push(await addAccount(ctx.state, { username: `Rush${i}` }));
-    const jacket = ctx.state.listings[0];
-    assert.equal(jacket.status, 'active');
-    const answers = await Promise.all(
-      buyers.map((b) =>
-        ctx.call('POST', '/api/purchase/create-checkout', { token: b.token, body: { type: 'fashion', id: jacket.id } }),
-      ),
-    );
-    assert.equal(answers.filter((a) => a.status === 200).length, 1);
-    for (const a of answers.filter((x) => x.status !== 200)) {
-      assert.deepEqual([a.status, a.body], [409, { error: 'Just sold or being purchased' }]);
-    }
-  });
-});
-
-describe('review: purchase/check', () => {
-  const ctx = useServer();
-
-  // FINDING (low): purchase/check maps every non-fashion type to a track
-  test('purchase/check about an album or film is not answered from a track with the same id', async () => {
-    // Ana owns track 1 (World Ending).
-    const res = await ctx.call('GET', '/api/purchase/check?type=film&id=1', { token: ctx.ana });
-    assert.deepEqual(res.body, { purchased: false });
   });
 });
 

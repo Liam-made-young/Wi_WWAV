@@ -43,7 +43,7 @@ export function session(over: Partial<FocusSession> = {}): FocusSession {
     endedAt: 0,
     focusMin: 25,
     interruptions: 0,
-    room: 'heat',
+    view: 'heat',
     ...over,
   };
 }

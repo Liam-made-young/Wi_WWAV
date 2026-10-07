@@ -9,22 +9,37 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use rusqlite::types::ValueRef;
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{params, Connection, OpenFlags};
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 use wi_store::{Room, Store};
 
-pub const ROOMS: [Room; 5] = [
-    Room::Heat,
-    Room::Space,
-    Room::Console,
-    Room::Unquantized,
-    Room::Library,
-];
+/// The rooms ⌘Z is pressed in: the three views and the library drawer.
+pub const ROOMS: [Room; 4] = [Room::Heat, Room::Space, Room::Console, Room::Library];
 
 pub fn library() -> (TempDir, Store) {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(&dir.path().join("Wi_WWAV")).unwrap();
     (dir, store)
+}
+
+/// A clip that was in the library before the journal began: its file goes in
+/// `media/` and its row straight into the table, so no journal entry made it
+/// and no undo takes it away. For a first state that undo and redo may change
+/// the values of but never remove.
+pub fn seed_clip(root: &Path, title: &str, bytes: &[u8], bpm: f64) -> String {
+    let id = wwav_ids::ulid();
+    let file = format!("media/{id}.wwav");
+    std::fs::write(root.join(&file), bytes).unwrap();
+    let conn = Connection::open(root.join("library.sqlite")).unwrap();
+    conn.busy_timeout(std::time::Duration::from_secs(5))
+        .unwrap();
+    conn.execute(
+        "INSERT INTO clips (id, kind, file, sha256, bytes, title, bpm) VALUES (?1, 'wwav', ?2, ?3, ?4, ?5, ?6)",
+        params![id, file, hex::encode(Sha256::digest(bytes)), bytes.len() as i64, title, bpm],
+    )
+    .unwrap();
+    id
 }
 
 /// A small file outside the library, to import.

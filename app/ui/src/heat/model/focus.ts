@@ -6,12 +6,12 @@
 // F starts or pauses. ⇧F stops and logs. I marks "Pulled away": it pauses
 // and records an interruption. Focus is 25 minutes, 50, or a custom 10–90;
 // breaks are 5 minutes and every fourth is 15. The state lives outside any
-// room, so switching rooms doesn't touch it (2.3).
+// view, so switching views doesn't touch it (2.3).
 
 import { countdown } from '../../shared/time/format';
 import * as copy from './copy';
 import { actualMin, formatMinutes } from './estimate';
-import type { FocusSession, Id, Room, Task, TaskOccurrence } from './records';
+import type { FocusSession, Id, Task, TaskOccurrence, View } from './records';
 import { checkOccurrence, recurs } from './recurrence';
 
 const MIN = 60_000;
@@ -47,13 +47,13 @@ export interface FocusState {
    * already logged, so a split round's parts add up to the round.
    */
   closed: { ms: number; minutes: number };
-  room: Room;
+  view: View;
   /** What just ended ("Focus done. 25m logged to …"), until the next press. */
   note: string | null;
 }
 
 export type FocusEvent =
-  | { type: 'press'; target?: FocusTarget; room?: Room }
+  | { type: 'press'; target?: FocusTarget; view?: View }
   | { type: 'stop' }
   | { type: 'pulledAway' }
   | { type: 'tick' }
@@ -76,18 +76,18 @@ export function isFocusLength(minutes: number): boolean {
 }
 
 export function initialFocus(): FocusState {
-  return idle({ round: 1, focusMin: 25, target: null, room: 'heat', note: null });
+  return idle({ round: 1, focusMin: 25, target: null, view: 'heat', note: null });
 }
 
 const NOTHING_CLOSED = { ms: 0, minutes: 0 };
 
-function idle(s: Pick<FocusState, 'round' | 'focusMin' | 'target' | 'room' | 'note'>): FocusState {
+function idle(s: Pick<FocusState, 'round' | 'focusMin' | 'target' | 'view' | 'note'>): FocusState {
   const lengthMs = s.focusMin * MIN;
   return {
     round: s.round,
     focusMin: s.focusMin,
     target: s.target,
-    room: s.room,
+    view: s.view,
     note: s.note,
     phase: 'idle',
     running: false,
@@ -139,7 +139,7 @@ function closeSession(
     endedAt,
     focusMin: minutes,
     interruptions: s.session.interruptions,
-    room: s.room,
+    view: s.view,
   };
   return { minutes, effects: [...ticked.effects, { kind: 'log', session }], closed };
 }
@@ -199,7 +199,7 @@ export function focusStep(
       if (s.phase === 'idle') {
         const target = event.target ?? s.target;
         if (!target) return done(s);
-        const begun = { ...s, target, room: event.room ?? s.room, phase: 'focus' as const };
+        const begun = { ...s, target, view: event.view ?? s.view, phase: 'focus' as const };
         return done({
           ...start(begun, now),
           session: { startedAt: now, fromLeftMs: s.leftMs, interruptions: 0, habitTicked: false },

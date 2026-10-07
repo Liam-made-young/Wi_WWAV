@@ -6,20 +6,32 @@
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm --prefix ../ui run dev",
-    "beforeBuildCommand": "npm --prefix ../ui run build"
+    "beforeDevCommand": "npm --prefix ui run dev",
+    "beforeBuildCommand": "npm --prefix ui run build"
   },
   "app": {
     "windows": [
       {
         "label": "main",
         "title": "Wi_WWAV",
+        "url": "index.html",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
         "minHeight": 680,
         "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 20, "y": 24 }
+      },
+      {
+        "label": "settings",
+        "create": false,
+        "title": "Settings",
+        "url": "index.html?window=settings",
+        "width": 760,
+        "height": 560,
+        "resizable": false,
+        "maximizable": false
       }
     ],
     "security": {
@@ -28,9 +40,44 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
     "icon": ["icons/icon.png"],
     "category": "Music",
-    "macOS": { "minimumSystemVersion": "13.0" }
+    "fileAssociations": [
+      {
+        "ext": ["wwav"],
+        "name": "WWAV song",
+        "description": "A song: its master and four stems in one WAV",
+        "mimeType": "audio/x-wwav",
+        "role": "Editor",
+        "rank": "Owner",
+        "exportedType": { "identifier": "com.mi-wwav.wwav", "conformsTo": ["com.microsoft.waveform-audio"] }
+      },
+      {
+        "ext": ["swav"],
+        "name": "SWAV film",
+        "description": "A film with its identity and lineage",
+        "mimeType": "video/x-swav",
+        "role": "Editor",
+        "rank": "Owner",
+        "exportedType": { "identifier": "com.mi-wwav.swav", "conformsTo": ["public.mpeg-4"] }
+      },
+      {
+        "ext": ["wwavsession"],
+        "name": "Wi_WWAV session",
+        "description": "A Console session and everything it needs",
+        "mimeType": "application/x-wwavsession",
+        "role": "Editor",
+        "rank": "Owner",
+        "exportedType": { "identifier": "com.mi-wwav.wwavsession", "conformsTo": ["com.apple.package"] }
+      }
+    ],
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://mi-wwav.com/desktop/latest.json"],
+      "pubkey": "",
+      "requireSignedVersion": true
+    }
   }
 }

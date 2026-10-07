@@ -111,7 +111,7 @@ export interface StemShape {
   notch: boolean; // selected: a 2 pt notch beneath; PRANA blinks, the app doesn't
 }
 
-export type Register = 'desk' | 'night' | 'interior';
+export type Register = 'desk' | 'night';
 
 export function stemShape(mix: Mix, stem: Stem, selected: boolean, register: Register): StemShape {
   const shape: StemShape = { fill: 1, stemRing: 0, inkRing: 'solid', outerRing: null, notch: selected };

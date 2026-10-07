@@ -1,0 +1,32 @@
+[package]
+name = "wi-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "The app's Rust core: the library, undo, the listening player, the engine supervisor, sync and the account, with no Tauri in it (docs/COMMANDS.md)"
+
+[dependencies]
+wi-store.workspace = true
+wi-heat.workspace = true
+wi-heat-store = { path = "../wi-heat-store" }
+wwav-formats.workspace = true
+wwav-wire.workspace = true
+wwav-ids.workspace = true
+wwav-tokens.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+rusqlite.workspace = true
+base64 = "0.22"
+jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
+libc = "0.2"
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+zip = { version = "8", default-features = false }
+
+[dev-dependencies]
+tempfile.workspace = true

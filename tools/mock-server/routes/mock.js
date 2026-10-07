@@ -4,7 +4,6 @@
 import { error, html, isObject, json, page } from '../http.js';
 import { seed } from '../fixtures.js';
 import { reset } from '../state.js';
-import { completeSession } from './commerce.js';
 
 // The seed again, and the clock back to its start.
 function resetAll(ctx) {
@@ -31,12 +30,6 @@ function fault(ctx) {
   if (drop === undefined && !Number.isInteger(status)) return error(400, 'Give a status or a drop');
   ctx.state.faults.push({ method: method.toUpperCase(), path, status, drop, times });
   return json(200, { queued: true });
-}
-
-// Stripe's checkout.session.completed, as if the buyer had paid.
-function stripeComplete(ctx) {
-  if (!completeSession(ctx.state, ctx.body.sessionId)) return error(409, 'This checkout has expired.');
-  return json(200, { completed: true });
 }
 
 function setLatest(ctx) {
@@ -66,7 +59,6 @@ export const routes = [
   ['POST', '/__mock/reset', resetAll],
   ['POST', '/__mock/clock', clock],
   ['POST', '/__mock/fail', fault],
-  ['POST', '/__mock/stripe/complete', stripeComplete],
   ['PUT', '/__mock/latest', setLatest],
   ['GET', '/__mock/state', snapshot],
 ];

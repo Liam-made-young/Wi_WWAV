@@ -13,7 +13,6 @@ export interface WorkFacts {
   durationSeconds?: number | null;
   words?: number | null;
   photos?: number | null;
-  priceCents?: number | null;
 }
 
 export interface World extends WorkFacts {

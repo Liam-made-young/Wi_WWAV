@@ -3,11 +3,14 @@
 //! these, so Claude and the window never disagree.
 
 use serde_json::{json, Value};
-use wi_heat::model::records::{CalendarEvent, Course, FocusSession, Grade, Habit, Space, Task, TaskOccurrence, Term, TimeBlock};
-use wi_heat::model::{estimate, grades, heat, plan, zone};
+use wi_heat::model::records::{
+    CalendarEvent, Capture, Course, FocusSession, Grade, Habit, Milestone, Project, Space, Task,
+    TaskOccurrence, Term, TimeBlock,
+};
+use wi_heat::model::{estimate, grades, heat, plan, recurrence, zone};
 use wi_store::Store;
 
-use crate::{all, kind, num, refused, round, Clock, Error, Result};
+use crate::{all, kind, num, refused, round, Clock, Result};
 
 /// "Day ends at", 11 PM by default (3.5).
 pub const DAY_ENDS_MIN: f64 = 23.0 * 60.0;
@@ -26,6 +29,9 @@ pub(crate) struct World {
     pub blocks: Vec<TimeBlock>,
     pub sessions: Vec<FocusSession>,
     pub habits: Vec<Habit>,
+    pub projects: Vec<Project>,
+    pub milestones: Vec<Milestone>,
+    pub captures: Vec<Capture>,
     pub terms: Vec<Term>,
     pub courses: Vec<Course>,
     pub raw_grades: Vec<Value>,
@@ -34,35 +40,51 @@ pub(crate) struct World {
     pub events: Vec<CalendarEvent>,
 }
 
-fn typed<T: serde::de::DeserializeOwned>(kind: &str, raw: &[Value]) -> Result<Vec<T>> {
-    raw.iter()
-        .map(|v| {
-            serde_json::from_value(v.clone()).map_err(|e| {
+/// The records of one kind that read as their type, beside their raw JSON.
+/// A record that doesn't read (one from a newer app, one half-written by
+/// another view) is left out of the maths, and said so on stderr, rather than
+/// stopping every command that reads Heat.
+fn typed<T: serde::de::DeserializeOwned>(kind: &str, raw: Vec<Value>) -> (Vec<T>, Vec<Value>) {
+    let mut out = Vec::with_capacity(raw.len());
+    let mut kept = Vec::with_capacity(raw.len());
+    for v in raw {
+        match serde_json::from_value(v.clone()) {
+            Ok(t) => {
+                out.push(t);
+                kept.push(v);
+            }
+            Err(e) => {
                 let id = v.get("id").and_then(Value::as_str).unwrap_or("?");
-                Error::Refused(format!("Heat's {kind} record {id} doesn't read: {e}."))
-            })
-        })
-        .collect()
+                eprintln!(
+                    "wi-heat-store: Heat's {kind} record {id} doesn't read, so it is left out: {e}"
+                );
+            }
+        }
+    }
+    (out, kept)
 }
 
 impl World {
     pub fn load(store: &Store) -> Result<World> {
-        let raw_tasks = all(store, kind::TASK)?;
-        let raw_grades = all(store, kind::GRADE)?;
+        let (tasks, raw_tasks) = typed(kind::TASK, all(store, kind::TASK)?);
+        let (grades, raw_grades) = typed(kind::GRADE, all(store, kind::GRADE)?);
         Ok(World {
-            spaces: typed(kind::SPACE, &all(store, kind::SPACE)?)?,
-            tasks: typed(kind::TASK, &raw_tasks)?,
+            spaces: typed(kind::SPACE, all(store, kind::SPACE)?).0,
+            tasks,
             raw_tasks,
-            occurrences: typed(kind::OCCURRENCE, &all(store, kind::OCCURRENCE)?)?,
-            blocks: typed(kind::BLOCK, &all(store, kind::BLOCK)?)?,
-            sessions: typed(kind::FOCUS, &all(store, kind::FOCUS)?)?,
-            habits: typed(kind::HABIT, &all(store, kind::HABIT)?)?,
-            terms: typed(kind::TERM, &all(store, kind::TERM)?)?,
-            courses: typed(kind::COURSE, &all(store, kind::COURSE)?)?,
-            grades: typed(kind::GRADE, &raw_grades)?,
+            occurrences: typed(kind::OCCURRENCE, all(store, kind::OCCURRENCE)?).0,
+            blocks: typed(kind::BLOCK, all(store, kind::BLOCK)?).0,
+            sessions: typed(kind::FOCUS, all(store, kind::FOCUS)?).0,
+            habits: typed(kind::HABIT, all(store, kind::HABIT)?).0,
+            projects: typed(kind::PROJECT, all(store, kind::PROJECT)?).0,
+            milestones: typed(kind::MILESTONE, all(store, kind::MILESTONE)?).0,
+            captures: typed(kind::CAPTURE, all(store, kind::CAPTURE)?).0,
+            terms: typed(kind::TERM, all(store, kind::TERM)?).0,
+            courses: typed(kind::COURSE, all(store, kind::COURSE)?).0,
+            grades,
             raw_grades,
             mail: all(store, kind::MAIL)?,
-            events: typed(kind::EVENT, &all(store, kind::EVENT)?)?,
+            events: typed(kind::EVENT, all(store, kind::EVENT)?).0,
         })
     }
 
@@ -81,7 +103,12 @@ impl World {
 
     /// A course by its code ("JPN 201", "jpn201") or id.
     pub fn course(&self, code: &str) -> Result<&Course> {
-        let squash = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_ascii_uppercase();
+        let squash = |s: &str| {
+            s.chars()
+                .filter(|c| !c.is_whitespace())
+                .collect::<String>()
+                .to_ascii_uppercase()
+        };
         let want = squash(code);
         self.courses
             .iter()
@@ -101,10 +128,19 @@ pub(crate) fn heat_order(world: &World, clock: &Clock) -> Vec<usize> {
 }
 
 /// One task as `list_tasks` gives it (3.13).
-pub(crate) fn task_view(world: &World, ctx: &estimate::EstimateContext<'_>, i: usize, clock: &Clock) -> Value {
+pub(crate) fn task_view(
+    world: &World,
+    ctx: &estimate::EstimateContext<'_>,
+    i: usize,
+    clock: &Clock,
+) -> Value {
     let task = &world.tasks[i];
     let raw = &world.raw_tasks[i];
-    let space = world.spaces.iter().find(|s| s.id == task.space_id).map(|s| s.name.clone());
+    let space = world
+        .spaces
+        .iter()
+        .find(|s| s.id == task.space_id)
+        .map(|s| s.name.clone());
     let course = task
         .course_id
         .as_ref()
@@ -114,7 +150,11 @@ pub(crate) fn task_view(world: &World, ctx: &estimate::EstimateContext<'_>, i: u
     let by = raw
         .get("estBy")
         .and_then(Value::as_str)
-        .unwrap_or(if task.est_min.is_some() { "you" } else { "default" });
+        .unwrap_or(if task.est_min.is_some() {
+            "you"
+        } else {
+            "default"
+        });
     let mut view = json!({
         "id": task.id,
         "title": task.title,
@@ -161,7 +201,9 @@ pub(crate) struct Plan {
     pub drafts: Vec<Value>,
     /// As `heatState.planDrafts` keeps them, for the time column.
     pub drafts_stored: Vec<Value>,
+    /// Open tasks that got no draft and have no block that day, in heat order.
     pub unplanned: Vec<Value>,
+    /// Minutes on the 15-minute grid still free between now and the day's end, after the drafts.
     pub minutes_left: f64,
 }
 
@@ -180,9 +222,19 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
         sessions: world.sessions.clone(),
         habits: world.habits.clone(),
     };
-    let options = plan::PlanOptions { day_ends_at: Some(day_ends), space_id: None };
+    let options = plan::PlanOptions {
+        day_ends_at: Some(day_ends),
+        space_id: None,
+    };
     let drafts = plan::plan_my_day(&data, now, &clock.zone, &options);
-    let title = |id: &str| world.tasks.iter().find(|t| t.id == id).map(|t| t.title.clone()).unwrap_or_default();
+    let title = |id: &str| {
+        world
+            .tasks
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| t.title.clone())
+            .unwrap_or_default()
+    };
     let drafted: Vec<&str> = drafts.iter().map(|d| d.task_id.as_str()).collect();
     let blocked: Vec<&str> = world
         .blocks
@@ -190,11 +242,24 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
         .filter(|b| b.date == date)
         .filter_map(|b| b.task_id.as_deref())
         .collect();
+    // A parent is planned through its subtasks, and a recurring series by its open occurrence.
+    let parents: Vec<&str> = world
+        .tasks
+        .iter()
+        .filter(|t| !t.done)
+        .filter_map(|t| t.parent_task_id.as_deref().filter(|p| !p.is_empty()))
+        .collect();
+    let open_tasks = recurrence::open_tasks(&world.tasks, &world.occurrences, now, &clock.zone);
+    let open: Vec<&str> = open_tasks.iter().map(|t| t.id.as_str()).collect();
     let unplanned = heat_order(world, clock)
         .into_iter()
         .map(|i| &world.tasks[i])
-        .filter(|t| !t.done && !drafted.contains(&t.id.as_str()) && !blocked.contains(&t.id.as_str()))
-        .take(20)
+        .filter(|t| {
+            open.contains(&t.id.as_str())
+                && !parents.contains(&t.id.as_str())
+                && !drafted.contains(&t.id.as_str())
+                && !blocked.contains(&t.id.as_str())
+        })
         .map(|t| {
             json!({
                 "task_id": t.id,
@@ -203,10 +268,7 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
             })
         })
         .collect();
-    let minutes_left = match drafts.last() {
-        Some(d) => d.left_min,
-        None => free_minutes(world, clock, date, now, day_ends),
-    };
+    let minutes_left = free_minutes(world, clock, date, now, day_ends, &drafts);
     Ok(Plan {
         drafts: drafts
             .iter()
@@ -220,29 +282,47 @@ pub(crate) fn plan(world: &World, clock: &Clock, date: &str, day_ends: f64) -> R
                 })
             })
             .collect(),
-        drafts_stored: drafts.iter().filter_map(|d| serde_json::to_value(d).ok()).collect(),
+        drafts_stored: drafts
+            .iter()
+            .filter_map(|d| serde_json::to_value(d).ok())
+            .collect(),
         unplanned,
         minutes_left: minutes_left.max(0.0),
     })
 }
 
-/// Minutes between now and the day's end not already under a block.
-fn free_minutes(world: &World, clock: &Clock, date: &str, now: f64, day_ends: f64) -> f64 {
-    let from = zone::minute_of_day(now, &clock.zone).max(0.0);
-    let mut taken = 0.0;
-    for b in world.blocks.iter().filter(|b| b.date == date) {
-        let start = b.start.max(from);
-        let end = (b.start + b.minutes).min(day_ends);
-        if end > start {
-            taken += end - start;
+/// The 15-minute marks from now (never before 7 AM) to the day's end that no
+/// block, timed event or draft covers, in minutes.
+fn free_minutes(
+    world: &World,
+    clock: &Clock,
+    date: &str,
+    now: f64,
+    day_ends: f64,
+    drafts: &[plan::Draft],
+) -> f64 {
+    let mut spans = plan::busy_spans(&world.blocks, &world.events, date, &clock.zone);
+    spans.extend(drafts.iter().map(|d| (d.start, d.start + d.minutes)));
+    let mut mark =
+        ((zone::minute_of_day(now, &clock.zone).max(DAY_STARTS_MIN)) / 15.0).ceil() * 15.0;
+    let mut free = 0.0;
+    while mark + 15.0 <= day_ends {
+        if spans.iter().all(|(a, b)| mark + 15.0 <= *a || mark >= *b) {
+            free += 15.0;
         }
+        mark += 15.0;
     }
-    (day_ends - from - taken).max(0.0)
+    free
 }
 
 /// One course as `get_grades` gives it (3.13).
 pub(crate) fn course_view(world: &World, course: &Course) -> Value {
-    let mine: Vec<Grade> = world.grades.iter().filter(|g| g.course_id == course.id).cloned().collect();
+    let mine: Vec<Grade> = world
+        .grades
+        .iter()
+        .filter(|g| g.course_id == course.id)
+        .cloned()
+        .collect();
     let scale = course.scale.clone().unwrap_or_else(grades::default_scale);
     let current = grades::current_pct(course, &mine);
     let decided = grades::decided_pct(course, &mine);
@@ -273,7 +353,9 @@ pub(crate) fn course_view(world: &World, course: &Course) -> Value {
 
 /// The category a grade's title suggests, from the course's keywords.
 pub(crate) fn guess_category(title: &str, course: &Course) -> Value {
-    grades::guess_category(title, &course.categories).map(Value::String).unwrap_or(Value::Null)
+    grades::guess_category(title, &course.categories)
+        .map(Value::String)
+        .unwrap_or(Value::Null)
 }
 
 /// A task's measured minutes: its focus sessions plus Get Info's "Took".

@@ -61,8 +61,8 @@ describe('Newest', () => {
   test('a card says what a thing is and waits: one fact line, one verb, no count', () => {
     const card = cardOf(item(1, { title: 'glass hours', artist: 'Ana', bpm: 128 }));
     expect(card).toEqual({ id: 'w001', title: 'glass hours', artist: 'Ana', facts: 'Song · A minor · 128 BPM', verb: 'Play' });
-    expect(cardOf(item(2, { medium: 'fashion', key: null, bpm: null, photos: 14, priceCents: 12000 }))).toMatchObject({
-      facts: 'Fashion · 14 photos · $120',
+    expect(cardOf(item(2, { medium: 'fashion', key: null, bpm: null, photos: 14 }))).toMatchObject({
+      facts: 'Fashion · 14 photos',
       verb: 'Look',
     });
   });
@@ -73,7 +73,6 @@ describe('Since you last looked', () => {
   const now = new Date(2026, 9, 7, 22, 30);
   const at = (day: number, hour: number) => new Date(2026, 9, day, hour, 0).toISOString();
   const events: SinceEvent[] = [
-    { kind: 'sale', at: at(5, 9), work: 'World Ending', priceCents: 400 },
     { kind: 'fork', at: at(6, 12), who: 'Ana', work: 'World Ending', fork: 'glass hours' },
     { kind: 'work', at: at(3, 9), who: 'Ana', title: 'Too old' },
     {
@@ -85,7 +84,6 @@ describe('Since you last looked', () => {
     },
     { kind: 'letter', at: at(7, 8), who: 'LMY', greeting: 'Dear Wi-WWAV,', opening: 'Hardware is hard.' },
     { kind: 'work', at: at(6, 20), who: 'Ana', title: 'Low Tide' },
-    { kind: 'payout', at: at(5, 10), amountCents: 3600 },
   ];
 
   test('lists what happened since, newest first, and ends with the date', () => {
@@ -94,8 +92,6 @@ describe('Since you last looked', () => {
       'A letter from LMY: "Dear Wi-WWAV, Hardware is hard."',
       'New from Ana: Low Tide.',
       'Ana forked World Ending: glass hours.',
-      '$36 paid out.',
-      'World Ending sold for $4.',
       'LMY says their planet is an influence of your planet.',
     ]);
     expect(list.end).toBe("That's everything since Oct 4.");
