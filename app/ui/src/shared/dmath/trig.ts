@@ -86,10 +86,13 @@ let reducedHead = 0;
 let reducedTail = 0;
 
 // x − n·π/2 for the nearest n, in reducedHead + reducedTail; returns n.
-// Exact to well under an ulp for |x| ≤ 2^19·π/2 (about 823,000). Beyond
-// that, x is first taken modulo the double nearest 2π, which `%` does
-// exactly: still the same bits everywhere, but the angle drifts by about
-// 4e−17 per radian. Nothing in the sky turns that far.
+// Exact to well under an ulp for |x| ≤ 2^20·π/2 (the high word 0x413921fb,
+// about 1.65 million; fdlibm's own comment says 2^19, wrongly). Beyond that,
+// x is first taken modulo the double nearest 2π, which `%` does exactly:
+// still the same bits everywhere, but the angle is off by up to
+// 3.9e−17·|x| (4e−8 at |x| = 1e9), so sin and cos there are deterministic
+// but no longer within an ulp of the true values. Nothing in the sky turns
+// that far.
 function reduce(x: number): number {
   let hx = highWord(x);
   let ix = hx & 0x7fffffff;

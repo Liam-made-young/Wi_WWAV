@@ -7,5 +7,7 @@ export default defineConfig({
   fullyParallel: false,
   reporter: [['list']],
   use: { baseURL: 'http://localhost:5173', viewport: { width: 1280, height: 800 } },
+  // Starts the dev server when none is running, so `npm run e2e` stands alone.
+  webServer: { command: 'npm run dev', url: 'http://localhost:5173', reuseExistingServer: true, timeout: 60_000 },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } }],
 });
