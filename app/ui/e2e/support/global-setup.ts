@@ -51,7 +51,7 @@ async function serving(url: string) {
 
 export default async function globalSetup() {
   // The bridge, the engine it starts, and the .wwav packer the tests use.
-  const built = spawnSync('cargo', ['build', '-q', '-p', 'wi-devbridge', '-p', 'mock-engine', '-p', 'wwav-formats'], {
+  const built = spawnSync('cargo', ['build', '-q', '-p', 'wi-devbridge', '-p', 'mock-engine', '-p', 'wwav-formats', '-p', 'wi-mcp'], {
     cwd: ROOT,
     stdio: 'inherit',
   });
