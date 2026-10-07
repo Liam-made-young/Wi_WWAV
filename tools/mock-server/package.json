@@ -1,0 +1,12 @@
+{
+  "name": "wi-mock-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A stand-in for mi-wwav.com that follows docs/SPEC.md's contract, for the app's tests.",
+  "main": "test/index.js",
+  "scripts": {
+    "start": "node server.js --port 8787",
+    "test": "node --test test/*.test.js"
+  }
+}
