@@ -99,3 +99,48 @@ test('a value the compiler cannot read is refused with its path', (t) => {
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /screen\.glow/);
 });
+
+test('--check names every line that writes a token, and only those', (t) => {
+  const root = scratch(t);
+  run(root);
+  const ui = join(root, 'app/ui/src/heat');
+  mkdirSync(ui, { recursive: true });
+  writeFileSync(
+    join(ui, 'pill.css'),
+    [
+      '#add,',
+      '.pill:hover {',
+      '  color: #123456;',
+      '  border-color: #abcdef;',
+      '  background: url(#grain) var(--label-red);',
+      '  outline-color: transparent;',
+      '  transition-delay: 0s;',
+      '  font-family: "White Rabbit";',
+      '  box-shadow: 0 1px 0',
+      '    rgb(0 0 0 / 0.2);',
+      '}',
+    ].join('\n'),
+  );
+  writeFileSync(
+    join(ui, 'pill.ts'),
+    [
+      "// #2946FF is royal blue, and fades take 140ms.",
+      "export const grade = (a: boolean) => (a ? 'green' : 'grey');",
+      'export const low = (n: number) => n & 0xffffff;',
+      "const at = location.hash === '#feed';",
+      "/* fill: 'red' */ export const fill = 'none';",
+      "export const ring = { stroke: 'white' };",
+      "export const tone = 0x2946ff;",
+    ].join('\n'),
+  );
+  const r = run(root, '--check');
+  assert.notEqual(r.status, 0);
+  const named = r.stderr.split('\n').filter((l) => l.startsWith('  app/')).map((l) => l.trim().split(': ')[0]);
+  assert.deepEqual(named, [
+    'app/ui/src/heat/pill.css:3',
+    'app/ui/src/heat/pill.css:4',
+    'app/ui/src/heat/pill.css:10',
+    'app/ui/src/heat/pill.ts:6',
+    'app/ui/src/heat/pill.ts:7',
+  ]);
+});

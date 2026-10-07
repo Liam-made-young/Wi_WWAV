@@ -1,9 +1,8 @@
 // node --test tools/tokens/compile.review.test.mjs
 //
 // An adversarial review of the token compiler (F7). Each test failed when it
-// was written, because of a finding in the review of build/tokens, and is
-// skipped with that finding as its reason so the suite stays green until it is
-// settled. Run one by deleting its skip.
+// was written, because of a finding in the review of build/tokens. Each
+// finding is fixed, so each test now runs with the suite.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +30,6 @@ function scratch(t) {
 
 test(
   '--check fails on a token written into the UI in any of the usual ways',
-  { skip: 'finding: the stray check only sees #hex, rgb() and hsl(), so F7a can be broken with --check passing' },
   (t) => {
     const root = scratch(t);
     run(root);
@@ -58,7 +56,6 @@ test(
 // comments. The CSS then lacks a token that the Rust and C++ outputs have.
 test(
   "a note in the token file can't break the CSS",
-  { skip: "finding: a $doc holding '*/' closes the CSS comment early, and the next declaration is lost" },
   (t) => {
     const root = scratch(t);
     const json = join(root, 'design/tokens.json');
@@ -77,7 +74,6 @@ test(
 
 test(
   'an anchor or an id in the UI is not a colour',
-  { skip: 'finding: the stray check reads #feed, #add or #bad (an href or a selector) as a hex colour and fails --check' },
   (t) => {
     const root = scratch(t);
     run(root);

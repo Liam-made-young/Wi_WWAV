@@ -5,7 +5,8 @@
 //
 //   node tools/tokens/compile.mjs           write each output that changed
 //   node tools/tokens/compile.mjs --check   exit 1 if an output is stale, or if
-//                                           the UI writes a colour of its own
+//                                           the UI writes a colour or a motion
+//                                           value of its own
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -124,6 +125,10 @@ const hex2 = (n) => n.toString(16).padStart(2, '0');
 // [data-appearance="dark"] whatever the system says.
 
 const kebab = (s) => s.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+// A note can't open or close the comment it sits in: a "*/" in it (a glob path
+// like heat/*/ is enough) would end the comment early and a browser would drop
+// the declaration after it.
+const commentSafe = (s) => s.replace(/\*\//g, '* /').replace(/\/\*/g, '/ *');
 const cssName = (path) => `--${path.map(kebab).join('-')}`;
 const GENERIC_FAMILIES = ['serif', 'sans-serif', 'monospace', 'system-ui', 'cursive', 'fantasy'];
 
@@ -153,7 +158,7 @@ function css(tree) {
   const dark = [];
   (function emit(group) {
     if (group.doc && group.path.length) {
-      const [first, ...rest] = wrap(`${group.path.join('.')}: ${group.doc}`, 72);
+      const [first, ...rest] = wrap(commentSafe(`${group.path.join('.')}: ${group.doc}`), 72);
       light.push('', `  /* ${first}`, ...rest.map((l) => `     ${l}`));
       light[light.length - 1] += ' */';
     }
@@ -375,27 +380,161 @@ function cpp(tree) {
   return out.join('\n');
 }
 
-// ---- Stray colours ------------------------------------------------------------
+// ---- Stray tokens -------------------------------------------------------------
 //
-// F7: a token is defined nowhere but the token file. In the web UI the tell
-// is a colour literal, a hex or a numeric rgb() or hsl(), anywhere but the
-// generated CSS. Test files may hold expected colours.
+// F7: a token is defined nowhere but the token file. In the web UI the tell is
+// a value written out where a token belongs: a colour as #hex, as a three.js
+// or canvas 0xhex, as a colour function, or by name in a colour's place; or
+// motion typed out as a duration or a cubic-bezier(). CSS is read declaration
+// by declaration, so a selector (#add) is never a colour; code and markup are
+// read with their comments blanked, and an anchor (href="#feed") is never a
+// colour. Test files may hold expected values; the generated CSS is the file.
 
 const UI = 'app/ui/src';
-const LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(\s*[\d.]/;
+const KIND = [
+  [/\.css$/, 'css'],
+  [/\.(html|svg)$/, 'markup'],
+  [/\.[cm]?[jt]sx?$/, 'code'],
+  [/\.json$/, 'json'],
+];
 
-function strayColors() {
+// CSS's named colours (transparent and currentcolor name no colour).
+const NAMES =
+  'aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|' +
+  'burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|' +
+  'darkgoldenrod|darkgray|darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|' +
+  'darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkslategrey|darkturquoise|darkviolet|' +
+  'deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|' +
+  'ghostwhite|gold|goldenrod|gray|green|greenyellow|grey|honeydew|hotpink|indianred|indigo|ivory|khaki|' +
+  'lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|' +
+  'lightgray|lightgreen|lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|' +
+  'lightslategrey|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|' +
+  'mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|' +
+  'mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|' +
+  'olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|' +
+  'papayawhip|peachpuff|peru|pink|plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|' +
+  'saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|' +
+  'snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|' +
+  'yellowgreen';
+
+const HEX_LITERAL = /(?<![&\w/])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])/gi;
+const COLOR_FUNCTION =
+  /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(\s*[-+.\d]|\bcolor\(\s*(?:srgb|srgb-linear|display-p3|a98-rgb|prophoto-rgb|rec2020|xyz|xyz-d50|xyz-d65)\b/i;
+const CURVE_LITERAL = /\bcubic-bezier\(/i;
+// In a CSS value any word may be a colour's name.
+const NAME = new RegExp(`(?<![\\w-])(?:${NAMES})(?![\\w-])`, 'i');
+// In code a name is a colour only in a colour's place: a colour property or
+// attribute (color, fill, stroke, background, fillStyle…), or three.js.
+const NAME_IN_PLACE = new RegExp(
+  `(?<![\\w-])(?:[a-z-]*colou?r|fill|stroke|background|fillStyle|strokeStyle)\\s*[:=]\\s*\\{?\\s*['"\`]?\\s*(?:${NAMES})(?![\\w-])` +
+    `|\\b(?:Color|setStyle)\\(\\s*['"\`](?:${NAMES})['"\`]`,
+  'i',
+);
+// three.js and canvas take a colour as a number; a mask in a bit operation
+// isn't one.
+const NUMBER_COLOR = /(?<![\w.$])0x[0-9a-f]{6}(?!\w)/gi;
+const BIT_BEFORE = /(?:^|[^&|])[&|^]=?\s*$|(?:<<|>>>?)\s*$/;
+const BIT_AFTER = /^\s*(?:[&|^](?![&|])|<<|>>)/;
+// A #fragment, not a colour: a link, a url(#id), a selector handed to the DOM.
+const FRAGMENT =
+  /(?:\b(?:href|xlink:href|to)\s*=\s*\{?\s*['"`]|\burl\(\s*['"]?|\b(?:querySelector(?:All)?|closest|matches)\(\s*['"`]|\bhash\s*[!=]==?\s*['"`])$/;
+// A duration in CSS (140ms, 0.14s); in code only ms, as 2s is often copy.
+const CSS_TIME = /(?<![\w.-])(\d*\.?\d+)m?s(?![\w-])/g;
+const CODE_TIME = /(?<![\w.$-])(\d*\.?\d+)ms(?![\w-])/g;
+
+const blank = (s) => s.replace(/[^\n]/g, ' ');
+
+// Comments become spaces, so offsets and line numbers hold.
+function uncommented(text, kind) {
+  if (kind === 'css') return text.replace(/\/\*[\s\S]*?\*\//g, blank);
+  if (kind === 'markup') return text.replace(/<!--[\s\S]*?-->/g, blank);
+  if (kind !== 'code') return text;
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const two = text.slice(i, i + 2);
+    let end = i + 1;
+    if (two === '//') {
+      end = text.indexOf('\n', i);
+      if (end < 0) end = text.length;
+      out += blank(text.slice(i, end));
+    } else if (two === '/*') {
+      end = text.indexOf('*/', i + 2);
+      end = end < 0 ? text.length : end + 2;
+      out += blank(text.slice(i, end));
+    } else if (`'"\``.includes(text[i])) {
+      // A string runs to its closing quote (a ' or " string stops at the line's end).
+      while (end < text.length && text[end] !== text[i] && (text[i] === '`' || text[end] !== '\n')) {
+        end += text[end] === '\\' ? 2 : 1;
+      }
+      end = Math.min(end + 1, text.length);
+      out += text.slice(i, end);
+    } else {
+      out += text[i];
+    }
+    i = end;
+  }
+  return out;
+}
+
+const someTime = (text, pattern) => [...text.matchAll(pattern)].some((m) => Number(m[1]) > 0);
+
+// Does a CSS value write out a colour or motion?
+function strayValue(value) {
+  // A string or a url() names a font, some content or a file, not a colour.
+  const v = value.replace(/(["'])(?:\\.|(?!\1).)*\1|\burl\([^)]*\)/g, blank);
+  // search(), as test() on a /g pattern would start where the last call ended.
+  return (
+    v.search(HEX_LITERAL) >= 0 ||
+    COLOR_FUNCTION.test(v) ||
+    NAME.test(v) ||
+    CURVE_LITERAL.test(v) ||
+    someTime(v, CSS_TIME)
+  );
+}
+
+// Does a line of code, markup or JSON write out a colour or motion?
+function strayLine(line, kind) {
+  const hex = [...line.matchAll(HEX_LITERAL)].some((m) => !FRAGMENT.test(line.slice(0, m.index)));
+  const number =
+    kind === 'code' &&
+    [...line.matchAll(NUMBER_COLOR)].some(
+      (m) => !BIT_BEFORE.test(line.slice(0, m.index)) && !BIT_AFTER.test(line.slice(m.index + m[0].length)),
+    );
+  const name = kind !== 'json' && NAME_IN_PLACE.test(line);
+  return hex || number || name || COLOR_FUNCTION.test(line) || CURVE_LITERAL.test(line) || someTime(line, CODE_TIME);
+}
+
+// The 1-based lines of a file that write out a token.
+function strayLines(text, kind) {
+  const clean = uncommented(text, kind);
+  if (kind !== 'css') {
+    return clean.split('\n').flatMap((line, i) => (strayLine(line, kind) ? [i + 1] : []));
+  }
+  const lines = new Set();
+  const lineAt = (offset) => clean.slice(0, offset).split('\n').length;
+  // A declaration follows a {, a ; or a line's start and ends at a ; or a };
+  // a selector ends at a {, so it never matches.
+  for (const m of clean.matchAll(/(?:^|[{;])\s*[-\w]+\s*:([^;{}]*)(?=[;}])/gm)) {
+    const start = m.index + m[0].length - m[1].length;
+    m[1].split('\n').forEach((part, i) => {
+      if (strayValue(part)) lines.add(lineAt(start) + i);
+    });
+  }
+  return [...lines].sort((a, b) => a - b);
+}
+
+function strayTokens() {
   const dir = join(ROOT, UI);
   if (!existsSync(dir)) return [];
   const found = [];
   for (const file of readdirSync(dir, { recursive: true }).sort()) {
     const rel = `${UI}/${file}`;
-    if (rel === CSS_OUT || /\.test\.\w+$/.test(file) || !/\.(css|html|svg|[cm]?[jt]sx?)$/.test(file)) continue;
-    readFileSync(join(dir, file), 'utf8')
-      .split('\n')
-      .forEach((line, i) => {
-        if (LITERAL.test(line)) found.push(`${rel}:${i + 1}: ${line.trim()}`);
-      });
+    const kind = KIND.find(([pattern]) => pattern.test(file))?.[1];
+    if (!kind || rel === CSS_OUT || /\.test\.\w+$/.test(file)) continue;
+    const text = readFileSync(join(dir, file), 'utf8');
+    const lines = text.split('\n');
+    for (const n of strayLines(text, kind)) found.push(`${rel}:${n}: ${lines[n - 1].trim()}`);
   }
   return found;
 }
@@ -415,12 +554,15 @@ function main(check) {
     return 0;
   }
   const stale = Object.keys(outputs).filter((p) => !current(p));
-  const strays = strayColors();
+  const strays = strayTokens();
   if (stale.length) {
     console.error(`Stale, so run node tools/tokens/compile.mjs:\n${stale.map((p) => `  ${p}`).join('\n')}`);
   }
   if (strays.length) {
-    console.error(`Colours written outside ${SOURCE}; use its custom properties:\n${strays.map((s) => `  ${s}`).join('\n')}`);
+    console.error(
+      `Colours or motion written outside ${SOURCE}; use its custom properties, or import the file:\n` +
+        strays.map((s) => `  ${s}`).join('\n'),
+    );
   }
   return stale.length || strays.length ? 1 : 0;
 }

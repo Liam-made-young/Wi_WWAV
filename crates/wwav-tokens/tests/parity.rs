@@ -246,24 +246,66 @@ fn css_name(path: &[String]) -> String {
 /// The custom properties of each rule in tokens.css, by selector.
 fn css_blocks() -> BTreeMap<String, BTreeMap<String, String>> {
     let css = std::fs::read_to_string(common::repo().join("app/ui/src/styles/tokens.css")).unwrap();
+    parse_css(&css)
+}
+
+/// Reads CSS as a browser does: a comment ends at its first `*/`, and a
+/// declaration runs to the next `;` or `}`, whatever lines it spans. Anything
+/// inside a rule that isn't `--name: value` fails, so text a browser would
+/// read as a broken declaration can't hide.
+fn parse_css(css: &str) -> BTreeMap<String, BTreeMap<String, String>> {
+    let mut text = String::new();
+    let mut rest = css;
+    while let Some(open) = rest.find("/*") {
+        text += &rest[..open];
+        let close = rest[open + 2..]
+            .find("*/")
+            .unwrap_or_else(|| panic!("a comment never closes: {}", &rest[open..]));
+        rest = &rest[open + 2 + close + 2..];
+    }
+    text += rest;
+
     let mut blocks: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-    let mut selector: Option<String> = None;
-    for line in css.lines().map(str::trim) {
-        if let Some(sel) = line.strip_suffix('{') {
-            let sel = sel.trim();
-            if sel.starts_with(":root") {
-                selector = Some(sel.to_string());
+    let mut open: Vec<String> = Vec::new(); // the selectors of the rules we're in
+    let mut held = String::new();
+    for ch in text.chars() {
+        match ch {
+            '{' => {
+                open.push(held.trim().to_string());
+                held.clear();
             }
-        } else if line == "}" {
-            selector = None;
-        } else if let (Some(sel), Some(decl)) = (&selector, line.strip_prefix("--")) {
-            let (name, value) = decl.split_once(':').unwrap();
-            let value = value.trim().strip_suffix(';').unwrap();
-            let block = blocks.entry(sel.clone()).or_default();
-            let old = block.insert(format!("--{name}"), value.to_string());
-            assert!(old.is_none(), "--{name} twice in {sel}");
+            ';' | '}' => {
+                let decl = held.trim();
+                if !decl.is_empty() {
+                    let sel = open
+                        .last()
+                        .unwrap_or_else(|| panic!("outside any rule: {decl:?}"));
+                    let (name, value) = decl
+                        .split_once(':')
+                        .unwrap_or_else(|| panic!("not a declaration in {sel}: {decl:?}"));
+                    let name = name.trim();
+                    let custom = name.strip_prefix("--").is_some_and(|n| {
+                        !n.is_empty()
+                            && n.chars()
+                                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                    });
+                    assert!(custom, "not a custom property in {sel}: {decl:?}");
+                    let block = blocks.entry(sel.clone()).or_default();
+                    let old = block.insert(name.to_string(), value.trim().to_string());
+                    assert!(old.is_none(), "{name} twice in {sel}");
+                }
+                held.clear();
+                if ch == '}' {
+                    open.pop().expect("a } with no rule to close");
+                }
+            }
+            _ => held.push(ch),
         }
     }
+    assert!(
+        open.is_empty() && held.trim().is_empty(),
+        "tokens.css ends inside a rule"
+    );
     blocks
 }
 
@@ -306,6 +348,20 @@ fn css_val(like: &Val, s: &str, unit: Option<&str>) -> Val {
             Val::Curve(n.try_into().unwrap())
         }
     }
+}
+
+#[test]
+fn the_css_is_read_as_a_browser_reads_it() {
+    // A note holding "*/" closes its comment early. A browser then reads the
+    // comment's tail as CSS and drops the declaration after it, so the reader
+    // must not skip it as a comment line would.
+    let broken = ":root {\n  /* heat: see heat/*/ for the tubes. */\n  --heat-cool: #4f9be6;\n}\n";
+    assert!(
+        std::panic::catch_unwind(|| parse_css(broken)).is_err(),
+        "read a declaration a browser drops"
+    );
+    let fine = ":root {\n  /* heat: see heat/* / for the tubes. */\n  --heat-cool: #4f9be6;\n}\n";
+    assert_eq!(parse_css(fine)[":root"]["--heat-cool"], "#4f9be6");
 }
 
 const LIGHT: &str = ":root";
