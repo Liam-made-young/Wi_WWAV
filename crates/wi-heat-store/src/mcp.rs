@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// The tools, in 3.13's order.
-pub const TOOLS: [&str; 21] = [
+pub const TOOLS: [&str; 23] = [
     "list_tasks",
     "add_task",
     "update_task",
@@ -38,6 +38,8 @@ pub const TOOLS: [&str; 21] = [
     "list_mail_accounts",
     "list_mail",
     "save_mail_text",
+    "list_mail_outbox",
+    "finish_mail_action",
 ];
 
 /// The most days `get_schedule` reads at once.
@@ -83,6 +85,26 @@ pub fn call(
         "add_capture" => add_capture(store, clock, args),
         "list_mail_accounts" => list_mail_accounts(store),
         "list_mail" => list_mail(store, clock, args),
+        "list_mail_outbox" => Ok(json!({"actions": mail::outbox(store)?
+            .iter()
+            .map(|a| {
+                json!({
+                    "id": a["id"], "kind": a["kind"], "thread_id": a["threadId"], "account": a["account"],
+                    "to": a["to"], "cc": a["cc"], "subject": a["subject"], "body": a["body"],
+                })
+            })
+            .collect::<Vec<_>>()})),
+        "finish_mail_action" => {
+            let done = text(args, "result") == Some("done");
+            let doc = mail::finish(
+                store,
+                clock,
+                text(args, "id").unwrap_or_default(),
+                done,
+                text(args, "error").unwrap_or_default(),
+            )?;
+            Ok(json!({"id": doc["id"], "status": doc["status"]}))
+        }
         "save_mail_text" => mail::save_text(
             store,
             clock,
@@ -435,6 +457,7 @@ pub fn record_mail_thread(store: &mut Store, args: &Map<String, Value>) -> Resul
     if let Some(category) = text(args, "category") {
         thread["category"] = json!(category);
     }
+    let unread = args.get("unread").and_then(Value::as_bool);
     if let Some(course) = text(args, "course") {
         thread["course"] = json!(course);
     }
@@ -447,6 +470,10 @@ pub fn record_mail_thread(store: &mut Store, args: &Map<String, Value>) -> Resul
         claude("record_mail_thread", args),
         |txn| put(txn, kind::MAIL, &thread),
     )?;
+    // Whether Gmail has it unread, kept beside the record, outside the journal.
+    if let Some(unread) = unread {
+        mail::set_flags(store, thread_id, Some(unread), None)?;
+    }
     Ok(json!({"thread": thread, "created": created, "undo_label": undo}))
 }
 

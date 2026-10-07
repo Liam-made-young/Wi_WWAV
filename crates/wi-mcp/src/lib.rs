@@ -171,7 +171,8 @@ fn error(id: Value, code: i64, message: &str) -> Value {
 
 /// Checks arguments against one of [`tools::input_schema`]'s schemas: the
 /// subset they use (object, string, integer, enum, required, lengths,
-/// minimum and maximum, pattern, a list's size, and closed properties). Says what is wrong
+/// minimum and maximum, pattern, true or false, a list's size, and closed
+/// properties). Says what is wrong
 /// in one sentence.
 pub fn check(schema: &Value, args: &Map<String, Value>) -> Result<(), String> {
     let props = schema.get("properties").and_then(Value::as_object).cloned().unwrap_or_default();
@@ -245,6 +246,10 @@ fn check_value(key: &str, schema: &Value, value: &Value) -> Result<(), String> {
             }
             Ok(())
         }
+        Some("boolean") => match value {
+            Value::Bool(_) => Ok(()),
+            _ => Err(format!("\"{key}\" must be true or false.")),
+        },
         // An array's own rules are the store's to check (its items are objects).
         Some("array") => {
             let Some(items) = value.as_array() else {

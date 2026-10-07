@@ -11,6 +11,7 @@ mod heat_public;
 mod heat_watch;
 mod history;
 mod library;
+mod mail;
 mod player;
 mod review;
 mod supervisor;
