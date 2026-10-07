@@ -31,7 +31,7 @@ use rusqlite::{Connection, ErrorCode};
 pub use clips::{
     ByExtension, Clip, Colour, Inspection, Inspector, Kind, NewClip, Placement, UPLOAD_QUEUE,
 };
-pub use journal::{Actor, EntryInfo, History, Menu, Txn};
+pub use journal::{Actor, DocChange, EntryDocs, EntryInfo, History, Menu, Txn};
 pub use media::Files;
 pub use organise::{Pin, SmartFolder, SmartRule, Tag, TagKind};
 pub use records::{Doc, PluginScan, ScanStatus, Sequence};
@@ -180,6 +180,31 @@ impl Store {
     /// The newest journal entries first, only Claude's when `claude_only`.
     pub fn entries(&self, claude_only: bool, limit: usize) -> Result<Vec<EntryInfo>> {
         journal::entries(&self.conn, claude_only, limit)
+    }
+
+    /// The journal entries newer than `after` (all of them for None), oldest
+    /// first, each with the records it changed. The core reads the ones the
+    /// MCP helper wrote while the app was open (docs/HEAT.md).
+    pub fn entries_after(&self, after: Option<&str>, limit: usize) -> Result<Vec<EntryDocs>> {
+        journal::entries_after(&self.conn, after, limit)
+    }
+
+    /// One journal entry with the records it changed.
+    pub fn entry_docs(&self, id: &str) -> Result<Option<EntryDocs>> {
+        journal::entry_docs(&self.conn, id)
+    }
+
+    /// The newest journal entry's id, or None for a library with no changes.
+    pub fn last_entry(&self) -> Result<Option<String>> {
+        journal::last_entry(&self.conn)
+    }
+
+    /// SQLite's `data_version` for this handle: it differs between two reads
+    /// when another handle, in this process or another, committed in
+    /// between. A commit made through this handle never changes it, so the
+    /// core's own writes are not news to it (docs/SPEC.md 8.8).
+    pub fn data_version(&self) -> Result<i64> {
+        Ok(self.conn.query_row("PRAGMA data_version", [], |r| r.get(0))?)
     }
 
     /// Undoes one entry out of order and returns its label (Settings →

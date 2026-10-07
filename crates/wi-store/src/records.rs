@@ -99,6 +99,17 @@ impl Store {
         docs.map(|d| to_doc(d?)).collect()
     }
 
+    /// The records of one kind in the order they were made (a view's lists
+    /// read in that order: the sidebar's spaces, a day's captures). Undo puts a
+    /// record back under its old number, so it comes back in its old place.
+    pub fn docs_oldest_first(&self, kind: &str) -> Result<Vec<Doc>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT kind, key, json, text FROM docs WHERE kind = ?1 ORDER BY n",
+        )?;
+        let docs = stmt.query_map([kind], doc_from)?;
+        docs.map(|d| to_doc(d?)).collect()
+    }
+
     /// Records of every kind whose text has every word typed, newest first.
     pub fn search_docs(&self, text: &str, limit: usize) -> Result<Vec<Doc>> {
         let Some(query) = crate::organise::fts_query(text) else {
@@ -259,6 +270,21 @@ impl Txn<'_> {
             )?;
         }
         Ok(())
+    }
+
+    /// A record as it stands inside this change, so an edit built on it
+    /// can't lose what another handle wrote a moment before the change began.
+    pub fn doc(&self, kind: &str, key: &str) -> Result<Option<Doc>> {
+        let Some(row) = self.get("docs", &format!("{kind}/{key}"))? else {
+            return Ok(None);
+        };
+        let text = |c: &str| row.get(c).and_then(Value::as_str).unwrap_or_default().to_string();
+        Ok(Some(Doc {
+            kind: kind.to_string(),
+            key: key.to_string(),
+            json: serde_json::from_str(&text("json"))?,
+            text: text("text"),
+        }))
     }
 
     pub fn delete_doc(&mut self, kind: &str, key: &str) -> Result<()> {

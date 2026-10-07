@@ -794,6 +794,115 @@ pub(crate) fn entries(conn: &Connection, claude_only: bool, limit: usize) -> Res
     Ok(out)
 }
 
+/// One record a journal entry changed: its kind and key, and the record
+/// before and after (None: it wasn't there).
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocChange {
+    pub kind: String,
+    pub key: String,
+    pub before: Option<Value>,
+    pub after: Option<Value>,
+}
+
+/// A journal entry with the records it changed. Whoever watches the journal
+/// (the core noticing the MCP helper's writes) reads these, newer than the
+/// last it saw.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntryDocs {
+    pub id: String,
+    pub label: String,
+    pub room: Room,
+    pub actor: Actor,
+    pub docs: Vec<DocChange>,
+}
+
+/// A `docs` row as the journal snapshots it, as the record it holds.
+fn doc_record(snapshot: Option<Row>) -> Result<Option<Value>> {
+    let Some(row) = snapshot else { return Ok(None) };
+    match row.get("json").and_then(Value::as_str) {
+        Some(text) => Ok(Some(serde_json::from_str(text)?)),
+        None => Err(Error::Corrupt("a journaled docs row has no json".into())),
+    }
+}
+
+fn docs_of(conn: &Connection, txn: &str) -> Result<Vec<DocChange>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT row_id, before, after FROM txn_row WHERE txn_id = ?1 AND tbl = 'docs' ORDER BY seq",
+    )?;
+    let rows = stmt
+        .query_map([txn], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, Option<String>>(2)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    // A row touched twice in one change: the first `before`, the last `after`.
+    let mut out: Vec<DocChange> = Vec::new();
+    for (row_id, before, after) in rows {
+        let Some((kind, key)) = row_id.split_once('/') else {
+            continue;
+        };
+        let after = doc_record(parse(after)?)?;
+        match out.iter_mut().find(|d| d.kind == kind && d.key == key) {
+            Some(d) => d.after = after,
+            None => out.push(DocChange {
+                kind: kind.to_string(),
+                key: key.to_string(),
+                before: doc_record(parse(before)?)?,
+                after,
+            }),
+        }
+    }
+    Ok(out)
+}
+
+fn entry_docs_from(
+    conn: &Connection,
+    (id, label, room, actor, tool, reason): (String, String, String, String, Option<String>, Option<String>),
+) -> Result<EntryDocs> {
+    let room = Room::parse(&room)
+        .ok_or_else(|| Error::Corrupt(format!("a journal entry names no room: {room}")))?;
+    let actor = match actor.as_str() {
+        "claude" => Actor::Claude { tool: tool.unwrap_or_default(), reason: reason.unwrap_or_default() },
+        _ => Actor::You,
+    };
+    let docs = docs_of(conn, &id)?;
+    Ok(EntryDocs { id, label, room, actor, docs })
+}
+
+type EntryRow = (String, String, String, String, Option<String>, Option<String>);
+
+fn entry_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<EntryRow> {
+    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?))
+}
+
+/// The entries newer than `after` (all of them for None), oldest first, each
+/// with the records it changed.
+pub(crate) fn entries_after(conn: &Connection, after: Option<&str>, limit: usize) -> Result<Vec<EntryDocs>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT id, label, room, actor, tool, reason FROM txn WHERE id > ?1 ORDER BY id LIMIT ?2",
+    )?;
+    let rows = stmt
+        .query_map(params![after.unwrap_or(""), limit as i64], entry_row)?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    rows.into_iter().map(|row| entry_docs_from(conn, row)).collect()
+}
+
+/// One entry with the records it changed.
+pub(crate) fn entry_docs(conn: &Connection, id: &str) -> Result<Option<EntryDocs>> {
+    let row = conn
+        .query_row(
+            "SELECT id, label, room, actor, tool, reason FROM txn WHERE id = ?1",
+            [id],
+            entry_row,
+        )
+        .optional()?;
+    row.map(|row| entry_docs_from(conn, row)).transpose()
+}
+
+/// The newest entry's id: where a watcher starts from.
+pub(crate) fn last_entry(conn: &Connection) -> Result<Option<String>> {
+    Ok(conn.query_row("SELECT max(id) FROM txn", [], |r| r.get(0))?)
+}
+
 /// Undoes one entry out of order, for Settings → Claude's list. Refused when
 /// it was undone already, when it took back a publish the server has, or
 /// when a later done entry changed the same values since.
