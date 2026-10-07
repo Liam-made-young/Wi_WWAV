@@ -262,6 +262,62 @@ fn notes_keep_where_they_were_played() {
     assert_eq!(m.played_len_beats, 0.2310);
 }
 
+#[test]
+fn a_history_that_does_not_fit_session_json_starts_again_and_never_panics() {
+    // Two copies of one package edited apart (two windows, before the
+    // lock), their journals joined: open anchors on B's save, but A's
+    // change on the undo stack doesn't fit B's file. Fails if open keeps
+    // that history (⌘Z then panicked), or loses B's saved session.
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = FakeClock::at(T0);
+    let pkg = Package::create(&tmp.path().join("a"), sample_session(0), clock.clone()).unwrap();
+    let a_dir = pkg.dir().to_path_buf();
+    drop(pkg);
+    let b_dir = tmp.path().join("b.wwavsession");
+    copy_dir(&a_dir, &b_dir);
+
+    let (mut a, _) = Package::open(&a_dir, clock.clone()).unwrap();
+    a.edit("rename", |s| s.title = "From A".into()).unwrap();
+    a.save().unwrap();
+    drop(a);
+    let (mut b, _) = Package::open(&b_dir, clock.clone()).unwrap();
+    b.edit("move clip", |s| s.tracks[0].events[0].at_ms = 2)
+        .unwrap();
+    b.save().unwrap();
+    drop(b);
+    // A's journal with B's lines after the start line they share, and B's
+    // session.json.
+    let a_lines = fs::read_to_string(a_dir.join("journal/undo.ndjson")).unwrap();
+    let b_lines = fs::read_to_string(b_dir.join("journal/undo.ndjson")).unwrap();
+    let joined: String = a_lines
+        .lines()
+        .chain(b_lines.lines().skip(1))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    fs::write(a_dir.join("journal/undo.ndjson"), joined).unwrap();
+    let saved = fs::read(b_dir.join("session.json")).unwrap();
+    fs::write(a_dir.join("session.json"), &saved).unwrap();
+
+    let (mut pkg, opened) = Package::open(&a_dir, clock.clone()).unwrap();
+    assert!(opened.history_reset);
+    assert_eq!(session_json(&pkg), saved);
+    assert_eq!(pkg.undo_label(), "Nothing to undo.");
+    assert_eq!(pkg.undo().unwrap(), None);
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_dir() {
+            copy_dir(&path, &to.join(entry.file_name()));
+        } else {
+            fs::copy(&path, to.join(entry.file_name())).unwrap();
+        }
+    }
+}
+
 /// A tiny deterministic generator, so a failure names its seed.
 struct Rng(u64);
 impl Rng {
@@ -360,6 +416,8 @@ proptest::proptest! {
         let text = String::from_utf8(s.to_json_bytes()).unwrap();
         let back = Session::from_json_bytes(text.as_bytes()).unwrap();
         proptest::prop_assert_eq!(String::from_utf8(back.to_json_bytes()).unwrap(), text);
-        proptest::prop_assert_eq!(back.tracks[0].gain_db.to_bits(), gain.to_bits());
+        // Zero has one form: -0.0 is written, and reads back, as 0.0.
+        let want = if gain == 0.0 { 0.0f64 } else { gain };
+        proptest::prop_assert_eq!(back.tracks[0].gain_db.to_bits(), want.to_bits());
     }
 }

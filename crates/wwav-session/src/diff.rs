@@ -28,6 +28,19 @@ pub struct Row {
     pub after: Option<Value>,
 }
 
+impl Row {
+    /// What is there before the row is applied and what it leaves, forward
+    /// (redo) or backward (undo).
+    pub fn ends(&self, forward: bool) -> (Option<&Value>, Option<&Value>) {
+        let (before, after) = (self.before.as_ref(), self.after.as_ref());
+        if forward {
+            (before, after)
+        } else {
+            (after, before)
+        }
+    }
+}
+
 /// A present key is Some, even when its value is null; only an absent key
 /// is None.
 fn present<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
@@ -46,7 +59,8 @@ pub fn diff(a: &Value, b: &Value) -> Vec<Row> {
     rows
 }
 
-fn walk(path: String, a: &Value, b: &Value, rows: &mut Vec<Row>) {
+/// Pushes the rows that turn `a`, at `path` in the document, into `b`.
+pub fn walk(path: String, a: &Value, b: &Value, rows: &mut Vec<Row>) {
     if a == b {
         return;
     }
@@ -106,20 +120,23 @@ fn row(path: String, before: Option<&Value>, after: Option<&Value>) -> Row {
 
 /// Applies rows forward: what was `before` becomes `after`.
 pub fn redo(doc: &mut Value, rows: &[Row]) -> Result<(), Mismatch> {
-    rows.iter()
-        .try_for_each(|r| put(doc, &r.path, r.before.as_ref(), r.after.as_ref()))
+    rows.iter().try_for_each(|r| {
+        let (from, to) = r.ends(true);
+        put(doc, &r.path, from, to)
+    })
 }
 
 /// Applies rows backward: what is `after` goes back to `before`.
 pub fn undo(doc: &mut Value, rows: &[Row]) -> Result<(), Mismatch> {
-    rows.iter()
-        .rev()
-        .try_for_each(|r| put(doc, &r.path, r.after.as_ref(), r.before.as_ref()))
+    rows.iter().rev().try_for_each(|r| {
+        let (from, to) = r.ends(false);
+        put(doc, &r.path, from, to)
+    })
 }
 
 /// Replaces, inserts or removes the value at `path`, checking first that
 /// what is there is `from`.
-fn put(
+pub fn put(
     doc: &mut Value,
     path: &str,
     from: Option<&Value>,
@@ -170,8 +187,14 @@ fn put(
     Ok(())
 }
 
-fn escape(key: &str) -> String {
+pub fn escape(key: &str) -> String {
     key.replace('~', "~0").replace('/', "~1")
+}
+
+/// A pointer's reference tokens, unescaped: "/a~1b/0" is `["a/b", "0"]`,
+/// and "" (the whole document) has none.
+pub fn tokens(path: &str) -> Vec<String> {
+    path.split('/').skip(1).map(unescape).collect()
 }
 
 fn unescape(token: &str) -> String {

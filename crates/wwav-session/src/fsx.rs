@@ -13,6 +13,14 @@ pub fn tmp_path(path: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
+/// `path` with ".<ULID>.tmp" added: a temporary name no other writer
+/// shares.
+pub fn unique_tmp_path(path: &Path) -> PathBuf {
+    let mut name = OsString::from(path.as_os_str());
+    name.push(format!(".{}.tmp", wwav_ids::ulid()));
+    PathBuf::from(name)
+}
+
 /// Writes and syncs a file, so its bytes are on disk before anything names
 /// it.
 pub fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
