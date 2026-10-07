@@ -315,3 +315,71 @@ export const moving = {
   notExport: 'This file isn’t a Heat export.',
   newer: 'This export is from a newer Heat. Update Wi_WWAV, then try again.',
 };
+
+// --- The Public switch, in the words 3.15 gives each kind of record --------------------
+//
+// What a switch says before it is turned on, and what it says while it is on.
+// A record shows only its own fields; nothing worked out across records ever does.
+
+export const publicSwitch = {
+  label: 'Public',
+  task: {
+    off: 'Private. Turn this on to show the task’s title, due date and whether it is done to anyone who opens your sun.',
+    on: 'Anyone who opens your sun can see this task’s title, due date and whether it is done.',
+  },
+  project: {
+    off: 'Private. Turn this on to show the project’s title, status and target date to anyone who opens your sun.',
+    on: 'Anyone who opens your sun can see this project’s title, status and target date.',
+  },
+  milestone: {
+    off: 'Private. Turn this on to show the milestone’s title, date and whether it is reached to anyone who opens your sun.',
+    on: 'Anyone who opens your sun can see this milestone’s title, date and whether it is reached.',
+  },
+  habit: {
+    off: 'Private. Turn this on to show the habit’s title and its day-by-day grid to anyone who opens your sun. A streak or running count never leaves your Mac.',
+    on: 'Anyone who opens your sun can see this habit’s title and its day-by-day grid.',
+  },
+  note: {
+    off: 'Private. Turn this on to show the note’s text to anyone who opens your sun.',
+    on: 'Anyone who opens your sun can read this note.',
+  },
+  course: {
+    off: 'Private. Turn this on to show the course’s code and name to anyone who opens your sun. Its grades, percentage and letter stay with you.',
+    on: 'Anyone who opens your sun can see this course’s code and name. Its grades, percentage and letter stay with you.',
+  },
+  grade: {
+    off: 'Grades are private by default. Your school keeps them as education records. Turning this on shows this grade to anyone who opens your sun.',
+    on: 'Anyone who opens your sun can see this grade’s course, item, score and what it was out of. The course’s percentage and letter stay with you.',
+  },
+  pendingGrade: 'A grade waiting for its score stays private. Enter the score first.',
+  focusSession: {
+    off: 'Private. Turn this on to show the task’s title, the date and this session’s minutes to anyone who opens your sun.',
+    on: 'Anyone who opens your sun can see the task’s title, the date and this session’s minutes.',
+  },
+};
+
+// --- Grades, as the tab words it (3.8) --------------------------------------------------
+
+export const gradesUi = {
+  noCourses: 'No courses yet. Add one to start keeping grades.',
+  addCourseFirst: 'Add a course first.',
+  addCourse: 'Add course',
+  addGrade: 'Add grade',
+  nothingGraded: 'Nothing is graded yet.',
+  noItems: 'No grades here yet.',
+  noCategory: 'No category',
+  courseNeedsCode: 'Give the course a code first.',
+  gradeNeedsName: 'Give the grade a name first.',
+  categoryNeedsName: 'Give every category a name.',
+  typeScore: 'Type the score as a number.',
+  typeOutOf: 'Type what it is out of as a number above 0.',
+  scaleOrder: 'List the scale from the highest to the lowest.',
+  scaleNeedsLetters: 'Give every step a letter and a percentage from 0 to 100.',
+  weightsHint: 'Weights are percentages of the course. They should add to 100.',
+  keywordsHint: 'Keywords file new grades here: a grade whose name holds one goes in this category.',
+  entered: (title: string, score: number, outOf: number) => `${title}: ${score} out of ${outOf}.`,
+  whatItWouldTake: 'What it would take',
+  aimFor: 'Aim for',
+  noScale: 'This course uses the usual scale.',
+  scaleOwn: 'This course has its own scale',
+};

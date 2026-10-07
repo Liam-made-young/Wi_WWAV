@@ -39,10 +39,12 @@ describe('Heat’s frame', () => {
     await click(tabButton('Tasks'));
     expect(plus()!.getAttribute('aria-label')).toBe('New task');
     expect(act()).toBe('Triage inbox');
-    // The tabs still to come show their "+" disabled and say why; Mail has none.
+    // Grades adds a grade once a course exists, and its one secondary act is Add course.
     await click(tabButton('Grades'));
     expect(plus()!.getAttribute('aria-label')).toBe('New grade');
-    expect(plus()!.hasAttribute('disabled')).toBe(true);
+    expect(plus()!.hasAttribute('disabled')).toBe(false);
+    expect(act()).toBe('Add course');
+    // The tab still to come shows its "+" disabled and says why; Mail has none.
     await click(tabButton('Habits'));
     expect(plus()!.getAttribute('aria-label')).toBe('New habit');
     await click(tabButton('Mail'));

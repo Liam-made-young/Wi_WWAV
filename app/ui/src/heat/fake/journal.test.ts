@@ -59,11 +59,16 @@ describe('the fake core’s journal', () => {
   it('undoes one entry out of order, and ⌘Z then skips it without bringing it back', async () => {
     const { fake, heat, call } = boot();
     await heat.put('task', task('Mine'));
-    const claude = fake.write('add task', ['task'], () => fake.store.task.set('c1', { ...task('Claude’s'), id: 'c1' }), {
-      actor: 'claude',
-      tool: 'add_task',
-      reason: 'Because.',
-    });
+    const claude = fake.write(
+      'add task',
+      ['task'],
+      () => fake.store.task.set('c1', { ...task('Claude’s'), id: 'c1' }),
+      {
+        actor: 'claude',
+        tool: 'add_task',
+        reason: 'Because.',
+      },
+    );
     await heat.put('task', task('Later'));
 
     expect(await call('history.undoEntry', { txnId: claude.txnId })).toEqual({ label: 'add task' });
@@ -83,11 +88,16 @@ describe('the fake core’s journal', () => {
 
   it('refuses to undo an entry when a later one touched the same records', async () => {
     const { fake, heat, call } = boot();
-    const claude = fake.write('add task', ['task'], () => fake.store.task.set('c1', { ...task('Claude’s'), id: 'c1' }), {
-      actor: 'claude',
-      tool: 'add_task',
-      reason: 'Because.',
-    });
+    const claude = fake.write(
+      'add task',
+      ['task'],
+      () => fake.store.task.set('c1', { ...task('Claude’s'), id: 'c1' }),
+      {
+        actor: 'claude',
+        tool: 'add_task',
+        reason: 'Because.',
+      },
+    );
     await heat.patch('task', 'c1', { notes: 'I added a note' });
     await expect(call('history.undoEntry', { txnId: claude.txnId })).rejects.toMatchObject({
       code: 'changed_since',

@@ -163,6 +163,8 @@ export interface Grade {
   postedAt?: number;
   source: 'you' | 'mail' | 'valence' | 'claude';
   public?: boolean;
+  /** The Mail row Claude recorded this notice from (`add_pending_grade`'s `mail_thread_id`); beyond docs/HEAT.md. */
+  mailThreadId?: Id;
 }
 
 export interface MailThread {
@@ -314,7 +316,17 @@ export interface Snapshot {
     hotTasks: Id[];
     lists: Record<'inbox' | 'allOpen' | 'hot' | 'dueThisWeek' | 'scheduled' | 'someday' | 'done', Id[]>;
     averages: { space?: string | null; type: string; minutes: number; count: number }[];
-    courses: Record<Id, { currentPct: number | null; decidedPct: number; letter: string | null; weights: string | null }>;
+    courses: Record<
+      Id,
+      {
+        currentPct: number | null;
+        decidedPct: number;
+        letter: string | null;
+        weights: string | null;
+        /** Each category's percentage so far, null while nothing in it is graded; beyond docs/HEAT.md. */
+        categories?: Record<Id, number | null>;
+      }
+    >;
     habits: Record<Id, { today: boolean; record: string }>;
     status: string;
     /** A recurring task's occurrences in the snapshot's window, for Calendar's pills and flags. */
