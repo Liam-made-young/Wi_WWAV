@@ -3,7 +3,11 @@
 
 pub mod desk {
     //! Heat and the Console's chrome, Settings and every sheet (8.2). Light and
-    //! dark are Heat's tokens with 8.2's five fixes.
+    //! dark are Heat's tokens with 8.2's five fixes, and two inks moved so they
+    //! hold on every stop of their ground (see $contrast). A gel pill draws its
+    //! stops top to bottom with a hard break at gelBreak: a plain gel's two as
+    //! first, first, second, first; a blue gel's four as listed. A segment or
+    //! chip draws a plain gel's two as a plain gradient.
     pub const INK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x1b, 0x1b, 0x1b), dark: crate::Color::rgb(0xec, 0xec, 0xec) };
     pub const INK2: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x4a, 0x4a, 0x4a), dark: crate::Color::rgb(0xc2, 0xc2, 0xc2) };
     pub const INK3: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x5f, 0x5f, 0x5f), dark: crate::Color::rgb(0x9a, 0x9a, 0x9a) };
@@ -15,23 +19,27 @@ pub mod desk {
     pub const DECK_PINSTRIPE: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0xe9, 0xef, 0xf6), dark: crate::Color::rgba(0x00, 0x00, 0x00, 0.0) };
     pub const PINSTRIPE_EVERY_PX: f32 = 4.0;
     pub const DECK_INK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x16, 0x1d, 0x26), dark: crate::Color::rgb(0xec, 0xec, 0xec) };
-    pub const DECK_INK_SOFT: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x5d, 0x69, 0x75), dark: crate::Color::rgb(0xec, 0xec, 0xec) };
+    pub const DECK_INK_SOFT: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x4f, 0x59, 0x63), dark: crate::Color::rgb(0xec, 0xec, 0xec) };
     pub const SELECT: crate::Color = crate::Color::rgb(0x1b, 0x4c, 0x8c);
     pub const SELECT_INK: crate::Color = crate::Color::rgb(0xff, 0xff, 0xff);
     pub const SELECT_BAR_PX: f32 = 3.0;
     pub const HIGHLIGHT: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x38, 0x75, 0xd7), dark: crate::Color::rgb(0x3a, 0x6f, 0xc4) };
     pub const FOCUS: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgba(0x38, 0x75, 0xd7, 0.6), dark: crate::Color::rgba(0x3a, 0x6f, 0xc4, 0.6) };
     pub const FOCUS_WIDTH_PX: f32 = 3.0;
+    pub const GEL: crate::Themed<&[crate::Color]> = crate::Themed { light: &[crate::Color::rgb(0xfe, 0xfe, 0xfe), crate::Color::rgb(0xd2, 0xd2, 0xd2)], dark: &[crate::Color::rgb(0x5e, 0x61, 0x65), crate::Color::rgb(0x46, 0x49, 0x4d)] };
+    pub const GEL_BLUE: &[crate::Color] = &[crate::Color::rgb(0xa9, 0xcd, 0xf6), crate::Color::rgb(0x6a, 0xa8, 0xef), crate::Color::rgb(0x3e, 0x86, 0xdc), crate::Color::rgb(0x7f, 0xb8, 0xf5)];
+    pub const GEL_BLUE_INK: crate::Color = crate::Color::rgb(0x1b, 0x1b, 0x1b);
+    pub const GEL_BREAK: &[f32] = &[0.45, 0.55];
     pub const GEL_SELECTED: &[crate::Color] = &[crate::Color::rgb(0x33, 0x6d, 0xcc), crate::Color::rgb(0x1b, 0x4c, 0x8c)];
     pub const GEL_PRESS: f32 = 0.88;
     pub const BACKDROP: crate::Color = crate::Color::rgba(0x00, 0x00, 0x00, 0.25);
 
     pub mod lcd {
-        //! The Now strip: Heat's olive LCD, with its dim text darkened (2.2,
-        //! 8.2).
+        //! The Now strip: Heat's olive LCD (2.2). Its dim text is darkened in
+        //! light (8.2) and lightened in dark, so it holds on both stops.
         pub const GROUND: crate::Themed<&[crate::Color]> = crate::Themed { light: &[crate::Color::rgb(0xf2, 0xf4, 0xe4), crate::Color::rgb(0xdf, 0xe3, 0xc6)], dark: &[crate::Color::rgb(0x2c, 0x31, 0x21), crate::Color::rgb(0x20, 0x24, 0x1a)] };
         pub const INK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x26, 0x2a, 0x17), dark: crate::Color::rgb(0xd7, 0xe0, 0xa8) };
-        pub const DIM: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x4b, 0x50, 0x34), dark: crate::Color::rgb(0x8e, 0x96, 0x70) };
+        pub const DIM: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x4b, 0x50, 0x34), dark: crate::Color::rgb(0x9c, 0xa3, 0x82) };
     }
 
     pub mod source_list {
@@ -277,6 +285,10 @@ pub const ALL: &[(&str, crate::Token)] = &[
     ("desk.highlight", crate::Token::ThemedColor(desk::HIGHLIGHT)),
     ("desk.focus", crate::Token::ThemedColor(desk::FOCUS)),
     ("desk.focusWidth", crate::Token::Number(desk::FOCUS_WIDTH_PX)),
+    ("desk.gel", crate::Token::ThemedColors(desk::GEL)),
+    ("desk.gelBlue", crate::Token::Colors(desk::GEL_BLUE)),
+    ("desk.gelBlueInk", crate::Token::Color(desk::GEL_BLUE_INK)),
+    ("desk.gelBreak", crate::Token::Numbers(desk::GEL_BREAK)),
     ("desk.gelSelected", crate::Token::Colors(desk::GEL_SELECTED)),
     ("desk.gelPress", crate::Token::Number(desk::GEL_PRESS)),
     ("desk.backdrop", crate::Token::Color(desk::BACKDROP)),

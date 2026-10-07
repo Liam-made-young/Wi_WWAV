@@ -4,7 +4,8 @@
 //!
 //! Fails if: a body pair is under 7:1 or a secondary pair under 4.5:1 on any
 //! colour of its ground in either appearance; a quoted ratio is more than 0.1
-//! from the measured one; the night's text steps and its pairs disagree.
+//! from the measured one (on the stop the spec measured, if the pair names
+//! it); the night's text steps and its pairs disagree.
 
 mod common;
 
@@ -16,13 +17,14 @@ struct Pair {
     ink: String,
     alpha: f32,
     on: Vec<String>,
-    over: Option<Vec<usize>>,
     role: String,
     quoted: Value,
+    /// The stop of the ground the spec measured its quote on.
+    quoted_on: Option<usize>,
 }
 
 fn pairs() -> Vec<Pair> {
-    let known = ["ink", "alpha", "on", "over", "role", "quoted", "why"];
+    let known = ["ink", "alpha", "on", "role", "quoted", "quotedOn", "why"];
     json()["$contrast"]["pairs"]
         .as_array()
         .unwrap()
@@ -42,15 +44,18 @@ fn pairs() -> Vec<Pair> {
                 ["body", "secondary", "mark"].contains(&role.as_str()),
                 "role {role}"
             );
+            let quoted_on = p["quotedOn"].as_u64().map(|i| i as usize);
+            assert!(
+                quoted_on.is_none() || on.len() == 1,
+                "quotedOn names a stop of one ground: {p}"
+            );
             Pair {
                 ink: p["ink"].as_str().unwrap().into(),
                 alpha: p["alpha"].as_f64().unwrap_or(1.0) as f32,
                 on,
-                over: p["over"]
-                    .as_array()
-                    .map(|a| a.iter().map(|i| i.as_u64().unwrap() as usize).collect()),
                 role,
                 quoted: p["quoted"].clone(),
+                quoted_on,
             }
         })
         .collect()
@@ -65,8 +70,9 @@ fn name(p: &Pair) -> String {
     format!("{}{alpha} on {}", p.ink, p.on.join(" / "))
 }
 
-/// The lowest ratio of the ink against every colour of its ground.
-fn measure(tokens: &[Token], p: &Pair, appearance: &str) -> f64 {
+/// The lowest ratio of the ink against every colour of its ground, or against
+/// only the stop `only`.
+fn measure(tokens: &[Token], p: &Pair, appearance: &str, only: Option<usize>) -> f64 {
     let inks = colors(tokens, &p.ink, appearance);
     assert_eq!(inks.len(), 1, "{} is one colour", p.ink);
     let mut ink = inks[0];
@@ -74,12 +80,12 @@ fn measure(tokens: &[Token], p: &Pair, appearance: &str) -> f64 {
     let mut grounds = Vec::new();
     for g in &p.on {
         let stops = colors(tokens, g, appearance);
-        match &p.over {
-            Some(over) => grounds.extend(over.iter().map(|&i| {
+        match only {
+            Some(i) => grounds.push(
                 *stops
                     .get(i)
-                    .unwrap_or_else(|| panic!("{g} has no stop {i} in {appearance}"))
-            })),
+                    .unwrap_or_else(|| panic!("{g} has no stop {i} in {appearance}")),
+            ),
             None => grounds.extend(stops),
         }
     }
@@ -105,7 +111,7 @@ fn every_text_pair_meets_its_bar_in_light_and_dark() {
     for p in pairs() {
         let Some(bar) = bar(&p.role) else { continue };
         for appearance in APPEARANCES {
-            let ratio = measure(&tokens, &p, appearance);
+            let ratio = measure(&tokens, &p, appearance, None);
             checked += 1;
             if ratio < bar {
                 misses.push(format!(
@@ -116,8 +122,8 @@ fn every_text_pair_meets_its_bar_in_light_and_dark() {
             }
         }
     }
-    // 25 text pairs, each in two appearances; a pair the parse skipped shows here.
-    assert_eq!(checked, 50, "text pairs checked");
+    // 27 text pairs, each in two appearances; a pair the parse skipped shows here.
+    assert_eq!(checked, 54, "text pairs checked");
     assert!(misses.is_empty(), "under the bar:\n{}", misses.join("\n"));
 }
 
@@ -131,7 +137,7 @@ fn every_ratio_the_spec_quotes_is_reproduced_within_a_tenth() {
             let Some(quoted) = p.quoted.get(appearance).and_then(Value::as_f64) else {
                 continue;
             };
-            let ratio = measure(&tokens, &p, appearance);
+            let ratio = measure(&tokens, &p, appearance, p.quoted_on);
             checked += 1;
             if (ratio - quoted).abs() > 0.1 {
                 wrong.push(format!(
@@ -142,7 +148,7 @@ fn every_ratio_the_spec_quotes_is_reproduced_within_a_tenth() {
         }
     }
     // Every quote in the file, once for each appearance it's quoted for.
-    assert_eq!(checked, 51, "quoted ratios checked");
+    assert_eq!(checked, 52, "quoted ratios checked");
     assert!(
         wrong.is_empty(),
         "quoted ratios that are off:\n{}",
@@ -189,6 +195,16 @@ fn the_check_catches_the_colours_the_spec_fixed() {
     let white = Color::rgb(0xff, 0xff, 0xff);
     assert!(contrast(Color::rgb(0x7a, 0x7a, 0x7a), white) < 4.5);
     assert!(contrast(white, Color::rgb(0x38, 0x75, 0xd7)) < 4.5);
+    // The two inks that missed on their ground's other stop, and the dark gel.
+    let deck_bottom = Color::rgb(0xC9, 0xD0, 0xD8);
+    assert!(contrast(Color::rgb(0x5D, 0x69, 0x75), deck_bottom) < 4.5);
+    assert!(contrast(Color::rgb(0x4f, 0x59, 0x63), deck_bottom) >= 4.5);
+    let dark_lcd_top = Color::rgb(0x2c, 0x31, 0x21);
+    assert!(contrast(Color::rgb(0x8e, 0x96, 0x70), dark_lcd_top) < 4.5);
+    assert!(contrast(Color::rgb(0x9c, 0xa3, 0x82), dark_lcd_top) >= 4.5);
+    let dark_ink = Color::rgb(0xec, 0xec, 0xec);
+    assert!(contrast(dark_ink, Color::rgb(0x6a, 0x6d, 0x71)) < 4.5);
+    assert!(contrast(dark_ink, Color::rgb(0x5e, 0x61, 0x65)) >= 4.5);
     // 35% night ink and below are fills, never text (8.2).
     let mut ink = Color::rgb(0xF4, 0xEF, 0xE6);
     ink.a = 0.35;

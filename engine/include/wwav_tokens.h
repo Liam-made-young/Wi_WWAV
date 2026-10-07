@@ -35,7 +35,11 @@ struct Curve {
 
 namespace desk {
 // Heat and the Console's chrome, Settings and every sheet (8.2). Light and
-// dark are Heat's tokens with 8.2's five fixes.
+// dark are Heat's tokens with 8.2's five fixes, and two inks moved so they
+// hold on every stop of their ground (see $contrast). A gel pill draws its
+// stops top to bottom with a hard break at gelBreak: a plain gel's two as
+// first, first, second, first; a blue gel's four as listed. A segment or chip
+// draws a plain gel's two as a plain gradient.
 inline constexpr Themed<Color> kInk{{0x1b, 0x1b, 0x1b, 1.0f}, {0xec, 0xec, 0xec, 1.0f}};
 inline constexpr Themed<Color> kInk2{{0x4a, 0x4a, 0x4a, 1.0f}, {0xc2, 0xc2, 0xc2, 1.0f}};
 inline constexpr Themed<Color> kInk3{{0x5f, 0x5f, 0x5f, 1.0f}, {0x9a, 0x9a, 0x9a, 1.0f}};
@@ -51,25 +55,34 @@ inline constexpr Themed<Color> kDeckEdge{{0x98, 0xa2, 0xad, 1.0f}, {0x26, 0x28, 
 inline constexpr Themed<Color> kDeckPinstripe{{0xe9, 0xef, 0xf6, 1.0f}, {0x00, 0x00, 0x00, 0.0f}};
 inline constexpr float kPinstripeEveryPx = 4.0f;
 inline constexpr Themed<Color> kDeckInk{{0x16, 0x1d, 0x26, 1.0f}, {0xec, 0xec, 0xec, 1.0f}};
-inline constexpr Themed<Color> kDeckInkSoft{{0x5d, 0x69, 0x75, 1.0f}, {0xec, 0xec, 0xec, 1.0f}};
+inline constexpr Themed<Color> kDeckInkSoft{{0x4f, 0x59, 0x63, 1.0f}, {0xec, 0xec, 0xec, 1.0f}};
 inline constexpr Color kSelect{0x1b, 0x4c, 0x8c, 1.0f};
 inline constexpr Color kSelectInk{0xff, 0xff, 0xff, 1.0f};
 inline constexpr float kSelectBarPx = 3.0f;
 inline constexpr Themed<Color> kHighlight{{0x38, 0x75, 0xd7, 1.0f}, {0x3a, 0x6f, 0xc4, 1.0f}};
 inline constexpr Themed<Color> kFocus{{0x38, 0x75, 0xd7, 0.6f}, {0x3a, 0x6f, 0xc4, 0.6f}};
 inline constexpr float kFocusWidthPx = 3.0f;
+inline constexpr Color kGelLight[] = {{0xfe, 0xfe, 0xfe, 1.0f}, {0xd2, 0xd2, 0xd2, 1.0f}};
+inline constexpr Color kGelDark[] = {{0x5e, 0x61, 0x65, 1.0f}, {0x46, 0x49, 0x4d, 1.0f}};
+inline constexpr Themed<List<Color>> kGel{{kGelLight, 2}, {kGelDark, 2}};
+inline constexpr Color kGelBlueItems[] = {{0xa9, 0xcd, 0xf6, 1.0f}, {0x6a, 0xa8, 0xef, 1.0f}, {0x3e, 0x86, 0xdc, 1.0f}, {0x7f, 0xb8, 0xf5, 1.0f}};
+inline constexpr List<Color> kGelBlue{kGelBlueItems, 4};
+inline constexpr Color kGelBlueInk{0x1b, 0x1b, 0x1b, 1.0f};
+inline constexpr float kGelBreakItems[] = {0.45f, 0.55f};
+inline constexpr List<float> kGelBreak{kGelBreakItems, 2};
 inline constexpr Color kGelSelectedItems[] = {{0x33, 0x6d, 0xcc, 1.0f}, {0x1b, 0x4c, 0x8c, 1.0f}};
 inline constexpr List<Color> kGelSelected{kGelSelectedItems, 2};
 inline constexpr float kGelPress = 0.88f;
 inline constexpr Color kBackdrop{0x00, 0x00, 0x00, 0.25f};
 
 namespace lcd {
-// The Now strip: Heat's olive LCD, with its dim text darkened (2.2, 8.2).
+// The Now strip: Heat's olive LCD (2.2). Its dim text is darkened in light
+// (8.2) and lightened in dark, so it holds on both stops.
 inline constexpr Color kGroundLight[] = {{0xf2, 0xf4, 0xe4, 1.0f}, {0xdf, 0xe3, 0xc6, 1.0f}};
 inline constexpr Color kGroundDark[] = {{0x2c, 0x31, 0x21, 1.0f}, {0x20, 0x24, 0x1a, 1.0f}};
 inline constexpr Themed<List<Color>> kGround{{kGroundLight, 2}, {kGroundDark, 2}};
 inline constexpr Themed<Color> kInk{{0x26, 0x2a, 0x17, 1.0f}, {0xd7, 0xe0, 0xa8, 1.0f}};
-inline constexpr Themed<Color> kDim{{0x4b, 0x50, 0x34, 1.0f}, {0x8e, 0x96, 0x70, 1.0f}};
+inline constexpr Themed<Color> kDim{{0x4b, 0x50, 0x34, 1.0f}, {0x9c, 0xa3, 0x82, 1.0f}};
 }  // namespace lcd
 
 namespace sourceList {

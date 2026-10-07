@@ -1,9 +1,10 @@
 //! An adversarial review of design/tokens.json against docs/SPEC.md 8 (F7).
 //!
 //! Each test here failed when it was written, because of a finding in the
-//! review of build/tokens. They are #[ignore]d so the suite stays green until
-//! the finding is settled; run them with `cargo test -p wwav-tokens --test
-//! review -- --ignored`. Each says which finding it shows.
+//! review of build/tokens. Those whose finding is fixed run with the suite.
+//! The rest are #[ignore]d with their finding or question until the founder
+//! settles it; run them with `cargo test -p wwav-tokens --test review --
+//! --ignored`. Each says which finding it shows.
 
 mod common;
 
@@ -22,7 +23,6 @@ const NIGHT_INK_50: f32 = 0.5;
 /// half, where the soft ink #5D6975 falls to 3.6:1. The dark LCD's dim ink
 /// is 4.3:1 on its top stop.
 #[test]
-#[ignore = "finding: `over` hides deck soft ink at 3.6:1 and dark LCD dim at 4.3:1"]
 fn every_text_pair_holds_on_every_stop_of_its_ground() {
     let tokens = tokens();
     let mut misses = Vec::new();
@@ -96,7 +96,6 @@ fn night_secondary_ink_holds_on_clay() {
 /// an ink label … the darkest stop under it is 4.6:1" has no pair, so neither
 /// can be checked from the file alone.
 #[test]
-#[ignore = "finding: the dark gel's #5e6165 and the blue gel's 4.6:1 ink label are missing"]
 fn every_fix_in_8_2_is_in_the_file() {
     let text = std::fs::read_to_string(common::repo().join("design/tokens.json"))
         .unwrap()
@@ -119,14 +118,17 @@ fn every_fix_in_8_2_is_in_the_file() {
 }
 
 /// Question for the spec (8.2): "That tone holds at least 4:1 against the
-/// night … so no planet disappears in F minor." The opaque tone does, but v4
-/// never draws it opaque: Planet.jsx strokes the rim at rgba(glow, 0.75) and
-/// planet.css lays the glow at 0.32 and 0.12. At 0.75, eight of 25 tones are
-/// under 4:1, F major at 2.9:1 and F minor at 3.2:1.
+/// night … so no planet disappears in F minor." The builder's test holds it
+/// against the flat `#070A18`, where it does (F major 4.28:1). But 8.2's night
+/// is "`#070A18` under a key-tinted starfield", and "the starfield is v4's":
+/// StarfieldCanvas.jsx `paletteFrom(glowRgb)` bands the sky with the glow
+/// itself, its brightest (mid) band at 0.2 x glow (the luminance-52 cap never
+/// binds, since 0.2 x 255 = 51), drawn truncated to whole channels. Against
+/// that band F major's tone is 3.90:1. Behind the planet itself v4 also lays
+/// the breathing core (glow lifted 16%, at alpha 0.32), which takes it lower.
 #[test]
-#[ignore = "question: as v4 draws the rim (75% glow), F minor is 3.2:1 and F major 2.9:1"]
-fn the_glow_tone_holds_four_to_one_as_v4_draws_the_rim() {
-    let ground: Color = colors(&tokens(), "night.ground", "dark")[0];
+#[ignore = "question: against v4's key-tinted sky (its mid band) F major's glow tone is 3.90:1"]
+fn the_glow_tone_holds_four_to_one_on_the_key_tinted_sky() {
     let mut names = vec!["unknown".to_string()];
     for pc in [
         "A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#",
@@ -135,14 +137,19 @@ fn the_glow_tone_holds_four_to_one_as_v4_draws_the_rim() {
     }
     let mut under = Vec::new();
     for name in names {
-        let mut rim = glow_tone(parse_key(&name));
-        rim.a = 0.75;
-        let r = contrast(rim, ground);
+        let glow = glow_tone(parse_key(&name));
+        let band = |c: u8| (f64::from(c) * 0.2) as u8;
+        let sky = Color::rgb(band(glow.r), band(glow.g), band(glow.b));
+        let r = contrast(glow, sky);
         if r < 4.0 {
-            under.push(format!("{name}: {r:.2}:1"));
+            under.push(format!("{name}: {r:.2}:1 on {sky:?}"));
         }
     }
-    assert!(under.is_empty(), "under 4:1 at 75%:\n{}", under.join("\n"));
+    assert!(
+        under.is_empty(),
+        "under 4:1 on the sky's mid band:\n{}",
+        under.join("\n")
+    );
 }
 
 /// Finding: `Key`'s fields are public, so any u8 is a pitch class, and
@@ -150,7 +157,6 @@ fn the_glow_tone_holds_four_to_one_as_v4_draws_the_rim() {
 /// in a debug build and a wrong hue in release, where keyColor.ts gives the
 /// pitch class mod 12 (pc 40 is 120°, as pc 4 is).
 #[test]
-#[ignore = "finding: key_hue overflows u8 for pc >= 37 (panic in debug, wrong hue in release)"]
 fn key_hue_takes_any_pitch_class_mod_twelve() {
     use wwav_tokens::{key_hue, Key};
     for pc in [37u8, 40, 255] {
