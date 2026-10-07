@@ -13,6 +13,7 @@ import { estimateContext, type EstimateContext, estimateMin, formatMinutes } fro
 import { byHeat, duePhrase, heatOf } from './heat';
 import type { CalendarEvent, FocusSession, Habit, Id, Task, TaskOccurrence, TimeBlock } from './records';
 import { openTasks, taskOccurrences } from './recurrence';
+import { inSpace } from './spaces';
 
 export const HOUR_PX = 44;
 export const SNAP_MIN = 15;
@@ -69,8 +70,6 @@ export function nowLineY(nowMin: number): number | null {
 export function blockLength(estimate: number): number {
   return Math.max(SNAP_MIN, roundUp(estimate));
 }
-
-const inSpace = (spaceId: Id | undefined) => (t: Task) => spaceId === undefined || t.spaceId === spaceId;
 
 type Span = [number, number];
 

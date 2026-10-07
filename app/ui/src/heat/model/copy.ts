@@ -89,3 +89,85 @@ export const widgets = {
   openLink: 'Open link',
   openSession: 'Open session',
 };
+
+// "An A", "a B": the article a letter takes when read aloud.
+const withArticle = (letter: string, capital: boolean) => {
+  const a = /^[AEFHILMNORSX]/.test(letter) ? 'an' : 'a';
+  return `${capital ? a[0].toUpperCase() + a.slice(1) : a} ${letter}`;
+};
+
+// Grades (3.1, 3.8).
+export const grades = {
+  header: (term: string) => `${term} grades`,
+  basedOn: (pct: string) => `Based on ${pct}% of the course so far`,
+  newGradePosted: 'New grade posted',
+  enterScore: 'Enter score',
+  toEnter: (n: number) => `${plural(n, 'new grade')} to enter`,
+  weightsShort: (total: string, rest: string) => `Weights add to ${total}%. The other ${rest}% is unassigned.`,
+  weightsOver: (total: string, over: string) => `Weights add to ${total}%. That is ${over}% more than 100.`,
+  syllabusFound: (n: number, total: string) =>
+    `Claude found ${plural(n, 'category', 'categories')} adding to ${total}%. Check them against the syllabus.`,
+  need: (letter: string, min: string, need: string, left: string) =>
+    `To finish with ${withArticle(letter, false)} (${min}%), you need ${need}% on the remaining ${left}%.`,
+  outOfReach: (letter: string, best: string, bestLetter: string) =>
+    `${withArticle(letter, true)} is out of reach; the highest possible is ${best}% (${bestLetter}).`,
+  safe: (letter: string, left: string) => `You keep ${withArticle(letter, false)} even with 0% on the remaining ${left}%.`,
+  allGraded: (pct: string, letter: string) => `Every category is graded. The course stands at ${pct}% (${letter}).`,
+  addCourse: 'Add course',
+  addGrade: 'Add grade',
+};
+
+// Habits (3.9).
+export const habits = {
+  limit: 'Habit limit reached',
+  nameFirst: 'Give the habit a name first.',
+  advice: 'Keep them small enough that you never skip.',
+  ofDone: (done: number, all: number) => `${done} of ${all} done`,
+  record: (days: number, since: string) => `Done ${plural(days, 'day')} since ${since}`,
+  notYet: 'Not done yet',
+  streak: (days: number) => `${days}-day streak`,
+  showCounter: 'Show a streak counter',
+  showYear: 'Show the year',
+};
+
+// Tasks and the sidebar (3.1, 3.4, 3.6).
+export const tasks = {
+  empty: (space: string | null) => `Add your first ${space ? `${space} ` : ''}task and Heat will rank it.`,
+  rankIt: 'Heat will rank it.',
+  nameFirst: 'Give the task a name first.',
+  all: 'All',
+  newSpace: 'New space…',
+  library: 'Library',
+  inbox: 'Inbox',
+  allOpen: 'All open',
+  hot: 'Hot',
+  dueThisWeek: 'Due this week',
+  scheduled: 'Scheduled',
+  someday: 'Someday',
+  done: 'Done',
+  averageTime: 'Your average time',
+  triageInbox: 'Triage inbox',
+  markDone: 'Mark done',
+  took: 'Took',
+  edit: 'Edit',
+};
+
+// Where a task came from, as Get Info names it (3.1).
+export const source = {
+  you: 'Added by you',
+  calendar: 'Brightspace calendar',
+  ical: 'Brightspace calendar',
+  mail: 'Mail',
+  capture: 'Quick capture',
+};
+
+// Calendar (3.1, 3.7).
+export const calendar = {
+  more: (n: number) => `${n} more`,
+  dueFlag: (time: string) => `due ${time}`,
+  today: 'Today',
+  unscheduled: 'Unscheduled',
+  month: 'Month',
+  week: 'Week',
+  day: 'Day',
+};
