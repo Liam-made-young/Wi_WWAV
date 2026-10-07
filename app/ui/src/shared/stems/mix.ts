@@ -34,7 +34,10 @@ export type StageAction =
   | { type: 'bloom'; owner: FxOwner | null } // FX moons out round a body, or away
   | { type: 'fxCharacter'; owner: FxOwner; effect: Effect } // the effect's next character
   | { type: 'playPause' }
-  | { type: 'focus'; stem: Stem | null };
+  | { type: 'focus'; stem: Stem | null }
+  // ⌘-click or Return (5.8): the stem becomes the planet and its tracks its
+  // moons. Only the Console's Planet has an inside; elsewhere it is ignored.
+  | { type: 'enter'; stem: Stem };
 
 export function freshMix(level = 0.8): Mix {
   const stem = (): StemMix => ({
@@ -72,27 +75,33 @@ export function applyToMix(mix: Mix, actions: StageAction[]): Mix {
   return next;
 }
 
-// Under a solo only soloed stems sound, muted or not; otherwise every
-// stem that isn't muted.
+// A mute always silences, and under a solo only soloed stems sound. So a
+// click on a soloed stem mutes it at once, as anywhere else, and the solo
+// still holds the others: on iOS, where a solo is every other stem muted,
+// the same click leaves the same silence. Soloing a stem un-mutes it
+// (gesture.ts), so "solo instead" is always heard.
 export function audible(mix: Mix): Record<Stem, boolean> {
   const anySolo = STEMS.some((s) => mix[s].soloed);
   const out = {} as Record<Stem, boolean>;
-  for (const s of STEMS) out[s] = anySolo ? mix[s].soloed : !mix[s].muted;
+  for (const s of STEMS) out[s] = !mix[s].muted && (!anySolo || mix[s].soloed);
   return out;
 }
 
-export type StemState = 'audible' | 'muted' | 'soloed' | 'silent';
+export type StemState = 'audible' | 'muted' | 'soloed' | 'soloedMuted' | 'silent';
 
-// A solo shows before a mute, and a mute before the silence a solo
-// elsewhere imposes, so a stem's own setting is always the one you see.
+// A stem's own settings show before the silence a solo elsewhere imposes,
+// and a solo and a mute together show as both.
 export function stemState(mix: Mix, stem: Stem): StemState {
-  if (mix[stem].soloed) return 'soloed';
-  if (mix[stem].muted) return 'muted';
+  const { soloed, muted } = mix[stem];
+  if (soloed) return muted ? 'soloedMuted' : 'soloed';
+  if (muted) return 'muted';
   return audible(mix)[stem] ? 'audible' : 'silent';
 }
 
 // State is shape, not colour (8.3). Every mark wears a 1 pt ring in its
 // register's ink, which carries the contrast; the fill is the stem's own hex.
+// The centre says muted or not and the outer ring says soloed or not, so a
+// soloed stem that is also muted wears both: the open centre and the ring.
 export interface StemShape {
   fill: number; // opacity of the stem-colour fill: 1, 0.45, or 0 for an open centre
   stemRing: number; // width of a stem-colour ring, pt (2 when muted)
@@ -109,12 +118,18 @@ export function stemShape(mix: Mix, stem: Stem, selected: boolean, register: Reg
     case 'muted':
       return { ...shape, fill: 0, stemRing: 2 };
     case 'soloed':
-      return { ...shape, outerRing: register === 'night' ? '#2946FF' : 'ink' };
+      return { ...shape, outerRing: soloRing(register) };
+    case 'soloedMuted':
+      return { ...shape, fill: 0, stemRing: 2, outerRing: soloRing(register) };
     case 'silent':
       return { ...shape, fill: 0.45, inkRing: 'dashed' };
     default:
       return shape;
   }
+}
+
+function soloRing(register: Register): string {
+  return register === 'night' ? '#2946FF' : 'ink';
 }
 
 // "Vocals, 70 percent, audible", "Drums, muted", "Bass, soloed".
@@ -127,6 +142,8 @@ export function voiceLabel(mix: Mix, stem: Stem): string {
       return `${name}, muted`;
     case 'soloed':
       return `${name}, soloed`;
+    case 'soloedMuted':
+      return `${name}, soloed and muted`;
     case 'silent':
       return `${name}, silent under a solo`;
   }

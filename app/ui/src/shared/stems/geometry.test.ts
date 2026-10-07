@@ -4,12 +4,17 @@ import {
   ARMS,
   FX_DIRECTIONS,
   LIGHT_HIT,
+  LIGHT_SIZE,
+  NOW_STRIP,
+  NOW_STRIP_NARROW_W,
   fxCentre,
   fxReach,
   levelAt,
   lightAt,
   moonCentre,
   stageGeometry,
+  stemLights,
+  trackHalfX,
 } from './geometry';
 
 describe('the planet player on a 560 pt stage', () => {
@@ -81,14 +86,50 @@ describe('the FX moons', () => {
 });
 
 describe('the stem lights', () => {
-  test('each answer to a 44 × 44 pt square round the 8 pt light', () => {
-    expect(LIGHT_HIT).toBe(44);
-    const centres = { vocals: { x: 22, y: 22 }, drums: { x: 66, y: 22 }, other: { x: 110, y: 22 }, bass: { x: 154, y: 22 } };
-    expect(lightAt(centres, { x: 0.5, y: 0.5 })).toBe('vocals');
-    expect(lightAt(centres, { x: 43.5, y: 43.5 })).toBe('vocals');
-    expect(lightAt(centres, { x: 44.5, y: 30 })).toBe('drums');
-    expect(lightAt(centres, { x: 175.5, y: 1 })).toBe('bass');
-    expect(lightAt(centres, { x: 176.5, y: 22 })).toBeNull();
-    expect(lightAt(centres, { x: 22, y: 44.5 })).toBeNull();
+  for (const stripW of [NOW_STRIP.w, NOW_STRIP_NARROW_W]) {
+    const lights = stemLights(stripW);
+
+    test(`sit in the track half of the ${stripW} × 44 pt strip, in file order, each with a 44 × 44 pt hit area`, () => {
+      expect(NOW_STRIP).toEqual({ w: 520, h: 44 });
+      expect(LIGHT_HIT).toBe(44);
+      expect(lights.map((l) => l.stem)).toEqual(['vocals', 'drums', 'other', 'bass']);
+      for (const l of lights) {
+        expect([l.hit.w, l.hit.h]).toEqual([44, 44]);
+        expect(l.hit.x).toBeGreaterThanOrEqual(trackHalfX(stripW));
+        expect(l.hit.x + l.hit.w).toBeLessThanOrEqual(stripW);
+        expect([l.hit.y, l.hit.y + l.hit.h]).toEqual([0, NOW_STRIP.h]);
+        // The 8 pt light sits inside its own square, on line 2.
+        expect(l.centre.x - LIGHT_SIZE / 2).toBeGreaterThanOrEqual(l.hit.x);
+        expect(l.centre.x + LIGHT_SIZE / 2).toBeLessThanOrEqual(l.hit.x + l.hit.w);
+        expect(l.centre.y).toBeGreaterThan(NOW_STRIP.h / 2 - 6);
+        expect(l.centre.y + LIGHT_SIZE / 2).toBeLessThanOrEqual(NOW_STRIP.h - 6);
+      }
+      // Centres a whole hit area apart, so no light's area is cut short.
+      for (let i = 1; i < lights.length; i++) expect(lights[i].centre.x - lights[i - 1].centre.x).toBeGreaterThanOrEqual(LIGHT_HIT);
+    });
+
+    // The review: lightAt split overlapping squares by the nearer centre, so
+    // a strip that drew its lights closer than 44 pt gave each less than 44 × 44.
+    test(`every point of each 44 × 44 pt square answers to its own light, and nowhere else does (${stripW} pt)`, () => {
+      for (const l of lights) {
+        for (let dx = 0; dx < 44; dx += 1) {
+          for (let dy = 0; dy < 44; dy += 1) {
+            expect(lightAt({ x: l.hit.x + dx + 0.5, y: l.hit.y + dy + 0.5 }, stripW)).toBe(l.stem);
+          }
+        }
+      }
+      const first = lights[0].hit;
+      const last = lights[3].hit;
+      expect(lightAt({ x: first.x - 0.5, y: 22 }, stripW)).toBeNull();
+      expect(lightAt({ x: last.x + last.w + 0.5, y: 22 }, stripW)).toBeNull();
+      expect(lightAt({ x: first.x + 10, y: -0.5 }, stripW)).toBeNull();
+      expect(lightAt({ x: first.x + 10, y: 44.5 }, stripW)).toBeNull();
+    });
+  }
+
+  test('leave line 2 the rest of the track half for "1:42 / 3:58"', () => {
+    const room = (w: number) => w - (stemLights(w)[3].hit.x + LIGHT_HIT);
+    expect(room(NOW_STRIP.w)).toBe(83.5);
+    expect(room(NOW_STRIP_NARROW_W)).toBe(43.5);
   });
 });

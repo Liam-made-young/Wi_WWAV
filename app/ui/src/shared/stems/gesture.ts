@@ -7,14 +7,23 @@
 //   hold 400 ms                       bloom the four FX moons (or put them away)
 //   drag along the arm (8 pt slop)    level = clamp(level0 + (d · armDir) / span, 0, 1)
 //   drag across a bloomed arm         pan
+//   ⌘-click, or Return                enter the stem (5.8; only the Console's Planet has an inside)
 //   keys on a focused stem            arrows ±5%, M mute, S solo, Tab next in file order
 //
 // A click acts on release, never waiting to see whether a second follows:
-// that is what makes the mute immediate. The machine keeps no timers. Every
-// input carries its time, and a hold is judged on the clock of whatever
-// input comes next, so a surface sends a tick at 400 ms and the rules are
-// exactly testable. The lights have no arms and no room to bloom, so on
-// them (stage null) only clicks and keys do anything.
+// that is what makes the mute immediate. A second click counts per stem,
+// as iOS keeps one last tap per moon. Soloing a stem un-mutes it, so "solo
+// instead" is always heard; muting a soloed stem leaves the solo, so the
+// click silences it as it would anywhere (mix.ts).
+//
+// The machine keeps no timers. Every input carries its time, and a hold is
+// judged on the clock of whatever input comes next, so a surface sends a
+// tick at 400 ms and the rules are exactly testable. One pointer at a time:
+// the first one down is captured, and every other pointer's inputs are
+// ignored until it lifts. `command` is ⌘ on macOS and Ctrl elsewhere; with
+// it held a key is the app's shortcut, never a stem's. The lights have no
+// arms and no room to bloom, so on them (stage null) only clicks and keys
+// do anything.
 
 import { ARMS, FX_DIRECTIONS, PAN_AXES, fxReach, fxWet, type Point, type StageGeometry } from './geometry';
 import type { Effect, FxOwner, Mix, StageAction } from './mix';
@@ -36,6 +45,8 @@ export type Target =
 
 export interface GestureState {
   phase: 'idle' | 'pressed' | 'dragging' | 'held';
+  pointer: number | null; // the captured pointer, while one is down
+  command: boolean; // whether ⌘ was held when it went down
   target: Target | null;
   down: Point;
   downTime: number;
@@ -44,17 +55,20 @@ export interface GestureState {
   // Which way this drag moves its stem; null until it leaves the slop,
   // when a bloomed stem may still go either way.
   axis: 'level' | 'pan' | null;
-  lastClick: { stem: Stem; time: number; mutedBefore: boolean } | null;
+  // Each stem's last click, for the second click that solos instead.
+  lastClicks: Partial<Record<Stem, { time: number; mutedBefore: boolean }>>;
   bloom: FxOwner | null;
 }
 
+// `pointer` is the PointerEvent's pointerId. A cancel without one (Esc,
+// lost focus) ends whatever press there is.
 export type GestureInput =
-  | { type: 'down'; target: Target; at: Point; time: number }
-  | { type: 'move'; at: Point; time: number }
-  | { type: 'up'; time: number }
+  | { type: 'down'; pointer: number; command: boolean; target: Target; at: Point; time: number }
+  | { type: 'move'; pointer: number; at: Point; time: number }
+  | { type: 'up'; pointer: number; time: number }
   | { type: 'tick'; time: number }
-  | { type: 'cancel' }
-  | { type: 'key'; key: string; shift: boolean; stem: Stem };
+  | { type: 'cancel'; pointer?: number }
+  | { type: 'key'; key: string; shift: boolean; command: boolean; stem: Stem };
 
 export interface Surface {
   mix: Mix;
@@ -69,13 +83,15 @@ interface Step {
 export function idleGesture(): GestureState {
   return {
     phase: 'idle',
+    pointer: null,
+    command: false,
     target: null,
     down: { x: 0, y: 0 },
     downTime: 0,
     level0: 0,
     pan0: 0,
     axis: null,
-    lastClick: null,
+    lastClicks: {},
     bloom: null,
   };
 }
@@ -85,9 +101,13 @@ export function stemGesture(state: GestureState, input: GestureInput, surface: S
     case 'key':
       return { state, actions: keyActions(input, surface.mix) };
     case 'cancel':
-      return { state: { ...state, phase: 'idle', target: null }, actions: [] };
+      if (input.pointer !== undefined && input.pointer !== state.pointer) return { state, actions: [] };
+      return { state: released(state), actions: [] };
     case 'down':
       return press(state, input, surface);
+  }
+  if (input.type !== 'tick' && state.phase !== 'idle' && input.pointer !== state.pointer) {
+    return { state, actions: [] };
   }
   const held = holdIfDue(state, input.time, surface);
   if (input.type === 'move') {
@@ -99,13 +119,17 @@ export function stemGesture(state: GestureState, input: GestureInput, surface: S
       held.state.phase === 'pressed' && input.time - held.state.downTime < TAP_MS
         ? click(held.state, input.time, surface.mix)
         : { state: held.state, actions: [] };
-    return { state: { ...clicked.state, phase: 'idle', target: null }, actions: [...held.actions, ...clicked.actions] };
+    return { state: released(clicked.state), actions: [...held.actions, ...clicked.actions] };
   }
   return held;
 }
 
+function released(state: GestureState): GestureState {
+  return { ...state, phase: 'idle', pointer: null, command: false, target: null };
+}
+
 function press(state: GestureState, input: Extract<GestureInput, { type: 'down' }>, surface: Surface): Step {
-  // One pointer at a time; a second finger on another moon waits its turn.
+  // One pointer at a time: a second finger is ignored until the first lifts.
   if (state.phase !== 'idle') return { state, actions: [] };
   const { target } = input;
   if (target.kind === 'sky') {
@@ -119,6 +143,8 @@ function press(state: GestureState, input: Extract<GestureInput, { type: 'down' 
     state: {
       ...state,
       phase: 'pressed',
+      pointer: input.pointer,
+      command: input.command,
       target,
       down: input.at,
       downTime: input.time,
@@ -180,6 +206,9 @@ function move(state: GestureState, at: Point, surface: Surface): Step {
 
 function click(state: GestureState, time: number, mix: Mix): Step {
   const target = state.target!;
+  // A ⌘-click is never a plain click: it enters a stem, and does nothing
+  // anywhere else.
+  if (state.command) return { state, actions: target.kind === 'stem' ? [{ type: 'enter', stem: target.stem }] : [] };
   if (target.kind === 'fx') {
     const wet = fxWet(mix, target.owner, target.effect);
     const action: StageAction =
@@ -198,25 +227,27 @@ function click(state: GestureState, time: number, mix: Mix): Step {
   if (target.kind !== 'stem') return { state, actions: [] };
 
   const stem = target.stem;
-  const last = state.lastClick;
-  if (last && last.stem === stem && time - last.time < TAP_MS) {
+  const last = state.lastClicks[stem];
+  if (last && time - last.time < TAP_MS) {
+    const soloed = !mix[stem].soloed;
     return {
-      state: { ...state, lastClick: null },
+      state: { ...state, lastClicks: { ...state.lastClicks, [stem]: undefined } },
       actions: [
-        { type: 'mute', stem, muted: last.mutedBefore },
-        { type: 'solo', stem, soloed: !mix[stem].soloed },
+        { type: 'mute', stem, muted: soloed ? false : last.mutedBefore },
+        { type: 'solo', stem, soloed },
       ],
     };
   }
   const muted = mix[stem].muted;
   return {
-    state: { ...state, lastClick: { stem, time, mutedBefore: muted } },
+    state: { ...state, lastClicks: { ...state.lastClicks, [stem]: { time, mutedBefore: muted } } },
     actions: [{ type: 'mute', stem, muted: !muted }],
   };
 }
 
 function keyActions(input: Extract<GestureInput, { type: 'key' }>, mix: Mix): StageAction[] {
   const { stem } = input;
+  if (input.command) return [];
   const nudge = (by: number): StageAction[] => [
     { type: 'level', stem, level: Math.min(1, Math.max(0, mix[stem].level + by)) },
   ];
@@ -232,9 +263,16 @@ function keyActions(input: Extract<GestureInput, { type: 'key' }>, mix: Mix): St
       return [{ type: 'mute', stem, muted: !mix[stem].muted }];
     case 's':
     case 'S':
-      return [{ type: 'solo', stem, soloed: !mix[stem].soloed }];
+      return mix[stem].soloed || !mix[stem].muted
+        ? [{ type: 'solo', stem, soloed: !mix[stem].soloed }]
+        : [
+            { type: 'mute', stem, muted: false },
+            { type: 'solo', stem, soloed: true },
+          ];
     case 'Tab':
       return [{ type: 'focus', stem: nextStem(stem, input.shift) }];
+    case 'Enter':
+      return [{ type: 'enter', stem }];
     default:
       return [];
   }
