@@ -49,6 +49,21 @@ pub fn server() -> String {
     std::env::var("WI_WWAV_SERVER").unwrap_or_else(|_| "https://www.mi-wwav.com".into())
 }
 
+/// Where the browser signs in (9.7): `WI_WWAV_SIGN_IN`, or www.wi-wwav.com.
+/// A server set by `WI_WWAV_SERVER` serves its own sign-in page.
+pub fn sign_in() -> String {
+    sign_in_from(
+        std::env::var("WI_WWAV_SIGN_IN").ok(),
+        std::env::var("WI_WWAV_SERVER").ok(),
+    )
+}
+
+fn sign_in_from(sign_in: Option<String>, server: Option<String>) -> String {
+    sign_in
+        .or(server)
+        .unwrap_or_else(|| "https://www.wi-wwav.com".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,6 +74,17 @@ mod tests {
         assert_eq!(
             engine_beside(exe, "macos"),
             Path::new("/Applications/Wi_WWAV.app/Contents/Helpers/wwav-engine.app/Contents/MacOS/wwav-engine")
+        );
+    }
+
+    #[test]
+    fn sign_in_opens_on_wi_wwav_unless_a_server_or_an_address_is_set() {
+        assert_eq!(sign_in_from(None, None), "https://www.wi-wwav.com");
+        let mock = Some("http://127.0.0.1:4010".to_string());
+        assert_eq!(sign_in_from(None, mock.clone()), "http://127.0.0.1:4010");
+        assert_eq!(
+            sign_in_from(Some("https://www.mi-wwav.com".into()), mock),
+            "https://www.mi-wwav.com"
         );
     }
 

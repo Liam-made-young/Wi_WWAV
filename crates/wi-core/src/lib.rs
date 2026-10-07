@@ -142,6 +142,10 @@ pub struct Config {
     pub engine_path: PathBuf,
     /// mi-wwav.com, or `tools/mock-server`'s address.
     pub server_url: String,
+    /// Where the browser signs in (9.7): www.wi-wwav.com, which serves the
+    /// same page as the server. `Config::new` leaves it at the server's
+    /// own address.
+    pub sign_in_url: String,
     pub secrets: Arc<dyn SecretStore>,
     pub opener: Opener,
     /// The engine's `--device`: None for the default output, "null" for the
@@ -169,6 +173,7 @@ impl Config {
         Config {
             engine_path: engine_path.into(),
             server_url: server_url.trim_end_matches('/').to_string(),
+            sign_in_url: server_url.trim_end_matches('/').to_string(),
             secrets,
             opener,
             device: None,
@@ -198,6 +203,8 @@ pub(crate) struct Inner {
     fixed_now: Mutex<Option<f64>>,
     uploads: Mutex<upload::Status>,
     opener: Opener,
+    /// Where the browser signs in; the code comes back to `net`'s server.
+    sign_in_url: String,
     /// One sign-in at a time: the browser may only be asked once.
     signing_in: Mutex<()>,
     closing: AtomicBool,
@@ -311,6 +318,7 @@ impl Core {
             fixed_now: Mutex::new(config.now),
             uploads: Mutex::new(upload::Status::default()),
             opener: config.opener,
+            sign_in_url: config.sign_in_url.trim_end_matches('/').to_string(),
             signing_in: Mutex::new(()),
             closing: AtomicBool::new(false),
             wake: (Mutex::new(0), Condvar::new()),

@@ -35,6 +35,41 @@ fn tokens(setup: &Setup) -> Value {
     serde_json::from_str(&text).unwrap()
 }
 
+/// The page is opened on the sign-in address (www.wi-wwav.com), and the
+/// code it hands back is redeemed on the server (mi-wwav.com). Fails if the
+/// browser is sent to the server's address, or the token request to the
+/// sign-in address, which has no token route.
+#[test]
+fn the_browser_opens_the_sign_in_address_and_the_code_goes_to_the_server() {
+    let server = MockServer::start();
+    let setup = Setup::new();
+    let opened = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let browser = server.browser("lmy@mi-wwav.com", "WeWave-lmy1");
+    let (seen, base) = (opened.clone(), server.url.clone());
+    // One server answers the page on both addresses; nothing else lives on
+    // the sign-in one.
+    let opener: wi_core::Opener = Arc::new(move |url: &str| {
+        seen.lock().unwrap().push(url.to_string());
+        browser(&url.replace("https://www.wi-wwav.test", &base))
+    });
+    let mut config = setup.config(&server.url, opener);
+    config.sign_in_url = "https://www.wi-wwav.test/".into();
+    let core = Core::open(&setup.library(), config).unwrap();
+
+    let r = ok(&core, "account.signIn", json!({}));
+    assert_eq!(r, json!({"signedIn": true, "username": "LMY"}));
+    let opened = opened.lock().unwrap();
+    assert_eq!(opened.len(), 1);
+    assert!(
+        opened[0].starts_with(
+            "https://www.wi-wwav.test/oauth/desktop/authorize?response_type=code&client_id=wi-wwav-desktop&"
+        ),
+        "{}",
+        opened[0]
+    );
+    assert!(tokens(&setup)["access"].as_str().unwrap().len() > 20);
+}
+
 #[test]
 fn sign_in_goes_through_the_browser_and_the_token_only_to_the_keychain() {
     let server = MockServer::start();

@@ -129,10 +129,6 @@ impl Net {
         }
     }
 
-    pub fn base(&self) -> &str {
-        &self.base
-    }
-
     pub fn url(&self, path: &str) -> String {
         if path.starts_with("http://") || path.starts_with("https://") {
             path.to_string()

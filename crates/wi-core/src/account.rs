@@ -1,9 +1,11 @@
 //! One account (docs/SPEC.md 2.4, 9.7, 9.8). Sign-in happens in the system
-//! browser: the app opens mi-wwav.com's desktop authorization page with a
-//! PKCE challenge and listens on a loopback address for the answer (RFC
-//! 8252). The password never reaches the app. The answer must carry the
-//! state the app sent; then the code and the verifier go to the token
-//! endpoint, and the tokens go to the keychain and nowhere else.
+//! browser: the app opens the desktop authorization page with a PKCE
+//! challenge and listens on a loopback address for the answer (RFC 8252).
+//! The page is the same on www.wi-wwav.com, where the app opens it, and on
+//! mi-wwav.com. The password never reaches the app. The answer must carry
+//! the state the app sent; then the code and the verifier go to
+//! mi-wwav.com's token endpoint, and the tokens go to the keychain and
+//! nowhere else.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -133,7 +135,7 @@ pub(crate) fn sign_in(i: &Inner) -> Result<Value, CoreError> {
     );
     let url = format!(
         "{}/oauth/desktop/authorize?response_type=code&client_id={CLIENT_ID}&redirect_uri={}&code_challenge={challenge}&code_challenge_method=S256&state={state}",
-        i.net.base(),
+        i.sign_in_url,
         encode(&redirect),
     );
     (i.opener)(&url).map_err(|e| {

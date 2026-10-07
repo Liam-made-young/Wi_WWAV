@@ -34,19 +34,20 @@ impl wi_core::SecretStore for KeyringStore {
 
 pub fn open<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<dyn Core>, CoreError> {
     let browser = app.clone();
-    // Sign-in opens mi-wwav.com in the system browser (9.7).
+    // Sign-in opens www.wi-wwav.com in the system browser (9.7).
     let opener: wi_core::Opener = Arc::new(move |url: &str| {
         browser
             .opener()
             .open_url(url, None::<&str>)
             .map_err(|e| e.to_string())
     });
-    let config = wi_core::Config::new(
+    let mut config = wi_core::Config::new(
         paths::engine(),
         &paths::server(),
         Arc::new(KeyringStore::default()),
         opener,
     );
+    config.sign_in_url = paths::sign_in();
     let core = wi_core::Core::open(&paths::library(app.path().audio_dir().ok()), config)?;
 
     let (events, meters) = (core.events(), core.meters());
