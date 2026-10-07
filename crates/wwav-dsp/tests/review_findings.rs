@@ -133,3 +133,38 @@ fn the_shown_peak_agrees_with_the_cut() {
         peaks.lines()
     );
 }
+
+/// Finding (low, 5.4 and `Estimates::bpm`'s "60–180 BPM"): the estimate can
+/// leave the range the spec gives it. The lags run from ⌊60 ÷ 180 × fps⌋ to
+/// ⌈fps⌉, so the extremes are 184.6 and 59.4 BPM at 44.1 kHz, and a clean
+/// 180 BPM click at 48 kHz reads 181.5, shown as "≈ 182 BPM (estimate)".
+/// analysis.js gives the same (the port is faithful).
+#[test]
+#[ignore = "finding: a 180 BPM click at 48 kHz is estimated at 181.5 BPM"]
+fn a_tempo_estimate_stays_within_60_to_180_bpm() {
+    let rate = 48_000u32;
+    let seconds = 70.0;
+    let frames = (seconds * rate as f64) as usize;
+    let mut x = vec![0.0f32; frames * 2];
+    let mut t0 = 0.5;
+    while t0 < seconds {
+        let start = (t0 * rate as f64).round() as usize;
+        for i in 0..(0.25 * rate as f64) as usize {
+            if start + i >= frames {
+                break;
+            }
+            let t = i as f64 / rate as f64;
+            let s = 0.8 * (-t / 0.03).exp() * (2.0 * std::f64::consts::PI * 80.0 * t).sin();
+            x[(start + i) * 2] = s as f32;
+            x[(start + i) * 2 + 1] = s as f32;
+        }
+        t0 += 60.0 / 180.0;
+    }
+    let bpm = estimate_tempo(&[Audio {
+        samples: &x,
+        channels: 2,
+        rate,
+    }])
+    .expect("a tempo");
+    assert!((60.0..=180.0).contains(&bpm), "estimated {bpm} BPM");
+}
