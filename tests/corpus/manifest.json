@@ -142,6 +142,26 @@
       "sha256": "83fee9133e4e48b8c70caec52be46d1f61b53e4e334a26d3d69079fda1ff7ffb"
     },
     {
+      "file": "version-number.wwav",
+      "why": "A version written as a JSON number, 1.0, not a string.",
+      "verdict": "the master only: version 1.0 is newer than this reader (0.x)",
+      "differs": {
+        "wi": "the master only: version 1 is newer than this reader (0.x)",
+        "because": "Wi's reader (wi/src/formats/wwav.js pyStr) prints a number with String(), which drops the .0 that python's str() keeps."
+      },
+      "sha256": "fadd75737fd46d75313f550bc01a284c2536a161e312682ff1437a6b5678ce75"
+    },
+    {
+      "file": "version-digits.wwav",
+      "why": "A version in Arabic-Indic digits, which python's \\d reads as digits.",
+      "verdict": "the master only: version ١.0 is newer than this reader (0.x)",
+      "differs": {
+        "wi": "the master only: wmet has no version",
+        "because": "Wi's reader matches the version with an ASCII-only \\d, as the device does; wwav_pack.py's \\d takes any script's digits."
+      },
+      "sha256": "da4bbcd961f244a39d765af93ed367c1db7a2f3766acd8e501948371eac916da"
+    },
+    {
       "file": "frames-wmet.wwav",
       "why": "wmet's frames one more than the master's.",
       "verdict": "the master only: frame counts differ (data 600, wstm 600, wmet 601)",
