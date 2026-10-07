@@ -1,0 +1,16 @@
+[package]
+name = "wi-devbridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Hosts the app's core over a WebSocket, so Playwright drives the real core from Chromium (docs/COMMANDS.md)"
+
+[dependencies]
+wi-core.workspace = true
+serde_json.workspace = true
+tungstenite = "0.26"
+
+[dev-dependencies]
+tempfile.workspace = true

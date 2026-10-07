@@ -7,6 +7,13 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# The shell is a library so its tests can build it on Tauri's mock runtime;
+# main.rs only calls run(). The name differs from the binary's so their build
+# outputs never collide.
+[lib]
+name = "wi_wwav_app"
+path = "src/lib.rs"
+
 [[bin]]
 name = "wi-wwav"
 path = "src/main.rs"
@@ -16,5 +23,17 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+wi-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The OS secret store: Keychain on macOS, Credential Manager on Windows, the
+# Secret Service (GNOME Keyring, KWallet) elsewhere (docs/SPEC.md 9.8).
+keyring = { version = "3.6", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tempfile = { workspace = true }
