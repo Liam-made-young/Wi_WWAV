@@ -122,8 +122,8 @@ fn every_text_pair_meets_its_bar_in_light_and_dark() {
             }
         }
     }
-    // 27 text pairs, each in two appearances; a pair the parse skipped shows here.
-    assert_eq!(checked, 54, "text pairs checked");
+    // 23 text pairs, each in two appearances; a pair the parse skipped shows here.
+    assert_eq!(checked, 46, "text pairs checked");
     assert!(misses.is_empty(), "under the bar:\n{}", misses.join("\n"));
 }
 
@@ -148,7 +148,7 @@ fn every_ratio_the_spec_quotes_is_reproduced_within_a_tenth() {
         }
     }
     // Every quote in the file, once for each appearance it's quoted for.
-    assert_eq!(checked, 52, "quoted ratios checked");
+    assert_eq!(checked, 44, "quoted ratios checked");
     assert!(
         wrong.is_empty(),
         "quoted ratios that are off:\n{}",

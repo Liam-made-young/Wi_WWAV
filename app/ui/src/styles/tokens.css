@@ -82,27 +82,6 @@
   --night-sun: #fff8e6, #ffd89a, #f0a23c, #b25f12;
   --night-focus-width: 2px;
 
-  /* room: Unquantized, lit rather than painted (8.2; v3's mock, PRANA,
-     Crater). Dusk is light, after hours is dark: the walls fall to limousine
-     and paper stays paper. */
-  --room-field-ground: #f7f4ee, #e6dfd0;
-  --room-field-rose: #fbede8;
-  --room-field-cool: #dde2e6;
-  --room-field-drift-shortest: 53000ms;
-  --room-field-drift-longest: 131000ms;
-  --room-material-sand: #e8dcc8;
-  --room-material-sand-deep: #d4c4a8;
-  --room-material-clay: #b89878;
-  --room-material-clay-deep: #7a5e45;
-  --room-ink: #3d2e22;
-  --room-ink2: #6b5643;
-  --room-paper: #ffe9c8;
-  --room-accent: #c89668;
-  --room-lamp: #e8915b, #f4b483;
-  --room-sky: #f8d0a4, #d4763f;
-  --room-hairline: 1px;
-  --room-focus-width: 2px;
-
   /* stem: PRANA's stem colours, the same everywhere, in stem order (8.3).
      Every stem mark carries a ring in its register's ink; state is shape:
      muted is a stem-colour ring, soloed adds an outer ring, silent under a
@@ -231,7 +210,6 @@
     --desk-lcd-dim: #9ca382;
     --desk-source-list-ground: #2e3136;
     --desk-source-list-heading: #9aa3ad;
-    --room-field-ground: #0f0c09, #0f0c09;
   }
 }
 
@@ -255,5 +233,4 @@
   --desk-lcd-dim: #9ca382;
   --desk-source-list-ground: #2e3136;
   --desk-source-list-heading: #9aa3ad;
-  --room-field-ground: #0f0c09, #0f0c09;
 }
