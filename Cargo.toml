@@ -10,6 +10,7 @@ members = [
   "crates/wi-store",
   "crates/mock-engine",
   "crates/wwav-engine-cli",
+  "app/src-tauri",
 ]
 
 [workspace.package]
