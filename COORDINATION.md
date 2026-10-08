@@ -424,33 +424,157 @@ Tests that fail and aren't mine, for whoever runs the core's suite:
 
 ## Console Phase 0 (branch `codex/console-phase-0`)
 
-Worktree: `/private/tmp/wi-wwav-console`, from `8f4ea3a`. Started 7 Oct 2026.
-Liam requested one phase at a time: build, verify, commit, report here, then
-wait for his go. Phase 0 only is in progress.
+Worktree: `/private/tmp/wi-wwav-console`. Started from `8f4ea3a` on
+7 Oct 2026; updated on 8 Oct to the combined Focus, Ask/Database/Wiki and
+Commitments/Notes baseline `eaec951`. The main checkout is still on
+`claude/relaxed-cori-x2igz9`; this branch includes the combined app's work.
+The separate `claude/console-av` worktree's uncommitted spike is untouched.
 
-**I claim** Console's shell and its four independent tools (Write, Image,
-Audiovisual, 3D), Console's shared Library, versions, variations, provenance,
-the Console Claude entry point (Command-T), and their document bundles.
-Existing .wwav/.swav specifications remain the authority for media formats.
+**I claim** Console's shell and four independent tools (Write, Image,
+Audiovisual, 3D), its shared Library, versions, variations, provenance,
+Command-T entry point, and document bundles. Existing `.wwav`/`.swav`
+specifications in `wwav-formats` remain authoritative.
 
 **Owned files:** `app/ui/src/console/`, `crates/wi-core/src/console/`,
-`crates/wi-core/tests/console.rs`, `docs/CONSOLE.md`, and Console-specific
-browser tests/configuration. Phase 0 replaces the old audio-only Console frame.
+`crates/wi-core/tests/console.rs`, `docs/CONSOLE.md`, Console-specific
+browser tests/configuration and preview entry, and
+`app/ui/public/licenses/lucide.txt`. The only added dependency is
+`lucide-react` 1.52.0 (ISC with Feather MIT notices, checked and bundled).
 
-**Shared addition:** `crates/wi-core/src/lib.rs` gets one module and a
-`console.*` command dispatch arm. No Learn, Ask, Focus, token, or existing
-library files are edited. Console uses its own disk directory under the
-configured library root, named `Wi-WWAV Library`.
+**Built in Phase 0:**
 
-**Integration:** Focus's registry has not landed here and currently registers
-Learn tabs, not Console tools. Console exposes its own four-tool registry;
-a future shell adapter can summon them. Styling reads prism tokens with
-existing-token fallbacks. Command-T is scoped to the active Console only.
-The shared Library drawer and Space publication integration stay with their
-owners; Phase 0 prepares a local export package and explicitly reports
-publication as unavailable.
+- Four independent tool panels and open-document tabs; keys 1-4 scoped to
+  Console. Drafts survive tool and room switches; saved workspace survives
+  restart. Plain-text Write test surface, empty native canvases for the
+  later tools, read-only imported media/text readers.
+- Disk Library under `<Core::library()>/Wi-WWAV Library`, tool filter,
+  search and previews. Ordinary assets inside JSON-manifest `.wwwork`
+  folders remain readable outside the app.
+- Every save appends an immutable version. Variations record the exact
+  parent document/version. Undo/redo append restore versions. Stale writes
+  are refused; concurrent writes use an OS lock and atomic filesystem commits.
+- Human/Claude actor records, clickable provenance and version readers.
+  Imports honestly say "Origin unverified"; recorded/inherited Claude work
+  stays marked "Claude assisted" even when undone.
+- Command-T receives tool/document/selection context, previews a structured
+  Claude proposal, and applies through the same Rust save/fork functions.
+  Claude edits create versions, support undo, and reject stale proposals.
+- Prepare Space post writes a local export/lineage/provenance package and
+  explicitly returns `published: false`.
 
-**Status:** building storage and commands, then shell and verification.
+**Shared APIs (additions only):** `pub mod console` and the `console.*`
+dispatcher in `crates/wi-core/src/lib.rs`.
+`console::tool_definitions()` and `console::call_tool(core, name, args)`
+are the mount point for Claude; tool calls force Claude's actor.
+Commands cover workspace/tool/selection, library/create/import/open/close,
+read/history/save/variation/undo/redo, post preparation and Claude
+context/ask/apply. `console.tools` and `console.tool.call` expose the same
+registry. Successful mutations emit `console`; selection events carry
+workspace state without a full Library rescan. UI context event:
+`wi-console-context {tool, documentId, selection}`.
+See `docs/CONSOLE.md` for argument contracts and bundle schemas.
+
+**Integration and stubs:** The combined Focus registry mounts Learn tabs,
+not app rooms. Console has its own `CONSOLE_TOOLS` registry and uses the
+landed prism tokens. No Learn/Ask/Focus-owned files are edited. Space
+publication and the shared Library drawer's Console index remain unconnected.
+The native Edit menu still uses the shared journal; Console has its own
+version buttons and scoped Command-Z. The actual Claude service was not
+called in verification; a fixture CLI exercises proposal, apply and undo.
+The real creative editors, media engines and exports begin in later phases.
+
+**Performance limits:** 24 MiB assets, 1 MiB text edits, 16 KiB selection
+context, 16 MiB manifests. Search scans all manifests and their short text
+previews; histories grow linearly. Bounded media previews use browser-native
+decoders and base64 copies, not a streaming Rust engine. No heavy media
+library or ffmpeg was added. Unsaved drafts are memory-only, not crash recovery.
+The combined production UI retains its large-chunk warning (about 1.25 MB JS).
+
+**Verification:** 12 Rust Console integration tests; full UI suite,
+948 passed / 1 skipped; production typecheck/build; three Playwright tests
+against a real Rust core, including the combined Focus shell and mobile
+framing. Scoped clippy passes with the existing `homes_cmd.rs`
+redundant-closure warning suppressed; workspace-wide strict lint has existing
+Learn type-complexity findings. Desktop/mobile/full-shell screenshots inspected.
+
+**Status:** Phase 0 complete, ready on this branch. Stop here and wait for
+Liam's go before Phase 1.
+
+**Requests to other owners:**
+
+- Shell/Focus: mount `CONSOLE_TOOLS` for any cross-room summon path and route
+  native Edit-menu undo/redo to the active Console document. The existing
+  Learn-only registry must not mount Console inside Learn.
+- Ask: mount `console::tool_definitions()` / `console::call_tool` if Console
+  is wanted in the shared prompt box. Read/mutation effect staging belongs
+  to your adapter; Command-T already works independently.
+- Shared Library/Space: index Console bundles and consume
+  `console.post.prepare`'s local package when those integrations are ready.
+
+**Phase 1 authorized:** Liam said to build the full Write phase on 8 Oct.
+Work continues in the same isolated worktree on `codex/console-phase-1`,
+from Phase 0 commit `ba65754`. Ownership is unchanged, adding Write-specific
+tests and permissively licensed bundled font/library notices. Shared dependency
+manifests may gain Markdown/Fountain/PDF dependencies; no other agent's
+implementation files are edited. Building a Markdown-section manuscript,
+binder/outline, screenplay and lyrics modes, document research with Learn-note
+links, four Rust exports, and selection-scoped Claude proposals. Phase 2 stays
+paused until Liam's next go.
+
+## Space: every link is a planet (branch `space`)
+
+(Added a second time on 8 Oct: a rewrite of this file between 8:10 and 8:38
+AM dropped the section. Nothing else here was changed.)
+
+Started 8 Oct 2026. The founder redefined Space that day: every link is a
+planet, a link that connects many links grows and gains gravity, a search
+moves you to its results, a web page is a body you go into, and you travel
+in first person. Search engine and browser first; the social half and
+posting later. **`docs/SPACE.md` is the whole of it,** with the protocol for
+any Claude or Codex instance in its section 9. It supersedes `docs/SPEC.md`
+chapter 4, the Space part of `docs/SCOPE_CUT.md` and `docs/PLAN.md` Stage 5.
+
+**Where.** Branch `space`, worktree `../Wi-WWAV-space`, made on 8 Oct 2026
+from `claude/focus-ask-notes` at `eaec951` (PR #2, the branch the app on this
+Mac is built from), so it holds the Focus layout, the prompt box, Database,
+Wiki, commitments and notes. Its build folder is
+`~/Library/Developer/wi-wwav-build/target-space`. The first three commits of
+the spec were made on `claude/relaxed-cori-x2igz9` in the main checkout,
+before the worktree existed, and are merged into `space`; they change only
+`docs/`.
+
+**No code yet.** `docs/SPACE.md` section 8 holds the founder's answers, in
+three rounds, and what is still open.
+
+**I claim** `app/ui/src/space/`, `crates/wi-core/src/space/` (new, with its
+tests), `tools/mock-server/routes/space.js` and `test/space.test.js`,
+`app/ui/e2e/space-*.spec.ts`, and `docs/SPACE.md`.
+
+**Shared files touched so far:** a pointer of two or three lines each at the
+top of `docs/SPEC.md` chapter 4, `docs/PLAN.md` Stage 5 and the Space part of
+`docs/SCOPE_CUT.md`.
+
+**To expect later** (all additions): a `space.*` arm in `Core::invoke` and a
+`mod` line in `crates/wi-core/src/lib.rs`; a section in `docs/COMMANDS.md`;
+and in `app/src-tauri/`, web views of their own for the pages Space opens,
+with one store of sign-ins. That last one touches the shell's owner (Focus
+layout): a request will be written there before any of it is built.
+
+**Console:** a work published to mi-wwav.com is a link, so it is a planet
+like any other. Nothing about publishing changes yet, and posting from Space
+is not being built.
+
+**Status**
+
+- [x] `docs/SPACE.md`: the brief, the answers, the proposals, the open
+      questions, the protocol
+- [x] The branch and the worktree
+- [x] The founder's answers to questions 1 to 26
+- [ ] Web views proved inside the Mac app (section 10, step 1)
+
+**Requests to me**
+
+(none yet)
 
 ## Requests for other agents
 

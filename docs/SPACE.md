@@ -1,7 +1,7 @@
 # Space: every link is a planet
 
 Written 8 Oct 2026 from the founder's brief of that day, and brought up to
-his answers of the same day, in two rounds (section 8). Where this file and
+his answers of the same day, in three rounds (section 8). Where this file and
 `docs/SPEC.md` chapter 4, `docs/SCOPE_CUT.md` ("Space: the social view") or
 `docs/PLAN.md` Stage 5 disagree, this file is right and the others are the
 old Space.
@@ -48,6 +48,12 @@ holds what is what the web itself says.
 video, you find it with its channel. Looking for the song, you find it with
 the song.
 
+**Far away, what makes most sense. Close up, what is most useful.** As you
+zoom out, things shift to make more sense; as you come close, they shift to
+be most useful. Together with "it depends on how you came", this is the
+operating rule for the questions this file doesn't answer. How it works is
+not settled, and is expected to grow clearer as Space is built.
+
 **You are an astronaut, seen from your own eyes.** "FPS: first person
 space." You float, and you move. Things may move around you.
 
@@ -84,7 +90,8 @@ for one person, with the fewest moves for the greatest return and no polish
 for its own sake. Section 12 says what changes for many.
 
 **Free the way Chrome and Google Search are free,** for now. Nothing in the
-prototype is paid for.
+prototype is paid for. The general web search is DuckDuckGo, steering away
+from Google where that is possible.
 
 **The big platforms come first,** searchable from inside Space. Everything
 that can be fitted in through an embed is fitted in through an embed.
@@ -129,7 +136,8 @@ has: a site, a page on it, a link on that page.
 Which of these a thing is drawn as also follows its mass (section 3): a
 channel with ten videos is not a galaxy yet.
 
-**One rule under all of it (Proposed).** Where you are is the centre, and
+**One rule under all of it (Decided "for the most part", with the far and
+near rule of section 1 over it).** Where you are is the centre, and
 what it links to orbits it. A site's own structure gives the big steps
 (service, artist, album, song), and the links on a page give the rest. Go to
 one of the orbiting bodies and it becomes the centre. That is how a song is
@@ -213,14 +221,15 @@ corrects it here, and dates the correction.
 | X | Nothing without paying | The post's embed, by its address, no key | | Section 6 |
 | One song across services | A matching service that takes one link and answers the others, or the recording's ISRC | | | Rate limits and terms |
 
-**The general web search (Decided: free the way Chrome and Google Search are
-free, so nothing paid and no card. Which way: Proposed).**
+**The general web search (Decided: DuckDuckGo, read from its own page,
+nothing paid and no card).**
 
-| Way | What it is | Cost, checked 8 Oct 2026 | Fit |
+| Way | What it is | Cost | Fit |
 |---|---|---|---|
-| The search engine's own page | Google or DuckDuckGo opened as a page in Space, like any page. The results page is a body, and Space reads the links on the page in front of you and draws them around it, as it does for every page (section 2) | Nothing: no key, no quota, no card | Proposed first (question 23). It is "free as Chrome" exactly, it covers the whole web, Bandcamp, Substack and X included, and it needs nothing built that Space doesn't need anyway. Fine for one person browsing; the engine's terms are read before anyone else uses it (section 12) |
-| Marginalia Search, by its API | An independent, open-source search engine for the small, hand-made, text-first web | Free. A key for non-commercial use is given on request by email; the shared key `public` works at once but is often rate-limited | Proposed second: a different sky, the part of the web no platform covers, with clean results. Its code can be run by us if Space grows |
-| Brave Search, by its API | An independent index of the whole web | $5 of credit a month, about 1,000 searches, but a card is required to use it | Out. It is not free in the founder's sense |
+| DuckDuckGo's own page | DuckDuckGo opened as a page in Space, like any page. The results page is a body, and Space reads the links on the page in front of you and draws them around it, as it does for every page (section 2) | Nothing: no key, no quota, no card | Decided. It covers the whole web, Bandcamp, Substack and X included, asks for no sign-in, and has a plain HTML results page that is easy to read. Its `!` shortcuts (`!w`, `!yt`) send a search straight to a site's own search, which suits a place where you travel to sites. Fine for one person browsing; its terms are read before anyone else uses it (section 12). Unchecked: how soon it slows down a web view that searches often |
+| Marginalia Search, by its API | An independent, open-source search engine for the small, hand-made, text-first web | Free. A key for non-commercial use is given on request by email; the shared key `public` works at once but is often rate-limited (checked 8 Oct 2026) | Proposed as a second search, later: a different sky, the part of the web no platform covers |
+| Google's own page | The same as the first row, with Google | Nothing | Not used. The founder steers away from Google |
+| Brave Search, by its API | An independent index of the whole web | A card is required even for its free credit (checked 8 Oct 2026) | Out. It is not free in the founder's sense |
 
 ## 6. X, without paying for its API (Open)
 
@@ -307,15 +316,27 @@ saying why.
 | 20 | Is a card on file acceptable for a "free" search provider? | He asked for this to be made clearer too, and said everything should be as free as Chrome and Google Search for now. So no card: Brave is out (section 5). Question 23 follows from it |
 | 21 | How much of a browser in the prototype? | Back, forward and staying signed in. Polish is not the priority |
 
-### New, from those answers (Open)
+### Answered by the founder, 8 Oct 2026, third round
 
-| # | Question | Recommendation |
+| # | Question | His answer |
 |---|---|---|
-| 22 | Question 17 again, plainly. A YouTube video has an obvious thing to orbit, its channel. A Wikipedia article doesn't: "Saturn" is linked from thousands of articles and belongs to none of them. So when you search Wikipedia for Saturn and arrive, what is around you? | The article is the centre and the articles it links to orbit it, with Wikipedia as the galaxy all of it sits in. Fly to one and it becomes the centre. Under "where you are is the centre" (section 2) this stops being a special case |
-| 23 | "Free as Google Search" can be had literally: open Google's or DuckDuckGo's own results page inside Space and draw the links on it as planets, with no key at all. Do you want that as the general web search, and which engine first? | Yes. Try Google first, since it is the one you named, and DuckDuckGo if Google's page keeps asking whether you are a robot inside the app |
-| 24 | The same could be done for YouTube: its own results page in place of its API's search, which lifts the limit of about 100 searches a day. | The API first: it is free, clean, and enough for one person. The results page only if the limit is ever hit |
-| 25 | A page can hold hundreds of links (a Wikipedia article, about 500). How many orbit it? | The biggest few dozen by mass, and the rest as a faint belt you can ask to see |
-| 26 | An artist has a page on every service, like a song. Reached through a song search, is the artist one galaxy joined across services, or the artist as the service you came through shows them? Songs can be matched across services reliably; artists only by name, which can be wrong | For the prototype, the artist as that service shows them, and only songs are joined |
+| 22 | You search Wikipedia for Saturn and arrive. Is the article the centre, with the articles it links to around it and Wikipedia as the galaxy? | Yes. Context dependence is important |
+| 23 | The search engine's own results page as the general web search, and which engine? | DuckDuckGo. He wants to steer away from Google, hasn't used DuckDuckGo, and thinks it would suit the project |
+| 24 | YouTube's own results page in place of its API's search? | As recommended: the API first, the results page only if the daily limit is hit |
+| 25 | How many of a page's links orbit it? | As recommended: the biggest few dozen by mass, the rest as a faint belt you can ask to see |
+| 26 | Is an artist joined across services, or shown as the service you came through shows them? | As recommended for the prototype: as that service shows them; only songs are joined. And the general answer to questions like these: context dependence, and close up most useful, far away what makes most sense |
+| | "One rule under all of it": where you are is the centre | "For the most part yes", and: when you zoom out things shift to make more sense, when you are close they shift to be most useful |
+
+### Still open
+
+- **How the sky shifts between far and near.** The rule is Decided; what
+  shifts, and when, is to be found by building and showing him.
+- **X** (section 6): links and the real page first, as recommended, has not
+  been confirmed.
+- **Sizing by order of magnitude** (section 3) is a proposal he has not
+  spoken to, beyond gravity.
+- **Keys.** A YouTube Data API key and a registered Spotify app are his to
+  make. Neither is needed for step 1 of section 10.
 
 ## 9. Protocol for any Claude or Codex instance working on Space
 
@@ -332,8 +353,8 @@ saying why.
 3. Space work is done on the branch `space`, in the worktree
    `Desktop/Mi-WWAV journey/Wi-WWAV-space`, started from
    `claude/focus-ask-notes` (the branch the installed app is built from; `main`
-   once PR #2 is merged). Never in the main checkout, `Wi-WWAV`. The Space
-   section of `COORDINATION.md` says whether the worktree exists yet.
+   once PR #2 is merged). Never in the main checkout, `Wi-WWAV`. The
+   worktree was made on 8 Oct 2026.
 4. Two instances at once take one piece each. Each works on its own branch
    off `space`, named `claude/space-<piece>` or `codex/space-<piece>`, in its
    own worktree `../Wi-WWAV-space-<piece>`, and merges into `space` when its
@@ -400,7 +421,7 @@ saying why.
 
 ## 10. A first order of work (Proposed)
 
-Nothing here is started. The founder is still deciding (section 8).
+Nothing here is started.
 
 1. **Prove the web views in the Mac app.** A YouTube video, a Spotify song
    and an Apple Music song each playing inside the installed app; a real page
