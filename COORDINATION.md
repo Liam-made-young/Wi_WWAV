@@ -511,6 +511,146 @@ Liam's go before Phase 1.
 - Shared Library/Space: index Console bundles and consume
   `console.post.prepare`'s local package when those integrations are ready.
 
+**Phase 1 authorized:** Liam said to build the full Write phase on 8 Oct.
+Work continues in the same isolated worktree on `codex/console-phase-1`,
+from Phase 0 commit `ba65754`. Ownership is unchanged, adding Write-specific
+tests and permissively licensed bundled font/library notices. Shared dependency
+manifests may gain Markdown/Fountain/PDF dependencies; no other agent's
+implementation files are edited. Building a Markdown-section manuscript,
+binder/outline, screenplay and lyrics modes, document research with Learn-note
+links, four Rust exports, and selection-scoped Claude proposals. Phase 2 stays
+paused until Liam's next go.
+
+### Console Phase 1: Write (branch `codex/console-phase-1`)
+
+**Complete, 8 Oct 2026.** Built on Phase 0 `ba65754` in
+`/private/tmp/wi-wwav-console`. Commit subject: `Console Phase 1: standalone
+Write with manuscripts, exports and Claude provenance`. No other owner's
+implementation files were edited. The main checkout's newer Space commits
+are documentation-only; the latest shared coordination sections are retained.
+
+**What landed:** CodeMirror Markdown/Fountain source editor and safe live
+preview; focus and typewriter modes; persistent per-document view preferences;
+section binder with drag reorder, subtree nesting, keyboard-accessible move
+buttons and outline/synopses; Rust section/total word counts; screenplay's six
+standard elements and Fountain import/export; lyrics types and per-line
+word/estimated English syllable counts; document notes and research, including
+search/link/read of existing Learn notes. Markdown, plain text, Fountain and
+PDF export run in Rust, pinned to a saved version. PDFs embed OFL fonts and
+have prose pagination or screenplay title page/standard indents. Readers show
+formatted saved sections. Oversized imported text stays readable, not editable.
+
+Write's `wi-write/1` record is additive to immutable `Version.write`: Markdown
+section assets, private notes asset and research metadata in the existing
+manifest bundle. Legacy versions remain unchanged until their next save.
+Variations preserve the whole manuscript, exact lineage and inherited actor
+markers. Space packages now share the edit ledger, never private manuscript
+notes or research snapshots.
+
+**Shared APIs added:** `console.write.read/save/edit/render/transform/view/
+export/assist/research.search/research.read`, all registered in
+`console::tool_definitions()` and `console::call_tool`. `edit` handles section
+add/update/move/delete/reorder, modes, notes/research, formatting and UTF-16
+selection replacement; every persisted edit creates a version. Shared Claude
+context includes Write's mode and section hierarchy. Command-T offers scoped
+rewrite/tighten, read-only rhyme/alternative/summary suggestions, validated
+reordering and explicitly requested continuation. Preview/apply uses the
+existing proposal protocol and records undoable Claude-authored versions.
+No private notes/research are sent in Write assistance context.
+
+**Dependencies:** CodeMirror/Lezer (MIT), pulldown-cmark (MIT), fountain
+(Unlicense OR MIT; Unlicense option), nom (MIT), lopdf (MIT, already in the
+graph), rustybuzz (MIT and retained upstream notices), IBM Plex Serif/Mono
+(OFL-1.1). Added transitive licenses audited; no GPL or ffmpeg. Notices are
+bundled in `app/ui/public/licenses/write.txt` and beside the Rust font files.
+Shared Cargo/npm manifests and lockfiles changed, not shared application logic.
+
+**Verification:** 26 Console Rust integration tests; UI 948 passed / one
+existing skip; typecheck/production build; seven Playwright tests against a
+real Rust bridge, including combined Focus-room persistence, multi-section
+writing/reorder/nesting, Learn-note research, screenplay/Fountain, lyrics,
+four exports, Claude proposal/apply/undo/reorder/continuation, a long manuscript
+and oversized read-only imports. Desktop/mobile screenshots and prose and
+screenplay PDF rasters inspected. Scoped strict clippy passes with the existing
+`homes_cmd.rs` redundant-closure warning suppressed. Dependency-wide strict
+clippy still reports existing Learn `homes.rs` type-complexity warnings.
+
+**Limits and stubs:** 1 MiB serialized manuscript including research, 256
+sections/eight levels/100 sources, 32 KB selection edits, 2,000 PDF pages;
+the shell's 24 MiB import and 16 MiB manifest caps still apply. A 20,001-word
+development sample measured roughly 63-88 ms for four keystrokes plus paint,
+450-451 ms to save, 385-397 ms for PDF, and 2.9-3.3 seconds to fill/render/count.
+These are samples on this Mac, not guarantees. History/search remain linear;
+production JS is about 1.78 MB / 534 KB gzip with the existing chunk warning.
+Syllables are English estimates. Fountain is the standard-element subset,
+not full conformance. PDF flattens inline rich formatting and refuses
+unsupported glyphs with a lossless Markdown/text alternative. Drafts remain
+memory-only, with per-section typing undo and saved-version document undo.
+Space publication, shared drawer indexing, native Edit-menu routing and the
+shared Ask mount remain the Phase 0 integration requests. Live Claude service
+and a native app installation were not exercised; tests use a fixture CLI.
+
+**Next authorized:** Liam explicitly said to begin Phase 2 immediately after
+Phase 1 completion. Image will start from this commit in the same isolated
+worktree on `codex/console-phase-2`, preserving the existing ownership boundary.
+No Phase 3 agent has been requested or created; possible parallel ownership
+of Phase 3a was discussed only. Do not start Audiovisual work without its go.
+
+## Space: every link is a planet (branch `space`)
+
+(Added a second time on 8 Oct: a rewrite of this file between 8:10 and 8:38
+AM dropped the section. Nothing else here was changed.)
+
+Started 8 Oct 2026. The founder redefined Space that day: every link is a
+planet, a link that connects many links grows and gains gravity, a search
+moves you to its results, a web page is a body you go into, and you travel
+in first person. Search engine and browser first; the social half and
+posting later. **`docs/SPACE.md` is the whole of it,** with the protocol for
+any Claude or Codex instance in its section 9. It supersedes `docs/SPEC.md`
+chapter 4, the Space part of `docs/SCOPE_CUT.md` and `docs/PLAN.md` Stage 5.
+
+**Where.** Branch `space`, worktree `../Wi-WWAV-space`, made on 8 Oct 2026
+from `claude/focus-ask-notes` at `eaec951` (PR #2, the branch the app on this
+Mac is built from), so it holds the Focus layout, the prompt box, Database,
+Wiki, commitments and notes. Its build folder is
+`~/Library/Developer/wi-wwav-build/target-space`. The first three commits of
+the spec were made on `claude/relaxed-cori-x2igz9` in the main checkout,
+before the worktree existed, and are merged into `space`; they change only
+`docs/`.
+
+**No code yet.** `docs/SPACE.md` section 8 holds the founder's answers, in
+three rounds, and what is still open.
+
+**I claim** `app/ui/src/space/`, `crates/wi-core/src/space/` (new, with its
+tests), `tools/mock-server/routes/space.js` and `test/space.test.js`,
+`app/ui/e2e/space-*.spec.ts`, and `docs/SPACE.md`.
+
+**Shared files touched so far:** a pointer of two or three lines each at the
+top of `docs/SPEC.md` chapter 4, `docs/PLAN.md` Stage 5 and the Space part of
+`docs/SCOPE_CUT.md`.
+
+**To expect later** (all additions): a `space.*` arm in `Core::invoke` and a
+`mod` line in `crates/wi-core/src/lib.rs`; a section in `docs/COMMANDS.md`;
+and in `app/src-tauri/`, web views of their own for the pages Space opens,
+with one store of sign-ins. That last one touches the shell's owner (Focus
+layout): a request will be written there before any of it is built.
+
+**Console:** a work published to mi-wwav.com is a link, so it is a planet
+like any other. Nothing about publishing changes yet, and posting from Space
+is not being built.
+
+**Status**
+
+- [x] `docs/SPACE.md`: the brief, the answers, the proposals, the open
+      questions, the protocol
+- [x] The branch and the worktree
+- [x] The founder's answers to questions 1 to 26
+- [ ] Web views proved inside the Mac app (section 10, step 1)
+
+**Requests to me**
+
+(none yet)
+
 ## Requests for other agents
 
 From `claude/ask-database-wiki`:

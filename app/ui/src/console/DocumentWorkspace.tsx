@@ -4,12 +4,18 @@ import { api, errorText, type Document, type ReadResult } from './client';
 import { toolById } from './registry';
 import { Media } from './Reader';
 import { IconButton } from './Panels';
+import { WriteWorkspace } from './write/WriteWorkspace';
 
-export function DocumentWorkspace({ document: d, visible, busy, onDirty, onSave, onError, onPanel, onVariation, onUndo, onPost }: {
+export interface WorkspaceProps {
   document: Document; visible: boolean; busy: boolean; onDirty(v: boolean): void;
   onSave(base: string, title: string, text?: string): Promise<void>; onError(s: string): void;
   onPanel(kind: 'history' | 'provenance' | 'reader' | 'claude'): void; onVariation(): void; onUndo(redo: boolean): void; onPost(): void;
-}) {
+  onRefresh(): Promise<void>;
+}
+export function DocumentWorkspace(props: WorkspaceProps) {
+  return props.document.tool === 'write' && props.document.asset.mime.startsWith('text/') && props.document.asset.bytes <= 1024 * 1024 ? <WriteWorkspace {...props} /> : <OtherWorkspace {...props} />;
+}
+function OtherWorkspace({ document: d, visible, busy, onDirty, onSave, onError, onPanel, onVariation, onUndo, onPost }: WorkspaceProps) {
   const [data, setData] = useState<ReadResult | null>(null);
   const [title, setTitle] = useState(d.title);
   const [text, setText] = useState<string | undefined>();
@@ -21,7 +27,7 @@ export function DocumentWorkspace({ document: d, visible, busy, onDirty, onSave,
   useEffect(() => {
     if (dirtyRef.current) return;
     let live = true;
-    api.read(d.id).then(r => { if (live) { setData(r); setTitle(r.version.title); setText(r.version.asset.mime.startsWith('text/') && d.tool === 'write' ? r.text ?? '' : undefined); setBase(r.version.id); } }, e => { if (live) callbacks.current.onError(errorText(e)); });
+    api.read(d.id).then(r => { if (live) { setData(r); setTitle(r.version.title); setText(r.version.asset.mime.startsWith('text/') && r.version.asset.bytes <= 1024 * 1024 && d.tool === 'write' ? r.text ?? '' : undefined); setBase(r.version.id); } }, e => { if (live) callbacks.current.onError(errorText(e)); });
     return () => { live = false; };
   }, [d.id, d.head, d.tool]);
   useEffect(() => { callbacks.current.onDirty(dirty); }, [dirty]);

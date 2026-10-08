@@ -31,19 +31,19 @@ test('four workspaces preserve drafts; hand and Claude versions, forks, reader a
   await page.getByRole('tab', { name: '3D', exact: true }).click();
   await create(page, 'Player body');
   await page.getByRole('tab', { name: 'Write', exact: true }).click();
-  await expect(text).toHaveValue('A song begins with one line.\n');
+  await expect(text).toHaveText('A song begins with one line.');
   await page.getByRole('button', { name: 'Save version', exact: true }).click();
   await expect(page.locator('.console-version-label:visible')).toHaveText('v2');
   const listing = await core('console.library', { tool: 'write' });
   const first = listing.documents.find((d: any) => d.title === 'Small beginnings');
   expect(first.marker).toBe('Made by hand');
   await core('console.tool.call', { name: 'console_save', args: { id: first.id, base: first.head, text: 'One line becomes a song.\n' } });
-  await expect(text).toHaveValue('One line becomes a song.\n');
+  await expect(text).toHaveText('One line becomes a song.');
   await expect(page.locator('.console-document:visible .console-provenance')).toHaveText('Claude assisted');
   await page.getByRole('button', { name: 'Undo document edit', exact: true }).click();
-  await expect(text).toHaveValue('A song begins with one line.\n');
+  await expect(text).toHaveText('A song begins with one line.');
   await page.getByRole('button', { name: 'Redo document edit', exact: true }).click();
-  await expect(text).toHaveValue('One line becomes a song.\n');
+  await expect(text).toHaveText('One line becomes a song.');
   await page.getByRole('button', { name: 'Save as variation', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('Second beginning');
   await page.getByRole('button', { name: 'Create variation', exact: true }).click();
@@ -71,7 +71,7 @@ test('four workspaces preserve drafts; hand and Claude versions, forks, reader a
   await page.screenshot({ path: '/private/tmp/console-desktop.png' });
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Document title', exact: true })).toHaveValue('Second beginning');
-  await expect(page.getByRole('textbox', { name: 'Document text', exact: true })).toHaveValue('One line becomes a song.\n');
+  await expect(page.getByRole('textbox', { name: 'Document text', exact: true })).toHaveText('One line becomes a song.');
   expect(errors).toEqual([]);
 });
 
@@ -107,13 +107,13 @@ test('Console coexists with the combined Focus shell and keeps work across room 
   await page.keyboard.press('Meta+1');
   await expect(page.locator('[data-room="heat"]')).toHaveAttribute('data-current', 'true');
   await page.keyboard.press('Meta+3');
-  await expect(text).toHaveValue('Keep these unsaved words.');
+  await expect(text).toHaveText('Keep these unsaved words.');
   await page.locator('.console-name').click();
   await page.keyboard.press('2');
   await expect(page.getByRole('tab', { name: 'Image', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('[data-room="console"]')).toHaveAttribute('data-current', 'true');
   await page.keyboard.press('1');
-  await expect(text).toHaveValue('Keep these unsaved words.');
+  await expect(text).toHaveText('Keep these unsaved words.');
   await page.keyboard.press('Meta+s');
   await expect(page.locator('.console-version-label:visible')).toHaveText('v2');
   await page.setViewportSize({ width: 1024, height: 768 });

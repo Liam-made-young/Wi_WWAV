@@ -7,6 +7,9 @@ use serde_json::{json, Value};
 use tempfile::TempDir;
 use wi_core::{Config, Core, MemorySecrets};
 
+#[path = "console/write.rs"]
+mod write;
+
 struct App {
     core: Core,
     dir: TempDir,
@@ -218,7 +221,7 @@ fn space_package_is_local_and_contains_exact_export_lineage_and_provenance() {
     assert_eq!(result["published"], false);
     let path = std::path::Path::new(result["path"].as_str().unwrap());
     assert_eq!(
-        fs::read(path.join("draft.md")).unwrap(),
+        fs::read(path.join(fork["asset"]["name"].as_str().unwrap())).unwrap(),
         b"Unchanged bytes\n"
     );
     let manifest: Value =

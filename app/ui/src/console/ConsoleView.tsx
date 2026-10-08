@@ -40,7 +40,7 @@ export function ConsoleView({ active: forced }: { active?: boolean }) {
   useEffect(() => { if (active) void refresh(); }, [active, refresh]);
   useEffect(() => on('console', payload => {
     const event = payload as { command?: string; workspace?: Workspace };
-    if (event.command === 'console.selection' && event.workspace) setWorkspace(event.workspace);
+    if (['console.selection', 'console.write.view'].includes(event.command ?? '') && event.workspace) setWorkspace(event.workspace);
     else void refresh();
   }), [refresh]);
   useEffect(() => { if (!active) { setPanel(null); setNameSheet(null); } }, [active]);
@@ -78,6 +78,7 @@ export function ConsoleView({ active: forced }: { active?: boolean }) {
       const field = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
       const command = e.metaKey || e.ctrlKey;
       if (e.key === 'Escape' && (panel || nameSheet)) { setPanel(null); setNameSheet(null); e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (target.closest('dialog')) { e.stopImmediatePropagation(); return; }
       if (panel || nameSheet) return;
       if (command && e.code === 'KeyT' && !e.shiftKey && !e.altKey) { openClaude(); }
       else if (command && e.code === 'KeyS' && !e.altKey) { root.current?.querySelector<HTMLButtonElement>('[data-active="true"] [data-save]')?.click(); }
@@ -117,7 +118,7 @@ export function ConsoleView({ active: forced }: { active?: boolean }) {
             <span className="console-tab-spacer" /><span className="console-tool-label">{tool.title}</span>
           </div>
           {!state?.active && <div className="console-empty-canvas"><tool.Icon size={40} strokeWidth={1} aria-hidden /><h1>{tool.title}</h1><button type="button" className="console-primary" disabled={!workspace || busy} onClick={() => setNameSheet({ tool: tool.id })}><Plus size={16} /> New document</button></div>}
-          {openDocs.map(d => <DocumentWorkspace key={d.id} document={d} visible={state?.active === d.id && selectedTool === tool.id && active} busy={busy} onDirty={v => setDirty(was => was[d.id] === v ? was : { ...was, [d.id]: v })} onSave={async (base, title, text) => { await api.save(d.id, base, title, text); await refresh(); setMessage('Version saved'); }} onError={setError} onPanel={kind => setPanel({ kind, id: d.id })} onVariation={() => setNameSheet({ tool: d.tool, parent: d })} onUndo={redo => void act(() => api.restore(d, redo))} onPost={() => void act(async () => { const r = await api.post(d); setMessage(`${r.message} ${r.path}`); })} />)}
+          {openDocs.map(d => <DocumentWorkspace key={d.id} document={d} visible={state?.active === d.id && selectedTool === tool.id && active} busy={busy} onDirty={v => setDirty(was => was[d.id] === v ? was : { ...was, [d.id]: v })} onRefresh={refresh} onSave={async (base, title, text) => { await api.save(d.id, base, title, text); await refresh(); setMessage('Version saved'); }} onError={setError} onPanel={kind => setPanel({ kind, id: d.id })} onVariation={() => setNameSheet({ tool: d.tool, parent: d })} onUndo={redo => void act(() => api.restore(d, redo))} onPost={() => void act(async () => { const r = await api.post(d); setMessage(`${r.message} ${r.path}`); })} />)}
         </section>;
       })}
     </main>

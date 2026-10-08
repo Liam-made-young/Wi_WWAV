@@ -5,6 +5,12 @@ import type { Document, Workspace } from './client';
 
 const state = vi.hoisted(() => ({ workspace: null as Workspace | null, documents: [] as Document[], calls: [] as string[], changed: () => {} }));
 vi.mock('../bridge', () => ({ on: (_name: string, f: () => void) => { state.changed = f; return () => {}; } }));
+vi.mock('./write/client', () => ({ write: {
+  read: async (id: string) => ({ document: state.documents.find(d => d.id === id), base: 'v1', manuscript: { format: 'wi-write/1', mode: 'prose', sections: [{ id: 'section', parent: null, title: 'Draft', kind: 'section', synopsis: '', text: 'A first line' }], notes: '', research: [] }, stats: { words: 3, sections: [] }, view: {} }),
+  render: async () => ({ html: '<p>A first line</p>', stats: { words: 3, lines: [], outline: [] } }),
+  view: async () => {},
+} }));
+vi.mock('./write/Editor', () => ({ Editor: (p: { text: string; onChange(text: string): void }) => <textarea aria-label="Document text" value={p.text} onChange={e => p.onChange(e.target.value)} /> }));
 vi.mock('./client', () => ({
   errorText: (e: Error) => e.message,
   api: {

@@ -93,6 +93,8 @@ pub struct Version {
     pub asset: Asset,
     pub restored_from: Option<String>,
     pub changes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write: Option<super::write::Record>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -152,7 +154,7 @@ impl Document {
             "canUndo":!self.undo.is_empty(),"canRedo":!self.redo.is_empty()}),
         )
     }
-    fn check_base(&self, base: &str) -> Result<()> {
+    pub(super) fn check_base(&self, base: &str) -> Result<()> {
         if self.head != base {
             return Err(CoreError::new(
                 "conflict",
@@ -245,10 +247,10 @@ impl Library {
         });
         Ok(json!({"root":self.root,"documents":documents,"issues":issues}))
     }
-    fn write_manifest(&self, doc: &Document) -> Result<()> {
+    pub(super) fn write_manifest(&self, doc: &Document) -> Result<()> {
         atomic_json(&self.folder(&doc.id)?.join("manifest.json"), doc)
     }
-    fn asset(&self, id: &str, name: &str, bytes: &[u8]) -> Result<Asset> {
+    pub(super) fn asset(&self, id: &str, name: &str, bytes: &[u8]) -> Result<Asset> {
         if bytes.len() > MAX_CONTENT {
             return Err(refused("Phase 0 files are limited to 24 MiB. Large media streaming arrives with the editors."));
         }
@@ -326,6 +328,15 @@ impl Library {
         fs::create_dir(&folder)?;
         let result = (|| {
             let asset = self.asset(&id, name, bytes)?;
+            let write = if tool == Tool::Write
+                && asset.mime.starts_with("text/")
+                && bytes.len() <= MAX_TEXT
+            {
+                let manuscript = super::write::seed(&id, name, bytes)?;
+                Some(super::write::store(self, &id, &manuscript)?.0)
+            } else {
+                None
+            };
             let version = Version {
                 id: wwav_ids::ulid(),
                 previous: None,
@@ -343,6 +354,7 @@ impl Library {
                 asset,
                 restored_from: None,
                 changes: vec!["Document created".into()],
+                write,
             };
             let doc = Document {
                 format: "wi-console/0.1".into(),
@@ -375,6 +387,16 @@ impl Library {
         let mut doc = self.load(id)?;
         doc.check_base(base)?;
         let old = doc.current()?.clone();
+        if let Some(text) = text.filter(|_| old.write.is_some()) {
+            let mut manuscript = super::write::load(self, &doc, &old)?;
+            if manuscript.sections.len() != 1 {
+                return Err(refused(
+                    "Choose a section for a text edit in this multi-section manuscript.",
+                ));
+            }
+            manuscript.sections[0].text = text.into();
+            return self.save_write(id, base, title, &manuscript, actor, reason);
+        }
         let mut changes = Vec::new();
         let title = title
             .map(title_checked)
@@ -407,6 +429,7 @@ impl Library {
             asset,
             restored_from: None,
             changes,
+            write: old.write,
         };
         doc.undo.push(doc.head.clone());
         doc.redo.clear();
@@ -419,6 +442,11 @@ impl Library {
         let doc = self.load(id)?;
         doc.check_base(base)?;
         let current = doc.current()?;
+        let manuscript = current
+            .write
+            .as_ref()
+            .map(|_| super::write::load(self, &doc, current))
+            .transpose()?;
         let parent = Parent {
             document_id: doc.id.clone(),
             version_id: doc.head.clone(),
@@ -426,14 +454,68 @@ impl Library {
             claude_assisted: doc.assisted(),
             origin_unverified: doc.unverified(),
         };
-        self.create_with(
+        let mut fork = self.create_with(
             doc.tool,
             title,
             &current.asset.name,
             &self.bytes(id, &current.asset)?,
             actor,
             Some(parent),
-        )
+        )?;
+        if let Some(manuscript) = manuscript {
+            let result = (|| -> Result<()> {
+                let (record, asset) = super::write::store(self, &fork.id, &manuscript)?;
+                fork.versions[0].write = Some(record);
+                fork.versions[0].asset = asset;
+                self.write_manifest(&fork)
+            })();
+            if result.is_err() {
+                let _ = fs::remove_dir_all(self.folder(&fork.id)?);
+            }
+            result?;
+        }
+        Ok(fork)
+    }
+    pub(super) fn save_write(
+        &self,
+        id: &str,
+        base: &str,
+        title: Option<&str>,
+        manuscript: &super::write::Manuscript,
+        actor: Actor,
+        reason: &str,
+    ) -> Result<Document> {
+        let mut doc = self.load(id)?;
+        doc.check_base(base)?;
+        let old = doc.current()?;
+        let before = super::write::load(self, &doc, old)?;
+        let title = title
+            .map(title_checked)
+            .transpose()?
+            .unwrap_or_else(|| old.title.clone());
+        let mut changes = super::write::changes(&before, manuscript);
+        if old.title != title {
+            changes.push(format!("Title: {} -> {}", old.title, title));
+        }
+        let (record, asset) = super::write::store(self, id, manuscript)?;
+        let v = Version {
+            id: wwav_ids::ulid(),
+            previous: Some(doc.head.clone()),
+            at: wwav_ids::now_ms(),
+            actor,
+            action: reason.chars().take(500).collect(),
+            title,
+            asset,
+            restored_from: None,
+            changes,
+            write: Some(record),
+        };
+        doc.undo.push(doc.head.clone());
+        doc.redo.clear();
+        doc.head = v.id.clone();
+        doc.versions.push(v);
+        self.write_manifest(&doc)?;
+        Ok(doc)
     }
     /// Undo is another immutable version, so neither actor history nor files disappear.
     pub fn restore(&self, id: &str, base: &str, redo: bool, actor: Actor) -> Result<Document> {
@@ -467,6 +549,7 @@ impl Library {
             asset: old.asset,
             restored_from: Some(target),
             changes: vec!["Earlier version restored".into()],
+            write: old.write,
         };
         doc.head = v.id.clone();
         doc.versions.push(v);
@@ -482,6 +565,18 @@ impl Library {
                 "Export a finished work from this tool before preparing a Space post.",
             ));
         }
+        // Share the edit ledger, never private manuscript notes or research snapshots.
+        let ledger: Vec<Value> = doc
+            .versions
+            .iter()
+            .map(|v| {
+                json!({
+                    "id":v.id,"at":v.at,"actor":v.actor,"action":v.action,
+                    "changes":v.changes,"restoredFrom":v.restored_from,
+                    "title":v.title,"sha256":v.asset.sha256
+                })
+            })
+            .collect();
         let bytes = self.bytes(id, &current.asset)?;
         let dir = self
             .root
@@ -498,7 +593,7 @@ impl Library {
                 atomic_bytes(&stage.join(&current.asset.name), &bytes)?;
                 atomic_json(
                     &stage.join("space.json"),
-                    &json!({"format":"wi-console-post/0.1","documentId":doc.id,"versionId":doc.head,"tool":doc.tool,"title":current.title,"file":current.asset,"lineage":doc.parent,"provenance":{"marker":doc.marker(),"versions":doc.versions},"published":false}),
+                    &json!({"format":"wi-console-post/0.1","documentId":doc.id,"versionId":doc.head,"tool":doc.tool,"title":current.title,"file":current.asset,"lineage":doc.parent,"provenance":{"marker":doc.marker(),"versions":ledger},"published":false}),
                 )?;
                 fs::rename(&stage, &dir)?;
                 Ok(())

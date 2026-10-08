@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react';
 import { File, LoaderCircle } from 'lucide-react';
 import { api, errorText, type ReadResult } from './client';
+import { write, type WriteData } from './write/client';
+import { Preview } from './write/Preview';
+import './write/write.css';
+
+function WriteReading({ id, version }: { id: string; version: string }) {
+  const [data, setData] = useState<WriteData | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let live = true;
+    write.read(id, version).then(r => { if (live) setData(r); }, e => { if (live) setError(errorText(e)); });
+    return () => { live = false; };
+  }, [id, version]);
+  return <div className="write-reading">{error && <p role="alert">{error}</p>}{data?.manuscript.sections.map(s => <section key={s.id}>{data.manuscript.mode !== 'screenplay' && <h2>{s.title}</h2>}<Preview text={s.text} mode={data.manuscript.mode} /></section>)}</div>;
+}
 
 export function Media({ data }: { data: ReadResult }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -32,6 +46,6 @@ export function Reader({ id, version }: { id: string; version?: string }) {
   return <div className="console-reader">
     {error && <p role="alert">{error}</p>}
     {!error && !data && <p role="status">Opening file...</p>}
-    {data && <><div className="console-reader-meta"><span>{data.version.title}</span><span>Read only</span></div><Media data={data} /><p className="console-file-path">{data.path}</p></>}
+    {data && <><div className="console-reader-meta"><span>{data.version.title}</span><span>Read only</span></div>{data.document.tool === 'write' && data.text !== null && data.version.asset.bytes <= 1024 * 1024 ? <WriteReading id={id} version={data.version.id} /> : <Media data={data} />}<p className="console-file-path">{data.path}</p></>}
   </div>;
 }

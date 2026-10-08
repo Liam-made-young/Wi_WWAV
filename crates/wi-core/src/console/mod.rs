@@ -2,6 +2,7 @@
 //! UI commands are hand edits; `call_tool` supplies Claude's actor itself.
 mod storage;
 mod tools;
+mod write;
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -21,6 +22,8 @@ struct ToolState {
     open: Vec<String>,
     active: Option<String>,
     selection: Value,
+    #[serde(default)]
+    views: BTreeMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -76,6 +79,9 @@ fn reply(d: &storage::Document) -> Result<Value> {
 }
 
 pub fn invoke(core: &Core, cmd: &str, args: Value) -> Result<Value> {
+    if cmd == "console.write.assist" {
+        return write::ask(core, &args);
+    }
     if cmd == "console.claude.ask" {
         return ask(core, &args);
     }
@@ -92,6 +98,9 @@ pub fn tool_definitions() -> Value {
 pub fn call_tool(core: &Core, name: &str, args: Value) -> Result<Value> {
     let cmd = tools::command(name)
         .ok_or_else(|| CoreError::new("unknown_tool", "Unknown Console tool."))?;
+    if cmd == "console.write.assist" {
+        return write::ask(core, &args);
+    }
     execute(core, cmd, args, Actor::Claude)
 }
 
@@ -99,6 +108,7 @@ fn execute(core: &Core, cmd: &str, args: Value, actor: Actor) -> Result<Value> {
     let l = Library::open(&core.library().join("Wi-WWAV Library"))?;
     let a = &args;
     let result = match cmd {
+        c if c.starts_with("console.write.") => write::invoke(core, &l, c, a, actor),
         "console.tools" => Ok(tool_definitions()),
         "console.workspace" => Ok(json!({"workspace":workspace(&l)?,"root":l.root})),
         "console.selectTool" => {
@@ -221,6 +231,22 @@ fn execute(core: &Core, cmd: &str, args: Value, actor: Actor) -> Result<Value> {
             let proposal: Value = storage::read_json(&path)?;
             let p = &proposal["args"];
             let d = match string(&proposal, "command")? {
+                "console.write.edit" => {
+                    let doc = l.load(string(p, "id")?)?;
+                    doc.check_base(string(p, "base")?)?;
+                    let mut manuscript = write::load(&l, &doc, doc.current()?)?;
+                    let action: write::Edit = serde_json::from_value(p["action"].clone())
+                        .map_err(|e| storage::refused(e.to_string()))?;
+                    write::edit(core, &mut manuscript, action)?;
+                    l.save_write(
+                        &doc.id,
+                        string(p, "base")?,
+                        None,
+                        &manuscript,
+                        Actor::Claude,
+                        proposal["summary"].as_str().unwrap_or("Claude edit"),
+                    )?
+                }
                 "console.save" => l.save(
                     string(p, "id")?,
                     string(p, "base")?,
@@ -261,10 +287,16 @@ fn execute(core: &Core, cmd: &str, args: Value, actor: Actor) -> Result<Value> {
                 | "console.read"
                 | "console.history"
                 | "console.claude.context"
+                | "console.write.read"
+                | "console.write.render"
+                | "console.write.transform"
+                | "console.write.research.search"
+                | "console.write.research.read"
+                | "console.write.export"
         ) {
             core.inner.bus.emit(
                 "console",
-                if cmd == "console.selection" {
+                if matches!(cmd, "console.selection" | "console.write.view") {
                     json!({"command":cmd,"workspace":value["workspace"]})
                 } else {
                     json!({"command":cmd})
@@ -332,8 +364,20 @@ fn context(l: &Library, a: &Value) -> Result<Value> {
     } else {
         None
     };
+    let manuscript = if let Some(d) = document.as_ref().filter(|d| {
+        d.tool == Tool::Write
+            && d.current()
+                .is_ok_and(|v| v.asset.mime.starts_with("text/") && v.asset.bytes <= MAX_TEXT)
+    }) {
+        let m = write::load(l, d, d.current()?)?;
+        Some(
+            json!({"mode":m.mode,"sections":m.sections.iter().map(|s|json!({"id":s.id,"parent":s.parent,"title":s.title,"kind":s.kind})).collect::<Vec<_>>()}),
+        )
+    } else {
+        None
+    };
     Ok(
-        json!({"tool":tool,"document":document.as_ref().map(|d|d.summary()).transpose()?,"selection":selection,"content":content,"tools":tools::definitions(),"available":document.is_some()}),
+        json!({"tool":tool,"document":document.as_ref().map(|d|d.summary()).transpose()?,"selection":selection,"content":content,"manuscript":manuscript,"tools":tools::definitions(),"available":document.is_some()}),
     )
 }
 

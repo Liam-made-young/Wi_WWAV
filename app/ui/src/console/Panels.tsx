@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, Check, Eye, GitBranch, MessageSquare, X } from 'lucide-react';
 import { api, errorText, type Document, type Proposal, type ToolId, type Version } from './client';
 import { toolById } from './registry';
+import { WriteClaude } from './write/Claude';
 
 export function IconButton({ label, children, ...props }: { label: string; children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button type="button" className="console-icon" aria-label={label} title={label} {...props}>{children}</button>;
@@ -26,7 +27,10 @@ export function HistoryPanel({ id, provenance, onRead }: { id: string; provenanc
     <ol>{[...data.versions].reverse().map((v, i) => <li key={v.id}><div><strong>v{data.versions.length - i} <span>{v.action}</span></strong><span className="console-history-actor">{v.actor === 'hand' ? 'By hand' : v.actor === 'claude' ? 'Claude' : 'Imported / origin unverified'}</span><time>{new Date(v.at).toLocaleString()}</time>{provenance && v.changes.map((c, n) => <p key={n}>{c}</p>)}{v.restoredFrom && <small>Restores {v.restoredFrom}</small>}</div><IconButton label={`Read version ${data.versions.length - i}`} onClick={() => onRead(v.id)}><Eye size={16} /></IconButton></li>)}</ol>
   </>}</div>;
 }
-export function ClaudePanel({ document: d, dirty, onApplied }: { document?: Document; dirty: boolean; onApplied(): Promise<void> }) {
+export function ClaudePanel(props: { document?: Document; dirty: boolean; onApplied(): Promise<void> }) {
+  return props.document?.tool === 'write' ? <WriteClaude document={props.document} dirty={props.dirty} onApplied={props.onApplied} /> : <OtherClaude {...props} />;
+}
+function OtherClaude({ document: d, dirty, onApplied }: { document?: Document; dirty: boolean; onApplied(): Promise<void> }) {
   const [prompt, setPrompt] = useState('');
   const [answer, setAnswer] = useState('');
   const [proposal, setProposal] = useState<Proposal | null>(null);
