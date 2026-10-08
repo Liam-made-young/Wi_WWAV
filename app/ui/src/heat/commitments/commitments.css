@@ -1,0 +1,331 @@
+/* Commitments (docs/COMMITMENTS.md): the layer Calendar and Today draw, the
+   lines under Today's subtitle, a mail's one-tap row, the Schedule section
+   and the sheets. A commitment is a solid, quiet block in its space's hue,
+   with its travel time fainter above and below; a task block keeps its heat
+   border and another calendar's event its grey hatching, so the three read
+   apart. Sizes and inks are tokens; the one colour made here is a space's
+   hue, as the sidebar's dot makes it. */
+
+/* ---- The layer ------------------------------------------------------------ */
+
+.heat-commit,
+.heat-commit-buffer,
+.heat-commit-dot {
+  --commit: var(--desk-ink3);
+}
+
+.heat-commit[data-hue='true'],
+.heat-commit-buffer[data-hue='true'],
+.heat-commit-dot[data-hue='true'] {
+  --commit: hsl(var(--hue) 62% 46%);
+}
+
+.heat-commit {
+  position: absolute;
+  left: 48px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  padding: 0 var(--space-s2);
+  border: 0;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--commit) 24%, var(--desk-well));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--commit) 50%, var(--desk-well));
+  color: var(--desk-ink);
+  font-size: var(--type-desk-small);
+  line-height: 16px;
+  text-align: left;
+  cursor: default;
+}
+
+.heat-cal-col .heat-commit,
+.heat-cal-col .heat-commit-buffer {
+  left: 0;
+  right: 0;
+}
+
+.heat-commit-title {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s1);
+  min-width: 0;
+}
+
+.heat-commit-name,
+.heat-commit-sub {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.heat-commit-name {
+  flex: 1;
+}
+
+.heat-commit-sub {
+  color: var(--desk-ink2);
+}
+
+/* A day an exception moved says so, and its edge is dashed. */
+.heat-commit[data-moved='true'] {
+  box-shadow: none;
+  outline: 1px dashed color-mix(in srgb, var(--commit) 70%, var(--desk-ink));
+  outline-offset: -1px;
+}
+
+.heat-commit-moved {
+  flex: none;
+  padding: 0 var(--space-s1);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-desk-small);
+  line-height: 12px;
+}
+
+/* Travel time: the same hue, faint, above and below. */
+.heat-commit-buffer {
+  position: absolute;
+  left: 48px;
+  right: 6px;
+  background: color-mix(in srgb, var(--commit) 10%, var(--desk-well));
+  border-inline: 1px dotted color-mix(in srgb, var(--commit) 45%, var(--desk-well));
+  pointer-events: none;
+}
+
+/* The month: a dot a commitment, in the cell's top left corner. */
+.heat-commit-dots {
+  position: absolute;
+  top: 9px;
+  left: var(--space-s2);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.heat-commit-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--commit) 70%, var(--desk-well));
+}
+
+.heat-commit-more {
+  font-size: var(--type-desk-small);
+  line-height: 1;
+  color: var(--desk-ink2);
+}
+
+/* A block that overlaps a commitment or its travel: a small flag, with the sentence as its title. */
+.heat-conflict {
+  flex: none;
+  align-self: center;
+  width: 0;
+  height: 0;
+  border-inline: 5px solid transparent;
+  border-bottom: 9px solid var(--heat-warm);
+}
+
+.heat-block[data-conflict='true'] {
+  border-style: dashed;
+  border-left-style: solid;
+}
+
+/* ---- Today's lines, and what a mail asked for ----------------------------- */
+
+.heat-next-line {
+  display: inline-block;
+  margin: var(--space-s1) 0 0;
+  padding: 1px var(--space-s2);
+  border-radius: var(--radius-chip);
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-small);
+  letter-spacing: 0.04em;
+  color: var(--desk-lcd-ink);
+  background: linear-gradient(var(--desk-lcd-ground));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--desk-lcd-ink) 30%, transparent);
+}
+
+.heat-free-line {
+  margin: var(--space-s1) 0 0;
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink2);
+}
+
+/* More is planned than the day has left: said plainly, in the sticky's yellow, with the words carrying it. */
+.heat-free-line[data-over='true'] {
+  width: fit-content;
+  padding: 0 var(--space-s2);
+  border: 1px solid color-mix(in srgb, var(--label-yellow) 65%, var(--desk-ink));
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--label-yellow) var(--sticky-mix, 30%), var(--desk-well));
+  color: var(--desk-ink);
+}
+
+.heat-pending {
+  display: grid;
+  gap: var(--space-s1);
+  margin-top: var(--space-s1);
+}
+
+.heat-cal > .heat-pending {
+  margin: 0;
+  padding: var(--space-s1) var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.heat-pending-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-s2);
+  margin: 0;
+  font-size: var(--type-desk-body);
+}
+
+/* ---- Schedule, in Calendar's sidebar --------------------------------------- */
+
+.heat-schedule-row {
+  align-items: flex-start;
+}
+
+.heat-schedule-row .heat-commit-dot {
+  margin-top: 5px;
+}
+
+.heat-schedule-words {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.heat-schedule-when {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.heat-schedule-remove {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--desk-ink2);
+}
+
+.heat-schedule-sleep {
+  padding: 0 var(--space-s3);
+}
+
+.heat-schedule-sleep .field {
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  margin-bottom: var(--space-s1);
+}
+
+.heat-schedule-sleep input {
+  min-width: 0;
+  width: 100%;
+}
+
+/* ---- The sheets -------------------------------------------------------------- */
+
+.heat-commit-days {
+  display: flex;
+  gap: var(--space-s1);
+  margin-bottom: var(--space-s2);
+}
+
+.heat-day-toggle {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 40%, var(--desk-well));
+  border-radius: 50%;
+  background: var(--desk-well);
+  color: var(--desk-ink);
+}
+
+.heat-day-toggle[aria-pressed='true'] {
+  border-color: var(--desk-select);
+  background: var(--desk-select);
+  color: var(--desk-select-ink);
+}
+
+.heat-commit-exceptions {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 var(--space-s2);
+  padding: 0;
+  list-style: none;
+}
+
+.heat-commit-exceptions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  column-gap: var(--space-s2);
+}
+
+.heat-commit-change,
+.heat-term-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0 var(--space-s2);
+}
+
+.heat-term-add .field:first-child {
+  flex: 1 1 180px;
+}
+
+.heat-schedule-modes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s1) var(--space-s4);
+  margin-bottom: var(--space-s2);
+}
+
+.heat-schedule-modes .field {
+  margin-bottom: 0;
+}
+
+.heat-schedule textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.heat-schedule-drop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s2);
+  padding: var(--space-s2) var(--space-s3);
+  border: 1px dashed color-mix(in srgb, var(--desk-ink) 40%, var(--desk-well));
+  border-radius: var(--radius-chip);
+}
+
+/* A line that is there already is greyed, and says so. */
+.heat-schedule-table tr[data-new='false'] th,
+.heat-schedule-table tr[data-new='false'] td {
+  color: var(--desk-ink2);
+}
+
+.heat-schedule-table td:first-child {
+  width: 24px;
+}
+
+.heat-schedule-table .check {
+  justify-content: center;
+  min-width: 24px;
+}

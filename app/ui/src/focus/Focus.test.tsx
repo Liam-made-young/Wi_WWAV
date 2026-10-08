@@ -170,7 +170,7 @@ describe('Focus', () => {
 
   it('shows the hint under the task at first, and not after the first week', async () => {
     const first = await mountFocus();
-    expect(text(first.rig, '.focus-hint')).toMatch(/K for anything · 1–8 for tools · hold .+ for the map/);
+    expect(text(first.rig, '.focus-hint')).toMatch(/K for anything · 1–9 for tools · hold .+ for the map/);
     first.rig.unmount();
     localStorage.setItem('wi.focusHint', JSON.stringify({ first: 0, launches: 99 }));
     const later = await mountFocus();

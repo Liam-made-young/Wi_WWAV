@@ -11,5 +11,7 @@ import './public';
 import './claude';
 import './settings';
 import '../../focus/fake';
+import './commitments';
+import './notes';
 
 export { createFake, type Fake } from './core';

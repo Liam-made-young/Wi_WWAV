@@ -88,6 +88,39 @@ fn default_range(date: &str) -> (String, String) {
     (zone::add_days(&first, -7.0), zone::add_days(&last, 7.0))
 }
 
+/// The stretch of days a snapshot covers: the one asked for, else the month
+/// around its day.
+pub fn window_of(clock: &Clock, window: &Window) -> (String, String) {
+    let date = window
+        .date
+        .clone()
+        .filter(|d| is_day(d))
+        .unwrap_or_else(|| clock.today());
+    let (default_from, default_to) = default_range(&date);
+    (
+        window
+            .from
+            .clone()
+            .filter(|d| is_day(d))
+            .unwrap_or(default_from),
+        window
+            .to
+            .clone()
+            .filter(|d| is_day(d))
+            .unwrap_or(default_to),
+    )
+}
+
+/// Commitments' and Notes' share of the snapshot (docs/COMMITMENTS.md,
+/// docs/NOTES.md), from one reading of the library: `commitments`, `notes`,
+/// `notices`, and the two record kinds.
+pub fn extras(store: &Store, clock: &Clock, window: &Window, snap: &mut Value) -> Result<()> {
+    let world = World::load(store)?;
+    let (from, to) = window_of(clock, window);
+    crate::commit::for_snapshot(store, &world, clock, snap, &from, &to)?;
+    crate::notes::for_snapshot(store, &world, clock, snap)
+}
+
 /// `heat.snapshot`: everything the views draw for a day.
 pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> {
     let today = clock.today();

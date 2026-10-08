@@ -8,7 +8,10 @@ import { useHeat } from '../store';
 
 export function useDailyNote() {
   const { snap, client, act, date } = useHeat();
-  const saved = snap?.records.dailyNote.find((n) => n.date === date)?.markdown ?? '';
+  // The day's note is the note titled with the day (docs/NOTES.md); a `dailyNote` record from before stands in until it is moved over.
+  const noteId = snap?.notes?.daily ?? null;
+  const note = noteId ? snap?.records.note.find((n) => n.id === noteId) : undefined;
+  const saved = note?.markdown ?? snap?.records.dailyNote.find((n) => n.date === date)?.markdown ?? '';
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(saved);
   const latest = useRef({ text, saved, open });
@@ -29,7 +32,7 @@ export function useDailyNote() {
       const { text: t, saved: s, open: o } = latest.current;
       if (!o) return false;
       setOpen(false);
-      if (t !== s) void act(client.put('dailyNote', { date, markdown: t }));
+      if (t !== s) void act(client.notes.daily(date, t));
       return true;
     },
   };

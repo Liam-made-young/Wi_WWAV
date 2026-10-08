@@ -12,6 +12,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { atMinute, type DayKey } from '../../shared/time/zone';
 import type { Id } from '../client';
+import { PendingExceptions } from '../commitments/Lines';
+import { Schedule } from '../commitments/Schedule';
 import { copy, plural } from '../fmt';
 import { useFrame, useSelection, useSheets, useSpaceFilter, useTabActs, useTabKeys, useTabScope } from '../frame';
 import { useHeat } from '../store';
@@ -176,6 +178,8 @@ export function Calendar() {
           </div>
         </div>
       </header>
+      <Schedule day={selected} />
+      <PendingExceptions />
       {mode === 'month' ? (
         <MonthView
           days={days}

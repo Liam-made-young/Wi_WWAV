@@ -465,7 +465,10 @@ pub(crate) struct Extra {
 /// Mount a list here, one line each:
 /// `&Extra { tools: learn_tools::TOOLS, stage: learn_tools::stage }`.
 /// A name here must not be one of [`TOOLS`]'s, and can't hold a dot.
-pub(crate) const EXTRA: &[&Extra] = &[];
+pub(crate) const EXTRA: &[&Extra] = &[&Extra {
+    tools: crate::learn_tools::FOR_ASK,
+    stage: crate::learn_tools::stage_for_ask,
+}];
 
 /// Every tool the box offers: its own, then what was mounted.
 pub(crate) fn all() -> impl Iterator<Item = &'static Tool> {

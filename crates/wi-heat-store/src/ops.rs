@@ -224,6 +224,21 @@ pub fn delete_record(store: &mut Store, _clock: &Clock, k: &str, id: &str) -> Re
                     .map(|g| (kind::GRADE, g.id.clone())),
             );
             without(&world.raw_tasks, "courseId", kind::TASK, id, &mut rewritten);
+            // A class and a note outlive their course: they only stop pointing at it.
+            without(
+                &all(store, kind::COMMITMENT)?,
+                "courseId",
+                kind::COMMITMENT,
+                id,
+                &mut rewritten,
+            );
+            without(
+                &all(store, kind::NOTE)?,
+                "courseId",
+                kind::NOTE,
+                id,
+                &mut rewritten,
+            );
         }
         kind::PROJECT => {
             gone.extend(
@@ -270,6 +285,20 @@ pub fn delete_record(store: &mut Store, _clock: &Clock, k: &str, id: &str) -> Re
             if busy {
                 return refused("This space still holds tasks, projects or milestones. Move or delete them first.");
             }
+            without(
+                &all(store, kind::COMMITMENT)?,
+                "spaceId",
+                kind::COMMITMENT,
+                id,
+                &mut rewritten,
+            );
+            without(
+                &all(store, kind::NOTE)?,
+                "spaceId",
+                kind::NOTE,
+                id,
+                &mut rewritten,
+            );
         }
         kind::TERM if world.courses.iter().any(|c| c.term_id == id) => {
             return refused("This term still holds courses. Delete them first.");

@@ -3,6 +3,8 @@
 
 mod account;
 mod ask;
+mod capture;
+mod commitments;
 mod common;
 mod db;
 mod export;
@@ -16,6 +18,7 @@ mod heat_watch;
 mod history;
 mod library;
 mod mail;
+mod notes;
 mod player;
 mod review;
 mod supervisor;

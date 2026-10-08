@@ -11,6 +11,7 @@ import { useMemo } from 'react';
 import { longDay } from '../../shared/time/format';
 import { useActions } from '../actions';
 import type { Id } from '../client';
+import { CommitmentLines, PendingExceptions } from '../commitments/Lines';
 import { copy, formatMinutes } from '../fmt';
 import { useSelection, useSheets, useSpaceFilter, useTabActs, useTabKeys } from '../frame';
 import { useHeat } from '../store';
@@ -90,6 +91,8 @@ export function Today() {
         <p className="heat-subtitle" data-text="secondary">
           {subtitle}
         </p>
+        <CommitmentLines />
+        <PendingExceptions />
       </header>
       <div className="heat-today-body">
         <TimeColumn blocks={view.blocks} drafts={view.drafts} />

@@ -13,6 +13,7 @@ import type { TabId } from './frame';
 import { Grades } from './grades/Grades';
 import { Habits } from './habits/Habits';
 import { Mail } from './mail/Mail';
+import { Notes } from './notes/Notes';
 import { Tasks } from './tasks/Tasks';
 import { Today } from './today/Today';
 import { Wiki } from './wiki/Wiki';
@@ -26,4 +27,5 @@ export const HEAT_TABS: Record<TabId, ComponentType> = {
   mail: Mail,
   database: Database,
   wiki: Wiki,
+  notes: Notes,
 };

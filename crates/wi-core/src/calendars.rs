@@ -29,7 +29,7 @@ static ONE_SYNC: Mutex<()> = Mutex::new(());
 
 /// The address as it will be fetched, or why it can't be. `webcal://` is
 /// `https://`. The address itself is never in the sentence.
-fn clean_address(url: &str) -> Result<String, CoreError> {
+pub(crate) fn clean_address(url: &str) -> Result<String, CoreError> {
     let url = url.trim();
     let lower = url.to_ascii_lowercase();
     let address = if let Some(rest) = lower

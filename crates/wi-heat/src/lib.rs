@@ -13,6 +13,11 @@
 //!   field (2.8, 9.7).
 //! - [`assist`] is the client side of `/api/assist/:task`: consent, bodies,
 //!   answers, failures and the one retry (2.11, 3.12).
+//! - [`commitments`] is the fixed things in a week: when a class or a shift
+//!   really happens, what a day has left around them, a schedule read out of
+//!   text, a photo or an `.ics` file, and mail that cancels a class.
+//! - [`notes`] is a note as markdown: its links, tags and checkboxes, the
+//!   file it is on disk, search, and where a captured page is filed.
 //! - [`model`] is Heat's own maths, ported from `app/ui/src/heat/model`: the
 //!   records, heat, estimates, grades, Plan my day, the focus timer, habits,
 //!   recurrence, the calendar, the weekly review's facts, spaces and moving in
@@ -21,8 +26,10 @@
 
 pub mod assist;
 pub mod brightspace;
+pub mod commitments;
 pub mod homes;
 pub mod ical;
 pub mod mail;
 pub mod model;
+pub mod notes;
 pub mod sync;

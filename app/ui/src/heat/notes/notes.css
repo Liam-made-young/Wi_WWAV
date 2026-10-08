@@ -1,0 +1,718 @@
+/* Notes (docs/NOTES.md): a list of notes and the open one beside it, on the
+   desk register. The note reads in one calm column about 70 characters
+   wide; what is written and what is drawn share one measure and one line
+   height, so a block doesn't jump when the caret enters it. Every colour and
+   size is a token (styles/tokens.css). */
+
+.notes {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+.notes-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  padding: var(--space-s2) var(--space-s4);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.notes-head .heat-heading {
+  margin: 0;
+}
+
+.notes-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+/* What the capture inbox is doing, said quietly under the heading. */
+.notes-capture {
+  margin: 0;
+  padding: var(--space-s1) var(--space-s4);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.notes-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 0;
+}
+
+/* ---- The list ---------------------------------------------------------------- */
+
+.notes-list {
+  overflow-y: auto;
+  border-right: 1px solid var(--desk-deck-edge);
+}
+
+.notes-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-s2);
+  align-items: baseline;
+  padding: var(--space-s1) var(--space-s3);
+  cursor: default;
+}
+
+.notes-row:nth-of-type(even) {
+  background: var(--desk-stripe);
+}
+
+.notes-row[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+.notes-row-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: bold;
+}
+
+.notes-row-date {
+  font-size: var(--type-desk-small);
+}
+
+.notes-row-excerpt {
+  display: -webkit-box;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.notes-row[aria-selected='true'] .notes-row-excerpt {
+  color: var(--desk-select-ink);
+}
+
+.notes-row-chips {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: var(--space-s1);
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.notes-row-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.notes-none {
+  margin: var(--space-s4);
+}
+
+/* ---- The open note ----------------------------------------------------------- */
+
+.notes-pane {
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--desk-well);
+}
+
+.notes-page {
+  display: flex;
+  flex-direction: column;
+  max-width: 70ch;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: var(--space-s4) var(--space-s5) var(--space-s6);
+  font-size: var(--type-desk-large);
+}
+
+/* The title is the note's name: large, and a field only when it has the keyboard. */
+.heat input.notes-title {
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  font-size: var(--type-desk-title);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+}
+
+.heat input.notes-title:hover,
+.heat input.notes-title:focus {
+  border-bottom-color: color-mix(in srgb, var(--desk-ink) 40%, var(--desk-well));
+}
+
+.notes-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s1) var(--space-s3);
+  margin: var(--space-s1) 0 var(--space-s3);
+  padding-bottom: var(--space-s2);
+  font-size: var(--type-desk-small);
+  border-bottom: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+}
+
+.notes-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.notes-file select {
+  max-width: 28ch;
+  font-size: var(--type-desk-body);
+}
+
+/* A page waiting in the inbox: where it goes is the first thing to decide. */
+.notes-meta[data-inbox] {
+  padding: var(--space-s2);
+  border: 1px solid var(--desk-highlight);
+  border-radius: var(--radius-chip);
+  background: var(--desk-stripe);
+}
+
+.notes-meta[data-inbox] .notes-file select {
+  font-weight: bold;
+  border-color: var(--desk-highlight);
+}
+
+.notes-acts {
+  display: flex;
+  gap: var(--space-s1);
+  margin-left: auto;
+}
+
+/* ---- The text: blocks, drawn or being written -------------------------------- */
+
+.notes-editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.notes-block {
+  padding: 2px 0;
+  cursor: text;
+  user-select: text;
+}
+
+.notes-block > :first-child {
+  margin-top: 0;
+}
+
+.notes-block > :last-child {
+  margin-bottom: 0;
+}
+
+.notes-writing {
+  position: relative;
+  margin: 2px calc(-1 * var(--space-s2));
+}
+
+.heat textarea.notes-field {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0 var(--space-s2);
+  overflow: hidden;
+  resize: none;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-body);
+  line-height: 1.6;
+  tab-size: 4;
+  background: var(--desk-stripe);
+  border: 0;
+  border-radius: var(--radius-chip);
+  box-shadow: inset var(--desk-select-bar) 0 0 var(--desk-highlight);
+}
+
+/* Under the last block: a click here starts the next one. */
+.notes-editor-end {
+  flex: 1;
+  min-height: 96px;
+  padding: var(--space-s2) 0;
+  text-align: left;
+  vertical-align: top;
+  color: var(--desk-ink3);
+  background: none;
+  border: 0;
+  cursor: text;
+}
+
+.notes-editor-end:focus-visible {
+  outline-offset: -3px;
+}
+
+.notes-p,
+.notes-items,
+.notes-quote,
+.notes-code,
+.notes-table {
+  margin: 0 0 var(--space-s2);
+}
+
+.notes-h {
+  margin: var(--space-s3) 0 var(--space-s1);
+  font-weight: bold;
+  line-height: 1.25;
+}
+
+h1.notes-h {
+  font-size: var(--type-desk-title);
+  font-weight: normal;
+}
+
+h2.notes-h {
+  font-size: 17px;
+}
+
+h3.notes-h,
+h4.notes-h,
+h5.notes-h,
+h6.notes-h {
+  font-size: var(--type-desk-large);
+}
+
+h4.notes-h,
+h5.notes-h,
+h6.notes-h {
+  color: var(--desk-ink2);
+}
+
+.notes-items {
+  padding-left: var(--space-s5);
+}
+
+.notes-items .notes-items {
+  margin-bottom: 0;
+}
+
+.notes-items > li[data-box] {
+  position: relative;
+  list-style: none;
+}
+
+.notes-box {
+  position: absolute;
+  top: 0.3em;
+  left: calc(-1 * var(--space-s5) + 2px);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+/* "Make task" waits beside its checkbox until the pointer or the keyboard is on the line. */
+.notes-make-task {
+  margin-left: var(--space-s2);
+  padding: 0 var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  background: none;
+  border: 1px dashed currentColor;
+  border-radius: var(--radius-pill);
+  opacity: 0;
+}
+
+li[data-box]:hover > .notes-make-task,
+li[data-box]:focus-within > .notes-make-task,
+.notes-make-task:focus-visible {
+  opacity: 1;
+}
+
+.notes-task-chip {
+  margin-left: var(--space-s2);
+  color: var(--desk-ink2);
+  background: none;
+}
+
+.notes-quote {
+  padding: var(--space-s1) var(--space-s3);
+  border-left: var(--desk-select-bar) solid var(--desk-highlight);
+  background: var(--desk-stripe);
+}
+
+.notes-quote > :last-child {
+  margin-bottom: 0;
+}
+
+.notes-code,
+.notes-code-inline {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-body);
+  background: color-mix(in srgb, var(--desk-ink) 6%, var(--desk-well));
+  border-radius: var(--radius-chip);
+}
+
+.notes-code {
+  padding: var(--space-s2) var(--space-s3);
+  overflow-x: auto;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.notes-code-inline {
+  padding: 1px var(--space-s1);
+}
+
+.notes-rule {
+  margin: var(--space-s3) 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--desk-ink) 30%, var(--desk-well));
+}
+
+.notes-table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: var(--type-desk-body);
+}
+
+.notes-table th,
+.notes-table td {
+  padding: var(--space-s1) var(--space-s2);
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 22%, var(--desk-well));
+}
+
+.notes-table th {
+  background: var(--desk-stripe);
+}
+
+.notes-link {
+  color: var(--desk-ink);
+  text-decoration: underline;
+}
+
+.notes-link[data-dead] {
+  text-decoration-style: dotted;
+}
+
+/* A link to a note, a course or a task is a button that reads as a link; one to nothing yet is dashed. */
+.notes-wikilink {
+  display: inline;
+  padding: 0;
+  font: inherit;
+  text-align: inherit;
+  color: var(--desk-ink);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--desk-highlight);
+  cursor: pointer;
+}
+
+.notes-wikilink[data-kind='course']::after,
+.notes-wikilink[data-kind='task']::after {
+  margin-left: var(--space-s1);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  content: attr(data-kind);
+}
+
+.notes-wikilink[data-kind='missing'] {
+  color: var(--desk-ink2);
+  border-bottom-style: dashed;
+  border-bottom-color: currentColor;
+}
+
+.notes-tag {
+  display: inline;
+  padding: 0 var(--space-s2);
+  font: inherit;
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink);
+  background: var(--desk-stripe);
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 22%, var(--desk-well));
+  border-radius: var(--radius-pill);
+}
+
+button.notes-tag {
+  cursor: pointer;
+}
+
+.notes-img-open {
+  display: block;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: zoom-in;
+}
+
+.notes-img {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  border: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+  border-radius: var(--radius-chip);
+}
+
+.notes-img-wait {
+  display: block;
+  padding: var(--space-s4);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  text-align: center;
+  background: color-mix(in srgb, var(--desk-ink) 5%, var(--desk-well));
+  border: 1px dashed color-mix(in srgb, var(--desk-ink) 30%, var(--desk-well));
+  border-radius: var(--radius-chip);
+}
+
+/* ---- The list `[[` opens, and Quick open's -------------------------------------- */
+
+.notes-links,
+.notes-quick-list {
+  margin: 0;
+  padding: var(--space-s1) 0;
+  list-style: none;
+}
+
+.notes-links {
+  position: absolute;
+  z-index: 6;
+  min-width: 220px;
+  max-width: 360px;
+  font-family: var(--type-desk-family);
+  font-size: var(--type-desk-body);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--desk-ink) 30%, transparent);
+}
+
+.notes-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  min-height: 24px;
+  padding: 2px var(--space-s3);
+  cursor: default;
+}
+
+.notes-link-row[aria-selected='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+}
+
+.notes-link-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.notes-quick-back {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: var(--desk-backdrop);
+}
+
+.notes-quick {
+  width: 420px;
+  max-width: calc(100% - var(--space-s5));
+  margin: 72px auto 0;
+  padding: var(--space-s3);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-sheet);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--desk-ink) 30%, transparent);
+  animation: fade-in var(--motion-beat) linear;
+}
+
+.notes-quick-field {
+  width: 100%;
+}
+
+.notes-quick .why {
+  margin: var(--space-s2) 0 0;
+}
+
+.notes-lightbox {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-s2);
+  padding: var(--space-s4);
+  background: color-mix(in srgb, var(--desk-ink) 70%, transparent);
+  cursor: zoom-out;
+  animation: fade-in var(--motion-beat) linear;
+}
+
+.notes-lightbox img {
+  max-width: 100%;
+  max-height: calc(100% - 60px);
+  background: var(--desk-well);
+  border-radius: var(--radius-chip);
+}
+
+/* ---- Under the text: what Claude suggested, and what links here ----------------- */
+
+.notes-suggest,
+.notes-backlinks {
+  margin-top: var(--space-s4);
+  padding-top: var(--space-s3);
+  font-size: var(--type-desk-body);
+  border-top: 1px solid color-mix(in srgb, var(--desk-ink) 16%, var(--desk-well));
+}
+
+.notes-section-title {
+  margin: 0 0 var(--space-s1);
+  font-size: var(--type-desk-small);
+  font-weight: normal;
+  color: var(--desk-ink2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.notes-suggest-tasks,
+.notes-backlink-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notes-suggest-task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.notes-suggest-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.notes-suggest-due {
+  font-size: var(--type-desk-small);
+}
+
+.notes-terms {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s1) var(--space-s2);
+  margin: var(--space-s2) 0;
+}
+
+.notes-backlink {
+  display: grid;
+  width: 100%;
+  padding: var(--space-s1) 0;
+  text-align: left;
+  color: var(--desk-ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.notes-backlink-title {
+  text-decoration: underline;
+}
+
+.notes-backlink-line {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+/* ---- The guide ------------------------------------------------------------------- */
+
+.notes-guide {
+  width: 520px;
+  max-height: calc(100% - var(--space-s4));
+  overflow-y: auto;
+}
+
+.notes-guide-step {
+  margin: var(--space-s3) 0 var(--space-s1);
+  font-size: var(--type-desk-body);
+}
+
+.notes-guide-list,
+.notes-guide-folders {
+  margin: 0 0 var(--space-s2);
+  padding-left: var(--space-s5);
+}
+
+.notes-guide code {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-small);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ---- The quiet notices: a small stack at the bottom left of the main view, above
+   Today's timer, under every sheet -------------------------------------------------- */
+
+/* At the foot of the sidebar, which is empty there on every tab: over the
+   main view a notice would sit on the daily note, a note's backlinks or the
+   timer. */
+.notes-notices {
+  position: absolute;
+  bottom: var(--space-s3);
+  left: var(--space-s2);
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s1);
+  width: calc(190px - 2 * var(--space-s2));
+  pointer-events: none;
+}
+
+.notes-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s1);
+  padding: var(--space-s2) var(--space-s1) var(--space-s1) var(--space-s2);
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--desk-ink) 18%, transparent);
+  pointer-events: auto;
+  animation: fade-in var(--motion-beat) linear;
+}
+
+.notes-notice-text {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.notes-notice-acts {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notes-notice-x {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  font-size: var(--type-desk-large);
+  line-height: 1;
+  color: var(--desk-ink2);
+  background: none;
+  border: 0;
+}

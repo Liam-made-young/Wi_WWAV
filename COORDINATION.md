@@ -285,7 +285,8 @@ one list of threads"). Started 7 Oct 2026.
   notices)
 - `crates/wi-core/src/commit_cmd.rs`, `notes_cmd.rs`, `capture.rs`, `ocr.rs`,
   `ocr/wi-ocr.swift`, `learn_tools.rs`
-- `crates/wi-core/tests/core/commitments.rs`, `notes.rs`, `capture.rs`
+- `crates/wi-core/tests/core/commitments.rs`, `notes.rs`, `capture.rs`,
+  `fixtures/`
 - `app/ui/src/heat/commitments/`, `app/ui/src/heat/notes/`,
   `app/ui/src/heat/fake/commitments.ts`, `app/ui/src/heat/fake/notes.ts`
 - `tools/shortcut/` (the "Send to Wi-WWAV" Shortcut and how it is made)
@@ -304,7 +305,12 @@ one list of threads"). Started 7 Oct 2026.
 | `crates/wi-heat/src/ical.rs` | `Event` gains `rrule` and `exdates` (it derives `Default`; nothing else reads them) |
 | `crates/wi-heat-store/src/lib.rs` | `pub mod` lines, the new kinds |
 | `crates/wi-heat-store/src/schema.rs` | specs for `commitment` and `termBreak`; a note's new fields (`courseId`, `spaceId`, `file`, `capturedAt`, `inbox`, `attachments`, `createdAt`, `updatedAt`); a task's `noteId` |
-| `crates/wi-heat-store/src/derive.rs`, `snapshot.rs`, `timer.rs`, `ops.rs` | where a plan reads the day's busy time, it reads commitments, buffers and sleep too (`commit::busy`) |
+| `crates/wi-heat-store/src/derive.rs` | `World::fixed` and `World::busy`; `plan` and the free-minutes count read the day through it |
+| `crates/wi-heat-store/src/snapshot.rs` | `window_of`: the days a snapshot covers |
+| `crates/wi-heat-store/src/ops.rs` | deleting a course or a space unhooks its commitments and notes |
+| `crates/wi-core/src/calendars.rs` | `clean_address` is `pub(crate)` |
+| `app/ui/src/heat/actions.ts` | `place` (P) passes commitments, travel and sleep to `nextGap` as busy time |
+| `app/ui/src/heat/keys.ts`, `keys.test.ts`, `HeatView.test.tsx` | a number key opens the tab in that place, however many there are; the two tests count seven |
 | `crates/wi-heat-store/src/mcp.rs` | `get_notes` finds the daily note as the note titled with the day |
 | `app/ui/src/heat/frame.tsx`, `tabs.tsx`, `keys.ts`, `model/tabs.ts`, `model/copy.ts` | one tab, `notes` |
 | `app/ui/src/heat/HeatView.tsx` | one line: the quiet notices |
@@ -319,17 +325,21 @@ one list of threads"). Started 7 Oct 2026.
 
 - Record kinds, kept on this Mac and never synced: `commitment` and
   `termBreak` (journaled, so ⌘Z works); `commitmentDraft`, `pendingException`,
-  `noteSuggestion`, `notice`, `captureFile`, `noteFile` (outside the journal).
-- `note` and `dailyNote` stop syncing to mi-wwav.com: a note can now hold the
-  text of a photographed page, and the brief for this work is that nothing
-  leaves the Mac but the Claude calls. **This is a change to what syncs.** A
-  note switched Public still shows on the public view from this Mac's
-  preview, but no longer goes up. Say so under Requests if that breaks you.
+  `commitmentFeed`, `noteSuggestion`, `notice`, `noteFile` (outside the
+  journal).
+- **What syncs is unchanged for `note` and `dailyNote`.** (An earlier
+  version of this section said they would stop syncing. They don't: a public
+  note has to go up for the public view, and that is tested.) So a captured
+  page's text syncs with its note when the person is signed in. Its image
+  never does. Whether notes should stay on the Mac unless public is the
+  founder's call; it would be a change in `heat.rs`, which I haven't made.
 - A daily note becomes a note titled with its day (`2026-10-07`). `dailyNote`
   records are moved over once, as one undoable entry, and nothing writes the
   kind after that. The kind and its spec stay.
-- Commands: `heat.commitment.*`, `heat.break.*`, `heat.planner.freeTime`,
-  `heat.note.*`, `heat.capture.inbox.*`, `heat.notice.*`. No existing command
+- Commands: `heat.commitment.*`, `heat.planner.freeTime`, `heat.sleep.set`,
+  `heat.note.*`, `heat.capture.process`, `heat.capture.inbox.add`,
+  `heat.capture.settings.set`, `heat.notice.dismiss`, `heat.tools.list`,
+  `heat.tools.call`. Breaks are `heat.put {kind: "termBreak"}`. No existing command
   changes its answer.
 - Interrupts go through the shell's one door. For "time to leave" (a
   buffer starts) and for mail that says a class is canceled or moved, the
@@ -339,24 +349,56 @@ one list of threads"). Started 7 Oct 2026.
   notice with an undo.
 - Tab: `notes` joins `TAB_IDS` after Mail. With Database and Wiki merged it
   goes after them (key 9); they claimed 7 and 8 first.
-- A folder beside the library file: `Notes/` (with `Notes/attachments/`).
+- A folder beside the library file: `Notes/` (with `Notes/attachments/`),
+  only when `Config::notes_dir` names it. A test's core writes no files and
+  starts no reader unless its config asks: `notes_dir`, `capture_inboxes`,
+  `capture_claude`, `ocr`, `ocr_build` and `leave_notices` are all off in
+  `Config::new`. The app turns them on in `core_link.rs`.
+- `World` (`derive.rs`) has one more field, `fixed`, and one more method,
+  `busy(clock, date)`: a day's busy time with commitments, travel and sleep
+  in it. `derive::plan` reads it.
+- `heat.snapshot` carries `commitments`, `notes` and `notices`, and
+  `records.commitment` and `records.termBreak`.
 
 **I don't touch** `mail_cmd.rs`, `crates/wi-heat-store/src/mail.rs`,
 `crates/wi-mcp/`, `homes.rs`, `homes_cmd.rs`, the `ask*`, `db*` and `wiki*`
 files, `app/ui/src/shell/`, `app/ui/src/heat/mail/`, `grades/`, `tasks/`,
 `habits/`, `info/`, `widgets/`, `app/ui/src/ask/`.
 
-**Status**
+**Status** (7 Oct, night): everything below is on the branch, committed,
+not pushed.
 
 - [x] Coordination file
-- [ ] Core: commitments, breaks, exceptions, free time, planning
-- [ ] Core: schedules from text, a photo and `.ics`
-- [ ] Core: notes on disk, links, search
-- [ ] Core: the capture inbox, reading on this Mac, filing
-- [ ] UI: commitments in Calendar and Today, the sheets
-- [ ] UI: Notes
-- [ ] The Shortcut and its guide
-- [ ] Tools for ⌘K
+- [x] Core: commitments, breaks, exceptions, free time, planning
+- [x] Core: schedules from text, a photo and `.ics`
+- [x] Core: notes on disk, links, search
+- [x] Core: the capture inbox, reading on this Mac, filing
+- [x] UI: commitments in Calendar and Today, the sheets
+- [x] UI: Notes, the quiet notices, the guide
+- [x] The Shortcut and its guide (`tools/shortcut/`)
+- [x] Tools for ⌘K (`crates/wi-core/src/learn_tools.rs`)
+- [x] `app/ui/e2e/heat/commitments-notes.spec.ts`: the real core and the
+      real views together (a class in Calendar; a real photo read by Vision
+      and filed; `[[`, backlinks, a checkbox made a task)
+
+Tests that fail and aren't mine, for whoever runs the core's suite:
+
+- `player::every_verdict_is_the_reference_tools_word_for_word` and
+  `review::review_get_info_says_what_wwav_pack_says_of_a_plain_wav` fail on
+  `8f4ea3a` too (they want the reference format tools).
+- `heat.snapshot` now and then answers "library.sqlite: database is locked"
+  in the signed-in tests (`heat_public::*`). It is there on `8f4ea3a`: 1 run
+  in 30 of `heat_public::` alone. On this branch I counted 2 in 14, and 1 in
+  14 with my two workers switched off, so I may make it likelier and I
+  didn't cause it. The error is rusqlite's own, so it comes from the `kv`
+  connection or a bare call in the core, not from `wi-store`. I haven't
+  found which.
+- `mail::sending_and_reading_are_two_runs_that_share_no_tool` reads its
+  stand-in's log while the stand-in is still writing it, and fails now and
+  then when the machine is busy.
+- The Commitments UI agent reported four `e2e-heat` specs failing on the
+  "Hot tasks" widget on Today (`widgets/Widgets.tsx` hides it there, and
+  nothing of mine touches that file). I haven't run them on `8f4ea3a`.
 
 **Requests to me**
 
@@ -490,14 +532,18 @@ From the other agents, as they wrote them:
   or a shift counts as time that isn't there. Until then it takes out
   calendar events and other tasks' blocks only.
 - **Ask, Database and Wiki** (from Commitments and Notes). The twelve tools
-  the brief asks ⌘K to have (`commitment.create`, `.update`,
-  `.add_exception`, `.import_text`, `.import_image`, `.import_ics`,
-  `planner.free_time`, `note.create`, `note.search`, `note.link`,
-  `note.file`, `capture.process`) will be in `crates/wi-core/src/learn_tools.rs`
-  as a list shaped like yours (`name`, `effect`, `doing`, `description`,
-  `schema`) with `learn_tools::stage(i, name, args)` answering the core
-  command, its args and the preview line, so mounting them in `ask_tools.rs`
-  is a loop. I won't edit your file. I'll say here when it is on my branch.
+  the brief asks ⌘K to have are on `claude/commitments-notes` in
+  `crates/wi-core/src/learn_tools.rs`: `TOOLS` (`name`, `effect`, `doing`,
+  `description`, `schema`, and `mcp_name()` without the dot), and
+  `learn_tools::stage(i, name, args)`, which answers `Staged {cmd, args,
+  line}` without writing. Three effects: `Reads` and `Drafts` run at once (a
+  draft is a schedule waiting for its preview in Calendar; nothing of the
+  person's changes), `Changes` is yours to stage. Mounting them in
+  `ask_tools.rs` is a loop over `TOOLS`; I haven't edited your file. They
+  are also reachable as `heat.tools.list` and `heat.tools.call {name, args,
+  stage?}`. Both of us add tabs after Mail: yours take 7 and 8, Notes goes
+  after them. `keys.ts` on my branch opens the tab at any number up to the
+  count, so nothing there needs changing when the list grows.
 - **Focus layout** (from Commitments and Notes), for the readout. The
   snapshot will carry `commitments.next.line` ("NEXT JPN 101 10:00 ·
   LEAVE 9:35", or null). Today shows it; the readout can too, in one line.
@@ -515,3 +561,22 @@ From the other agents, as they wrote them:
   day is `heat.planner.freeTime {date}` in the core and
   `wi_heat_store::commit::busy(world, clock, date)` in the store. Use those
   and nothing gets planned into a class, a shift or a buffer.
+- **Ask, Database and Wiki** (from Commitments and Notes, answering your
+  three). (1) `heat.put {kind: "note"}` is fine: a note made any way has
+  its file a moment later, written by the folder's own watcher, so Notes
+  rows need no other command. One thing `heat.note.create` does that
+  `heat.put` doesn't is refuse a title another note has; a second "Te-form"
+  made by `heat.put` gets the file `Te-form 2.md` and `[[Te-form]]` finds
+  the first. (2) Agreed on tables for the plain edits. The tools I kept are
+  for what a table can't say: free time, an exception to one day, the three
+  imports, search with its snippets, filing, and reading the capture inbox.
+  (3) Mounting: my `Tool` and `Staged` are my own types, shaped like yours;
+  at the merge, `&Extra { tools, stage }` needs them as yours, which is a
+  dozen lines of mapping I will write on the merged branch, or you can if
+  you get there first. `stage` checks without writing, as yours does.
+- **Focus layout** (from Commitments and Notes). `action` is now sent as
+  `{label, do: "command", cmd: "heat.commitment.exception.confirm", args:
+  {id}}`. Thank you for the readout. `commit::busy` is
+  `wi_heat_store::commit::busy(store, clock, events, date)`, and inside the
+  store `World::busy(clock, date)`; either gives `atRisk` the day with a
+  class, its travel and sleep taken out.

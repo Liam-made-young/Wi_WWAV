@@ -42,6 +42,11 @@ pub struct Event {
     pub start: Option<When>,
     pub end: Option<When>,
     pub due: Option<When>,
+    /// The rule it repeats by, as written, without "RRULE:". A class in a
+    /// timetable has one; a due date doesn't.
+    pub rrule: Option<String>,
+    /// The days a repeating event skips (EXDATE).
+    pub exdates: Vec<When>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -274,7 +279,29 @@ fn event(c: &Component, zones: &HashMap<String, TimeZone>, zone: &TimeZone) -> E
         start: when("DTSTART"),
         end: when("DTEND"),
         due: when("DUE"),
+        rrule: c
+            .prop("RRULE")
+            .map(|l| l.value.trim().to_string())
+            .filter(|r| !r.is_empty()),
+        exdates: exdates(c, zones, zone),
     }
+}
+
+/// Every EXDATE of an event: there may be several lines, each with several
+/// times between commas.
+fn exdates(c: &Component, zones: &HashMap<String, TimeZone>, zone: &TimeZone) -> Vec<When> {
+    let mut out = Vec::new();
+    for line in c.lines.iter().filter(|l| l.name == "EXDATE") {
+        for part in line.value.split(',') {
+            let one = Line {
+                name: line.name.clone(),
+                params: line.params.clone(),
+                value: part.to_string(),
+            };
+            out.extend(when(&one, zones, zone));
+        }
+    }
+    out
 }
 
 fn when(line: &Line, zones: &HashMap<String, TimeZone>, zone: &TimeZone) -> Option<When> {

@@ -110,9 +110,29 @@ fn answer_json(envelope: &Value) -> Result<Value, CoreError> {
     }
 }
 
+/// Runs `ask` in `folder`, where Claude may read files and do nothing else:
+/// a photo of a schedule, a notebook page Vision couldn't read. The folder
+/// is one the caller made for the run and holds only what is to be read;
+/// reading is the one built-in tool switched on, and a run can't read
+/// outside the folder it stands in.
+pub(crate) fn run_json_looking(i: &Inner, ask: &Ask, folder: &Path) -> Result<Value, CoreError> {
+    let envelope = run_in(&binary(i)?, ask, &|| i.closing(), Some(folder))?;
+    answer_json(&envelope)
+}
+
 /// The run itself: the result envelope `--output-format json` prints.
 /// `stop` is asked while waiting, so closing the app ends the run.
 fn run_at(binary: &Path, ask: &Ask, stop: &dyn Fn() -> bool) -> Result<Value, CoreError> {
+    run_in(binary, ask, stop, None)
+}
+
+/// [`run_at`], in a folder of its own when there is something to look at.
+fn run_in(
+    binary: &Path,
+    ask: &Ask,
+    stop: &dyn Fn() -> bool,
+    look: Option<&Path>,
+) -> Result<Value, CoreError> {
     let mut command = Command::new(binary);
     command
         .arg("-p")
@@ -120,8 +140,9 @@ fn run_at(binary: &Path, ask: &Ask, stop: &dyn Fn() -> bool) -> Result<Value, Co
         .arg("--no-session-persistence")
         // No skills either: their list alone is most of a run's cost.
         .arg("--disable-slash-commands")
-        // No built-in tools, ever: no shell, no files, no web.
-        .args(["--tools", ""]);
+        // No built-in tools, ever: no shell, no files, no web. A run that
+        // has something to look at may read, and only that.
+        .args(["--tools", if look.is_some() { "Read" } else { "" }]);
     if !ask.allowed_tools.is_empty() {
         command.args(["--allowedTools", &ask.allowed_tools.join(",")]);
     }
@@ -132,7 +153,7 @@ fn run_at(binary: &Path, ask: &Ask, stop: &dyn Fn() -> bool) -> Result<Value, Co
         command.args(["--json-schema", &schema.to_string()]);
     }
     // A folder of its own, so no project's instructions or settings apply.
-    let cwd = std::env::temp_dir();
+    let cwd = look.map_or_else(std::env::temp_dir, Path::to_path_buf);
     let mut path = vec![binary.parent().unwrap_or(Path::new("/")).to_path_buf()];
     path.extend(
         ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
@@ -308,6 +329,34 @@ mod tests {
         assert!(
             seen.contains("--json-schema\n{\"type\":\"object\"}"),
             "{seen}"
+        );
+    }
+
+    #[test]
+    fn a_run_with_something_to_look_at_may_read_and_stands_in_that_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = tempfile::tempdir().unwrap();
+        let seen = dir.path().join("seen");
+        let bin = script(
+            dir.path(),
+            &format!(
+                "printf '%s\\n' \"$@\" > {seen}; pwd -P >> {seen}; cat > /dev/null; echo '{{\"is_error\":false,\"result\":\"\"}}'",
+                seen = seen.display()
+            ),
+        );
+        run_in(
+            &bin,
+            &ask(&[], None, Duration::from_secs(20)),
+            NEVER,
+            Some(folder.path()),
+        )
+        .unwrap();
+        let seen = std::fs::read_to_string(&seen).unwrap();
+        assert!(seen.contains("--tools\nRead\n"), "{seen}");
+        let stood = seen.lines().last().unwrap();
+        assert_eq!(
+            Path::new(stood).canonicalize().unwrap(),
+            folder.path().canonicalize().unwrap()
         );
     }
 

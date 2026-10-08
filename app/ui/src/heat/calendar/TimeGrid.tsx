@@ -11,6 +11,7 @@ import { clock, longDay, shortMonthDay } from '../../shared/time/format';
 import { addDays, type DayKey, dayKey, keyParts, minuteOfDay, startOfDay } from '../../shared/time/zone';
 import { useActions } from '../actions';
 import type { HeatLevel, Id, TimeBlock } from '../client';
+import { CommitmentLayer, ConflictFlag, conflictLines } from '../commitments/CommitmentLayer';
 import { copy, formatMinutes } from '../fmt';
 import { useSelection } from '../frame';
 import { useHeat, useNow } from '../store';
@@ -61,6 +62,7 @@ export function TimeGrid({ days, selected, due, onPick, spaceId }: Props) {
   if (!snap) return null;
 
   const week = weekDays(key);
+  const conflicts = conflictLines(snap);
   const blocksOn = (day: DayKey) =>
     snap.records.timeBlock.filter((b) => b.date === day && (b.habitId !== undefined || inSpace(b.taskId)));
   const titleOf = (b: TimeBlock) =>
@@ -249,6 +251,7 @@ export function TimeGrid({ days, selected, due, onPick, spaceId }: Props) {
                       </div>
                     );
                   })}
+                  <CommitmentLayer day={day} toY={toY} />
                   {blocksOn(day).map((b) => {
                     const end = b.start + b.minutes;
                     const level = b.taskId ? snap.derived.tasks[b.taskId]?.heat.level : undefined;
@@ -261,11 +264,13 @@ export function TimeGrid({ days, selected, due, onPick, spaceId }: Props) {
                         data-selected={blockId === b.id}
                         data-current={day === date && b.start <= nowMin && nowMin < end}
                         data-finished={day === date && end <= nowMin}
+                        data-conflict={conflicts.has(b.id)}
                         style={{ top: toY(b.start), height: Math.max(16, toY(b.minutes)) }}
                         title={`${titleOf(b)}, ${clock(b.start)}, ${formatMinutes(b.minutes)}`}
                         onClick={() => selectBlock(b.id)}
                       >
                         <span className="heat-block-title">{titleOf(b)}</span>
+                        <ConflictFlag line={conflicts.get(b.id)} />
                       </div>
                     );
                   })}

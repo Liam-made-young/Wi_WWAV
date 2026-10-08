@@ -16,6 +16,9 @@
 //! - `heat_cmd`, `calendars`, `claude`, `watch`: Heat's `heat.*` commands,
 //!   its iCal calendars, Settings → Claude, and noticing the MCP helper
 //!   (docs/HEAT.md).
+//! - `commit_cmd`: commitments (docs/COMMITMENTS.md). `notes_cmd`, `capture`
+//!   and `ocr`: notes as files in a folder, and the capture inbox
+//!   (docs/NOTES.md).
 //! - `export`: Export everything (2.9).
 
 mod account;
@@ -27,8 +30,10 @@ mod ask_tools;
 mod batch;
 mod bus;
 mod calendars;
+mod capture;
 mod claude;
 mod claude_cli;
+mod commit_cmd;
 mod db;
 pub mod engine;
 mod export;
@@ -39,9 +44,12 @@ mod heat_cmd;
 mod history;
 mod homes_cmd;
 mod kv;
+mod learn_tools;
 mod library;
 mod mail_cmd;
 mod net;
+mod notes_cmd;
+mod ocr;
 mod player;
 mod settings;
 mod upload;
@@ -186,6 +194,25 @@ pub struct Config {
     /// Where the Wiki tab reads from. None: en.wikipedia.org. A test names
     /// a server of its own.
     pub wiki_url: Option<String>,
+    /// The folder notes are kept in as markdown files (docs/NOTES.md). None:
+    /// notes are records only, and nothing is written beside the library.
+    /// The app names `Notes` inside the library folder.
+    pub notes_dir: Option<PathBuf>,
+    /// Folders watched for photos and PDFs to capture, besides the one
+    /// inside the notes folder. The app names the two in iCloud Drive.
+    pub capture_inboxes: Vec<PathBuf>,
+    /// Whether a captured page may be sent to Claude: to read what this Mac
+    /// couldn't, to pick where it goes, to suggest tasks. Off unless the app
+    /// says so (and then the person's own switch decides).
+    pub capture_claude: bool,
+    /// `wi-ocr`, the text reader. None: `WI_WWAV_OCR`, else beside the app.
+    pub ocr: Option<PathBuf>,
+    /// Whether the core may build the text reader itself when it finds
+    /// none (ocr.rs). Off unless the app says so.
+    pub ocr_build: bool,
+    /// Whether "time to leave" is said, and subscribed calendars are read
+    /// again, while the app is open. Off unless the app says so.
+    pub leave_notices: bool,
 }
 
 impl Config {
@@ -210,8 +237,38 @@ impl Config {
             background_mail: false,
             auto_score: false,
             wiki_url: None,
+            notes_dir: None,
+            capture_inboxes: Vec::new(),
+            capture_claude: false,
+            ocr: None,
+            ocr_build: false,
+            leave_notices: false,
         }
     }
+}
+
+/// The name of the folder captures are put in (docs/NOTES.md).
+pub const CAPTURE_INBOX: &str = "Wi-WWAV Inbox";
+
+/// The capture inboxes in iCloud Drive, made if iCloud Drive is there: the
+/// one at its top, for the Mac (drag and drop, AirDrop, Continuity Camera),
+/// and the one inside the Shortcuts folder, which is the only place a
+/// shared Shortcut can save to without asking each time. Empty on a Mac
+/// with no iCloud Drive, and anywhere else.
+pub fn icloud_capture_inboxes() -> Vec<PathBuf> {
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+        return Vec::new();
+    };
+    let clouds = home.join("Library/Mobile Documents");
+    [
+        clouds.join("com~apple~CloudDocs"),
+        clouds.join("iCloud~is~workflow~my~workflows/Documents"),
+    ]
+    .into_iter()
+    .filter(|drive| drive.is_dir())
+    .map(|drive| drive.join(CAPTURE_INBOX))
+    .filter(|inbox| std::fs::create_dir_all(inbox).is_ok())
+    .collect()
 }
 
 pub(crate) struct Inner {
@@ -228,6 +285,15 @@ pub(crate) struct Inner {
     /// The Claude Code command line, when the config names one.
     claude: Option<PathBuf>,
     auto_score: bool,
+    /// The notes folder, when notes are kept as files.
+    notes_dir: Option<PathBuf>,
+    capture_inboxes: Vec<PathBuf>,
+    capture_claude: bool,
+    ocr_path: Option<PathBuf>,
+    ocr_build: bool,
+    /// What the capture inbox is doing, and what is known of the reader.
+    capture: capture::Capture,
+    ocr: ocr::Ocr,
     /// What Mail's worker has been asked for, and what it is doing.
     mail: mail_cmd::Mailbox,
     /// The Wiki tab's reader and its cache (wiki.rs).
@@ -357,6 +423,13 @@ impl Core {
             helper: config.helper.clone(),
             claude: config.claude.clone(),
             auto_score: config.auto_score,
+            notes_dir: config.notes_dir.clone(),
+            capture_inboxes: config.capture_inboxes.clone(),
+            capture_claude: config.capture_claude,
+            ocr_path: config.ocr.clone(),
+            ocr_build: config.ocr_build,
+            capture: capture::Capture::default(),
+            ocr: ocr::Ocr::default(),
             mail: mail_cmd::Mailbox::default(),
             wiki,
             ask: ask::State::default(),
@@ -377,6 +450,8 @@ impl Core {
             calendars::start(&inner),
             homes_cmd::start(&inner),
             mail_cmd::start(&inner, config.background_mail),
+            commit_cmd::start(&inner, config.leave_notices),
+            notes_cmd::start(&inner),
         ];
         Ok(Core { inner, workers })
     }

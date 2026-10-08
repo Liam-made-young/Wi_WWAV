@@ -32,13 +32,24 @@ import type { Id } from './client';
 /** What a dragged task carries in its dataTransfer: its id. */
 export const TASK_DRAG = 'application/x-heat-task';
 
-export type TabId = 'today' | 'tasks' | 'calendar' | 'grades' | 'habits' | 'mail' | 'database' | 'wiki';
+export type TabId = 'today' | 'tasks' | 'calendar' | 'grades' | 'habits' | 'mail' | 'database' | 'wiki' | 'notes';
 
 /**
  * The tabs in order, with their keys (3.17: 1-6, with no field focused). The
- * Database and the Wiki follow the first six, on 7 and 8 (docs/ASK.md).
+ * Database and the Wiki follow the first six, on 7 and 8 (docs/ASK.md), and
+ * Notes is on 9 (docs/NOTES.md).
  */
-export const TAB_IDS: readonly TabId[] = ['today', 'tasks', 'calendar', 'grades', 'habits', 'mail', 'database', 'wiki'];
+export const TAB_IDS: readonly TabId[] = [
+  'today',
+  'tasks',
+  'calendar',
+  'grades',
+  'habits',
+  'mail',
+  'database',
+  'wiki',
+  'notes',
+];
 
 /**
  * 3.3's table: what "+" adds (its tooltip is "New task", never "Add", 7.5)
@@ -59,6 +70,7 @@ export const TAB_TABLE: Record<TabId, { name: string; plus: string | null; adds:
   mail: { name: 'Mail', plus: null, adds: null, secondary: 'Open in Gmail' },
   database: { name: 'Database', plus: 'New row', adds: 'A row in this table', secondary: 'Fill down' },
   wiki: { name: 'Wiki', plus: null, adds: null, secondary: 'Search Wikipedia' },
+  notes: { name: 'Notes', plus: 'New note', adds: 'A note', secondary: 'Quick open' },
 };
 
 export interface Act {

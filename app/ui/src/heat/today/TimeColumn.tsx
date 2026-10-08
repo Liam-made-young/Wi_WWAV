@@ -12,6 +12,7 @@ import { type CSSProperties, type DragEvent, type PointerEvent, useLayoutEffect,
 import { addDays, minuteOfDay, startOfDay } from '../../shared/time/zone';
 import { useActions } from '../actions';
 import type { Draft, HeatLevel, Id, TimeBlock } from '../client';
+import { CommitmentLayer, ConflictFlag, conflictLines } from '../commitments/CommitmentLayer';
 import { clock, formatMinutes } from '../fmt';
 import { useSelection } from '../frame';
 import { useHeat, useNow } from '../store';
@@ -122,6 +123,7 @@ export function TimeColumn({ blocks, drafts }: { blocks: TimeBlock[]; drafts: Dr
   };
 
   const line = nowLineY(nowMin);
+  const conflicts = conflictLines(s);
   const title = (b: TimeBlock) =>
     (b.habitId ? idx.habit.get(b.habitId)?.title : idx.task.get(b.taskId ?? '')?.title) ?? '';
 
@@ -154,6 +156,7 @@ export function TimeColumn({ blocks, drafts }: { blocks: TimeBlock[]; drafts: Dr
             <span className="heat-event-title">{e.title}</span>
           </div>
         ))}
+        <CommitmentLayer day={date} toY={minutesToY} from={COLUMN_START} to={COLUMN_END} />
 
         {blocks.map((b) => {
           const shown = drag?.id === b.id ? drag : b;
@@ -169,6 +172,7 @@ export function TimeColumn({ blocks, drafts }: { blocks: TimeBlock[]; drafts: Dr
               data-current={b.date === date && b.start <= nowMin && nowMin < end}
               data-finished={b.date === date && end <= nowMin}
               data-dragging={drag?.id === b.id}
+              data-conflict={conflicts.has(b.id)}
               style={
                 { top: minutesToY(shown.start), height: Math.max(16, (shown.minutes / 60) * HOUR_PX) } as CSSProperties
               }
@@ -179,6 +183,7 @@ export function TimeColumn({ blocks, drafts }: { blocks: TimeBlock[]; drafts: Dr
                 {b.date === date && end <= nowMin ? '✓ ' : ''}
                 {title(b)}
               </span>
+              <ConflictFlag line={conflicts.get(b.id)} />
               <span className="heat-block-length">{formatMinutes(shown.minutes)}</span>
               <span className="heat-block-grip" data-grip onPointerDown={(e) => begin(e, b, 'resize')} />
             </div>

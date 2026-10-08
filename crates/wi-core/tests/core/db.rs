@@ -1029,7 +1029,7 @@ fn csv_goes_out_and_comes_back() {
             "sorts": [{"column": "title"}], "order": ["title", "courseId", "due", "estMin", "done"],
             "hidden": ["id", "spaceId", "type", "projectId", "milestoneId", "group", "parentTaskId", "scheduledDate",
                        "rrule", "difficulty", "estBy", "estReason", "adjustMin", "notes", "link", "doneAt", "source",
-                       "sourceId", "claudeReason", "tag", "public", "typeBy", "difficultyBy", "~heat", "~level", "~planned", "~logged", "~next"],
+                       "sourceId", "claudeReason", "tag", "noteId", "public", "typeBy", "difficultyBy", "~heat", "~level", "~planned", "~logged", "~next"],
         }}),
     );
     assert_eq!(out["name"], "Tasks.csv");

@@ -205,6 +205,15 @@ to go up; they leave when you're back."
 The views add their own areas (`heat.*`, `space.*`, `console.*`) under the
 same conventions, each listed here when it is built.
 
+### commitments and notes
+
+`heat.commitment.*`, `heat.planner.freeTime` and `heat.sleep.set` are in
+`docs/COMMITMENTS.md`; `heat.note.*`, `heat.capture.process`,
+`heat.capture.inbox.add`, `heat.capture.settings.set`, `heat.notice.dismiss`,
+`heat.tools.list` and `heat.tools.call` are in `docs/NOTES.md`. They follow
+the conventions above: one sentence for a refusal, `undo` on every write, the
+`heat` event with the kinds that changed.
+
 ## What the shell adds
 
 The Tauri app (`app/src-tauri/README.md`) answers two more commands of its own

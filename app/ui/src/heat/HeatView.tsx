@@ -53,6 +53,7 @@ import {
 import './heat.css';
 import { InfoPanel } from './info/InfoPanel';
 import { focusKind, type HeatCommand, heatRoute } from './keys';
+import { Notices } from './notes/Notices';
 import { NewTaskSheet, TookSheet } from './sheets';
 import { SpacesFilter } from './SpacesFilter';
 import { useHeat } from './store';
@@ -594,6 +595,7 @@ function Frame(p: FrameProps) {
           {sheet.kind === 'custom' && sheet.node}
         </>
       )}
+      <Notices />
       <p className="heat-sr" aria-live="polite">
         {p.message}
       </p>
