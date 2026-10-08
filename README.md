@@ -51,11 +51,15 @@ The window opens on Learn. Your library is made at `~/Music/Wi_WWAV/` the first 
 
 **What this build holds** (7 Oct 2026; `docs/PLAN.md` has the details):
 
-- **Learn** (⌘1): Today with the time column, Plan my day and the Pomodoro timer; Tasks; Calendar; Grades; Habits; Mail; Get Info with the Public switch; capture (⌘⇧N). Not built yet: the Settings panes for Learn, Claude and Privacy, sharing to your galaxy and the public view page, the space sheet, notes and the weekly review.
+- **Learn** (⌘1): Today with the time column, Plan my day and the Pomodoro timer; Tasks; Calendar; Grades; Habits; Mail; Notes; Get Info with the Public switch; capture (⌘⇧N). Not built yet: the Settings panes for Learn, Claude and Privacy, sharing to your galaxy and the public view page, the space sheet and the weekly review.
 - **Space** (⌘2): the frame, drawing a sample sky in 3D.
 - **Console** (⌘3): the frame, listing your library. The audio engine isn't built by these steps (it needs JUCE and CMake), so it says the engine is off; Learn never needs it.
 
 **Calendars.** Settings → Learn (⌘,) takes your Brightspace calendar link and any other calendar's iCal address. Each is kept in the Keychain. In Brightspace: Calendar → Subscribe, and copy the link.
+
+**Commitments.** Your classes, shifts and commutes go in from Calendar's sidebar (Schedule): by hand, by pasting a schedule, by dropping a photo of one, or from an `.ics` file or address. Plan my day and P then keep clear of them, of the travel time around them and of sleep, and Today says what the day has left. `docs/COMMITMENTS.md` has the details.
+
+**Notes.** Notes are markdown files in `~/Music/Wi_WWAV/Notes`, which any editor can open; Learn keeps them in step with what it shows. To get a notebook page in from an iPhone, add the Shortcut in `tools/shortcut/` (its README says how), then take a photo, tap Share, and tap Send to Wi-WWAV. On the Mac, drop or paste an image on the Notes tab, or put it in `Wi-WWAV Inbox` in iCloud Drive. The page is read on this Mac (the first time, the app builds its reader with `swiftc`, which takes a few seconds and needs Xcode's command-line tools) and filed to the class it was taken in. `docs/NOTES.md` has the details.
 
 **Mail.** The app holds no password for any mailbox. It runs your own Claude Code (`claude`, signed in, with its Gmail connector on) to read mail every half hour while it is open and to send what you write. Add your addresses in Settings → Learn → Mail accounts: one is the mailbox Claude's Gmail connector is signed in to, and any other is forwarded into it at a plus address. In Mail you can read a thread, reply, compose, archive, mark unread, search and sort; "Read mail now" reads at once, and the Outbox shows what is waiting or failed.
 
