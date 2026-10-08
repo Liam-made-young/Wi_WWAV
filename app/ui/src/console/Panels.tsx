@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Eye, GitBranch, MessageSquare, X } from 'lucide-react
 import { api, errorText, type Document, type Proposal, type ToolId, type Version } from './client';
 import { toolById } from './registry';
 import { WriteClaude } from './write/Claude';
+import { ImageClaude } from './image/Claude';
 
 export function IconButton({ label, children, ...props }: { label: string; children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button type="button" className="console-icon" aria-label={label} title={label} {...props}>{children}</button>;
@@ -28,6 +29,7 @@ export function HistoryPanel({ id, provenance, onRead }: { id: string; provenanc
   </>}</div>;
 }
 export function ClaudePanel(props: { document?: Document; dirty: boolean; onApplied(): Promise<void> }) {
+  if (props.document?.tool === 'image') return <ImageClaude {...props} document={props.document} />;
   return props.document?.tool === 'write' ? <WriteClaude document={props.document} dirty={props.dirty} onApplied={props.onApplied} /> : <OtherClaude {...props} />;
 }
 function OtherClaude({ document: d, dirty, onApplied }: { document?: Document; dirty: boolean; onApplied(): Promise<void> }) {

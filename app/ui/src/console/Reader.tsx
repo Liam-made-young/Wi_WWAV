@@ -26,6 +26,7 @@ export function Media({ data }: { data: ReadResult }) {
     return () => URL.revokeObjectURL(objectUrl);
   }, [data]);
   const mime = data.version.asset.mime;
+  if (data.preview) return <img src={`data:${data.preview.mime};base64,${data.preview.base64}`} alt={data.version.title} className="console-media-image" />;
   if (data.text !== null) return <pre className="console-text-preview">{data.text || 'Empty document'}</pre>;
   if (!url) return <LoaderCircle aria-label="Loading preview" />;
   if (mime.startsWith('image/')) return <img src={url} alt={data.version.title} className="console-media-image" />;

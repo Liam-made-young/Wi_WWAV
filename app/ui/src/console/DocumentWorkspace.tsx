@@ -5,6 +5,7 @@ import { toolById } from './registry';
 import { Media } from './Reader';
 import { IconButton } from './Panels';
 import { WriteWorkspace } from './write/WriteWorkspace';
+import { ImageWorkspace } from './image/ImageWorkspace';
 
 export interface WorkspaceProps {
   document: Document; visible: boolean; busy: boolean; onDirty(v: boolean): void;
@@ -13,6 +14,7 @@ export interface WorkspaceProps {
   onRefresh(): Promise<void>;
 }
 export function DocumentWorkspace(props: WorkspaceProps) {
+  if (props.document.tool === 'image' && ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'application/json'].includes(props.document.asset.mime)) return <ImageWorkspace {...props} />;
   return props.document.tool === 'write' && props.document.asset.mime.startsWith('text/') && props.document.asset.bytes <= 1024 * 1024 ? <WriteWorkspace {...props} /> : <OtherWorkspace {...props} />;
 }
 function OtherWorkspace({ document: d, visible, busy, onDirty, onSave, onError, onPanel, onVariation, onUndo, onPost }: WorkspaceProps) {

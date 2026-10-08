@@ -1,7 +1,7 @@
 # Console
 
 Phase 0 supplies the four-tool shell and the shared local Library; Phase 1
-adds Write as a standalone writing tool. Write,
+adds Write as a standalone writing tool; Phase 2 adds Image. Write,
 Image, Audiovisual and 3D retain separate open documents and selections.
 Mounted editors retain drafts across tool and room switches. Saved workspace
 state survives restarting. Unsaved drafts are memory-only, guarded against
@@ -17,9 +17,10 @@ module and the `console.*` dispatcher in `Core::invoke`.
 Each tool has an independent document surface and the same document actions.
 Write has a CodeMirror Markdown/Fountain editor, a section binder and outline,
 screenplay and lyrics modes, notes/research, exports, and scoped Claude edits.
-The other native documents still have empty canvases. Imported text, images,
-audio and video have read-only readers. Brushes, a timeline, modeling,
-rendering and media export belong to later phases.
+Image has pixel and vector layers, pressure-aware brushes, selections, masks,
+adjustments, groups, transforms and PNG/JPG/SVG/PDF exports. Audiovisual and
+3D still have empty canvases. Imported text, images, audio and video have
+read-only readers. Timeline and modeling belong to later phases.
 
 Keys 1-4 switch tools while Console is active and focus is outside a field.
 Command-T opens its Claude entry; Command-S saves. Command-Z outside text
@@ -357,3 +358,33 @@ Claude-service call was part of these tests.
 
 Phase 1 is complete. Liam authorized Image (Phase 2) to begin immediately
 after this phase's commit and coordination report; it remains a separate phase.
+
+## Image (Phase 2)
+
+The `wi-image/1` bundle stores its JSON model, ordinary PNG pixel layers and
+masks, SVG vector layers, and a flattened PNG alongside immutable versions.
+Every persisted edit runs in Rust through `console.image.edit`; the same
+tool schemas serve UI and Claude. Selection and viewport preferences are
+workspace state. Claude proposals cannot create pixels; applying an allowed
+adjustment, selection, arrangement or vector edit creates an undoable version.
+
+PNG/JPEG/WebP decoding, EXIF orientation, SVG rendering, painting, adjustments,
+masking, compositing and exports stay in Rust. Preview images have a bounded
+1536-pixel edge; zoom requests a detail region. PDF exports are rasterized.
+SVG preserves normal vector layers but embeds PNG for adjusted/masked layers;
+non-normal blends flatten the entire SVG to preserve appearance.
+
+Limits: 16 megapixels, 8192-pixel edges, 64 layers, four group levels,
+4096 vector objects, 64 MiB imports and 128 MiB saved assets. Generic Library
+imports still have the earlier 24 MiB bound. There is no ICC workflow,
+crash-recovery autosave or advanced typography. Saves render the full canvas
+and may take seconds; navigation does not depend on full-resolution decoding
+in the webview. A local 4096-square import/save/preview measured 2.3 seconds
+and pan-frame p95 was 17.3 ms, not a cross-device guarantee.
+
+Core now requires Rust 1.88 for image 0.25.10. Dependency notices are shipped
+in `public/licenses/image.txt`; no GPL or ffmpeg dependency was added.
+Verification includes 37 Console Rust tests, the existing 948-pass UI suite,
+typechecking, production build, real-core browser workflows and inspected
+desktop/mobile screenshots and a rendered PDF. Live Claude uses the installed
+CLI; automated tests substitute a deterministic proposal process.

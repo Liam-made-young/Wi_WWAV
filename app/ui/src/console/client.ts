@@ -5,7 +5,7 @@ export interface Asset { name: string; file: string; mime: string; bytes: number
 export interface Parent { documentId: string; versionId: string; title: string; claudeAssisted: boolean; originUnverified: boolean }
 export interface Document { id: string; tool: ToolId; title: string; head: string; updatedAt: number; versions: number; parent: Parent | null; marker: string; asset: Asset; canUndo: boolean; canRedo: boolean }
 export interface Version { id: string; previous: string | null; at: number; actor: 'hand' | 'claude' | 'import'; action: string; title: string; asset: Asset; restoredFrom: string | null; changes: string[] }
-export interface ReadResult { document: Document; version: Version; text: string | null; base64: string | null; path: string; readOnly: true }
+export interface ReadResult { document: Document; version: Version; text: string | null; base64: string | null; path: string; readOnly: true; preview?: { mime: string; base64: string } | null }
 export interface ToolState { open: string[]; active: string | null; selection: unknown }
 export interface Workspace { tool: ToolId; tools: Record<ToolId, ToolState> }
 export interface Listing { root: string; documents: Document[]; issues: { file: string; message: string }[] }

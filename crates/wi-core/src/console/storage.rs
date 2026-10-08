@@ -95,6 +95,8 @@ pub struct Version {
     pub changes: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub write: Option<super::write::Record>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<super::image::Record>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -251,7 +253,12 @@ impl Library {
         atomic_json(&self.folder(&doc.id)?.join("manifest.json"), doc)
     }
     pub(super) fn asset(&self, id: &str, name: &str, bytes: &[u8]) -> Result<Asset> {
-        if bytes.len() > MAX_CONTENT {
+        let limit = if name.ends_with(".png") || name.ends_with(".svg") {
+            super::image::MAX_IMAGE_BYTES
+        } else {
+            MAX_CONTENT
+        };
+        if bytes.len() > limit {
             return Err(refused("Phase 0 files are limited to 24 MiB. Large media streaming arrives with the editors."));
         }
         let (name, mime) = file_kind(name)?;
@@ -272,7 +279,7 @@ impl Library {
         let path = folder.join(&file);
         if !path.exists() {
             atomic_bytes(&path, bytes)?;
-        } else if read_limited(&path, MAX_CONTENT)? != bytes {
+        } else if read_limited(&path, limit)? != bytes {
             return Err(refused("A content file no longer matches its hash."));
         }
         let preview = if mime.starts_with("text/") {
@@ -302,7 +309,12 @@ impl Library {
         if !path.starts_with(fs::canonicalize(&folder)?) {
             return Err(refused("Content must stay inside its document bundle."));
         }
-        let bytes = read_limited(&path, MAX_CONTENT)?;
+        let limit = if asset.mime == "image/png" || asset.mime == "image/svg+xml" {
+            super::image::MAX_IMAGE_BYTES
+        } else {
+            MAX_CONTENT
+        };
+        let bytes = read_limited(&path, limit)?;
         if hex::encode(Sha256::digest(&bytes)) != asset.sha256 {
             return Err(refused("This file was changed outside Console. Import it as a new file to preserve its history."));
         }
@@ -327,13 +339,24 @@ impl Library {
         let folder = self.folder(&id)?;
         fs::create_dir(&folder)?;
         let result = (|| {
-            let asset = self.asset(&id, name, bytes)?;
+            let mut asset = self.asset(&id, name, bytes)?;
             let write = if tool == Tool::Write
                 && asset.mime.starts_with("text/")
                 && bytes.len() <= MAX_TEXT
             {
                 let manuscript = super::write::seed(&id, name, bytes)?;
                 Some(super::write::store(self, &id, &manuscript)?.0)
+            } else {
+                None
+            };
+            let image = if tool == Tool::Image {
+                super::image::seed(self, &id, &asset)?
+                    .map(|m| super::image::store(self, &id, &id, &m))
+                    .transpose()?
+                    .map(|(record, rendered)| {
+                        asset = rendered;
+                        record
+                    })
             } else {
                 None
             };
@@ -355,6 +378,7 @@ impl Library {
                 restored_from: None,
                 changes: vec!["Document created".into()],
                 write,
+                image,
             };
             let doc = Document {
                 format: "wi-console/0.1".into(),
@@ -430,6 +454,7 @@ impl Library {
             restored_from: None,
             changes,
             write: old.write,
+            image: old.image,
         };
         doc.undo.push(doc.head.clone());
         doc.redo.clear();
@@ -447,6 +472,20 @@ impl Library {
             .as_ref()
             .map(|_| super::write::load(self, &doc, current))
             .transpose()?;
+        let image = if doc.tool == Tool::Image
+            && (current.image.is_some()
+                || matches!(
+                    current.asset.mime.as_str(),
+                    "image/png"
+                        | "image/jpeg"
+                        | "image/webp"
+                        | "image/svg+xml"
+                        | "application/json"
+                )) {
+            Some(super::image::load(self, &doc, current)?)
+        } else {
+            None
+        };
         let parent = Parent {
             document_id: doc.id.clone(),
             version_id: doc.head.clone(),
@@ -466,6 +505,18 @@ impl Library {
             let result = (|| -> Result<()> {
                 let (record, asset) = super::write::store(self, &fork.id, &manuscript)?;
                 fork.versions[0].write = Some(record);
+                fork.versions[0].asset = asset;
+                self.write_manifest(&fork)
+            })();
+            if result.is_err() {
+                let _ = fs::remove_dir_all(self.folder(&fork.id)?);
+            }
+            result?;
+        }
+        if let Some(image) = image {
+            let result = (|| -> Result<()> {
+                let (record, asset) = super::image::store(self, id, &fork.id, &image)?;
+                fork.versions[0].image = Some(record);
                 fork.versions[0].asset = asset;
                 self.write_manifest(&fork)
             })();
@@ -509,6 +560,49 @@ impl Library {
             restored_from: None,
             changes,
             write: Some(record),
+            image: None,
+        };
+        doc.undo.push(doc.head.clone());
+        doc.redo.clear();
+        doc.head = v.id.clone();
+        doc.versions.push(v);
+        self.write_manifest(&doc)?;
+        Ok(doc)
+    }
+    pub(super) fn save_image(
+        &self,
+        id: &str,
+        base: &str,
+        title: Option<&str>,
+        image: &super::image::Record,
+        actor: Actor,
+        reason: &str,
+    ) -> Result<Document> {
+        let mut doc = self.load(id)?;
+        doc.check_base(base)?;
+        let old = doc.current()?;
+        let before = super::image::load(self, &doc, old)?;
+        let title = title
+            .map(title_checked)
+            .transpose()?
+            .unwrap_or_else(|| old.title.clone());
+        let mut changes = super::image::changes(&before, image);
+        if old.title != title {
+            changes.push(format!("Title: {} -> {}", old.title, title));
+        }
+        let (record, asset) = super::image::store(self, id, id, image)?;
+        let v = Version {
+            id: wwav_ids::ulid(),
+            previous: Some(doc.head.clone()),
+            at: wwav_ids::now_ms(),
+            actor,
+            action: reason.chars().take(500).collect(),
+            title,
+            asset,
+            restored_from: None,
+            changes,
+            write: None,
+            image: Some(record),
         };
         doc.undo.push(doc.head.clone());
         doc.redo.clear();
@@ -550,6 +644,7 @@ impl Library {
             restored_from: Some(target),
             changes: vec!["Earlier version restored".into()],
             write: old.write,
+            image: old.image,
         };
         doc.head = v.id.clone();
         doc.versions.push(v);
@@ -711,6 +806,7 @@ pub fn file_kind(name: &str) -> Result<(String, &'static str)> {
         "md" | "txt" | "fountain" | "obj" => "text/plain",
         "json" | "gltf" => "application/json",
         "png" => "image/png",
+        "svg" => "image/svg+xml",
         "jpg" | "jpeg" => "image/jpeg",
         "webp" => "image/webp",
         "gif" => "image/gif",

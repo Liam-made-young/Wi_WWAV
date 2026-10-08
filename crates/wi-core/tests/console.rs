@@ -9,6 +9,8 @@ use wi_core::{Config, Core, MemorySecrets};
 
 #[path = "console/write.rs"]
 mod write;
+#[path = "console/image.rs"]
+mod image;
 
 struct App {
     core: Core,

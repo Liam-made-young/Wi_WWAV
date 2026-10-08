@@ -7,6 +7,7 @@ import { CONSOLE_CONTEXT_EVENT, CONSOLE_TOOLS, toolById } from './registry';
 import { Reader } from './Reader';
 import { ClaudePanel, HistoryPanel, IconButton, Modal, NameDialog, type NameSheet } from './Panels';
 import { DocumentWorkspace } from './DocumentWorkspace';
+import { ImageThumbnail } from './image/Thumbnail';
 import './console.css';
 
 type Panel = { kind: 'history' | 'provenance' | 'reader' | 'claude'; id: string; version?: string } | null;
@@ -40,7 +41,7 @@ export function ConsoleView({ active: forced }: { active?: boolean }) {
   useEffect(() => { if (active) void refresh(); }, [active, refresh]);
   useEffect(() => on('console', payload => {
     const event = payload as { command?: string; workspace?: Workspace };
-    if (['console.selection', 'console.write.view'].includes(event.command ?? '') && event.workspace) setWorkspace(event.workspace);
+    if (['console.selection', 'console.write.view', 'console.image.view', 'console.image.selection'].includes(event.command ?? '') && event.workspace) setWorkspace(event.workspace);
     else void refresh();
   }), [refresh]);
   useEffect(() => { if (!active) { setPanel(null); setNameSheet(null); } }, [active]);
@@ -103,7 +104,7 @@ export function ConsoleView({ active: forced }: { active?: boolean }) {
         <IconButton label="Import file" disabled={!workspace || busy} onClick={() => importInput.current?.click()}><Upload size={18} /></IconButton>
         <IconButton label="Toggle Console Library" aria-pressed={libraryOpen} onClick={() => setLibraryOpen(v => !v)}><Library size={19} /></IconButton>
       </div>
-      <input ref={importInput} className="console-file-input" type="file" aria-label="Import into Console" accept=".md,.txt,.fountain,.json,.gltf,.obj,.png,.jpg,.jpeg,.webp,.gif,.wav,.wwav,.mp3,.m4a,.ogg,.flac,.mp4,.swav,.webm" onChange={e => { const f = e.target.files?.[0]; if (f) void act(() => api.import(f), 'Imported on this Mac'); e.target.value = ''; }} />
+      <input ref={importInput} className="console-file-input" type="file" aria-label="Import into Console" accept=".md,.txt,.fountain,.json,.gltf,.obj,.png,.jpg,.jpeg,.webp,.svg,.gif,.wav,.wwav,.mp3,.m4a,.ogg,.flac,.mp4,.swav,.webm" onChange={e => { const f = e.target.files?.[0]; if (f) void act(() => api.import(f), 'Imported on this Mac'); e.target.value = ''; }} />
     </header>
     <main className="console-workbench">
       {CONSOLE_TOOLS.map(tool => {
@@ -129,7 +130,7 @@ export function ConsoleView({ active: forced }: { active?: boolean }) {
       <div className="console-library-list">
         {(filtered ?? library)?.documents.map(d => { const t = toolById(d.tool); return <article key={d.id} className="console-library-item" data-selected={selectedId === d.id}>
           <button className="console-library-open" type="button" aria-label={`Open ${d.title}`} onClick={() => { void act(() => api.open(d.id)); if (window.innerWidth <= 760) setLibraryOpen(false); }}>
-            <div className="console-file-preview"><t.Icon size={20} strokeWidth={1.3} /><span>{d.asset.preview.replace(/\s+/g, ' ').slice(0, 120) || (d.asset.mime === 'application/json' ? t.title : d.asset.name)}</span></div>
+            <div className="console-file-preview">{d.tool === 'image' && d.asset.mime === 'image/png' ? <ImageThumbnail document={d} /> : <><t.Icon size={20} strokeWidth={1.3} /><span>{d.asset.preview.replace(/\s+/g, ' ').slice(0, 120) || (d.asset.mime === 'application/json' ? t.title : d.asset.name)}</span></>}</div>
             <strong>{d.title}</strong><span className="console-file-facts">{t.title} <span>v{d.versions}</span></span>
           </button>
           <div className="console-library-bottom"><button type="button" className="console-provenance" onClick={() => setPanel({ kind: 'provenance', id: d.id })}>{d.marker === 'Made by hand' ? <Check size={12} /> : <CircleHelp size={12} />}{d.marker}</button><IconButton label={`Preview ${d.title}`} onClick={() => setPanel({ kind: 'reader', id: d.id })}><Eye size={15} /></IconButton></div>

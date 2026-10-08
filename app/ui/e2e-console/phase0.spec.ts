@@ -80,8 +80,8 @@ test('imports a real bitmap and previews it; compact layout stays within its vie
   await expect(page.getByRole('tab', { name: 'Write', exact: true })).toBeEnabled();
   await page.getByRole('tab', { name: 'Write', exact: true }).click();
   await create(page, 'Compact document');
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aE1kAAAAASUVORK5CYII=', 'base64');
-  await page.locator('input[type=file]').setInputFiles({ name: 'test-image.png', mimeType: 'image/png', buffer: png });
+  const png = Buffer.from(await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1; canvas.getContext('2d')!.fillRect(0, 0, 1, 1); return canvas.toDataURL('image/png').split(',')[1]; }), 'base64');
+  await page.getByLabel('Import into Console', { exact: true }).setInputFiles({ name: 'test-image.png', mimeType: 'image/png', buffer: png });
   await expect(page.getByRole('textbox', { name: 'Document title', exact: true })).toHaveValue('test-image.png');
   await expect(page.getByRole('img', { name: 'test-image.png', exact: true })).toBeVisible();
   expect(await page.getByRole('img', { name: 'test-image.png', exact: true }).evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);

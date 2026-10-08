@@ -1,5 +1,6 @@
 //! Console's four tools share commands, disk bundles, versions and provenance.
 //! UI commands are hand edits; `call_tool` supplies Claude's actor itself.
+mod image;
 mod storage;
 mod tools;
 mod write;
@@ -79,6 +80,9 @@ fn reply(d: &storage::Document) -> Result<Value> {
 }
 
 pub fn invoke(core: &Core, cmd: &str, args: Value) -> Result<Value> {
+    if cmd == "console.image.assist" {
+        return image::ask(core, &args);
+    }
     if cmd == "console.write.assist" {
         return write::ask(core, &args);
     }
@@ -98,6 +102,9 @@ pub fn tool_definitions() -> Value {
 pub fn call_tool(core: &Core, name: &str, args: Value) -> Result<Value> {
     let cmd = tools::command(name)
         .ok_or_else(|| CoreError::new("unknown_tool", "Unknown Console tool."))?;
+    if cmd == "console.image.assist" {
+        return image::ask(core, &args);
+    }
     if cmd == "console.write.assist" {
         return write::ask(core, &args);
     }
@@ -108,6 +115,7 @@ fn execute(core: &Core, cmd: &str, args: Value, actor: Actor) -> Result<Value> {
     let l = Library::open(&core.library().join("Wi-WWAV Library"))?;
     let a = &args;
     let result = match cmd {
+        c if c.starts_with("console.image.") => image::invoke(core, &l, c, a, actor),
         c if c.starts_with("console.write.") => write::invoke(core, &l, c, a, actor),
         "console.tools" => Ok(tool_definitions()),
         "console.workspace" => Ok(json!({"workspace":workspace(&l)?,"root":l.root})),
@@ -230,7 +238,34 @@ fn execute(core: &Core, cmd: &str, args: Value, actor: Actor) -> Result<Value> {
             let path = l.root.join("proposals").join(format!("{proposal_id}.json"));
             let proposal: Value = storage::read_json(&path)?;
             let p = &proposal["args"];
+            if string(&proposal, "command")? == "console.image.selection" {
+                let doc = l.load(string(p, "id")?)?;
+                doc.check_base(string(p, "base")?)?;
+                let result = image::invoke(core, &l, "console.image.selection", p, Actor::Claude)?;
+                storage::atomic_json(&path, &json!({"applied":doc.id}))?;
+                core.inner.bus.emit(
+                    "console",
+                    json!({"command":"console.image.selection","workspace":result["workspace"]}),
+                );
+                return Ok(result);
+            }
             let d = match string(&proposal, "command")? {
+                "console.image.edit" => {
+                    let doc = l.load(string(p, "id")?)?;
+                    doc.check_base(string(p, "base")?)?;
+                    let mut m = image::load(&l, &doc, doc.current()?)?;
+                    let action: image::Edit = serde_json::from_value(p["action"].clone())
+                        .map_err(|e| storage::refused(e.to_string()))?;
+                    image::apply(&l, &doc.id, &mut m, action, Actor::Claude)?;
+                    l.save_image(
+                        &doc.id,
+                        string(p, "base")?,
+                        None,
+                        &m,
+                        Actor::Claude,
+                        proposal["summary"].as_str().unwrap_or("Claude image edit"),
+                    )?
+                }
                 "console.write.edit" => {
                     let doc = l.load(string(p, "id")?)?;
                     doc.check_base(string(p, "base")?)?;
@@ -293,11 +328,21 @@ fn execute(core: &Core, cmd: &str, args: Value, actor: Actor) -> Result<Value> {
                 | "console.write.research.search"
                 | "console.write.research.read"
                 | "console.write.export"
+                | "console.image.read"
+                | "console.image.preview"
+                | "console.image.sample"
+                | "console.image.export"
         ) {
             core.inner.bus.emit(
                 "console",
-                if matches!(cmd, "console.selection" | "console.write.view") {
-                    json!({"command":cmd,"workspace":value["workspace"]})
+                if matches!(
+                    cmd,
+                    "console.selection"
+                        | "console.write.view"
+                        | "console.image.selection"
+                        | "console.image.view"
+                ) {
+                    json!({"command":cmd,"workspace":value["workspace"],"actor":actor})
                 } else {
                     json!({"command":cmd})
                 },
@@ -324,8 +369,13 @@ fn read(l: &Library, a: &Value) -> Result<Value> {
     } else {
         None
     };
+    let preview = if d.tool == Tool::Image && v.image.is_some() {
+        Some(image::read_preview(l, &d.id, v)?)
+    } else {
+        None
+    };
     Ok(
-        json!({"document":d.summary()?,"version":v,"text":text,"base64":if text.is_none(){Some(STANDARD.encode(bytes))}else{None},"path":l.folder(&d.id)?.join(&v.asset.file),"readOnly":true}),
+        json!({"document":d.summary()?,"version":v,"text":text,"base64":if text.is_none()&&preview.is_none(){Some(STANDARD.encode(bytes))}else{None},"preview":preview,"path":l.folder(&d.id)?.join(&v.asset.file),"readOnly":true}),
     )
 }
 
@@ -376,8 +426,14 @@ fn context(l: &Library, a: &Value) -> Result<Value> {
     } else {
         None
     };
+    let image = if let Some(d) = document.as_ref().filter(|d| d.tool == Tool::Image) {
+        let m = image::load(l, d, d.current()?)?;
+        Some(json!({"width":m.width,"height":m.height,"layers":m.layers}))
+    } else {
+        None
+    };
     Ok(
-        json!({"tool":tool,"document":document.as_ref().map(|d|d.summary()).transpose()?,"selection":selection,"content":content,"manuscript":manuscript,"tools":tools::definitions(),"available":document.is_some()}),
+        json!({"tool":tool,"document":document.as_ref().map(|d|d.summary()).transpose()?,"selection":selection,"content":content,"manuscript":manuscript,"image":image,"tools":tools::definitions(),"available":document.is_some()}),
     )
 }
 

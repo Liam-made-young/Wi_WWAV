@@ -78,7 +78,7 @@ test('multi-section writing, drag ordering, nesting, outline, research, versions
   expect(before.stats.words).toBe(15);
   await page.getByRole('button', { name: 'Export document' }).click();
   for (const format of ['markdown', 'text', 'pdf']) {
-    await page.getByLabel('Export format').selectOption(format);
+    await page.getByLabel('Export format', { exact: true }).selectOption(format);
     const download = page.waitForEvent('download');
     await page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click();
     const result = await download; const path = await result.path(); const bytes = await readFile(path!);
@@ -117,7 +117,7 @@ test('screenplay live preview, Fountain export and lyrics line counts work in a 
   await expect(preview.locator('.write-script-dialogue')).toHaveCount(2);
   await page.screenshot({ path: '/private/tmp/console-write-screenplay.png' });
   await page.getByRole('button', { name: 'Export document' }).click();
-  await page.getByLabel('Export format').selectOption('fountain');
+  await page.getByLabel('Export format', { exact: true }).selectOption('fountain');
   const download = page.waitForEvent('download'); await page.getByRole('dialog').getByRole('button', { name: 'Export', exact: true }).click();
   expect(await readFile((await (await download).path())!, 'utf8')).toBe(script);
   const savedScript = await manuscript('Short screenplay');
@@ -207,7 +207,7 @@ test('a twenty-thousand-word manuscript remains editable and exports through Rus
   console.log('Write performance sample:', JSON.stringify(metrics));
   await test.info().attach('write-performance.json', { body: JSON.stringify(metrics), contentType: 'application/json' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('input[type=file]').setInputFiles({ name: 'large-source.md', mimeType: 'text/markdown', buffer: Buffer.alloc(1024 * 1024 + 1, 'x') });
+  await page.getByLabel('Import into Console', { exact: true }).setInputFiles({ name: 'large-source.md', mimeType: 'text/markdown', buffer: Buffer.alloc(1024 * 1024 + 1, 'x') });
   await expect(active(page).getByLabel('Document title', { exact: true })).toHaveValue('large-source.md');
   await expect(text(page)).toHaveCount(0);
   await expect(active(page).locator('.console-text-preview')).toBeVisible();
