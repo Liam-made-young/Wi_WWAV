@@ -170,7 +170,7 @@ describe('Focus', () => {
 
   it('shows the hint under the task at first, and not after the first week', async () => {
     const first = await mountFocus();
-    expect(text(first.rig, '.focus-hint')).toMatch(/K for anything · 1–6 for tools · hold .+ for the map/);
+    expect(text(first.rig, '.focus-hint')).toMatch(/K for anything · 1–8 for tools · hold .+ for the map/);
     first.rig.unmount();
     localStorage.setItem('wi.focusHint', JSON.stringify({ first: 0, launches: 99 }));
     const later = await mountFocus();
@@ -199,7 +199,8 @@ describe('a view that registers', () => {
       undo.push(registerView({ id: 'notes', title: 'Notes', component: Notes, plus: 'New note' }));
     });
     await settle();
-    expect(await press(rig, '7')).toBe(true);
+    // The Database and the Wiki are on 7 and 8, so the next view to register takes 9.
+    expect(await press(rig, '9')).toBe(true);
     expect(seen).toMatchObject({ layer: 'tool', view: 'notes' });
     expect(text(rig, '.tool-name')).toBe('Notes');
     expect(text(rig, '.heat-tabpanel[data-current="true"] .notes-body')).toBe('Notes are here.');
@@ -220,13 +221,15 @@ describe('a view that registers', () => {
       'Grades4',
       'Habits5',
       'Mail6',
-      'Notes7',
+      'Database7',
+      'Wiki8',
+      'Notes9',
     ]);
     await click(button(tools, /^Notes/));
     await click(button(tools, /^Focus/));
     expect(summoned).toEqual(['notes', 'focus']);
     const map = $(rig, '[aria-label="Map of tools and shortcuts"]')!;
-    expect(map.textContent).toContain('7Notes');
+    expect(map.textContent).toContain('9Notes');
   });
 });
 
@@ -245,6 +248,8 @@ describe('the Classic layout', () => {
       'Grades',
       'Habits',
       'Mail',
+      'Database',
+      'Wiki',
       'Notes',
     ]);
   });

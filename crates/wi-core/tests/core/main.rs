@@ -2,7 +2,9 @@
 //! of docs/PLAN.md, written as what a fail looks like.
 
 mod account;
+mod ask;
 mod common;
+mod db;
 mod export;
 mod focus;
 mod heat;
@@ -18,3 +20,4 @@ mod player;
 mod review;
 mod supervisor;
 mod upload;
+mod wiki;

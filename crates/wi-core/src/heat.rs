@@ -68,6 +68,8 @@ fn local_only(kind: &str) -> bool {
         "syllabusDraft",
     ]
     .iter()
+    // The Database tab's own tables, columns and views stay on this Mac.
+    .chain(crate::db::KINDS.iter())
     .any(|k| kind.eq_ignore_ascii_case(k))
 }
 

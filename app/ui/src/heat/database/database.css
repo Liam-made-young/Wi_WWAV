@@ -1,0 +1,832 @@
+/* The Database tab (docs/ASK.md): a spreadsheet in Learn's desk register.
+   Every colour and size is a token (styles/tokens.css); this file only
+   arranges them, with one exception said where it stands: the chart's four
+   series colours. */
+
+/* The Database and the Wiki use the whole width: no widgets column, and the
+   sidebar lists tables or contents instead of spaces. */
+.heat[data-tab='database'],
+.heat[data-tab='wiki'] {
+  grid-template-columns: 190px minmax(0, 1fr) 0;
+}
+
+.heat[data-tab='database'] .heat-right,
+.heat[data-tab='wiki'] .heat-right,
+.heat[data-tab='database'] .heat-spaces,
+.heat[data-tab='wiki'] .heat-spaces,
+.heat[data-tab='database'] .heat-info-slot,
+.heat[data-tab='wiki'] .heat-info-slot {
+  display: none;
+}
+
+/* Eight tabs fit where six did. */
+.heat-tabs .segment {
+  width: auto;
+  min-width: 62px;
+  padding: 0 var(--space-s3);
+}
+
+.db {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  font-size: var(--type-desk-body);
+}
+
+.db-side-view {
+  padding-inline-start: var(--space-s5);
+  font-size: var(--type-desk-small);
+}
+
+/* ---- The toolbar ----------------------------------------------------------- */
+
+.db-bar,
+.db-panel-bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s2);
+  padding: var(--space-s2) var(--space-s3);
+  border-bottom: 1px solid var(--desk-deck-edge);
+  background: var(--desk-source-list-ground);
+}
+
+.db-bar-gap {
+  flex: 1 1 0;
+}
+
+.db-title {
+  padding: 0 var(--space-s2) 0 0;
+  font-size: var(--type-desk-large);
+  color: var(--desk-ink);
+  background: none;
+  border: 0;
+  text-align: left;
+}
+
+.db-title-view {
+  font-size: var(--type-desk-body);
+  color: var(--desk-ink2);
+}
+
+.db-search,
+.db-form input,
+.db-form select,
+.db-form textarea,
+.db-panel-bar select {
+  min-height: 26px;
+  padding: 2px var(--space-s2);
+  font: inherit;
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+}
+
+.db-search {
+  flex: 0 1 220px;
+  min-width: 120px;
+  border-radius: var(--radius-pill);
+  padding-inline: var(--space-s3);
+}
+
+.db-button,
+.db-quiet {
+  min-height: 26px;
+  padding: 2px var(--space-s3);
+  font: inherit;
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-pill);
+}
+
+.db-button[aria-pressed='true'],
+.db-quiet[aria-pressed='true'] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+  border-color: var(--desk-select);
+}
+
+.db-quiet {
+  background: none;
+  border-color: transparent;
+  color: var(--desk-select);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.db-locked,
+.db-empty {
+  flex: none;
+  margin: 0;
+  padding: var(--space-s1) var(--space-s3);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+/* ---- The grid --------------------------------------------------------------- */
+
+.db-grid {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  outline: none;
+  font-size: var(--type-desk-body);
+  background: var(--desk-well);
+}
+
+.db-grid:focus-visible {
+  box-shadow: inset 0 0 0 var(--desk-focus-width) var(--desk-focus);
+}
+
+.db-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 100%;
+}
+
+.db-head,
+.db-summary {
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  display: flex;
+  flex: none;
+  background: var(--desk-source-list-ground);
+}
+
+.db-head {
+  top: 0;
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.db-summary {
+  bottom: 0;
+  border-top: 1px solid var(--desk-deck-edge);
+}
+
+.db-corner,
+.db-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 7;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  background: var(--desk-source-list-ground);
+  border-right: 1px solid var(--desk-deck-edge);
+  user-select: none;
+}
+
+.db-gutter {
+  z-index: 3;
+}
+
+.db-gutter[data-selected] {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+}
+
+.db-th {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-s1);
+  padding: 0 var(--space-s2);
+  overflow: hidden;
+  font: inherit;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+  background: var(--desk-source-list-ground);
+  border: 0;
+  border-right: 1px solid var(--desk-deck-edge);
+  text-align: left;
+  user-select: none;
+}
+
+.db-th-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--desk-ink);
+}
+
+.db-th-kind:empty {
+  display: none;
+}
+
+.db-th-sort {
+  font-size: 9px;
+  color: var(--desk-select);
+}
+
+.db-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.db-add-column {
+  width: 40px;
+  justify-content: center;
+  color: var(--desk-ink2);
+}
+
+.db-row,
+.db-group {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  height: 28px;
+}
+
+.db-row[data-odd] .db-cell {
+  background: var(--desk-stripe);
+}
+
+.db-group {
+  align-items: center;
+  gap: var(--space-s2);
+  padding-inline-start: var(--space-s3);
+  font-weight: 600;
+  background: var(--desk-source-list-ground);
+  border-bottom: 1px solid var(--desk-deck-edge);
+}
+
+.db-group-name {
+  position: sticky;
+  left: var(--space-s3);
+}
+
+.db-group-count {
+  font-weight: normal;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.db-cell {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--space-s2);
+  overflow: hidden;
+  background: var(--desk-well);
+  border-right: 1px solid color-mix(in srgb, var(--desk-deck-edge) 45%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--desk-deck-edge) 45%, transparent);
+  cursor: cell;
+  user-select: none;
+}
+
+.db-cell[data-last-frozen],
+.db-th[data-last-frozen],
+.db-total[data-last-frozen] {
+  border-right: 2px solid var(--desk-deck-edge);
+}
+
+.db-text,
+.db-link {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.db-cell[data-numeric] {
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-cell[data-type='bool'] {
+  justify-content: center;
+}
+
+/* A locked cell is quieter, and says why when tried. */
+.db-cell[data-locked] {
+  color: var(--desk-ink2);
+  cursor: default;
+}
+
+.db-cell[data-error] {
+  color: var(--heat-overdue);
+}
+
+.db-row .db-cell[data-selected] {
+  background: color-mix(in srgb, var(--desk-select) 16%, var(--desk-well));
+}
+
+.db-row .db-cell[data-active] {
+  box-shadow: inset 0 0 0 2px var(--desk-select);
+}
+
+.db-link {
+  color: var(--desk-select);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.db-check {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--desk-ink2);
+  border-radius: 3px;
+  background: var(--desk-well);
+}
+
+.db-check[data-on] {
+  border-color: var(--desk-select);
+  background:
+    linear-gradient(45deg, transparent 43%, var(--desk-select-ink) 43% 57%, transparent 57%) 50% 60% / 7px 7px no-repeat,
+    var(--desk-select);
+}
+
+.db-check[data-on]::after {
+  content: '✓';
+  display: block;
+  margin-top: -3px;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--desk-select-ink);
+}
+
+.db-check[data-on] {
+  background: var(--desk-select);
+}
+
+.db-editor {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 0;
+  outline: none;
+}
+
+.db-new .db-gutter {
+  color: var(--desk-ink2);
+}
+
+.db-new-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0 var(--space-s2);
+  font: inherit;
+  color: var(--desk-ink);
+  background: none;
+  border: 0;
+  outline: none;
+}
+
+.db-new-input:focus {
+  box-shadow: inset 0 0 0 2px var(--desk-select);
+}
+
+.db-total {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 var(--space-s2);
+  overflow: hidden;
+  font-size: var(--type-desk-small);
+  background: var(--desk-source-list-ground);
+  border-right: 1px solid color-mix(in srgb, var(--desk-deck-edge) 45%, transparent);
+  white-space: nowrap;
+}
+
+/* The whole cell is the picker; the total it shows is drawn over it. */
+.db-total-pick {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.db-total:hover,
+.db-total:focus-within {
+  box-shadow: inset 0 0 0 1px var(--desk-select);
+}
+
+.db-total-value {
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* ---- Popovers and their forms ---------------------------------------------- */
+
+.db-pop-back {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.db-pop {
+  position: fixed;
+  z-index: 21;
+  max-height: 70vh;
+  overflow: auto;
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--desk-ink) 30%, transparent);
+}
+
+.db-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  max-width: 320px;
+  padding: var(--space-s1) 0;
+}
+
+.db-menu-head,
+.db-menu-why,
+.db-menu-formula {
+  margin: 0;
+  padding: var(--space-s1) var(--space-s3);
+}
+
+.db-menu-why,
+.db-menu-formula {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.db-menu-formula {
+  font-family: var(--type-mono-family);
+  overflow-wrap: anywhere;
+}
+
+.db-menu-item {
+  min-height: 26px;
+  padding: 2px var(--space-s3);
+  font: inherit;
+  color: var(--desk-ink);
+  background: none;
+  border: 0;
+  text-align: left;
+}
+
+.db-menu-item:hover,
+.db-menu-item:focus-visible {
+  color: var(--desk-select-ink);
+  background: var(--desk-select);
+}
+
+.db-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s2);
+  width: 300px;
+  padding: var(--space-s3);
+}
+
+.db-form-wide {
+  width: 440px;
+}
+
+.db-form-title {
+  margin: 0;
+  font-size: var(--type-desk-body);
+  font-weight: 600;
+}
+
+.db-form-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+}
+
+.db-form-row > span:first-child {
+  flex: none;
+  min-width: 56px;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.db-form-row input:not([type='checkbox']),
+.db-form-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.db-form-end {
+  justify-content: flex-end;
+}
+
+.db-form-note {
+  margin: 0;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.db-form-note[data-ok='false'] {
+  color: var(--heat-overdue);
+}
+
+.db-formula {
+  width: 100%;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-desk-small);
+  resize: vertical;
+}
+
+.db-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px var(--space-s3);
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.db-check-row,
+.db-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s2);
+  font-size: var(--type-desk-small);
+}
+
+/* ---- Pivot and chart -------------------------------------------------------- */
+
+.db-panels {
+  flex: none;
+  display: flex;
+  height: 46%;
+  min-height: 220px;
+  border-top: 2px solid var(--desk-deck-edge);
+}
+
+.db-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--desk-well);
+}
+
+.db-panel + .db-panel {
+  border-left: 1px solid var(--desk-deck-edge);
+}
+
+.db-panel-bar {
+  font-size: var(--type-desk-small);
+}
+
+.db-panel-bar label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s1);
+  color: var(--desk-ink2);
+}
+
+.db-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-s2) var(--space-s3);
+}
+
+.db-pivot,
+.db-chart-table table {
+  border-collapse: collapse;
+  font-size: var(--type-desk-body);
+}
+
+.db-pivot th,
+.db-pivot td,
+.db-chart-table th,
+.db-chart-table td {
+  padding: var(--space-s1) var(--space-s3);
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--desk-deck-edge) 45%, transparent);
+  white-space: nowrap;
+}
+
+.db-pivot th,
+.db-chart-table th {
+  font-size: var(--type-desk-small);
+  font-weight: 600;
+  color: var(--desk-ink2);
+  border-bottom-color: var(--desk-deck-edge);
+}
+
+.db-pivot [data-numeric],
+.db-chart-table [data-numeric] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-pivot tfoot td {
+  font-weight: 600;
+  border-top: 1px solid var(--desk-deck-edge);
+  border-bottom: 0;
+}
+
+.db-chart {
+  /* The chart's series, in a fixed order: the label blue and purple as they
+     are, the orange and green one step deeper so each holds 3:1 on the
+     surface. Checked together for colour-blind separation and contrast on
+     the light and the dark surface (dataviz validate_palette). */
+  --db-series-0: var(--label-blue);
+  --db-series-1: color-mix(in srgb, var(--label-orange) 82%, black);
+  --db-series-2: var(--label-purple);
+  --db-series-3: color-mix(in srgb, var(--label-green) 82%, black);
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+}
+
+.db-chart-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s3);
+  min-height: 26px;
+}
+
+.db-chart-title {
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink2);
+}
+
+.db-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+}
+
+.db-legend li,
+.db-tip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s1);
+}
+
+.db-key {
+  flex: none;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--db-series-0);
+}
+
+.db-key[data-shape='box'] {
+  height: 10px;
+  width: 10px;
+}
+
+.db-key[data-series='1'] {
+  background: var(--db-series-1);
+}
+
+.db-key[data-series='2'] {
+  background: var(--db-series-2);
+}
+
+.db-key[data-series='3'] {
+  background: var(--db-series-3);
+}
+
+.db-chart-plot {
+  position: relative;
+}
+
+.db-chart-plot svg {
+  display: block;
+  overflow: visible;
+}
+
+.db-gridline {
+  stroke: color-mix(in srgb, var(--desk-deck-edge) 40%, transparent);
+  stroke-width: 1;
+}
+
+.db-baseline {
+  stroke: var(--desk-deck-edge);
+  stroke-width: 1;
+}
+
+.db-crosshair {
+  stroke: var(--desk-ink2);
+  stroke-width: 1;
+}
+
+.db-axis-text,
+.db-axis-name {
+  font-size: 11px;
+  fill: var(--desk-ink2);
+}
+
+.db-axis-name {
+  fill: var(--desk-ink);
+}
+
+.db-mark {
+  fill: var(--db-series-0);
+}
+
+.db-line {
+  fill: none;
+  stroke: var(--db-series-0);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* A dot wears a ring of the surface, so it reads where it crosses a line. */
+.db-dot {
+  fill: var(--db-series-0);
+  stroke: var(--desk-well);
+  stroke-width: 2;
+}
+
+.db-mark[data-series='1'],
+.db-dot[data-series='1'] {
+  fill: var(--db-series-1);
+}
+
+.db-mark[data-series='2'],
+.db-dot[data-series='2'] {
+  fill: var(--db-series-2);
+}
+
+.db-mark[data-series='3'],
+.db-dot[data-series='3'] {
+  fill: var(--db-series-3);
+}
+
+.db-line[data-series='1'] {
+  stroke: var(--db-series-1);
+}
+
+.db-line[data-series='2'] {
+  stroke: var(--db-series-2);
+}
+
+.db-line[data-series='3'] {
+  stroke: var(--db-series-3);
+}
+
+.db-mark[data-lift] {
+  filter: brightness(1.18);
+}
+
+.db-tip {
+  position: absolute;
+  z-index: 2;
+  translate: -50% 0;
+  padding: var(--space-s1) var(--space-s2);
+  font-size: var(--type-desk-small);
+  color: var(--desk-ink);
+  background: var(--desk-well);
+  border: 1px solid var(--desk-deck-edge);
+  border-radius: var(--radius-chip);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--desk-ink) 20%, transparent);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.db-tip-x {
+  color: var(--desk-ink2);
+}
+
+.db-chart-empty {
+  margin: var(--space-s3) 0;
+  color: var(--desk-ink2);
+}
+
+.db-chart-table {
+  max-height: 240px;
+  overflow: auto;
+}

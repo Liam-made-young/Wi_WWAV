@@ -17,10 +17,11 @@ afterEach(() => rig?.unmount());
 const tabButton = (name: string) => button(rig, name)!;
 
 describe('Learn’s frame', () => {
-  it('holds a "+", the six tabs as one segmented control, and Sync', async () => {
+  it('holds a "+", the six tabs and the two beside them as one segmented control, and Sync', async () => {
     rig = await mountHeat();
     const tabs = $$(rig, '[role="tab"]').map((t) => t.textContent);
-    expect(tabs).toEqual(['Today', 'Tasks', 'Calendar', 'Grades', 'Habits', 'Mail']);
+    // The six of 3.3 keep their order; the Database and the Wiki follow (docs/ASK.md).
+    expect(tabs).toEqual(['Today', 'Tasks', 'Calendar', 'Grades', 'Habits', 'Mail', 'Database', 'Wiki']);
     expect(tabs).toEqual(TAB_IDS.map((id) => TAB_TABLE[id].name));
     expect(button(rig, 'New task')).toBeTruthy();
     expect(button(rig, 'Sync')).toBeTruthy();
@@ -57,7 +58,7 @@ describe('Learn’s frame', () => {
 
   it('keeps every tab built, and shows one', async () => {
     rig = await mountHeat();
-    expect($$(rig, '[role="tabpanel"]')).toHaveLength(6);
+    expect($$(rig, '[role="tabpanel"]')).toHaveLength(8);
     await click(tabButton('Tasks'));
     const current = $$(rig, '[role="tabpanel"]').filter((p) => p.getAttribute('data-current') === 'true');
     expect(current.map((p) => p.id)).toEqual(['heat-panel-tasks']);

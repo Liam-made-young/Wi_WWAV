@@ -1,6 +1,6 @@
 // The case's title bar (docs/SPEC.md 2.1): 52 pt of brushed metal in every
 // view, light and dark, holding the traffic lights, the view switcher, the
-// Now strip, the search pill and the galaxy chip. The case never changes, so
+// Now strip, the prompt box's pill and the galaxy chip. The case never changes, so
 // the controls never move.
 
 import type { ReactNode } from 'react';
@@ -44,10 +44,10 @@ export function TitleBar({ room, narrow, strip, menuOpen, onRoom, onSearch, onMe
         type="button"
         className={narrow ? 'magnifier' : 'search-pill'}
         onClick={onSearch}
-        aria-label={`Search (${keys('⌘K')})`}
+        aria-label={`Ask Claude or search (${keys('⌘K')})`}
       >
         <Magnifier />
-        {!narrow && <span className="search-word">Search</span>}
+        {!narrow && <span className="search-word">Ask or search</span>}
         {!narrow && <span className="search-keys">{keys('⌘K')}</span>}
       </button>
       <button

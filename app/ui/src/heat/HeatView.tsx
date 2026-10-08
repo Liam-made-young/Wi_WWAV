@@ -32,6 +32,7 @@ import { registerBuiltins } from '../focus/builtin';
 import { focusOf, FocusScreen } from '../focus/FocusScreen';
 import type { Layout } from '../focus/layout';
 import { useViews, viewById, viewByShortcut } from '../focus/registry';
+import { useLearnScreen } from '../ask/screen';
 import { useMedia } from '../shell/hooks';
 import { IS_MAC, keys } from '../shell/platform';
 import type { ScreenStatus } from '../shell/StatusBar';
@@ -244,6 +245,8 @@ function Frame(p: FrameProps) {
   const { snap, idx, client, act, say } = heat;
   const actions = useActions();
   const panel = useRef<HTMLDivElement>(null);
+  // The prompt box is told what is on screen, so "these" means these.
+  useLearnScreen(tab, selection, frame.spaceId);
 
   const views = useViews();
   const view = viewById(tab);

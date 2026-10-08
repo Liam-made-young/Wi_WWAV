@@ -5549,10 +5549,12 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "ureq",
+ "wi-formula",
  "wi-heat",
  "wi-heat-store",
  "wi-mcp",
  "wi-store",
+ "wi-wiki",
  "wwav-formats",
  "wwav-ids",
  "wwav-tokens",
@@ -5569,6 +5571,10 @@ dependencies = [
  "tungstenite",
  "wi-core",
 ]
+
+[[package]]
+name = "wi-formula"
+version = "0.1.0"
 
 [[package]]
 name = "wi-heat"
@@ -5621,6 +5627,13 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "wwav-ids",
+]
+
+[[package]]
+name = "wi-wiki"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
