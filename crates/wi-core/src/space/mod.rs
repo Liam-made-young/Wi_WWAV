@@ -1,9 +1,27 @@
 //! Space (docs/SPACE.md): the rules about links that need no window to
 //! check. A link in Space is a body; what its page loads, and what a page
-//! says back to the app, are decided here and tested here.
+//! says back to the app, are decided here and tested here. `home` is the
+//! galaxy you start in.
+
+pub mod home;
 
 use serde_json::Value;
 use url::Url;
+
+use crate::args::Args;
+use crate::{CoreError, Inner};
+
+/// Answers the core's `space.*` commands. (`space.page.*` and `space.fly`
+/// are the shell's: they move a window's web view.)
+pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError> {
+    match cmd {
+        "space.home" => home::home(i, a),
+        _ => Err(CoreError::new(
+            "unknown_command",
+            format!("Space has no command called {cmd}."),
+        )),
+    }
+}
 
 /// A YouTube video's id, if `link` is one of the addresses a video has.
 pub fn youtube_id(link: &Url) -> Option<String> {

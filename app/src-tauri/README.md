@@ -62,6 +62,7 @@ every local window call it.
 cd app/src-tauri
 cargo tauri dev                           # the UI from Vite, the core on ~/Music/Wi_WWAV
 cargo tauri build --debug --no-bundle     # the UI built in, for the end-to-end check
+WI_WWAV_BESIDE=1 WI_WWAV_LIBRARY=/tmp/x/Wi_WWAV target/debug/wi-wwav   # beside the app you have open, on a library of its own
 cargo build -p mock-engine                # the engine the end-to-end check runs
 node ../ui/e2e-webkit/run.mjs             # needs tauri-driver, WebKitWebDriver, xdotool, Xvfb
 ```

@@ -26,16 +26,20 @@ export interface Body {
   parent: string | null;
   at: Vector3;
   radius: number;
+  /** Its own colour, when the link has one (a world on mi-wwav.com does); otherwise one comes from the link. */
+  colour?: string;
 }
 
-/** You: a place, a way you face, and how fast you are drifting. */
+/** You: a place, a way you face, how fast you are drifting, and how fast you are turning. */
 export interface Pilot {
   at: Vector3;
   facing: Quaternion;
   velocity: Vector3;
+  /** Radians a second about your own up, right and forward. */
+  spin: Vector3;
 }
 
-/** What the keys ask for, each from -1 to 1. */
+/** What the keys ask for, each from -1 to 1, and whether you are in a hurry. */
 export interface Controls {
   forward: number;
   right: number;
@@ -43,9 +47,10 @@ export interface Controls {
   yaw: number;
   pitch: number;
   roll: number;
+  fast: boolean;
 }
 
-export const STILL: Controls = { forward: 0, right: 0, up: 0, yaw: 0, pitch: 0, roll: 0 };
+export const STILL: Controls = { forward: 0, right: 0, up: 0, yaw: 0, pitch: 0, roll: 0, fast: false };
 
 export interface View {
   width: number;
@@ -86,11 +91,21 @@ export function direction(key: string): Vector3 {
   return new Vector3(s * Math.cos(theta), u, s * Math.sin(theta));
 }
 
+export function pilotAt(at: Vector3, toward: Vector3): Pilot {
+  const facing = new Quaternion().setFromRotationMatrix(new Matrix4().lookAt(at, toward, new Vector3(0, 1, 0)));
+  return { at: at.clone(), facing, velocity: new Vector3(), spin: new Vector3() };
+}
+
 export function forwardOf(pilot: Pilot): Vector3 {
   return new Vector3(0, 0, -1).applyQuaternion(pilot.facing);
 }
 
 const half = (FOV * Math.PI) / 360;
+
+/** How far you turn for each point the sky is dragged, so the star you took hold of stays under the pointer. */
+export function turnPerPoint(view: View): number {
+  return (2 * Math.tan(half)) / view.height;
+}
 
 /** The page at a body's core: the widest rectangle of the view's shape that fits inside the sphere. */
 export function faceOf(body: Body, view: View): { width: number; height: number } {
@@ -169,36 +184,64 @@ export function aim(pilot: Pilot, bodies: readonly Body[], view: View): Body | n
   return best;
 }
 
-/** The distance from you to the nearest body's surface; never less than a step. */
-export function clearance(pilot: Pilot, bodies: readonly Body[]): number {
-  let least = Infinity;
-  for (const body of bodies) least = Math.min(least, pilot.at.distanceTo(body.at) - body.radius);
-  return Math.max(least, 0);
+/** The nearest body, and how far its surface is; never less than nothing. */
+function nearest(pilot: Pilot, bodies: readonly Body[]): { body: Body; clear: number } | null {
+  let best: { body: Body; clear: number } | null = null;
+  for (const body of bodies) {
+    const clear = Math.max(0, pilot.at.distanceTo(body.at) - body.radius);
+    if (!best || clear < best.clear) best = { body, clear };
+  }
+  return best;
 }
 
-/** How fast the keys carry you: slower the nearer you are to something, so a body's gravity is felt as care. */
+/**
+ * How fast the keys carry you. Far from everything you cross the sky in a
+ * few seconds; near a body you slow, which is its gravity felt as care; and
+ * right at one you still move at half its radius a second, so the last
+ * stretch is never a crawl.
+ */
 export function cruise(pilot: Pilot, bodies: readonly Body[]): number {
-  if (bodies.length === 0) return 400;
-  return Math.min(6000, Math.max(8, clearance(pilot, bodies) * 0.9));
+  const near = nearest(pilot, bodies);
+  if (!near) return 600;
+  return Math.min(9000, Math.max(near.body.radius * 0.5, near.clear * 1.4));
 }
 
-const TURN = 1.1; // radians a second at full deflection
-const EASE = 0.35; // seconds for your drift to follow the keys
+const TURN = 1.3; // radians a second at full deflection
+const EASE = 0.3; // seconds for your drift to follow the keys
+const SPIN_EASE = 0.11; // and for your turning to
+const HURRY = 4; // how much faster Shift carries you
 
 /** One moment of free flight. Changes `pilot`. */
-export function step(pilot: Pilot, controls: Controls, bodies: readonly Body[], dt: number): void {
-  if (controls.yaw || controls.pitch || controls.roll) {
+export function step(pilot: Pilot, controls: Controls, bodies: readonly Body[], view: View, dt: number): void {
+  const spin = new Vector3(controls.yaw, controls.pitch, controls.roll).multiplyScalar(TURN);
+  pilot.spin.lerp(spin, 1 - Math.exp(-dt / SPIN_EASE));
+  if (pilot.spin.lengthSq() > 1e-10) {
     const turn = new Quaternion()
-      .setFromAxisAngle(new Vector3(0, 1, 0), controls.yaw * TURN * dt)
-      .multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), controls.pitch * TURN * dt))
-      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), controls.roll * TURN * dt));
+      .setFromAxisAngle(new Vector3(0, 1, 0), pilot.spin.x * dt)
+      .multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), pilot.spin.y * dt))
+      .multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), pilot.spin.z * dt));
     pilot.facing.multiply(turn).normalize();
   }
   const want = new Vector3(controls.right, controls.up, -controls.forward);
   if (want.lengthSq() > 1) want.normalize();
-  want.applyQuaternion(pilot.facing).multiplyScalar(cruise(pilot, bodies));
+  want.applyQuaternion(pilot.facing).multiplyScalar(cruise(pilot, bodies) * (controls.fast ? HURRY : 1));
   pilot.velocity.lerp(want, 1 - Math.exp(-dt / EASE));
   pilot.at.addScaledVector(pilot.velocity, dt);
+  // Flying forward at a body, its gravity turns you to face it.
+  if (controls.forward > 0 && !controls.yaw && !controls.pitch) {
+    const body = aim(pilot, bodies, view);
+    // Enough, for a big body close by, to outdo the way a body off to one side slides further aside as you near it.
+    if (body) bend(pilot, body, view, controls.forward * dt * 4);
+  }
+}
+
+/** A body's pull on the way you face: stronger the bigger it is and the nearer you are. `amount` is how long, or how hard, you pushed toward it. */
+function bend(pilot: Pilot, body: Body, view: View, amount: number): void {
+  const dock = dockDepth(body, view);
+  const gap = Math.max(0, pilot.at.distanceTo(body.at) - dock);
+  const near = Math.min(1, Math.max(0, 1 - gap / (10 * dock)));
+  const pull = Math.min(1, near * (0.35 + 0.12 * body.magnitude) * amount);
+  if (pull > 0) pilot.facing.slerp(facingTo(pilot.at, pilot.facing, body.at), pull);
 }
 
 /** Looking around by dragging: `dx` and `dy` in radians. */
@@ -209,10 +252,10 @@ export function look(pilot: Pilot, dx: number, dy: number): void {
   pilot.facing.multiply(turn).normalize();
 }
 
-/** The facing that looks from `from` at `to`, keeping your own up as near as it can. */
-function facingTo(pilot: Pilot, to: Vector3): Quaternion {
-  const up = new Vector3(0, 1, 0).applyQuaternion(pilot.facing);
-  return new Quaternion().setFromRotationMatrix(new Matrix4().lookAt(pilot.at, to, up));
+/** The facing that looks from `from` at `to`, keeping the up of `facing` as near as it can. */
+function facingTo(from: Vector3, facing: Quaternion, to: Vector3): Quaternion {
+  const up = new Vector3(0, 1, 0).applyQuaternion(facing);
+  return new Quaternion().setFromRotationMatrix(new Matrix4().lookAt(from, to, up));
 }
 
 const NUDGE = 0.0022; // how much of the way one point of scrolling takes you
@@ -238,34 +281,84 @@ export function nudge(pilot: Pilot, bodies: readonly Body[], view: View, amount:
   const from = amount > 0 ? gap : Math.max(gap, dock * 0.02);
   const next = from * Math.exp(-NUDGE * amount);
   if (distance > 1e-9) pilot.at.addScaledVector(to.divideScalar(distance), gap - next);
-  if (amount > 0) {
-    const near = Math.min(1, Math.max(0, 1 - next / (8 * dock)));
-    const pull = Math.min(1, near * (0.05 + 0.03 * body.magnitude) * (amount / 30));
-    pilot.facing.slerp(facingTo(pilot, body.at), Math.min(1, Math.max(0, pull)));
-  }
+  if (amount > 0) bend(pilot, body, view, amount / 90);
   pilot.velocity.set(0, 0, 0);
 }
 
-/**
- * Being flown to a body until its page covers `cover` of the view (1 is in
- * it). Changes `pilot`, and answers true once you are there.
- */
-export function approach(pilot: Pilot, body: Body, view: View, cover: number, dt: number): boolean {
-  const depth = dockDepth(body, view) / cover;
-  const away = pilot.at.clone().sub(body.at);
-  if (away.lengthSq() < 1e-12) away.copy(forwardOf(pilot)).negate();
-  const target = body.at.clone().addScaledVector(away.normalize(), depth);
-  const facing = facingTo({ ...pilot, at: target }, body.at);
-  const k = 1 - Math.exp(-dt * 3.4);
-  pilot.at.lerp(target, k);
-  pilot.facing.slerp(facing, k).normalize();
-  pilot.velocity.set(0, 0, 0);
-  const there = pilot.at.distanceTo(target) < depth * 0.004 && pilot.facing.angleTo(facing) < 0.004;
-  if (there) {
-    pilot.at.copy(target);
-    pilot.facing.copy(facing);
+/** Scrolling you have done that hasn't moved you yet. A wheel turns in steps; you shouldn't. */
+export interface Glide {
+  push: number;
+}
+
+const GLIDE = 0.085; // seconds for a push to be mostly spent
+
+/** Spends some of what was scrolled, a frame's worth. Changes `pilot` and `glide`. */
+export function coast(pilot: Pilot, bodies: readonly Body[], view: View, glide: Glide, dt: number): void {
+  if (Math.abs(glide.push) < 0.01) {
+    glide.push = 0;
+    return;
   }
-  return there;
+  const now = glide.push * (1 - Math.exp(-dt / GLIDE));
+  glide.push -= now;
+  nudge(pilot, bodies, view, now);
+}
+
+/** A flight you are being taken on: to a body, until its page covers so much of the view. */
+export interface Course {
+  id: string;
+  /** How much of the view's height the page covers at the end: 1 is in it. */
+  cover: number;
+  /** Whether you go into the page on arriving. */
+  enter: boolean;
+  /** Where you were when it began. */
+  from: { at: Vector3; facing: Quaternion };
+  /** The way from the body to where you were, which is the line you fly along. */
+  along: Vector3;
+  elapsed: number;
+  seconds: number;
+}
+
+const smooth = (t: number) => {
+  const x = Math.min(1, Math.max(0, t));
+  return x * x * x * (x * (x * 6 - 15) + 10);
+};
+
+/** Plans a flight to a body. Longer for a longer way, but a hundred times the distance is not a hundred times the wait. */
+export function plot(pilot: Pilot, body: Body, view: View, cover: number, enter: boolean): Course {
+  const away = pilot.at.clone().sub(body.at);
+  const distance = away.length();
+  const along = distance > 1e-9 ? away.divideScalar(distance) : forwardOf(pilot).negate();
+  const end = dockDepth(body, view) / cover;
+  const stretch = Math.abs(Math.log(Math.max(distance, 1e-9) / end));
+  return {
+    id: body.id,
+    cover,
+    enter,
+    from: { at: pilot.at.clone(), facing: pilot.facing.clone() },
+    along,
+    elapsed: 0,
+    seconds: Math.min(2.6, Math.max(0.65, 0.55 + 0.42 * stretch)),
+  };
+}
+
+/**
+ * A moment of that flight. You turn to face the body first and then close
+ * the distance by the same share each moment, easing off at both ends, so a
+ * far body rushes up and the last of the way is slow. Changes `pilot` and
+ * `course`; answers true once you are there.
+ */
+export function follow(pilot: Pilot, course: Course, body: Body, view: View, dt: number): boolean {
+  course.elapsed += dt;
+  const t = Math.min(1, course.elapsed / course.seconds);
+  const start = Math.max(course.from.at.distanceTo(body.at), 1e-9);
+  const end = dockDepth(body, view) / course.cover;
+  const distance = Math.exp(Math.log(start) + (Math.log(end) - Math.log(start)) * smooth(t));
+  pilot.at.copy(body.at).addScaledVector(course.along, distance);
+  const facing = facingTo(pilot.at, course.from.facing, body.at);
+  pilot.facing.copy(course.from.facing).slerp(facing, smooth(t / 0.6)).normalize();
+  pilot.velocity.set(0, 0, 0);
+  pilot.spin.set(0, 0, 0);
+  return t >= 1;
 }
 
 /** A page is live from this much of the view's height, and stays so until it falls under the second. */

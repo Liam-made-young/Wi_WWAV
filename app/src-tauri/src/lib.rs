@@ -12,6 +12,7 @@ mod paths;
 mod review_tests;
 mod secrets;
 mod space_pages;
+mod space_picture;
 mod update;
 
 use std::path::Path;
@@ -37,12 +38,14 @@ pub fn shell<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 pub fn run() {
     // Linux and Windows start a second copy to open a file; it hands the
     // file to this one and leaves, so one library has one engine.
-    let builder =
-        Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+    let mut builder = Builder::default();
+    if !beside() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             // Paths on the second launch's command line are relative to where
             // that launch started, not to where this app did.
             open::route(app, open::from_args_in(args, Path::new(&cwd)));
         }));
+    }
     let app = shell(builder)
         .plugin(fence::plugin())
         .plugin(tauri_plugin_dialog::init())
@@ -81,6 +84,13 @@ pub fn run() {
         }
         _ => {}
     });
+}
+
+/// A development run that may sit beside the app you are using: it has a
+/// library of its own (`WI_WWAV_LIBRARY`) and says so (`WI_WWAV_BESIDE`).
+/// One library still has one app.
+fn beside() -> bool {
+    std::env::var_os("WI_WWAV_BESIDE").is_some() && std::env::var_os("WI_WWAV_LIBRARY").is_some()
 }
 
 /// Opens the core on a thread of its own, so the window draws while it

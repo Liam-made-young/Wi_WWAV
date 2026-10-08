@@ -6,6 +6,7 @@
 
 import { Vector3 } from 'three';
 import { type Body, direction, radiusOf } from './model';
+import { type Home, homeBodies, homeStart } from './home';
 
 interface Entry {
   id: string;
@@ -50,15 +51,15 @@ const ENTRIES: Entry[] = [
 const SHELL = 5200;
 const ORBIT = 3.4;
 
-/** The proving ground's bodies, each where its link's hash puts it: the same on every machine. */
-export function provingGround(): Body[] {
+/** The proving ground's bodies, each where its link's hash puts it: the same on every machine. `shell` is how far out the sites stand. */
+export function provingGround(shell = SHELL): Body[] {
   const bodies = new Map<string, Body>();
   for (const e of ENTRIES) {
     const radius = radiusOf(e.magnitude);
     const parent = e.parent ? bodies.get(e.parent) : undefined;
     const at = parent
       ? parent.at.clone().addScaledVector(direction(`${parent.url} ${e.url}`), parent.radius * ORBIT)
-      : direction(e.url).multiplyScalar(SHELL * (0.75 + 0.5 * fraction(e.url)));
+      : direction(e.url).multiplyScalar(shell * (0.75 + 0.5 * fraction(e.url)));
     bodies.set(e.id, { ...e, at, radius });
   }
   return [...bodies.values()];
@@ -73,4 +74,16 @@ function fraction(key: string): number {
 export function start(bodies: readonly Body[]): { at: Vector3; toward: Vector3 } {
   const biggest = [...bodies].sort((a, b) => b.magnitude - a.magnitude)[0];
   return { at: new Vector3(0, 0, 0), toward: biggest ? biggest.at.clone() : new Vector3(0, 0, -1) };
+}
+
+/** The whole sky: home in the middle when it is known, and the sites standing far out around it. */
+export function sky(home: Home | null): { bodies: Body[]; start: { at: Vector3; toward: Vector3 } } {
+  if (!home) {
+    const sites = provingGround();
+    return { bodies: sites, start: start(sites) };
+  }
+  const mine = homeBodies(home);
+  // The sites stand well clear of home: they are other galaxies, and far bigger ones.
+  const reach = mine.reduce((far, b) => Math.max(far, b.at.length() + b.radius), 0);
+  return { bodies: [...mine, ...provingGround(Math.max(SHELL, reach * 2.6))], start: homeStart(mine) };
 }

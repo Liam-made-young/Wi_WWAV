@@ -7,7 +7,8 @@ import { provingGround } from './flight/ground';
 // ground not marked as one; a body with no name in the sky; nothing saying
 // how to move; a Mac without 3D left with a blank view and no sentence; the
 // app's order to fly somewhere ignored, or you arriving in a page with no way
-// shown to back out of it.
+// shown to back out of it; home known to the core and not in the sky, or you
+// not starting there.
 //
 // The old frame's test (a sample sky seen from above, with − · + · fit) went
 // with that frame on 8 Oct 2026, when Space became first person.
@@ -15,6 +16,7 @@ import { provingGround } from './flight/ground';
 const fake = vi.hoisted(() => ({
   fail: false,
   draws: 0,
+  home: null as unknown,
   heard: new Map<string, (payload: unknown) => void>(),
 }));
 
@@ -27,13 +29,18 @@ vi.mock('./flight/scene', () => ({
         fake.draws += 1;
       },
       pick: () => null,
+      picture() {},
       dispose() {},
     };
   },
 }));
 
 vi.mock('../bridge', () => ({
-  call: vi.fn(async () => ({})),
+  call: vi.fn(async (cmd: string) => {
+    if (cmd !== 'space.home') return {};
+    if (!fake.home) throw new Error('no connection, and nothing kept');
+    return { home: fake.home, fresh: true };
+  }),
   on: (event: string, handler: (payload: unknown) => void) => {
     fake.heard.set(event, handler);
     return () => fake.heard.delete(event);
@@ -62,6 +69,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] });
   fake.fail = false;
   fake.draws = 0;
+  fake.home = null;
   fake.heard.clear();
   host = document.createElement('div');
   document.body.append(host);
@@ -80,7 +88,7 @@ describe('Space, in first person', () => {
     expect(host.querySelector('.space-sample')?.textContent).toBe('Proving ground');
     const names = [...host.querySelectorAll('.space-label')].map((el) => el.textContent);
     expect(names).toEqual(provingGround().map((b) => b.name));
-    expect(host.querySelector('.space-hint')?.textContent).toContain('W A S D move');
+    expect(host.querySelector('.space-hint')?.textContent).toContain('W A S D move · Shift to hurry');
     expect(host.querySelector('.space-hint')?.textContent).toContain('Pages open in the Mac app.');
     expect(host.querySelector('.space-sky')?.getAttribute('aria-label')).toContain('Return to go in');
   });
@@ -115,6 +123,30 @@ describe('Space, in first person', () => {
     await fly(3000);
     expect(host.querySelector('.space-acts button')?.textContent).toBe('Go in');
     expect(host.querySelector('.space-hint')).not.toBeNull();
+  });
+
+  it('puts home in the sky when the core knows it, starts you facing its sun, and is no longer only a proving ground', async () => {
+    fake.home = {
+      slug: 'someone',
+      url: 'https://www.mi-wwav.com/summer_26/g/someone',
+      name: 'someone',
+      systems: [
+        {
+          url: 'https://www.mi-wwav.com/summer_26/g/someone/s/first',
+          name: 'First album',
+          x: 2932,
+          y: 3018,
+          worlds: [{ url: 'https://www.mi-wwav.com/summer_26/play/t1', name: 'A song', kind: 'song', order: 0, radius: 800, phase: 1, palette: null }],
+        },
+      ],
+    };
+    await show();
+    await fly(200);
+    const names = [...host.querySelectorAll('.space-label')].map((el) => el.textContent);
+    expect(names.slice(0, 3)).toEqual(['someone', 'First album', 'A song']);
+    expect(names).toContain('YouTube');
+    expect(host.querySelector('.space-sample')).toBeNull();
+    expect(host.querySelector('.space-where strong')?.textContent).toBe('someone');
   });
 
   it('ignores an order to fly to a link that is not in the sky', async () => {

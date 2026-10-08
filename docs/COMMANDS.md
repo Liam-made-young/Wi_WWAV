@@ -190,6 +190,15 @@ would change is staged and made by `ask.apply`, as one journal entry. A
 write through `db.*` to one of Learn's records is the `heat.*` command a
 view would use, and sends the same `heat` event.
 
+### space (docs/SPACE.md)
+
+| cmd | args | result |
+|---|---|---|
+| `space.home` | `{slug?, refresh?}` | `{home, fresh}`: a galaxy on mi-wwav.com as links. `home` is `{slug, url, name, systems: [{url, name, x, y, worlds: [{url, name, kind, order, radius, phase, palette}]}]}`: every solar system and world with the address of its page, and what the server knows of where it sits. No account is needed. The answer is kept: without `refresh` the kept one comes back at once (`fresh: false`), and with no connection it is what you get. `slug` is the founder's galaxy when left out |
+
+The cmds that move a window's web view (`space.page.*`, `space.fly`) are the
+shell's, below.
+
 ### export (2.9)
 
 | cmd | args | result |
@@ -228,12 +237,13 @@ none of them: a browser has no menus.
 | `space.page.place` | `{x, y, width, height, zoom, shown}` | `{}`: the page follows its body. `zoom` scales its content with its size; `shown: false` puts it out of sight |
 | `space.page.dock` | `{docked}` | `{}`: you are in the page (it has the keyboard and its own scrolling), or back in the sky |
 | `space.page.close`, `.back`, `.forward`, `.reload` | — | `{}` |
-| `space.fly` | `{url, enter?}` | `{}`: the sky flies you to the body that is that link, and into its page when `enter` is true. Sent on to the UI as the event `space.fly` |
+| `space.page.picture` | `{of}` | `{asked}`: a picture of the page as it is now. It comes back as the event `space.page` `{what: "picture", of, data}`, `data` a JPEG as a `data:` address. Only the Mac can take one |
+| `space.fly` | `{url, enter?, cover?}` | `{}`: the sky flies you to the body that is that link: into its page when `enter` is true, or until the page covers `cover` of the view's height (0 to 1; a little over half if left out). Sent on to the UI as the event `space.fly` |
 
 Events `menu` `{action}` (`room.heat`, `room.space`, `room.console` on
 ⌘1–⌘3, `history.undo`, `history.redo`, `library.toggle`, `export.everything`,
 `session.new`), `open` `{clips} \| {sessions} \| {error}` (files opened from
 outside), and `space.page`: `{what: "loading" \| "loaded", url}` as the page
-in Space loads, and `{what: "said", said}` for whatever the page itself
+in Space loads, `{what: "said", said}` for whatever the page itself
 wrote (its title, scrolling over it, a click, Esc), which is never trusted
-for more than that.
+for more than that, and `{what: "picture", of, data}`.

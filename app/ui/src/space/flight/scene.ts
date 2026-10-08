@@ -14,6 +14,8 @@ export interface Sky {
   draw(pilot: Pilot, seconds: number, live: string | null): void;
   /** The body under a point of the view, or null. */
   pick(pilot: Pilot, x: number, y: number): Body | null;
+  /** Puts a picture of a link's page on its body's screen, for when the page itself isn't live. */
+  picture(id: string, data: string): void;
   dispose(): void;
 }
 
@@ -113,6 +115,7 @@ function glowTexture(): THREE.Texture {
 
 /** A body's colour from its link: the same link is the same colour everywhere. Big bodies burn warmer and brighter. */
 export function colourOf(body: Body): THREE.Color {
+  if (body.colour) return new THREE.Color(body.colour);
   const hue = chance(body.url, 'hue');
   const sun = Math.min(1, Math.max(0, (body.magnitude - 5) / 5));
   return new THREE.Color().setHSL(hue, 0.55 + 0.25 * sun, 0.58 + 0.1 * sun);
@@ -138,7 +141,7 @@ const GLASS_FRAGMENT = `
   void main() {
     float facing = abs(dot(normalize(vNormal), normalize(vView)));
     float rim = pow(1.0 - facing, 2.4);
-    float alpha = 0.05 + glow * 0.07 + rim * (0.55 + glow * 0.35);
+    float alpha = 0.09 + glow * 0.07 + rim * (0.55 + glow * 0.35);
     gl_FragColor = vec4(tint * (0.55 + rim * 0.9 + glow * 0.35), alpha);
   }
 `;
@@ -148,6 +151,8 @@ interface Drawn {
   face: THREE.Mesh;
   edge: THREE.LineSegments;
   spark: THREE.Sprite;
+  /** Whether its screen has a picture of its page on it. */
+  pictured: boolean;
 }
 
 export function createSky(canvas: HTMLCanvasElement, bodies: readonly Body[]): Sky {
@@ -215,7 +220,7 @@ export function createSky(canvas: HTMLCanvasElement, bodies: readonly Body[]): S
     edge.renderOrder = 4;
     scene.add(edge);
 
-    drawn.push({ body, face, edge, spark });
+    drawn.push({ body, face, edge, spark, pictured: false });
   }
 
   return {
@@ -241,8 +246,10 @@ export function createSky(canvas: HTMLCanvasElement, bodies: readonly Body[]): S
         d.face.scale.set(size.width, size.height, 1);
         d.edge.scale.set(size.width, size.height, 1);
         const s = sight(pilot, d.body, view);
-        // Too small to be a screen, it is only a light.
-        const screen = !!s && s.rect.height >= 14;
+        // Too small to be a screen, it is only a light. And a place you have
+        // never been has nothing to show until you are close: from afar it is
+        // a body, not an empty frame.
+        const screen = !!s && s.rect.height >= 14 && (d.pictured || s.cover >= 0.1);
         d.face.visible = screen && live !== d.body.id;
         d.edge.visible = screen;
         // The point of light: a few points across, more for a bigger body, fading once the sphere itself is big.
@@ -253,6 +260,24 @@ export function createSky(canvas: HTMLCanvasElement, bodies: readonly Body[]): S
         d.spark.scale.setScalar((points * 2 * Math.tan((FOV * Math.PI) / 360) * 2) / view.height);
       }
       renderer.render(scene, camera);
+    },
+    picture(id, data) {
+      const d = drawn.find((x) => x.body.id === id);
+      if (!d) return;
+      const image = new Image();
+      image.onload = () => {
+        const texture = new THREE.Texture(image);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.needsUpdate = true;
+        const material = d.face.material as THREE.MeshBasicMaterial;
+        d.pictured = true;
+        material.map?.dispose();
+        material.map = texture;
+        material.color.set(0xffffff);
+        material.opacity = 1;
+        material.needsUpdate = true;
+      };
+      image.src = data;
     },
     pick(pilot, x, y) {
       let best: Body | null = null;
@@ -273,6 +298,7 @@ export function createSky(canvas: HTMLCanvasElement, bodies: readonly Body[]): S
     },
     dispose() {
       glow.dispose();
+      for (const d of drawn) (d.face.material as THREE.MeshBasicMaterial).map?.dispose();
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
         mesh.geometry?.dispose();

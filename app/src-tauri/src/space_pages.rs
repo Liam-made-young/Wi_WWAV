@@ -17,10 +17,14 @@
 //! - `space.page.dock {docked}`: you are in the page (it has the keyboard
 //!   and its own scrolling), or back out in the sky.
 //! - `space.page.close`, `.back`, `.forward`, `.reload`.
+//! - `space.page.picture {of}`: a picture of the page as it is now, which
+//!   comes back as the event `{what: "picture", of, data}`, `data` a JPEG as
+//!   a `data:` address. It is what the body wears when its page isn't live.
 //!
-//! And one that moves you instead of the page: `space.fly {url, enter?}`
-//! tells the sky to fly you to the body that is that link, and into its page
-//! when `enter` is true. It is how a search will move you to its results.
+//! And one that moves you instead of the page: `space.fly {url, enter?,
+//! cover?}` tells the sky to fly you to the body that is that link: into its
+//! page when `enter` is true, or until the page covers `cover` of the view's
+//! height. It is how a search will move you to its results.
 //!
 //! The page talks back by one road: a script put in every page asks to go to
 //! `wwavspace://say/?<json>`, which is never a place; the request is read
@@ -178,6 +182,7 @@ fn open<R: Runtime>(app: &AppHandle<R>, args: &Value) -> Result<Value, CoreError
 }
 
 fn place<R: Runtime>(app: &AppHandle<R>, args: &Value) -> Result<Value, CoreError> {
+    proof::PLACED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let view = page(app)?;
     if args["shown"].as_bool() == Some(false) {
         let _ = view.hide();
@@ -227,6 +232,26 @@ fn eval<R: Runtime>(app: &AppHandle<R>, script: &str) -> Result<Value, CoreError
     Ok(json!({}))
 }
 
+fn picture<R: Runtime>(app: &AppHandle<R>, args: &Value) -> Result<Value, CoreError> {
+    use base64::Engine;
+    let view = page(app)?;
+    let of = args["of"].as_str().unwrap_or_default().to_string();
+    let to = app.clone();
+    let asked = crate::space_picture::take(&view, move |jpeg| {
+        // No picture this time (the page was out of sight): the body keeps the one it has.
+        let Some(jpeg) = jpeg else { return };
+        proof::PICTURED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let text = base64::engine::general_purpose::STANDARD.encode(jpeg);
+        let data = format!("data:image/jpeg;base64,{text}");
+        bridge::emit(
+            &to,
+            "space.page",
+            json!({ "what": "picture", "of": of, "data": data }),
+        );
+    });
+    Ok(json!({ "asked": asked }))
+}
+
 /// Answers the `space.page.*` cmds.
 pub fn command<R: Runtime>(
     app: &AppHandle<R>,
@@ -241,12 +266,18 @@ pub fn command<R: Runtime>(
         "space.page.back" => eval(app, "history.back()"),
         "space.page.forward" => eval(app, "history.forward()"),
         "space.page.reload" => eval(app, "location.reload()"),
+        "space.page.picture" => picture(app, args),
         "space.fly" => {
             let url = args["url"]
                 .as_str()
                 .ok_or_else(|| bad("space.fly needs the link to fly to."))?;
             let enter = args["enter"].as_bool().unwrap_or(false);
-            bridge::emit(app, "space.fly", json!({ "url": url, "enter": enter }));
+            let cover = args["cover"].as_f64().filter(|c| *c > 0.0 && *c <= 1.0);
+            bridge::emit(
+                app,
+                "space.fly",
+                json!({ "url": url, "enter": enter, "cover": cover }),
+            );
             Ok(json!({}))
         }
         _ => Err(bad(format!("Space has no command called {cmd}."))),
@@ -304,6 +335,12 @@ pub mod proof {
     use tauri::{AppHandle, Runtime};
 
     static HEARD: Mutex<Option<Vec<Value>>> = Mutex::new(None);
+
+    /// How many times the page has been moved and pictured, which the tour
+    /// writes beside its pictures: a sky that has stopped drawing stops
+    /// moving its page.
+    pub static PLACED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    pub static PICTURED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
     /// Asks a page, once it has loaded, to press its play button and say
     /// what is playing, what it holds, and whether it remembers the last
@@ -402,10 +439,9 @@ pub mod proof {
     }
 
     /// The same for the eye. With `WI_WWAV_SPACE_TOUR` naming a folder, the
-    /// app shows Space, flies to a video, goes into it, comes out and goes
-    /// into an article, taking a picture of the screen at each stop, and
-    /// quits. The pictures show the whole screen, so they are for the person
-    /// at this Mac and nobody else.
+    /// app shows Space at home, flies to a solar system, goes into a video
+    /// and backs away from it until only its picture is left, and goes to an
+    /// article, taking a picture of its own window at each stop, and quits.
     pub fn tour<R: Runtime>(app: &AppHandle<R>) {
         let Some(folder) = std::env::var_os("WI_WWAV_SPACE_TOUR") else {
             return;
@@ -418,21 +454,39 @@ pub mod proof {
         let folder = std::path::PathBuf::from(folder);
         std::thread::spawn(move || {
             let pause = |seconds: u64| std::thread::sleep(Duration::from_secs(seconds));
+            #[cfg(target_os = "macos")]
+            let window = tauri::Manager::get_window(&app, "main")
+                .and_then(|w| crate::space_picture::window_number(&w));
+            #[cfg(not(target_os = "macos"))]
+            let window: Option<isize> = None;
+            let counts = std::cell::RefCell::new(String::new());
             let picture = |name: &str| {
+                use std::sync::atomic::Ordering::Relaxed;
+                counts.borrow_mut().push_str(&format!(
+                    "{name}: the page moved {} times, pictured {}\n",
+                    PLACED.load(Relaxed),
+                    PICTURED.load(Relaxed)
+                ));
+                let _ = std::fs::write(folder.join("counts.txt"), counts.borrow().as_bytes());
+                let Some(number) = window else { return };
                 let _ = std::process::Command::new("screencapture")
-                    .args(["-x", "-t", "jpg"])
+                    .args(["-x", "-o", "-t", "jpg", "-l", &number.to_string()])
                     .arg(folder.join(format!("{name}.jpg")))
                     .status();
             };
-            let fly = |url: &str, enter: bool| {
-                let _ = super::command(&app, "space.fly", &json!({ "url": url, "enter": enter }));
+            let fly = |url: &str, enter: bool, cover: Option<f64>| {
+                let to = json!({ "url": url, "enter": enter, "cover": cover });
+                let _ = super::command(&app, "space.fly", &to);
             };
+            let system = "https://www.mi-wwav.com/summer_26/g/liam-made-young/s/listen-to-this-when-the-world-is-ending";
             let video = "https://www.youtube.com/watch?v=jNQXAC9IVRw";
             let article = "https://en.wikipedia.org/wiki/Saturn";
-            pause(3);
-            if let Some(window) = tauri::Manager::get_window(&app, "main") {
-                let _ = window.set_focus();
+            // The sky stops drawing when its window is covered, so for these few
+            // seconds the window stays above the others. It doesn't take the keyboard.
+            if let Some(main) = tauri::Manager::get_window(&app, "main") {
+                let _ = main.set_always_on_top(true);
             }
+            pause(3);
             // A library nobody has opened before greets you first; the tour has seen it.
             if let Some(main) = tauri::Manager::get_webview(&app, "main") {
                 let _ = main.eval(
@@ -441,20 +495,20 @@ pub mod proof {
             }
             pause(4);
             crate::bridge::emit(&app, "menu", json!({ "action": "room.space" }));
-            pause(3);
-            picture("1-the-sky");
-            fly(video, false);
             pause(5);
-            picture("2-near-a-video");
-            fly(video, true);
-            pause(5);
-            picture("3-in-the-video");
-            fly(article, false);
-            pause(6);
-            picture("4-near-an-article");
-            fly(article, true);
-            pause(6);
-            picture("5-in-the-article");
+            picture("1-home");
+            fly(system, false, Some(0.06));
+            pause(4);
+            picture("2-a-solar-system");
+            fly(video, true, None);
+            pause(7);
+            picture("3-in-a-video");
+            fly(video, false, Some(0.12));
+            pause(4);
+            picture("4-its-picture-from-afar");
+            fly(article, false, None);
+            pause(7);
+            picture("5-near-an-article");
             app.exit(0);
         });
     }

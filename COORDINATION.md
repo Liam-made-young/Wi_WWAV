@@ -626,74 +626,135 @@ editing the shared Console files while Image is underway.
 ## Console Phase 3a: the audio engine (branch `claude/console-av`)
 
 Started 8 Oct 2026, at Liam's word: Codex builds Phase 2 (Image) while a
-Claude session builds Phase 3a, in parallel. This is that session.
+Claude session builds Phase 3a, in parallel. **Built and committed on the
+branch the same day (`a0f1150`); not merged anywhere, and not pushed.** It stops here and waits for
+Liam's go before 3b.
 
-Worktree: `../Wi-WWAV-console` (the Audiovisual worktree an earlier Claude
-session made and left empty), fast-forwarded from `eaec951` to Console Phase 1
-(`b16a2f6`), so it holds Console's shell and Write. Build folder:
-`~/Library/Developer/wi-wwav-build/target-console-av`.
+Worktree: `../Wi-WWAV-console`, fast-forwarded from `eaec951` to Console
+Phase 1 (`b16a2f6`), so it holds Console's shell and Write and nothing of
+Phase 2. Build folder: `~/Library/Developer/wi-wwav-build/target-console-av`.
+(The untracked `spikes/` folder there is an earlier session's empty stubs.
+It isn't in the commit and nothing uses it.)
 
 **What 3a is,** in the Console brief's words: real-time playback and
 recording with low latency, on a dedicated audio thread that never blocks;
 decode common formats and resample as needed; read and write `.wwav`. No
-timeline, no mixer, no Audiovisual panel and no video: those are 3b and 3c,
-and they wait for Liam's go.
+timeline, no mixer, no Audiovisual panel and no video: those are 3b and 3c.
 
-**How it is built.** Liam's Audiovisual brief of 7 Oct decided two things
-that govern this: the engine is Rust, and it is a server of `docs/ENGINE.md`,
-so the app's supervisor (`crates/wi-core/src/engine.rs`), `wwav-engine-cli`
-and the engine tests keep working. So 3a is `wwav-engine` written in Rust, a
-new crate that answers every op `mock-engine` answers, on a real sound card
-(cpal) or the null device. `engine/` (the JUCE one) is left as it is.
-`.wwav` stays exactly what `crates/wwav-formats` says it is.
+**What landed.** Liam's Audiovisual brief of 7 Oct decided the engine is
+Rust and a server of `docs/ENGINE.md`. So:
 
-**Files that are mine** (new): `crates/wwav-engine/` and its tests.
+- `crates/wwav-engine`: `wwav-engine` in Rust. It answers the contract the
+  JUCE engine in `engine/` was built to (which is left as it is), on a sound
+  card through cpal or on the timer when none is open. Clips are held whole
+  or streamed from disk; tracks sum into the four stem buses and the master;
+  the clock, meters and crumb are in shared memory; `render` writes stems and
+  master as fast as the CPU goes. `crates/wwav-engine/README.md` is the whole
+  of it, with what was and wasn't checked and five minutes for Liam to run
+  by hand.
+- Recording: `record.start` and `record.stop` write one take at a time, and
+  say where it belongs in the session. The null device's input is its own
+  output, so a take is tested sample for sample without hardware.
+- Other formats and other rates: `crates/wwav-decode` (symphonia) decodes
+  FLAC, ALAC, AIFF, CAF, MP3, AAC and Vorbis; a file in one of them, or at
+  another rate than the session's, is made once into a WAV in a cache folder
+  and played from there.
+- `wwav.write`: the session's stems and master as a `.wwav`, through
+  `wwav-formats`, which still owns the format. The reference reader lists
+  what it writes with all four stems.
 
-**Shared files I add to** (additions only; none of them is claimed above):
+**Files that are mine** (new): `crates/wwav-engine/`, `crates/wwav-decode/`,
+`engine/tests/test_record.py`, `test_wwav.py`, `test_convert.py`.
 
-| File | What I add |
+**What I added to shared files** (none is claimed by another section):
+
+| File | What changed |
 |---|---|
-| `Cargo.toml`, `Cargo.lock` | one workspace member, and its dependencies |
-| `docs/ENGINE.md` | the recording ops, and the layout of the input and peaks rings that §4.5 reserves |
-| `crates/wwav-wire` | the same additions, on the app's side |
-| `crates/mock-engine`, `crates/wwav-engine-cli` | they answer and send the new ops, so one set of tests runs against both engines |
-| `docs/DECISIONS.md`, `docs/SPEC.md` 8.11 | rows for what I decide and for each licence |
+| `Cargo.toml`, `Cargo.lock` | two workspace members and their dependencies |
+| `docs/ENGINE.md` | which engine is which; `--cache`; the timer when no device opens; `hello`'s `features`; what a clip may be (3.3); 3.10 Recording; 3.11 Writing a .wwav; 4.5, the layout of the peaks and input rings |
+| `crates/wwav-wire/src/shm.rs`, `tests/shm_stress.rs` | `PeaksRing`, `InputRing`, `TakeFields`, `Shm::peaks()` and `Shm::input()`, and a test. Nothing that was there changed; the fixed part of the region is as it was |
+| `engine/tests/wwav_client.py` | `Engine(..., extra=())`: more flags for the engine |
+| `engine/tests/test_playback.py` | one case: a clip at another rate is expected to be refused only by an engine whose `hello` doesn't say `resample` |
+| `docs/DECISIONS.md` | nine rows, dated 8 Oct, marked (engine) |
+| `docs/SPEC.md` 8.11 | two licence rows: cpal and rtrb; symphonia |
+| `docs/PLAN.md` | four cells of the budgets table, each saying what was measured and on what |
 
-**I don't touch** `crates/wi-core/src/console/`, `app/ui/src/console/`,
-`docs/CONSOLE.md`, Console's tests, the Library or any bundle. 3a adds no
-`console.*` command and nothing to the web bundle.
+**Not changed, though I said I would:** `crates/mock-engine` and
+`crates/wwav-engine-cli`. The CLI already sends any op by name, so
+`record.start` and `wwav.write` work from a terminal as they are. The mock
+answers `unknown_op` to the three new ops; teaching it to fake a take is
+only worth doing when the app's UI has something to show one, in 3b.
 
-**Dependencies I expect to add,** each licence read before it goes in: cpal
-(Apache-2.0), rtrb (MIT or Apache-2.0), symphonia for decoding (MPL-2.0: not
-GPL, and it asks only that changes to its own files be published; Liam can
-say no and it becomes hound, claxon and lewton). No ffmpeg in 3a.
+**I didn't touch** `crates/wi-core/` (any of it), `app/`, `docs/CONSOLE.md`,
+Console's tests, the Library or any bundle. 3a adds no `console.*` command
+and nothing to the web bundle.
 
-**For Codex, while you build Phase 2:**
+**Shared surfaces, all additions:**
 
-- `Cargo.toml` and `Cargo.lock`: we both add lines. Mine is one member and
-  one block of dependencies of that crate; I add no `[workspace.dependencies]`
-  entry you would also add. Whoever merges second regenerates the lock file.
-- I read nothing from the Library in 3a. The engine plays a file by its
-  absolute path, as `ENGINE.md`'s `Clip.path` says. For 3b: `console.read`
-  answers a `path`; please keep it, because audio and video must reach the
-  engine as a path and never as base64 through the 24 MiB preview.
-- The Audiovisual panel, its `timeline.json` placeholder and the
-  Audiovisual tool's place in `CONSOLE_TOOLS` stay yours through Phase 2. I
-  don't edit them. When 3b gets its go, the Audiovisual document and its
-  `console.*` commands need one owner; whoever is given 3b proposes it here
-  first.
-- If Image needs anything that sounds like mine (a decoder, a ring, a clock),
-  write it under **Requests to me** and work around it until I answer.
+- Engine ops: `record.start`, `record.stop`, `wwav.write`. Events: `record`,
+  `convert.progress`, and `render.progress` with `stage: "wwav"`.
+- `hello` carries `features` from the Rust engine.
+- A flag, `--cache <dir>`, and a folder: `$TMPDIR/wwav-engine-cache` unless
+  the flag names another. Nothing removes files from it yet.
+- `wi_core::Config::engine_path` is how the app picks its engine; pointing
+  it at `wwav-engine` instead of `mock-engine` is all it takes. I haven't run
+  the app's supervisor against it: its tests lean on the mock's fake plugins.
+
+**Dependencies added,** each licence read: cpal 0.18 (Apache-2.0), rtrb 0.3
+(MIT or Apache-2.0), libm (MIT, already in the lock), symphonia 0.5.5 and
+its sub-crates (MPL-2.0: not GPL; it asks only that changes to its own files
+be published, and none are changed), with arrayvec, lazy_static, extended
+and encoding_rs behind it (MIT or Apache-2.0; encoding_rs also BSD-3-Clause).
+Dev only: hound (Apache-2.0), rustfft. No ffmpeg, no GPL. AAC is decoded in
+software by symphonia, which SPEC 8.11's patent question now covers.
+
+**Verification.** `cargo test -p wwav-engine`: 23 unit tests; the nine
+suites in `engine/tests` against the binary (90 tests: the six the JUCE
+engine was built to, and three new ones for takes, `.wwav` writing and
+conversion); and a test that is the audio thread with a counting allocator,
+which counts zero. `wwav-decode`: 40 tests. `wwav-wire`: its suite plus one.
+Clippy with `-D warnings` and fmt pass on the three crates; `cargo check -p
+wi-core` passes. Measured on this MacBook Pro: a render at 139 times real
+time; two minutes on the timer in blocks of 128 with no dropout; the
+MacBook's speakers opened and the clock ran at 44,100.0 a second.
+
+**Not verified:** how anything sounds; a real microphone (opening one makes
+macOS ask, which is Liam's to answer), and so where a take from a real card
+lands; an hour without a dropout; the JUCE engine on the same suites (it has
+never been built on a Mac); anything off macOS.
+
+**For Codex, and for whoever is given 3b:**
+
+- `Cargo.toml` and `Cargo.lock`: mine are two member lines and the two
+  crates' own dependencies. I added no `[workspace.dependencies]` entry.
+  Whoever merges second regenerates the lock file.
+- The engine plays a file by its absolute path. `console.read` answers a
+  `path`; please keep it, because audio must reach the engine as a path and
+  never as base64 through the 24 MiB preview. An import over 24 MiB is
+  refused by the Library today, and most songs are bigger: the Audiovisual
+  tool will need assets that are referenced or copied by path. That is the
+  first thing 3b has to settle with you.
+- The Audiovisual panel, its `timeline.json` placeholder and its place in
+  `CONSOLE_TOOLS` are yours and untouched. The Audiovisual document, its
+  `console.*` commands and who owns them are for 3b's owner to propose here
+  before writing any.
+- The two Console briefs disagree on one thing that isn't mine or yours to
+  settle: Liam's 7 Oct brief says versions, lineage and undo are
+  `wi-store`'s journal and Claude comes through the shared prompt box; your
+  brief, and what you built, give Console its own versions and ⌘T. I have
+  told Liam; nothing in 3a depends on the answer.
 
 **Status**
 
 - [x] Coordination file
-- [ ] The engine: devices, the null device, transport, the clock, meters
-- [ ] Clips streamed from disk; decoding and resampling; `.wwav` stems in place
-- [ ] The graph: tracks into the four stem buses into the master; render
-- [ ] Recording to a take
-- [ ] Writing a `.wwav`
-- [ ] The existing engine tests run against both engines
+- [x] The engine: devices, the null device, transport, the clock, meters
+- [x] Clips streamed from disk; decoding and resampling; `.wwav` stems in place
+- [x] The graph: tracks into the four stem buses into the master; render
+- [x] Recording to a take
+- [x] Writing a `.wwav`
+- [x] The existing engine tests run against the Rust engine
+- [ ] By hand, for Liam: the five minutes at the foot of
+      `crates/wwav-engine/README.md` (listening; the microphone)
 
 **Requests to me**
 
@@ -715,11 +776,13 @@ from `claude/focus-ask-notes` at `eaec951`, which is also where `main` now
 is (PR #2 was merged that day at the founder's word). Its build folder is
 `~/Library/Developer/wi-wwav-build/target-space`.
 
-**Built (step 1 of docs/SPACE.md 10).** Space is first person: you fly a
-proving ground of six real sites and four links on them, and a body's real
-page grows out of it as you come in, until it fills the view. Proved in the
-Mac app on 8 Oct: a YouTube video, a Spotify song and an Apple Music song
-play; Wikipedia, X and DuckDuckGo load; a cookie lasts between launches.
+**Built (steps 1 to 4 of docs/SPACE.md 10).** Space is first person. You
+start at the founder's galaxy, read from mi-wwav.com, with six real sites
+standing far out around it; a body's real page grows out of it as you come
+in, until it fills the view; and a body wears a picture of its page whenever
+the page isn't live. Proved in the Mac app on 8 Oct: a YouTube video, a
+Spotify song and an Apple Music song play; Wikipedia, X and DuckDuckGo load;
+a cookie lasts between launches.
 
 **I claim** `app/ui/src/space/`, `crates/wi-core/src/space/`,
 `app/src-tauri/src/space_pages.rs` and the `space_*` files beside it,
@@ -730,20 +793,23 @@ play; Wikipedia, X and DuckDuckGo load; a cookie lasts between launches.
 
 | File | What changed |
 |---|---|
-| `app/src-tauri/Cargo.toml` | Tauri's `unstable` feature, which lets a window hold a second web view |
-| `app/src-tauri/src/lib.rs` | `mod space_pages;`; three lines in `on_page_load` (the page's loading is passed to the UI; two development runs start when their environment variable is set) |
+| `app/src-tauri/Cargo.toml` | Tauri's `unstable` feature, which lets a window hold a second web view; `base64`; and for the Mac `objc2` and `block2`, which Tauri's web view already brings in |
+| `app/src-tauri/src/lib.rs` | `mod space_pages;`, `mod space_picture;`; three lines in `on_page_load` (the page's loading is passed to the UI; two development runs start when their environment variable is set); and **`WI_WWAV_BESIDE`**: with `WI_WWAV_LIBRARY` also set, the one-app plugin is left out, so a test run can start beside the app that is open. Any agent can use it, and nobody's app has to be quit |
 | `app/src-tauri/src/bridge.rs` | one arm: `space.page.*` and `space.fly` are answered by the shell, as `shell.room` is |
 | `app/src-tauri/src/fence.rs` | **the one to know about.** The web view labelled `space-page` is asked `space_pages::may_go` in place of the fence's rule: http and https only. Every other web view is fenced as before. No capability names `space-page`, so a page in it can call nothing |
 | `app/src-tauri/README.md` | that exception, in a paragraph |
 | `crates/wi-core/Cargo.toml`, `Cargo.lock` | `url = "2"`, which ureq already brought in |
-| `crates/wi-core/src/lib.rs` | `pub mod space;` and a line in the header |
+| `crates/wi-core/src/lib.rs` | `pub mod space;`, a line in the header, and one arm of `Core::invoke`: `space.*` |
 | `docs/COMMANDS.md`, `docs/DECISIONS.md` | the shell's new cmds and the `space.page` event; six rows |
 | `docs/SPEC.md`, `docs/PLAN.md`, `docs/SCOPE_CUT.md` | a pointer each to `docs/SPACE.md` |
 
-**New on shared surfaces** (all additions): the cmds `space.page.open`,
-`.place`, `.dock`, `.close`, `.back`, `.forward`, `.reload` and `space.fly`;
-the events `space.page` and `space.fly`; a web view `space-page`; a page
-served on a loopback port chosen at launch, which holds YouTube's player.
+**New on shared surfaces** (all additions): the core's cmd `space.home`,
+which keeps its answer under the key `space.home.<slug>`; the shell's cmds
+`space.page.open`, `.place`, `.dock`, `.close`, `.back`, `.forward`,
+`.reload`, `.picture` and `space.fly`; the events `space.page` and
+`space.fly`; a web view `space-page`; a page served on a loopback port
+chosen at launch, which holds YouTube's player; and `wi.space.pictures` in
+the main window's own storage.
 
 **Things to know.**
 
@@ -768,9 +834,11 @@ served on a loopback port chosen at launch, which holds YouTube's player.
 - [x] `docs/SPACE.md`: the brief, the founder's answers, the protocol
 - [x] The branch and the worktree
 - [x] Step 1: flying in first person, and real pages proved in the Mac app
-- [ ] Home: the founder's galaxy from mi-wwav.com
+- [x] A picture of the page on its body when it isn't live
+- [x] The flying smoothed (not yet tuned by hand)
+- [x] Home: the founder's galaxy from mi-wwav.com
 - [ ] Search that moves you (needs his YouTube key)
-- [ ] A picture of the page on its body when it is too far to be live
+- [ ] A sky that shows what is big and what goes round what
 
 **Requests to me**
 

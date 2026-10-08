@@ -35,6 +35,14 @@ serde_json = { workspace = true }
 # The OS secret store: Keychain on macOS, Credential Manager on Windows, the
 # Secret Service (GNOME Keyring, KWallet) elsewhere (docs/SPEC.md 9.8).
 keyring = { version = "3.6", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+# A page's picture travels to the window as text (space_pages.rs).
+base64 = "0.22"
+
+# The Mac takes that picture with WebKit's own snapshot, asked for by name
+# (space_picture.rs). Tauri's web view already brings both crates in.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }

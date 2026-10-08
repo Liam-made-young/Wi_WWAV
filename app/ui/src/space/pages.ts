@@ -17,7 +17,8 @@ export interface Place extends Rect {
 /** What comes back about the page. `said` is whatever the page itself wrote; trust none of it. */
 export type Heard =
   | { what: 'loading' | 'loaded'; url: string }
-  | { what: 'said'; said: Record<string, unknown> };
+  | { what: 'said'; said: Record<string, unknown> }
+  | { what: 'picture'; of: string; data: string };
 
 const quiet = (p: Promise<unknown>) => void p.catch(() => {});
 
@@ -54,6 +55,10 @@ export const pages = {
     if (!IN_APP) return;
     next = null;
     quiet(call('space.page.close'));
+  },
+  /** Asks for a picture of the page as it is now. It comes back as `{what: 'picture', of, data}`. */
+  picture(of: string): void {
+    if (IN_APP) quiet(call('space.page.picture', { of }));
   },
   back: () => IN_APP && quiet(call('space.page.back')),
   forward: () => IN_APP && quiet(call('space.page.forward')),

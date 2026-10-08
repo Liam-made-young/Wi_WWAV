@@ -481,6 +481,7 @@ impl Core {
             ask if ask.starts_with("ask.") => ask::invoke(i, ask, &a),
             db if db.starts_with("db.") => db::invoke(i, db, &a),
             wiki if wiki.starts_with("wiki.") => wiki::invoke(i, wiki, &a),
+            space if space.starts_with("space.") => space::invoke(i, space, &a),
 
             "library.list" => library::list(i, &a),
             "library.search" => library::search(i, &a),

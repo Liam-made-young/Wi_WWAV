@@ -414,10 +414,12 @@ saying why.
 **Checking and handing over**
 
 15. Run what covers your change and say what you ran. From `app/ui`:
-    `npx vitest run src/space` (139 passed on 8 Oct 2026). From the
-    repository's root: `cargo test -p wi-core --lib space` (5). From
+    `npx vitest run src/space` (152 passed on 8 Oct 2026). From the
+    repository's root: `cargo test -p wi-core --lib space` (8). From
     `tools/mock-server`: `node --test test/space.test.js` (22). What touches
-    pages is proved in the Mac app with `WI_WWAV_SPACE_PROOF` (section 13).
+    pages is proved in the Mac app with `WI_WWAV_SPACE_PROOF`, and looked at
+    with `WI_WWAV_SPACE_TOUR`, beside the app the founder has open (section
+    13); don't quit his.
     Failing tests that are not Space's are listed in `COORDINATION.md`.
 16. In a browser, use installed Chrome (`channel: 'chrome'`); Playwright's
     own browser is not installed. Check a port with `lsof` before using it,
@@ -436,25 +438,30 @@ saying why.
 
 ## 10. The order of work
 
-Step 1 is done (section 13). The rest is Proposed.
+Done, in the order the founder chose on 8 Oct 2026 after flying the first
+build ("good as a prototype but obviously very rough"): the web views
+proved; a picture of each page on its body; the flying smoothed; home. The
+rest is Proposed.
 
-1. ~~**Prove the web views in the Mac app.**~~ Done 8 Oct 2026, and made
-   "really space and really 3D" as the founder asked: you fly a proving
-   ground of real sites in first person and go into their pages.
-2. **Home.** The founder's galaxy from mi-wwav.com as the place you start,
-   in place of the proving ground.
-3. **YouTube search to planets.** `space.search`, results as bodies around
+1. ~~**Prove the web views in the Mac app,** really space and really 3D.~~
+2. ~~**A picture of the page on its body** when it isn't live.~~
+3. ~~**The flying:** easing, a wheel that doesn't jerk, flights that take a
+   moment whatever the distance.~~ Still untuned by hand (section 13).
+4. ~~**Home:** the founder's galaxy from mi-wwav.com as the place you
+   start.~~
+5. **YouTube search to planets.** `space.search`, results as bodies around
    their channels, the flight to them (`space.fly` is there already), going
    in opens the player. Needs his YouTube key.
-4. **A picture of the page on its body** when it is too far to be live, and
-   more than one page kept.
-5. **Mass and parents,** with YouTube channels and Wikipedia articles, which
+6. **The sky is plain.** A big site and a single video differ only in size,
+   and nothing shows what goes round what.
+7. **Mass and parents,** with YouTube channels and Wikipedia articles, which
    both give a count for nothing; and the links on the page in front of you
    as the bodies around it.
-6. **One song, every service.**
-7. **The general web search,** then feeds and podcasts, Substack.
-8. **The history of where you have been,** around home.
-9. **X, by link and as a page.**
+8. **One song, every service.**
+9. **The general web search,** then feeds and podcasts, Substack.
+10. **The history of where you have been,** around home; more than one page
+    kept; an address and search box in the strip.
+11. **X, by link and as a page.**
 
 ## 11. A page inside a planet: how
 
@@ -476,8 +483,14 @@ written from memory on 8 Oct 2026.
   sphere.
 - **The live page is always in front.** Nothing drawn in the sky can pass in
   front of it, and it can't be cut off at the view's edge, so it is shown
-  only while all of it is in view. The picture of the page on its body, for
-  when it is too far or half out of view, is not built yet.
+  only while all of it is in view.
+- **The rest of the time a body wears a picture of its page:** when it is
+  too far, half out of view, or not the one you are looking at. WebKit takes
+  the picture of the live page a moment after it loads, every few seconds
+  while it is in view, and as you leave it. Pictures are kept by link, so a
+  place you have been looks like itself the next time. A place you have
+  never been has no picture: from afar it is a plain body, and its empty
+  screen shows only when you are close.
 - **Out in the sky the page is part of the sky.** Scrolling and pinching
   over it move you, and a click goes in. Once you are in, the page has its
   own scrolling and keys, and Esc, a pinch outward, ⌘2 or "Back out" brings
@@ -520,65 +533,87 @@ works for one.
 | Where a page takes you | He chooses where to go | Blocking of harmful pages, pop-ups, and what is shown to whom |
 | The Mac's WebKit | The only target | Windows draws pages with a different engine; every web-view rule here is re-proved there |
 | The page that holds YouTube's player | Served from this Mac, at `http://127.0.0.1` on a port chosen at launch | Whether YouTube's terms accept that for a product given to others is read first; otherwise a fixed page on wi-wwav.com |
-| The proving ground | Ten links written by hand | Gone: home and search fill the sky |
+| The proving ground | Ten links written by hand, standing far out around home | Gone: search fills the sky |
+| Pictures of pages | The newest 24, in the window's own storage on his Mac | Kept by the core, in the library's cache, with a limit by size |
+| A test run beside the app | `WI_WWAV_BESIDE` with a library of its own (section 13) | The same; it is a development switch |
 | How the page talks to the app | By asking to go to an address the app refuses | The same, unless a site is found that it breaks |
 
 ## 13. What is built, and how it was proved
 
 **Flying.** `app/ui/src/space/flight/`: `model.ts` is the arithmetic (where
 you are, how keys, dragging and scrolling move you, where a body's page is
-on the screen, when you are in it), `scene.ts` draws it in three.js (far
+on the screen, when you are in it), and `scene.ts` draws it in three.js (far
 stars, dust that streams past as you move, each body a sphere of glass with
-a screen at its core), and `ground.ts` is the proving ground: YouTube,
-Spotify, Apple Music, Wikipedia, DuckDuckGo and X as bodies, with a video,
-two songs and an article beside them, each where its link's hash puts it.
-`SpaceView.tsx` is the view: a strip of its own along the top, and the sky.
+its page at its core). `SpaceView.tsx` is the view: a strip of its own along
+the top, and the sky.
 
 | To | Do |
 |---|---|
-| Move | W A S D, R and F for up and down, Q and E to roll |
-| Look | Drag the sky, or the arrow keys |
+| Move | W A S D, R and F for up and down, Q and E to roll. Shift to hurry |
+| Look | Drag the sky (the star you took hold of stays under the pointer), or the arrow keys |
 | Fly toward what you face | Scroll, or pinch. The body's gravity turns you to face it as you come |
 | Go to a body | Click it. Double-click, Return or "Go in" goes into its page |
 | Come out of a page | Esc, a pinch outward, ⌘2, or "Back out" |
 
-**Pages.** `app/src-tauri/src/space_pages.rs` and the three files beside it:
-the one web view a page is opened in, the cmds that move it
-(`space.page.*`, `space.fly`; docs/COMMANDS.md), the script put in every
-page, and the page on this Mac that holds YouTube's player. What a link's
-page loads, and what a page may say back, are `crates/wi-core/src/space/`.
+You slow as you near a body and never crawl at one. A flight you are taken
+on (a click, `space.fly`) eases off at both ends and takes between two
+thirds of a second and under three, however far.
+
+**Home.** `space.home` (`crates/wi-core/src/space/home.rs`) reads a galaxy
+from mi-wwav.com as links, with no account, and keeps the answer so home is
+there at once and offline. `flight/home.ts` lays it out: the galaxy's sun at
+the middle, each solar system where its maker put it on the galaxy's map and
+lifted off that map, its worlds on the orbits the server keeps in a plane
+tilted by the system's link. `flight/ground.ts` adds the proving ground far
+out around it: YouTube, Spotify, Apple Music, Wikipedia, DuckDuckGo and X,
+with a video, two songs and an article beside them.
+
+**Pages.** `app/src-tauri/src/space_pages.rs` and the files beside it: the
+one web view a page is opened in, the cmds that move it (`space.page.*`,
+`space.fly`; docs/COMMANDS.md), the script put in every page, the page on
+this Mac that holds YouTube's player, and `space_picture.rs`, which takes a
+page's picture. What a link's page loads, and what a page may say back, are
+`crates/wi-core/src/space/`. Pictures are kept by `app/ui/src/space/pictures.ts`.
 
 **The proof** is a run of the app itself. `WI_WWAV_SPACE_PROOF=<file>` opens
 each kind of link in turn, asks the page what happened, writes the answers
-and quits. Run four times in the Mac app on 8 Oct 2026, on a scratch
-library:
+and quits. Run five times in the Mac app on 8 Oct 2026, the last on the
+build this section describes:
 
 | Link | What the page answered |
 |---|---|
 | A YouTube video | Playing, unmuted, 7.4 seconds in, seven seconds after play was pressed |
 | A Spotify song | Its own play button pressed; a 30-second preview playing, 7.6 seconds in |
 | An Apple Music song | Its own play button pressed; a 90-second preview playing, 7.2 seconds in |
-| A Wikipedia article | Loaded: "Saturn - Wikipedia", 2,370 links |
+| A Wikipedia article | Loaded: "Saturn - Wikipedia", 2,376 links |
 | A profile on X | Loaded: "NASA (@NASA) / X", nobody signed in |
 | A DuckDuckGo search | Loaded: "saturn at DuckDuckGo", about 100 links |
 | Staying signed in | A cookie and a stored value set by one launch were there in the next, on every one of the six sites |
 
 `WI_WWAV_SPACE_TOUR=<folder>` is the same for the eye: the app shows Space,
-flies to the video, goes in, comes out, goes into the article, and takes a
-picture of the screen at each stop. Looked at on 8 Oct 2026: the sky with
-its bodies and names; the player live inside its sphere at a little over
-half size; the article live and whole at the same size; the article filling
-the view with the strip above it.
+flies to a solar system, goes into a video, backs away until only its
+picture is left, and goes to an article, taking a picture of its own window
+at each stop and writing how often the page was moved and pictured. Looked
+at on 8 Oct 2026: home, with the founder's two solar systems and their
+worlds by name; the solar system close up; the video filling the view; the
+video's body from afar, wearing the picture of its page; the article live
+and whole inside its sphere.
+
+**A run beside the app you are using.** `WI_WWAV_BESIDE=1` with
+`WI_WWAV_LIBRARY` set to a scratch folder lets a development run start while
+the app is open, so nobody's app has to be quit. The sky stops drawing when
+its window is covered, so the tour keeps its window above the others for
+its half minute.
 
 **Not proved, and why.**
 
 - Nobody has signed in to anything in it. That the store lasts is proved;
   that Spotify or Apple Music then plays whole songs is not.
-- Flying by hand (keys, dragging, scrolling, pinching, Esc inside a page)
-  has only been driven by the tests and the tour, not by a person.
-- After the link rules moved into the core, the app was rebuilt and the
-  rules' tests pass, but the proof was not run a fifth time: the Mac's
-  screen had locked, and a locked Mac doesn't load pages.
+- Flying by hand. The arithmetic is tested and the tour flies, but how the
+  speeds, the turning and the pull of a body feel under a hand has been
+  judged by nobody but the founder, once, on the first build.
+- Seen at an angle and near the edge of the view, a sphere is drawn as an
+  ellipse. That is what a wide view does, and it has not been softened.
 - The shell's own Rust tests don't build on a Mac (two of Tauri's contexts
   in one test binary, from before this work), so `space_pages.rs`'s one test
   runs only on Linux.
