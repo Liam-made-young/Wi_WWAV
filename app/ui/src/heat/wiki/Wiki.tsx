@@ -41,6 +41,8 @@ interface Step {
 
 const PREVIEW_AFTER_MS = 350;
 const sectionId = (id: string) => `wiki-sec-${id}`;
+/** A value inside an attribute selector's quotes. */
+const quoted = (s: string) => s.replace(/["\\]/g, '\\$&');
 
 export function Wiki() {
   const { active } = useTabScope();
@@ -87,9 +89,9 @@ export function Wiki() {
         // The path names the article as Wikipedia does, whatever was typed or linked.
         setSteps((all) => all.map((s, i) => (i === at && s.title !== got.article.title ? { ...s, title: got.article.title } : s)));
         requestAnimationFrame(() => {
-          const el = here.frag ? page.current?.querySelector<HTMLElement>(`[data-frag="${CSS.escape(here.frag)}"]`) : null;
-          if (el) el.scrollIntoView();
-          else page.current?.scrollTo({ top: 0 });
+          const el = here.frag ? page.current?.querySelector<HTMLElement>(`[data-frag="${quoted(here.frag)}"]`) : null;
+          if (el) el.scrollIntoView?.();
+          else if (page.current) page.current.scrollTop = 0;
         });
         wiki.related(got.article.title).then(
           (r) => mine === asked.current && setRelated(r.results),
@@ -138,7 +140,8 @@ export function Wiki() {
 
   // The trail keeps its newest step in view.
   useEffect(() => {
-    trail.current?.scrollTo({ left: trail.current.scrollWidth });
+    const el = trail.current;
+    if (el) el.scrollLeft = el.scrollWidth;
   }, [steps, at]);
 
   // A link to an article from anywhere: the prompt box, a search result, another tab.
@@ -160,14 +163,14 @@ export function Wiki() {
 
   const jump = (frag: string) => {
     const el =
-      page.current?.querySelector<HTMLElement>(`[data-frag="${CSS.escape(frag)}"]`) ??
-      page.current?.querySelector<HTMLElement>(`[data-frag="${CSS.escape(frag.replace(/ /g, '_'))}"]`);
-    if (el) el.scrollIntoView({ block: 'start' });
+      page.current?.querySelector<HTMLElement>(`[data-frag="${quoted(frag)}"]`) ??
+      page.current?.querySelector<HTMLElement>(`[data-frag="${quoted(frag.replace(/ /g, '_'))}"]`);
+    if (el) el.scrollIntoView?.({ block: 'start' });
   };
 
   const showRef = (id: string) => {
     setRefsOpen(true);
-    requestAnimationFrame(() => page.current?.querySelector<HTMLElement>(`[data-ref="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'center' }));
+    requestAnimationFrame(() => page.current?.querySelector<HTMLElement>(`[data-ref="${quoted(id)}"]`)?.scrollIntoView?.({ block: 'center' }));
   };
 
   // Which section is being read: the last heading above the top of the page.
@@ -286,7 +289,7 @@ export function Wiki() {
                 <h2 className="heat-side-heading" data-text="secondary">
                   Contents
                 </h2>
-                <button type="button" className="heat-side-row" data-dense aria-current={section === '' ? 'true' : undefined} onClick={() => page.current?.scrollTo({ top: 0 })}>
+                <button type="button" className="heat-side-row" data-dense aria-current={section === '' ? 'true' : undefined} onClick={() => page.current && (page.current.scrollTop = 0)}>
                   <span className="heat-side-name">{article.title}</span>
                 </button>
                 {article.sections.map((s) => (

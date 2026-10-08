@@ -212,11 +212,11 @@ export function Database() {
           reveal.current = t.id;
           // The row is shown whatever the table was filtered to.
           if (table.id !== tableId || viewId) openTable(table.id, null, m);
+          // Clearing the filters asks for the rows again, and the row is found when they come.
           setSpecState((s) => ({ ...s, filters: [], search: '' }));
-          void load();
         });
       }),
-    [meta, tableId, viewId, loadMeta, openTable, setTab, say, load],
+    [meta, tableId, viewId, loadMeta, openTable, setTab, say],
   );
   useEffect(() => {
     if (!data || !reveal.current || data.table.id !== tableId) return;

@@ -198,8 +198,12 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     setEditing({ r: pt.r, c: pt.c, text });
   };
 
+  // Return ends the editor, and the editor leaving loses focus: one of them commits, not both.
+  const open = useRef(false);
+  open.current = editing !== null;
   const commit = (move: Point | null) => {
-    if (!editing) return;
+    if (!editing || !open.current) return;
+    open.current = false;
     const col = columns[editing.c];
     const row = rows[editing.r];
     setEditing(null);

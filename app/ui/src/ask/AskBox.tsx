@@ -157,6 +157,8 @@ export const AskBox = forwardRef<AskHandle, Props>(function AskBox(
     }
     input.current?.focus();
     input.current?.select();
+    // Each opening starts with nothing picked, so Return asks.
+    setAt(-1);
     // Says once per opening whether Claude can be asked at all.
     ask.status().then(
       (s) => setUnavailable(s.available ? null : (s.reason ?? 'Claude Code isn’t available.')),
@@ -247,7 +249,7 @@ export const AskBox = forwardRef<AskHandle, Props>(function AskBox(
   // The newest turn stays in view as it grows.
   const last = turns[turns.length - 1];
   useEffect(() => {
-    if (!typing) thread.current?.scrollTo({ top: thread.current.scrollHeight });
+    if (!typing && thread.current) thread.current.scrollTop = thread.current.scrollHeight;
   }, [turns, typing]);
 
   const send = () => {

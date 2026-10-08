@@ -34,7 +34,12 @@ describe('Learn’s keyboard', () => {
       { type: 'tab', tab: 'habits' },
       { type: 'tab', tab: 'mail' },
     ]);
-    expect(heatRoute(key('7'), ctx())).toBeNull();
+    // The Database and the Wiki follow, on 7 and 8; there is no ninth tab.
+    expect([7, 8].map((n) => heatRoute(key(String(n)), ctx()))).toEqual([
+      { type: 'tab', tab: 'database' },
+      { type: 'tab', tab: 'wiki' },
+    ]);
+    expect(heatRoute(key('9'), ctx())).toBeNull();
   });
 
   it('takes N, C, P, F, ⇧F and I, but C and P only with something selected', () => {
