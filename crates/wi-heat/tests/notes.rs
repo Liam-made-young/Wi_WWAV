@@ -203,6 +203,9 @@ fn search_finds_every_word_and_puts_a_title_first() {
         "every word, not any"
     );
     assert_eq!(ids("   "), Vec::<String>::new());
+    // An image's file name isn't the note's words, and never shows in a snippet.
+    assert_eq!(ids("attachments"), Vec::<String>::new());
+    assert!(!search(&notes, "食べて", 10)[0].snippet.contains("p1.jpg"));
     assert_eq!(search(&notes, "te-form", 1).len(), 1);
     let hit = &search(&notes, "loop", 10)[0];
     assert!(

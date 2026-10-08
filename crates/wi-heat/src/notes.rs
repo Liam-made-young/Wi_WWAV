@@ -466,6 +466,17 @@ pub struct Hit {
     pub score: f64,
 }
 
+/// A note's markdown without what isn't its words: embedded images, and
+/// the ids that tie a checkbox to its task.
+fn readable(markdown: &str) -> String {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(r"!\[[^\]]*\]\((?:<[^>]*>|[^)]*)\)|!\[\[[^\]]*\]\]|[ \t]*\^t-[A-Za-z0-9_\-]+")
+            .expect("valid")
+    });
+    re.replace_all(markdown, "").into_owned()
+}
+
 fn snippet(markdown: &str, word: &str) -> String {
     let lower = markdown.to_lowercase();
     let Some(at) = lower.find(word) else {
@@ -504,6 +515,9 @@ pub fn search(notes: &[(String, String, String)], query: &str, limit: usize) -> 
     }
     let mut out: Vec<Hit> = Vec::new();
     for (id, title, markdown) in notes {
+        // What is searched is what is read: an image's path and a linked
+        // task's id are not the note's words.
+        let markdown = &readable(markdown);
         let (t, body) = (title.to_lowercase(), markdown.to_lowercase());
         if !words.iter().all(|w| t.contains(w) || body.contains(w)) {
             continue;
