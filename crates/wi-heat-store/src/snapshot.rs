@@ -111,6 +111,16 @@ pub fn window_of(clock: &Clock, window: &Window) -> (String, String) {
     )
 }
 
+/// Commitments' and Notes' share of the snapshot (docs/COMMITMENTS.md,
+/// docs/NOTES.md), from one reading of the library: `commitments`, `notes`,
+/// `notices`, and the two record kinds.
+pub fn extras(store: &Store, clock: &Clock, window: &Window, snap: &mut Value) -> Result<()> {
+    let world = World::load(store)?;
+    let (from, to) = window_of(clock, window);
+    crate::commit::for_snapshot(store, &world, clock, snap, &from, &to)?;
+    crate::notes::for_snapshot(store, &world, clock, snap)
+}
+
 /// `heat.snapshot`: everything the views draw for a day.
 pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> {
     let today = clock.today();

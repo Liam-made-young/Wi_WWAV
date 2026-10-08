@@ -51,6 +51,9 @@ const CLAUDE_TIMEOUT: Duration = Duration::from_secs(240);
 /// The largest file the inbox takes.
 const FILE_MAX_BYTES: u64 = 80 * 1024 * 1024;
 
+/// One capture is read at a time, whoever asked for it.
+static ONE: Mutex<()> = Mutex::new(());
+
 /// What the inbox is doing, for the snapshot.
 #[derive(Default)]
 pub(crate) struct Capture {
@@ -332,6 +335,13 @@ fn code_in(name: &str) -> &str {
 /// moved into the notes' attachments; otherwise it is copied and left.
 pub(crate) fn process(i: &Inner, path: &Path, from_inbox: bool) -> Result<Value, CoreError> {
     notes_cmd::folder(i)?;
+    // One capture at a time: the watcher and a command asking for the same
+    // file never both read it. Whoever comes second finds it gone, and that
+    // is not a failure: the page is a note already.
+    let _one = lock(&ONE);
+    if from_inbox && !path.exists() {
+        return Ok(Value::Null);
+    }
     if !path.is_file() || !takes(path) {
         return Err(CoreError::new(
             "refused",
@@ -611,12 +621,17 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
                     .iter()
                     .any(|dir| file.parent() == Some(dir.as_path()));
                 let note = process(i, file, in_inbox)?;
-                return Ok(json!({"notes": [note]}));
+                let made: Vec<Value> = [note].into_iter().filter(|n| !n.is_null()).collect();
+                return Ok(json!({ "notes": made }));
             }
             if a.opt_bool("wait")?.unwrap_or(false) {
                 let mut made = Vec::new();
                 for path in waiting(i) {
-                    made.push(process(i, &path, true)?);
+                    let note = process(i, &path, true)?;
+                    // Null: the watcher read that one while this waited its turn.
+                    if !note.is_null() {
+                        made.push(note);
+                    }
                 }
                 return Ok(json!({ "notes": made }));
             }

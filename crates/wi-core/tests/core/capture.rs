@@ -138,11 +138,8 @@ fn a_page_photographed_in_class_is_filed_to_the_class_image_on_top_text_below() 
     std::fs::write(d.inbox.join("notes.txt"), b"not a capture").unwrap();
     assert_eq!(snap(&d.core, DAY)["notes"]["capture"]["waiting"], 1);
 
-    let done = ok(&d.core, "heat.capture.process", json!({"wait": true}));
-    assert_eq!(
-        done["notes"],
-        json!([{"id": done["notes"][0]["id"], "title": "JPN 101 · Oct 7", "line": "Filed to JPN 101 · Oct 7"}])
-    );
+    // The folder's own watcher may read it first; either way it is read by the time this answers.
+    ok(&d.core, "heat.capture.process", json!({"wait": true}));
     let note = note_titled(&d.core, "JPN 101 · Oct 7");
     let course = records(&snap(&d.core, DAY), "course")[0].clone();
     assert_eq!(note["courseId"], course["id"]);
@@ -488,9 +485,12 @@ fn a_scanned_pdf_is_one_note_with_every_page() {
     );
     let d = desk(&setup, Some(reader), None);
     std::fs::write(d.inbox.join("2026-10-08 20.00.00 Scan.pdf"), b"%PDF-1.4").unwrap();
-    let done = ok(&d.core, "heat.capture.process", json!({"wait": true}));
-    assert_eq!(done["notes"][0]["line"], "Captured to the Notes inbox");
+    ok(&d.core, "heat.capture.process", json!({"wait": true}));
     let note = note_titled(&d.core, "Capture · Oct 8, 8:00 PM");
+    assert_eq!(
+        note["inbox"], true,
+        "no class was on: it waits in the Notes inbox"
+    );
     assert_eq!(
         note["markdown"],
         "![Page 1](attachments/2026-10-08-2000-capture-p1.jpg)\n\nFirst page of the handout, about loops\n\n\

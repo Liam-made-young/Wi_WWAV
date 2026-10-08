@@ -610,11 +610,18 @@ pub fn bring_daily_notes(store: &mut Store, clock: &Clock) -> Result<Outcome> {
     if crate::setting(store, DONE)?.is_some() {
         return Ok(Outcome::unchanged(json!({"moved": 0})));
     }
+    // The usual case, and every new library's: there are none, and nothing
+    // is written but that this was looked at.
+    let old = all(store, kind::DAILY_NOTE)?;
+    if old.is_empty() {
+        crate::set_setting(store, DONE, &json!(true))?;
+        return Ok(Outcome::unchanged(json!({"moved": 0})));
+    }
     let world = World::load(store)?;
     let mut taken = titles(&notes(store)?, None);
     let mut made = Vec::new();
     let mut gone = Vec::new();
-    for d in all(store, kind::DAILY_NOTE)? {
+    for d in old {
         let date = text(&d, "date").to_string();
         if !is_day(&date) {
             continue;
@@ -958,10 +965,14 @@ pub fn apply_disk(
 /// The share of `heat.snapshot` that is Notes: for each note what it links
 /// to and what links to it, its tags and checkboxes; the notes newest first;
 /// the tags; what waits in the inbox; what Claude suggested; the notices.
-pub fn for_snapshot(store: &Store, clock: &Clock, snap: &mut Value) -> Result<()> {
-    let world = World::load(store)?;
+pub(crate) fn for_snapshot(
+    store: &Store,
+    world: &World,
+    clock: &Clock,
+    snap: &mut Value,
+) -> Result<()> {
     let all_notes = notes(store)?;
-    let names = Names::new(&all_notes, &world);
+    let names = Names::new(&all_notes, world);
     let mut index = Map::new();
     let mut backlinks: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     let mut tag_counts: BTreeMap<String, usize> = BTreeMap::new();

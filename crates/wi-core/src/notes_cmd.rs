@@ -628,16 +628,11 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
     }
 }
 
-/// The notes' share of the snapshot: the store's, and what only the core
-/// knows (the folder, the capture inbox).
-pub(crate) fn for_snapshot(i: &Inner, snap: &mut Value) -> Result<(), CoreError> {
-    {
-        let store = i.store();
-        notes::for_snapshot(&store, &i.clock(), snap).map_err(core_error)?;
-    }
+/// What only the core knows of Notes, for the snapshot: the folder, and
+/// the capture inbox. The rest is the store's (`snapshot::extras`).
+pub(crate) fn for_snapshot(i: &Inner, snap: &mut Value) {
     snap["notes"]["folder"] = json!(i.notes_dir);
     snap["notes"]["capture"] = capture::status(i);
-    Ok(())
 }
 
 /// Daily notes from before Notes are moved over, once.

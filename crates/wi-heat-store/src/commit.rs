@@ -1544,14 +1544,14 @@ fn range_line(c: &Commitment, fixed: &Fixed) -> String {
 /// The share of `heat.snapshot` that is commitments: the records, each day
 /// of the window with what is fixed in it, what is next, what today has
 /// left, the blocks that sit on something, and what waits for a tap.
-pub fn for_snapshot(
+pub(crate) fn for_snapshot(
     store: &Store,
+    world: &World,
     clock: &Clock,
     snap: &mut Value,
     from: &str,
     to: &str,
 ) -> Result<()> {
-    let world = World::load(store)?;
     let fixed = world.fixed.clone();
     let date = snap["date"].as_str().unwrap_or_default().to_string();
     let today = clock.today();
@@ -1572,7 +1572,7 @@ pub fn for_snapshot(
                 .map_or(Value::Null, |k| json!(course_label(&k.code, &k.name)));
             (
                 c.id.as_str(),
-                json!({"hue": hue_of(&world, c), "label": label}),
+                json!({"hue": hue_of(world, c), "label": label}),
             )
         })
         .collect();
@@ -1615,7 +1615,7 @@ pub fn for_snapshot(
     }
     let mut drafts = Vec::new();
     for d in all(store, kind::COMMITMENT_DRAFT)? {
-        drafts.push(draft_shown(store, &world, clock, &d)?);
+        drafts.push(draft_shown(store, world, clock, &d)?);
     }
     snap["records"][kind::COMMITMENT] = Value::Array(all(store, kind::COMMITMENT)?);
     snap["records"][kind::BREAK] = Value::Array(all(store, kind::BREAK)?);
@@ -1623,7 +1623,7 @@ pub fn for_snapshot(
         "days": days,
         "list": list,
         "next": next,
-        "free": free_of(&fixed, &world, clock, &date),
+        "free": free_of(&fixed, world, clock, &date),
         "conflicts": conflicts,
         "sleep": fixed.sleep,
         "term": {"start": fixed.term_start, "end": fixed.term_end},

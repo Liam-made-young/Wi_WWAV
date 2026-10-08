@@ -104,14 +104,13 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             snap["school"] = school;
             // The mail accounts for Mail's switcher and Settings → Learn (3.10).
             snap["mailAccounts"] = Value::Array(mail::accounts(&store).map_err(core_error)?);
-            // Commitments: each day of the window, what is next, what the day has left.
-            let (from, to) = snapshot::window_of(&clock, &window);
-            wi_heat_store::commit::for_snapshot(&store, &clock, &mut snap, &from, &to)
-                .map_err(core_error)?;
+            // Commitments and Notes: each day's commitments, what is next,
+            // what the day has left; links, backlinks, the quiet notices.
+            snapshot::extras(&store, &clock, &window, &mut snap).map_err(core_error)?;
             drop(store);
             crate::mail_cmd::for_snapshot(i, &mut snap)?;
-            // Notes: links, backlinks, the inbox, the capture folders, the quiet notices.
-            crate::notes_cmd::for_snapshot(i, &mut snap)?;
+            // What only the core knows of Notes: the folder, the capture inbox.
+            crate::notes_cmd::for_snapshot(i, &mut snap);
             Ok(snap)
         }
         "heat.whatItWouldTake" => {
