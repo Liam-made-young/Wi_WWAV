@@ -15,6 +15,7 @@ server (`docs/HEAT.md`), and commerce comes later, inside Space
 - `docs/QUESTIONS.md` lists every open decision with its recommendation.
 - `docs/DECISIONS.md` logs what was decided while building, and why.
 - `docs/HEAT.md` says how Learn's store, commands and MCP helper fit together.
+- `docs/ASK.md` says how the prompt box on ⌘K, the Database tab and the Wiki tab are built.
 
 ## Getting the sources
 

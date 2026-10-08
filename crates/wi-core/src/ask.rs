@@ -173,8 +173,7 @@ fn run_claude(
     model: &str,
     stop: &dyn Fn() -> Option<&'static str>,
 ) -> Result<Value, CoreError> {
-    let allowed: Vec<String> = ask_tools::TOOLS
-        .iter()
+    let allowed: Vec<String> = ask_tools::all()
         .map(|t| format!("mcp__learn__{}", t.name))
         .collect();
     let mut command = Command::new(binary);
@@ -435,6 +434,8 @@ fn send(inner: &Arc<Inner>, a: &Args) -> Result<Value, CoreError> {
         "change": change_json(&run),
         "outward": outward_json(&run),
         "tools": lock(&run.calls).clone(),
+        // What the run cost, as Claude Code reports it, in US dollars.
+        "cost": envelope["total_cost_usd"],
         "seconds": (started.elapsed().as_secs_f64() * 10.0).round() / 10.0,
     });
     let pending = !lock(&run.staged).is_empty() || !lock(&run.outward).is_empty();
@@ -584,7 +585,7 @@ pub(crate) fn invoke(inner: &Arc<Inner>, cmd: &str, a: &Args) -> Result<Value, C
             Err(e) => json!({"available": false, "reason": e.message}),
         }),
         "ask.tools" => Ok(json!({
-            "tools": ask_tools::TOOLS.iter().map(|t| json!({
+            "tools": ask_tools::all().map(|t| json!({
                 "name": t.name,
                 "effect": match t.effect {
                     ask_tools::Effect::Reads => "reads",

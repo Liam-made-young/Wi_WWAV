@@ -439,15 +439,81 @@ pub(crate) const TOOLS: &[Tool] = &[
     },
 ];
 
+/// What a tool from another part of Learn asks the box to do: a command of
+/// the core with its arguments, and the line the preview shows for it.
+pub(crate) struct Staging {
+    pub cmd: String,
+    pub args: Value,
+    /// "New commitment: JPN 101, Mon Wed Fri 10:00". Not read for a tool that only reads.
+    pub line: String,
+    /// How the summary counts it: ("commitment", "commitments", "added").
+    /// None counts it as a change.
+    pub counts: Option<(String, String, String)>,
+}
+
+/// Tools another part of Learn brings to the box. Its `tools` say what each
+/// is and whether it reads, changes or leaves this Mac; its `stage` turns a
+/// call into the core command that does it. The box does the rest by the
+/// tool's effect, exactly as for its own: a read is run at once and
+/// answered, a change is kept for the preview and made by `ask.apply`, and
+/// what leaves this Mac waits for its own yes.
+pub(crate) struct Extra {
+    pub tools: &'static [Tool],
+    pub stage: fn(&Inner, &str, &Value) -> Result<Staging, String>,
+}
+
+/// Mount a list here, one line each:
+/// `&Extra { tools: learn_tools::TOOLS, stage: learn_tools::stage }`.
+/// A name here must not be one of [`TOOLS`]'s, and can't hold a dot.
+pub(crate) const EXTRA: &[&Extra] = &[];
+
+/// Every tool the box offers: its own, then what was mounted.
+pub(crate) fn all() -> impl Iterator<Item = &'static Tool> {
+    TOOLS
+        .iter()
+        .chain(EXTRA.iter().flat_map(|e| e.tools.iter()))
+}
+
 pub(crate) fn tool(name: &str) -> Option<&'static Tool> {
-    TOOLS.iter().find(|t| t.name == name)
+    all().find(|t| t.name == name)
+}
+
+/// Runs a mounted tool by its effect.
+fn mounted(i: &Inner, run: &Run, extra: &Extra, t: &Tool, args: &Value) -> Result<Value, String> {
+    let staging = (extra.stage)(i, t.name, args)?;
+    match t.effect {
+        Effect::Reads => invoke(i, &staging.cmd, &staging.args).map_err(said),
+        Effect::Changes => {
+            let line = staging.line.clone();
+            run.stage(Staged {
+                cmd: staging.cmd,
+                args: staging.args,
+                line: staging.line,
+                counts: vec![staging
+                    .counts
+                    .unwrap_or_else(|| ("change".into(), "changes".into(), "made".into()))],
+                makes: Vec::new(),
+            });
+            Ok(json!({"staged": 1, "preview": [line], "note": STAGED_NOTE}))
+        }
+        Effect::LeavesThisMac => {
+            let line = staging.line.clone();
+            lock(&run.outward).push(Staged {
+                cmd: staging.cmd,
+                args: staging.args,
+                line: staging.line,
+                counts: Vec::new(),
+                makes: Vec::new(),
+            });
+            Ok(json!({"asked": true, "preview": [line], "note": OUTWARD_NOTE}))
+        }
+    }
 }
 
 /// The tools as MCP lists them.
 pub(crate) fn list() -> Value {
     Value::Array(
-        TOOLS
-            .iter()
+        all()
             .map(|t| {
                 json!({
                     "name": t.name,
@@ -1200,9 +1266,11 @@ pub(crate) fn call(i: &Inner, run: &Run, name: &str, args: &Value) -> Result<Val
                         json!({"threadId": gmail, "unread": true}),
                         format!("Mark '{subject}' unread in your mailbox?"),
                     ),
-                    other => return Err(format!(
+                    other => {
+                        return Err(format!(
                         "Mail can archive, unarchive, mark_read and mark_unread, not '{other}'."
-                    )),
+                    ))
+                    }
                 }
             };
             lock(&run.outward).push(Staged {
@@ -1239,7 +1307,15 @@ pub(crate) fn call(i: &Inner, run: &Run, name: &str, args: &Value) -> Result<Val
             });
             Ok(json!({"asked": true, "preview": [line], "note": OUTWARD_NOTE}))
         }
-        other => Err(format!("There is no tool called '{other}'.")),
+        other => {
+            // A tool another part of Learn mounted.
+            for extra in EXTRA {
+                if let Some(t) = extra.tools.iter().find(|t| t.name == other) {
+                    return mounted(i, run, extra, t, args);
+                }
+            }
+            Err(format!("There is no tool called '{other}'."))
+        }
     }
 }
 
@@ -1398,7 +1474,7 @@ mod tests {
     #[test]
     fn every_tool_has_a_schema_that_takes_nothing_extra() {
         let mut names = Vec::new();
-        for t in TOOLS {
+        for t in all() {
             let schema = (t.schema)();
             assert_eq!(schema["type"], "object", "{}", t.name);
             assert_eq!(schema["additionalProperties"], false, "{}", t.name);
@@ -1411,6 +1487,12 @@ mod tests {
             }
             assert!(!names.contains(&t.name), "two tools called {}", t.name);
             names.push(t.name);
+            // A name goes into `mcp__learn__<name>`, which can't hold a dot.
+            assert!(
+                t.name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+                "{}",
+                t.name
+            );
             // A tool that changes anything says it is staged; one that leaves the Mac says it asks.
             match t.effect {
                 Effect::Changes => assert!(
@@ -1424,6 +1506,6 @@ mod tests {
                 Effect::Reads => {}
             }
         }
-        assert_eq!(list().as_array().unwrap().len(), TOOLS.len());
+        assert_eq!(list().as_array().unwrap().len(), all().count());
     }
 }

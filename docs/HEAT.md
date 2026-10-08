@@ -394,6 +394,23 @@ is error -32601.
 claude mcp add --scope user wi-wwav -- /Applications/Wi_WWAV.app/Contents/Helpers/wi-mcp
 ```
 
+## The prompt box, the Database tab and the Wiki tab
+
+Learn's tab bar has two more tabs after Mail, Database (7) and Wiki (8), and
+⌘K is the Claude prompt box. `docs/ASK.md` says how they are built. What
+they add to what this file describes:
+
+- **Kinds**: `dbTable`, `dbColumn`, `dbRow` and `dbView` (journaled) and
+  `dbLayout` (not). None syncs.
+- **One undo for many writes**: `Store::merge_entries` joins journal entries
+  made one after another, and the core's `batch::one_step` uses it for a
+  paste, a fill, and everything the prompt box applies. Each write is still
+  one of the store functions above; only the entries are joined.
+- **`history.undo` and `history.redo` send `heat`** as well as `records`, so
+  every tab shows an undo.
+- **A second file in the library folder**, `wiki-cache.sqlite`: articles
+  that were opened. It is a cache and can be deleted.
+
 ## Tests
 
 Fail criteria first, in `docs/PLAN.md` (S2.1–S2.11). The MCP suite is 8.12's:

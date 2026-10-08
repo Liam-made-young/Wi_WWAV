@@ -34,9 +34,10 @@ calls travel two ways:
   of `docs/ENGINE.md` 4.4.
 - Nothing the UI shows as a count of other people's attention exists in any
   result (gate 1.3).
-- The app calls no model. Claude reaches Learn through an MCP server, so there
-  is no command that asks Claude for anything, no Claude switch in the
-  settings and no key (docs/SPEC.md 2.11).
+- The app holds no key and calls no model's API. Where it asks Claude (Mail's
+  two jobs, a syllabus, the prompt box) it runs the person's own Claude Code,
+  signed in as them, with only the tools that job names (docs/HEAT.md,
+  docs/ASK.md).
 
 ## Commands
 
@@ -173,6 +174,15 @@ result and refusals, and what the snapshot carries. Every write answers
 `{..., undo}` with the Edit menu's text, and the core sends `heat`
 `{kinds: [...]}` after any Learn change, the app's own, Claude's (`wi-mcp`)
 or a sync's, so views refetch.
+
+### ask, db, wiki
+
+The prompt box on ⌘K (`ask.*`), the Database tab (`db.*`) and the Wiki tab
+(`wiki.*`). `docs/ASK.md` lists each one's arguments, result and refusals.
+`ask.send` sends `ask` events `{id, doing}` while Claude works. What Claude
+would change is staged and made by `ask.apply`, as one journal entry. A
+write through `db.*` to one of Learn's records is the `heat.*` command a
+view would use, and sends the same `heat` event.
 
 ### export (2.9)
 
