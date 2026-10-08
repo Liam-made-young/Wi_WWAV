@@ -951,6 +951,10 @@ Learn keeps its Aqua and brushed-metal skin (see 7). Its LCD stays iTunes olive 
 
 ## 4. Space: the social view
 
+> **Superseded on 8 Oct 2026.** Space is now "every link is a planet":
+> `docs/SPACE.md`. This chapter is the old Space; 4.3 to 4.5 are still read
+> for what is kept.
+
 Space is the social view. It opens with ⌘2, and it is where people and their work live. Every person is a galaxy, every project a solar system, every work a planet, and every page a sun. You move through it by zooming, and the player is not a screen you go to but a planet you come close to. The view is named after the first tab of v4's web app. Everything here is **Proposed** unless labelled **Exists today**, **Decided** or **Open**.
 
 Space is for looking, listening and reading (**Decided**). Its only controls on sound are the level, mute and solo of the four moons, and ↑ Push, which forks that mix. Anything more is made in the Console, and **Open in Console** (⌘E) is one press from any song or film. In the founder's words: "remixing is Mi-WWAV and Console, not Space."

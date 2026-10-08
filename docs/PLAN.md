@@ -145,6 +145,10 @@ Target: 80–90% by 11 Oct 2026. Basic: cutting only, no effects (Decided).
 
 ## Stage 5: Space
 
+**Superseded on 8 Oct 2026** by `docs/SPACE.md` (every link is a planet). The
+milestones below are the old Space's; which of them still stand is an open
+question there (section 7). The new order of work is its section 10.
+
 Target: 80–90% by 11 Oct 2026. Real 3D in three.js (Decided).
 
 | # | Milestone | Fails if | Runs on | Status |
