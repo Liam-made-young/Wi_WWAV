@@ -1,0 +1,483 @@
+/* The Focus layout's own parts (docs/FOCUS.md): the top bar and its
+   readout, Focus itself, a summoned tool's header, the edge reveal and the
+   ⌘ map. The look every view shares is prism.css; this file only arranges.
+   Space does the separating: an 8 px scale, one large element a screen, and
+   a hairline only where a control would be ambiguous without it. */
+
+/* ---- The case -------------------------------------------------------------- */
+
+.case[data-layout='focus'] {
+  grid-template-rows: 52px minmax(0, 1fr) auto;
+  background: var(--prism-ground);
+}
+
+/* Focus has no count and no secondary act, so no status bar. */
+.case[data-layout='focus'][data-layer='focus'] .case-status {
+  display: none;
+}
+
+.case[data-layout='focus'] .case-status {
+  border-top: 0;
+  color: var(--prism-ink3);
+  background: var(--prism-ground);
+}
+
+/* ---- The top bar: the readout, and the switch behind the top edge ---------- */
+
+.top-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding-right: var(--prism-s1);
+  overflow: hidden;
+  background: var(--prism-ground);
+  user-select: none;
+}
+
+.readout {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--prism-readout-height);
+  overflow: hidden;
+  border-radius: var(--prism-radius-control);
+  background: var(--prism-readout-field);
+}
+
+.readout-dots {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The window's top edge: touching it brings the switch down. */
+.top-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 78px;
+  height: 4px;
+}
+
+/* Out of sight, never out of reach: the keyboard gets to it, and brings it down. */
+.top-switch {
+  position: absolute;
+  inset: 0 0 0 78px;
+  display: flex;
+  align-items: center;
+  gap: var(--prism-s1);
+  padding: 0 var(--prism-s2) 0 0;
+  background: var(--prism-ground);
+  transform: translateY(-100%);
+  pointer-events: none;
+  transition: transform var(--prism-motion-detent) var(--prism-motion-curve);
+}
+
+.top-bar[data-revealed='true'] .top-switch,
+.top-switch:focus-within {
+  transform: none;
+  pointer-events: auto;
+}
+
+.top-switch-gap {
+  flex: 1 1 0;
+}
+
+/* ---- Learn's frame ---------------------------------------------------------- */
+
+.heat[data-layout='focus'] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--prism-ground);
+}
+
+.heat[data-layout='focus'] .heat-sidebar {
+  display: none;
+}
+
+.heat[data-layout='focus'] .heat-main {
+  grid-column: 1;
+}
+
+/* The sidebar comes with the tools that use it, and only with them. */
+.heat[data-layout='focus'][data-layer='tool'][data-sidebar='true'] {
+  grid-template-columns: 208px minmax(0, 1fr);
+}
+
+.heat[data-layout='focus'][data-layer='tool'][data-sidebar='true'] .heat-sidebar {
+  display: block;
+  border-right: 0;
+  background: var(--prism-raised);
+}
+
+.heat[data-layout='focus'][data-layer='tool'][data-sidebar='true'] .heat-main {
+  grid-column: 2;
+}
+
+.heat[data-layout='focus'][data-layer='focus'] .heat-main {
+  display: none;
+}
+
+/* The focus timer lives in Focus now, not in a panel under Today. */
+.heat[data-layout='focus'] .heat-pomo {
+  display: none;
+}
+
+.heat[data-layout='focus'] .heat-info-slot {
+  top: 64px;
+}
+
+/* A summoned tool's header: its name, and the way back. */
+.tool-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--prism-s2);
+  height: 64px;
+  padding: 0 var(--prism-s2) 0 var(--prism-s3);
+  user-select: none;
+}
+
+.tool-name {
+  margin: 0;
+  font-size: var(--prism-type-title);
+  font-weight: 600;
+  line-height: var(--prism-type-tight);
+  letter-spacing: -0.01em;
+}
+
+.tool-esc {
+  color: var(--prism-ink3);
+  font-family: var(--prism-type-mono);
+  font-size: var(--prism-type-small);
+}
+
+/* ---- Focus ------------------------------------------------------------------ */
+
+.focus {
+  position: relative;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: var(--prism-s6) var(--prism-s5);
+  overflow: auto;
+  text-align: center;
+  color: var(--prism-ink);
+  background: var(--prism-ground);
+}
+
+.focus-stage {
+  display: grid;
+  justify-items: center;
+  gap: var(--prism-s4);
+  width: 100%;
+  max-width: 760px;
+}
+
+/* The next thing settles into place with slight weight, and stops. */
+.focus-now {
+  display: grid;
+  justify-items: center;
+  gap: var(--prism-s2);
+  animation: focus-settle var(--prism-motion-settle) var(--prism-motion-curve);
+}
+
+@keyframes focus-settle {
+  from {
+    transform: translateY(var(--prism-s2));
+    opacity: 0;
+  }
+}
+
+/* A space's band of light: thin, and as bright as the task is hot. Its
+   colour is never the only word for the space; the name stands under the
+   title. */
+.focus-band {
+  --light: calc(var(--heat, 0) * var(--spectrum, 1));
+  width: 72px;
+  height: var(--prism-band-width);
+  margin-bottom: var(--prism-s2);
+  background: color-mix(in oklab, var(--band) calc(var(--light) * 100%), var(--prism-line));
+  box-shadow: 0 0 calc(var(--prism-s2) * var(--light)) color-mix(in oklab, var(--band) calc(var(--light) * 70%), transparent);
+  transition: background-color var(--prism-motion-settle) var(--prism-motion-curve);
+}
+
+.focus-title {
+  max-width: 20ch;
+  margin: 0;
+  font-size: var(--prism-type-display);
+  font-weight: 600;
+  line-height: var(--prism-type-tight);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.focus-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 var(--prism-s2);
+  margin: 0;
+  font-family: var(--prism-type-mono);
+  font-size: var(--prism-type-small);
+  letter-spacing: var(--prism-type-tracking);
+  text-transform: uppercase;
+  color: var(--prism-ink3);
+}
+
+.focus-meta span + span::before {
+  content: '·';
+  margin-right: var(--prism-s2);
+  color: var(--prism-ink3);
+}
+
+/* The risk colour is for real risk: a task past its due date. The words say so too. */
+.focus-due[data-risk='true'] {
+  color: var(--prism-risk);
+}
+
+.focus-step {
+  max-width: 48ch;
+  margin: var(--prism-s1) 0 0;
+  font-size: var(--prism-type-large);
+  color: var(--prism-ink2);
+}
+
+.focus-step-label {
+  margin-right: var(--prism-s1);
+  font-family: var(--prism-type-mono);
+  font-size: var(--prism-type-small);
+  letter-spacing: var(--prism-type-tracking);
+  text-transform: uppercase;
+  color: var(--prism-ink3);
+}
+
+.focus-timer {
+  display: grid;
+  justify-items: center;
+  gap: var(--prism-s1);
+}
+
+.focus-digits {
+  margin: 0;
+  font-family: var(--prism-type-mono);
+  font-size: var(--prism-type-title);
+  font-weight: 500;
+  line-height: var(--prism-type-tight);
+  color: var(--prism-ink2);
+}
+
+.focus-timer[data-running='true'] .focus-digits {
+  color: var(--prism-ink);
+}
+
+/* The meter drains as the round runs. */
+.focus-meter {
+  width: 160px;
+  height: 1px;
+  background: var(--prism-line);
+}
+
+.focus-meter-fill {
+  display: block;
+  width: calc(var(--left, 1) * 100%);
+  height: 1px;
+  background: var(--prism-ink);
+}
+
+.focus-line {
+  margin: 0;
+  font-size: var(--prism-type-small);
+  color: var(--prism-ink3);
+}
+
+.focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--prism-s1);
+  min-height: 40px;
+}
+
+.focus-lengths {
+  display: flex;
+  font-family: var(--prism-type-mono);
+}
+
+/* One quiet line, and only when it changes what comes next. */
+.focus-interrupt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 var(--prism-s1);
+  max-width: 64ch;
+  margin: 0;
+  font-size: var(--prism-type-body);
+  color: var(--prism-ink2);
+  animation: focus-settle var(--prism-motion-settle) var(--prism-motion-curve);
+}
+
+.focus-interrupt-line {
+  margin-right: var(--prism-s1);
+}
+
+.focus-interrupt[data-source='atRisk'] .focus-interrupt-line {
+  color: var(--prism-risk);
+}
+
+.focus-dismiss {
+  color: var(--prism-ink3);
+}
+
+.focus-said,
+.focus-hint {
+  position: absolute;
+  right: 0;
+  left: 0;
+  margin: 0;
+  font-size: var(--prism-type-small);
+  color: var(--prism-ink3);
+}
+
+.focus-said {
+  bottom: var(--prism-s5);
+  color: var(--prism-ink2);
+}
+
+.focus-hint {
+  bottom: var(--prism-s2);
+  font-family: var(--prism-type-mono);
+  letter-spacing: var(--prism-type-tracking);
+  animation: focus-settle var(--prism-motion-settle) var(--prism-motion-curve);
+}
+
+/* ---- The edge reveal -------------------------------------------------------- */
+
+.edge-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 26;
+  width: 8px;
+}
+
+/* In the page always, so the keyboard reaches it; only moved out of sight. */
+.edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 27;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 208px;
+  padding: var(--prism-s2) var(--prism-s1);
+  overflow-y: auto;
+  color: var(--prism-ink);
+  background: var(--prism-raised);
+  border-right: 1px solid var(--prism-line);
+  transform: translateX(-100%);
+  transition: transform var(--prism-motion-detent) var(--prism-motion-curve);
+}
+
+.edge[data-open='true'],
+.edge:focus-within {
+  transform: none;
+}
+
+.edge-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--prism-s2);
+  height: 40px;
+  padding: 0 var(--prism-s2);
+  border: 0;
+  border-radius: var(--prism-radius-control);
+  font-size: var(--prism-type-body);
+  text-align: left;
+  color: var(--prism-ink2);
+  background: none;
+  cursor: default;
+}
+
+.edge-row:hover,
+.edge-row[aria-current='page'] {
+  color: var(--prism-ink);
+  background: var(--prism-sunk);
+}
+
+.edge-icon {
+  flex: none;
+}
+
+.edge-name {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.edge-key,
+.keymap-row dt {
+  font-family: var(--prism-type-mono);
+  font-size: var(--prism-type-small);
+  color: var(--prism-ink3);
+}
+
+/* ---- The ⌘ map -------------------------------------------------------------- */
+
+/* Faint: the screen stays readable through it, and it is gone on release. */
+.keymap {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  color: var(--prism-ink);
+  background: color-mix(in srgb, var(--prism-ground) 92%, transparent);
+  animation: fade-in var(--prism-motion-quick) linear;
+}
+
+.keymap-sheet {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--prism-s7);
+  align-items: start;
+}
+
+.keymap-heading {
+  margin: 0 0 var(--prism-s2);
+  font-family: var(--prism-type-mono);
+  font-size: var(--prism-type-small);
+  font-weight: 400;
+  letter-spacing: var(--prism-type-tracking);
+  text-transform: uppercase;
+  color: var(--prism-ink3);
+}
+
+.keymap-list {
+  display: grid;
+  gap: var(--prism-s1);
+  margin: 0;
+}
+
+.keymap-row {
+  display: grid;
+  grid-template-columns: 72px auto;
+  gap: var(--prism-s2);
+  align-items: baseline;
+}
+
+.keymap-row dt {
+  color: var(--prism-ink);
+}
+
+.keymap-row dd {
+  margin: 0;
+  font-size: var(--prism-type-large);
+}

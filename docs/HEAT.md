@@ -394,6 +394,15 @@ is error -32601.
 claude mcp add --scope user wi-wwav -- /Applications/Wi_WWAV.app/Contents/Helpers/wi-mcp
 ```
 
+## The Focus layout
+
+The snapshot carries `focus`: `{entropy, now, next, interrupt, queued,
+config}`, which is everything the Focus layout draws. It is worked out from the
+snapshot itself in `crates/wi-core/src/focus.rs`, and the commands beside it
+(`heat.focus.state`, `heat.entropy`, `heat.interrupt.dismiss`,
+`heat.interrupt.raise`, `heat.focus.snooze`) are in `docs/FOCUS.md`. None of
+them is journaled, and none changes a record.
+
 ## Tests
 
 Fail criteria first, in `docs/PLAN.md` (S2.1–S2.11). The MCP suite is 8.12's:

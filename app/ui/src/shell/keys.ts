@@ -60,6 +60,11 @@ export function route(e: KeyLike, ctx: KeyContext): Command | null {
   const command = ctx.mac ? e.metaKey : e.ctrlKey;
   if (e.key === 'Escape') return { type: 'escape' };
   if (command) return commandKey(e, ctx);
+  // ⌥1 ⌥2 ⌥3: the views, for when the switch is put away (the Focus layout). A text field keeps ⌥ for its own characters.
+  if (e.altKey && !e.shiftKey && !e.metaKey && !e.ctrlKey && ctx.field !== 'text') {
+    const view = /^Digit([1-3])$/.exec(e.code);
+    if (view) return { type: 'room', room: ROOMS[Number(view[1]) - 1] };
+  }
   if (e.altKey || (ctx.mac && e.ctrlKey) || (!ctx.mac && e.metaKey)) return null;
 
   const { overlay, field } = ctx;
@@ -120,6 +125,9 @@ function commandKey(e: KeyLike, ctx: KeyContext): Command | null {
 /** Every shortcut the shell answers, for Settings → Keyboard (2.13). */
 export const SHORTCUTS: readonly { keys: string; does: string; where: string }[] = [
   { keys: '⌘1 · ⌘2 · ⌘3', does: 'Learn · Space · Console', where: 'everywhere' },
+  { keys: '⌥1 · ⌥2 · ⌥3', does: 'Learn · Space · Console', where: 'outside text' },
+  { keys: '1 – 9', does: 'A Learn tool, by its number', where: 'Learn, outside text' },
+  { keys: 'Hold ⌘', does: 'The map of every tool and its key', where: 'the Focus layout' },
   { keys: 'Space', does: 'Play or pause', where: 'outside text' },
   { keys: '⌘K', does: 'Search everything', where: 'everywhere' },
   { keys: '⌘⇧N', does: 'Quick capture', where: 'everywhere' },

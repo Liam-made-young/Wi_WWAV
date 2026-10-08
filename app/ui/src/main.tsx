@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { HeatProvider } from './heat/store';
 import './styles/tokens.css';
 import './shell/shell.css';
+import './focus/prism.css';
+import './focus/focus.css';
 import { Shell } from './shell/Shell';
 import { SettingsWindow } from './shell/SettingsWindow';
 

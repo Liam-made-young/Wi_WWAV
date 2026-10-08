@@ -182,7 +182,10 @@ test('gate 2.4: contrast, targets, type sizes and stillness, in every shell stat
       const at = `${size.width} × ${size.height}`;
       for (const [state, setup, opts] of STATES) {
         const context = await browser.newContext({ viewport: size, colorScheme: scheme });
-        await context.addInitScript(() => localStorage.setItem('wi.firstLaunch', 'done'));
+        await context.addInitScript(() => {
+          localStorage.setItem('wi.firstLaunch', 'done');
+          localStorage.setItem('wi.layout', 'classic');
+        });
         const page = await context.newPage();
         await page.goto('/');
         await page.locator('.case-bar').waitFor();

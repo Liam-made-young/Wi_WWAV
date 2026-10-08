@@ -174,6 +174,12 @@ result and refusals, and what the snapshot carries. Every write answers
 `{kinds: [...]}` after any Learn change, the app's own, Claude's (`wi-mcp`)
 or a sync's, so views refetch.
 
+The Focus layout's share is `heat.focus.state`, `heat.entropy`,
+`heat.interrupt.dismiss`, `heat.interrupt.raise` and `heat.focus.snooze`, and
+one event of its own, `entropy` `{score, level, parts}`, sent when the entropy
+is no longer what the views were last told. `docs/FOCUS.md` has their
+arguments and the rules behind them.
+
 ### export (2.9)
 
 | cmd | args | result |

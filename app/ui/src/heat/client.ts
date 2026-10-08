@@ -9,6 +9,7 @@
 //   const heat = heatClient(fakeTransport()); // tests
 
 import { call as coreCall, on as coreOn } from '../bridge';
+import type { Action, FocusState, Priority } from '../focus/model';
 
 export type Id = string;
 /** "YYYY-MM-DD" in the person's time zone. */
@@ -479,6 +480,8 @@ export interface Snapshot {
   /** Each thread's place, by Gmail's thread id. */
   mailState?: Record<string, MailPlace>;
   mailSync?: MailSync;
+  /** The Focus layout's state: entropy, the Now task, and at most one interrupt (docs/FOCUS.md). */
+  focus?: FocusState;
   derived: {
     tasks: Record<Id, TaskDerived>;
     today: {
@@ -600,6 +603,20 @@ export function heatClient(t: Transport = real) {
       args: { taskId?: Id; habitId?: Id; length?: number } = {},
     ) =>
       c<{ heatState: HeatState; logged?: FocusSession } & Undo>(`heat.focus.${step}`, args),
+
+    /** The Focus layout's own calls. None is journaled: sending a line away is not an edit. */
+    attention: {
+      state: (date?: DayKey) => c<FocusState>('heat.focus.state', { date }),
+      dismiss: (id: string) => c<Record<string, never>>('heat.interrupt.dismiss', { id }),
+      /** Asks for one line under the Now task. It shows only if `changesNext`, and one at a time. */
+      raise: (line: { id: string; source: string; line: string; action?: Action | null; changesNext: boolean; priority?: Priority }) =>
+        c<{ queued: boolean }>('heat.interrupt.raise', line),
+      /** Puts the fix off until tomorrow. */
+      snooze: () => c<Record<string, never>>('heat.focus.snooze'),
+      /** An interrupt's own answer: one of Learn's commands, named by whoever raised the line. */
+      run: (cmd: string, args: Record<string, unknown> = {}) =>
+        cmd.startsWith('heat.') ? c<unknown>(cmd, args) : Promise.reject(new Error('An interrupt may only run one of Learn’s own commands.')),
+    },
 
     capture: (text: string, link?: Link) => c<{ capture: Capture; inbox: string } & Undo>('heat.capture.add', { text, link }),
     triage: (id: Id, to: 'task' | 'note' | 'project' | 'upload', record?: Record<string, unknown>) =>

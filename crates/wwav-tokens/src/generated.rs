@@ -2,12 +2,12 @@
 // Don't edit it: change the JSON and run the compiler again.
 
 pub mod desk {
-    //! Heat and the Console's chrome, Settings and every sheet (8.2). Light and
-    //! dark are Heat's tokens with 8.2's five fixes, and two inks moved so they
-    //! hold on every stop of their ground (see $contrast). A gel pill draws its
-    //! stops top to bottom with a hard break at gelBreak: a plain gel's two as
-    //! first, first, second, first; a blue gel's four as listed. A segment or
-    //! chip draws a plain gel's two as a plain gradient.
+    //! Learn and the Console's chrome, Settings and every sheet (8.2). Light
+    //! and dark are Learn's tokens with 8.2's five fixes, and two inks moved so
+    //! they hold on every stop of their ground (see $contrast). A gel pill
+    //! draws its stops top to bottom with a hard break at gelBreak: a plain
+    //! gel's two as first, first, second, first; a blue gel's four as listed. A
+    //! segment or chip draws a plain gel's two as a plain gradient.
     pub const INK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x1b, 0x1b, 0x1b), dark: crate::Color::rgb(0xec, 0xec, 0xec) };
     pub const INK2: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x4a, 0x4a, 0x4a), dark: crate::Color::rgb(0xc2, 0xc2, 0xc2) };
     pub const INK3: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x5f, 0x5f, 0x5f), dark: crate::Color::rgb(0x9a, 0x9a, 0x9a) };
@@ -35,7 +35,7 @@ pub mod desk {
     pub const BACKDROP: crate::Color = crate::Color::rgba(0x00, 0x00, 0x00, 0.25);
 
     pub mod lcd {
-        //! The Now strip: Heat's olive LCD (2.2). Its dim text is darkened in
+        //! The Now strip: Learn's olive LCD (2.2). Its dim text is darkened in
         //! light (8.2) and lightened in dark, so it holds on both stops.
         pub const GROUND: crate::Themed<&[crate::Color]> = crate::Themed { light: &[crate::Color::rgb(0xf2, 0xf4, 0xe4), crate::Color::rgb(0xdf, 0xe3, 0xc6)], dark: &[crate::Color::rgb(0x2c, 0x31, 0x21), crate::Color::rgb(0x20, 0x24, 0x1a)] };
         pub const INK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x26, 0x2a, 0x17), dark: crate::Color::rgb(0xd7, 0xe0, 0xa8) };
@@ -43,7 +43,8 @@ pub mod desk {
     }
 
     pub mod source_list {
-        //! The library drawer and Heat's sidebar, with headings darkened (8.2).
+        //! The library drawer and Learn's sidebar, with headings darkened
+        //! (8.2).
         pub const GROUND: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0xe7, 0xec, 0xf2), dark: crate::Color::rgb(0x2e, 0x31, 0x36) };
         pub const HEADING: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x4f, 0x57, 0x61), dark: crate::Color::rgb(0x9a, 0xa3, 0xad) };
     }
@@ -105,7 +106,7 @@ pub mod stem {
 }
 
 pub mod heat {
-    //! Heat's level colours (3.1). They fill tubes, pill borders and dots; the
+    //! Learn's level colours (3.1). They fill tubes, pill borders and dots; the
     //! level word is ink.
     pub const COOL: crate::Color = crate::Color::rgb(0x4f, 0x9b, 0xe6);
     pub const WARM: crate::Color = crate::Color::rgb(0xef, 0xa4, 0x31);
@@ -233,6 +234,104 @@ pub mod r#type {
         pub const MIN_PX: f32 = 11.0;
         pub const MAX_PX: f32 = 15.0;
         pub const TRACKING_EM: f32 = 0.34;
+    }
+}
+
+pub mod prism {
+    //! The Focus layout's look (docs/FOCUS.md): a prism instrument. At rest the
+    //! app is white light, paper in light and ink in dark, and colour appears
+    //! only where there is energy: a thin band for a space, a small field, a
+    //! focus ring. Nothing is a gradient, a gloss or a shadow. ink, ink2 and
+    //! ink3 hold on ground, raised and sunk; line is the only border, for a
+    //! control that would otherwise be ambiguous; fill is the one filled button
+    //! a screen has.
+    pub const GROUND: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0xfa, 0xfa, 0xf7), dark: crate::Color::rgb(0x0e, 0x0f, 0x12) };
+    pub const RAISED: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0xf3, 0xf3, 0xef), dark: crate::Color::rgb(0x15, 0x17, 0x1b) };
+    pub const SUNK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0xea, 0xea, 0xe5), dark: crate::Color::rgb(0x1d, 0x20, 0x25) };
+    pub const INK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x12, 0x13, 0x16), dark: crate::Color::rgb(0xed, 0xed, 0xe8) };
+    pub const INK2: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x3f, 0x41, 0x46), dark: crate::Color::rgb(0xc2, 0xc3, 0xbe) };
+    pub const INK3: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x5c, 0x5f, 0x64), dark: crate::Color::rgb(0x9a, 0x9c, 0x96) };
+    pub const LINE: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgba(0x12, 0x13, 0x16, 0.16), dark: crate::Color::rgba(0xed, 0xed, 0xe8, 0.18) };
+    pub const FILL: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x12, 0x13, 0x16), dark: crate::Color::rgb(0xed, 0xed, 0xe8) };
+    pub const FILL_INK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0xfa, 0xfa, 0xf7), dark: crate::Color::rgb(0x0e, 0x0f, 0x12) };
+    pub const FOCUS: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0x29, 0x46, 0xff), dark: crate::Color::rgb(0x8c, 0x9b, 0xff) };
+    pub const FOCUS_WIDTH_PX: f32 = 2.0;
+    pub const BACKDROP: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgba(0x12, 0x13, 0x16, 0.18), dark: crate::Color::rgba(0x00, 0x00, 0x00, 0.5) };
+    pub const RISK: crate::Themed<crate::Color> = crate::Themed { light: crate::Color::rgb(0xb3, 0x26, 0x1e), dark: crate::Color::rgb(0xf0, 0x76, 0x6c) };
+
+    pub mod band {
+        //! The spectrum: the four WWAV anchors a space's band of light is
+        //! placed on or between, in order round the wheel. A band is a mark,
+        //! never text and never a large fill, and it always sits beside the
+        //! space's name. width is the band's thickness; rest is how much of its
+        //! colour a band keeps when entropy is 0, and it reaches full colour at
+        //! entropy 1 (heat scales it again, task by task).
+        pub const BLUE: crate::Color = crate::Color::rgb(0x29, 0x46, 0xff);
+        pub const GREEN: crate::Color = crate::Color::rgb(0x73, 0x86, 0x78);
+        pub const ORANGE: crate::Color = crate::Color::rgb(0xe2, 0x53, 0x1f);
+        pub const RED: crate::Color = crate::Color::rgb(0xd2, 0x1f, 0x2b);
+        pub const WIDTH_PX: f32 = 2.0;
+        pub const REST: f32 = 0.35;
+    }
+
+    pub mod readout {
+        //! The readout: the device's character LCD, drawn dot by dot. A dark
+        //! field in both appearances, the same everywhere, with every unlit dot
+        //! faintly there. A character is a 5 by 8 cell of dots; cells are a dot
+        //! apart.
+        pub const FIELD: crate::Color = crate::Color::rgb(0x0b, 0x0c, 0x0e);
+        pub const UNLIT: crate::Color = crate::Color::rgb(0x1e, 0x20, 0x24);
+        pub const LIT: crate::Color = crate::Color::rgb(0xf2, 0xf2, 0xec);
+        pub const DIM: crate::Color = crate::Color::rgb(0x8b, 0x8d, 0x88);
+        pub const DOT_PX: f32 = 2.0;
+        pub const PITCH_PX: f32 = 3.0;
+        pub const HEIGHT_PX: f32 = 40.0;
+    }
+    pub const S1_PX: f32 = 8.0;
+    pub const S2_PX: f32 = 16.0;
+    pub const S3_PX: f32 = 24.0;
+    pub const S4_PX: f32 = 32.0;
+    pub const S5_PX: f32 = 48.0;
+    pub const S6_PX: f32 = 64.0;
+    pub const S7_PX: f32 = 96.0;
+    pub const S8_PX: f32 = 128.0;
+
+    pub mod radius {
+        //! Corners are nearly square: a machined edge, not a pill.
+        pub const CONTROL_PX: f32 = 4.0;
+        pub const SHEET_PX: f32 = 6.0;
+    }
+
+    pub mod r#type {
+        //! One grotesk for words, one mono for numbers, times and the readout,
+        //! and Hiragino Sans for Japanese (it follows the grotesk in the stack,
+        //! so 第2課 is set in it). Both faces are bundled
+        //! (app/ui/src/focus/fonts, SIL Open Font License). Numbers that line
+        //! up are tabular.
+        pub const FAMILY: &[&str] = &["Instrument Sans", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "sans-serif"];
+        pub const MONO: &[&str] = &["IBM Plex Mono", "Hiragino Sans", "Menlo", "Consolas", "monospace"];
+        pub const SMALL_PX: f32 = 12.0;
+        pub const BODY_PX: f32 = 14.0;
+        pub const LARGE_PX: f32 = 17.0;
+        pub const TITLE_PX: f32 = 22.0;
+        pub const DISPLAY_PX: f32 = 40.0;
+        pub const LINE_HEIGHT: f32 = 1.45;
+        pub const TIGHT: f32 = 1.12;
+        pub const TRACKING_EM: f32 = 0.06;
+    }
+
+    pub mod motion {
+        //! Instrument motion: a part settles with slight weight and stops, like
+        //! a knob reaching a detent. Nothing bounces, and under Reduce Motion
+        //! nothing moves. edgeRest is how long the cursor rests on the left
+        //! edge before the tool list comes out; mapHold is how long the command
+        //! key is held before the map shows.
+        pub const QUICK_MS: f32 = 150.0;
+        pub const DETENT_MS: f32 = 180.0;
+        pub const SETTLE_MS: f32 = 240.0;
+        pub const CURVE: crate::Curve = crate::Curve { x1: 0.2, y1: 0.0, x2: 0.0, y2: 1.0 };
+        pub const EDGE_REST_MS: f32 = 150.0;
+        pub const MAP_HOLD_MS: f32 = 600.0;
     }
 }
 
@@ -366,4 +465,56 @@ pub const ALL: &[(&str, crate::Token)] = &[
     ("type.sign.min", crate::Token::Number(r#type::sign::MIN_PX)),
     ("type.sign.max", crate::Token::Number(r#type::sign::MAX_PX)),
     ("type.sign.tracking", crate::Token::Number(r#type::sign::TRACKING_EM)),
+    ("prism.ground", crate::Token::ThemedColor(prism::GROUND)),
+    ("prism.raised", crate::Token::ThemedColor(prism::RAISED)),
+    ("prism.sunk", crate::Token::ThemedColor(prism::SUNK)),
+    ("prism.ink", crate::Token::ThemedColor(prism::INK)),
+    ("prism.ink2", crate::Token::ThemedColor(prism::INK2)),
+    ("prism.ink3", crate::Token::ThemedColor(prism::INK3)),
+    ("prism.line", crate::Token::ThemedColor(prism::LINE)),
+    ("prism.fill", crate::Token::ThemedColor(prism::FILL)),
+    ("prism.fillInk", crate::Token::ThemedColor(prism::FILL_INK)),
+    ("prism.focus", crate::Token::ThemedColor(prism::FOCUS)),
+    ("prism.focusWidth", crate::Token::Number(prism::FOCUS_WIDTH_PX)),
+    ("prism.backdrop", crate::Token::ThemedColor(prism::BACKDROP)),
+    ("prism.risk", crate::Token::ThemedColor(prism::RISK)),
+    ("prism.band.blue", crate::Token::Color(prism::band::BLUE)),
+    ("prism.band.green", crate::Token::Color(prism::band::GREEN)),
+    ("prism.band.orange", crate::Token::Color(prism::band::ORANGE)),
+    ("prism.band.red", crate::Token::Color(prism::band::RED)),
+    ("prism.band.width", crate::Token::Number(prism::band::WIDTH_PX)),
+    ("prism.band.rest", crate::Token::Number(prism::band::REST)),
+    ("prism.readout.field", crate::Token::Color(prism::readout::FIELD)),
+    ("prism.readout.unlit", crate::Token::Color(prism::readout::UNLIT)),
+    ("prism.readout.lit", crate::Token::Color(prism::readout::LIT)),
+    ("prism.readout.dim", crate::Token::Color(prism::readout::DIM)),
+    ("prism.readout.dot", crate::Token::Number(prism::readout::DOT_PX)),
+    ("prism.readout.pitch", crate::Token::Number(prism::readout::PITCH_PX)),
+    ("prism.readout.height", crate::Token::Number(prism::readout::HEIGHT_PX)),
+    ("prism.s1", crate::Token::Number(prism::S1_PX)),
+    ("prism.s2", crate::Token::Number(prism::S2_PX)),
+    ("prism.s3", crate::Token::Number(prism::S3_PX)),
+    ("prism.s4", crate::Token::Number(prism::S4_PX)),
+    ("prism.s5", crate::Token::Number(prism::S5_PX)),
+    ("prism.s6", crate::Token::Number(prism::S6_PX)),
+    ("prism.s7", crate::Token::Number(prism::S7_PX)),
+    ("prism.s8", crate::Token::Number(prism::S8_PX)),
+    ("prism.radius.control", crate::Token::Number(prism::radius::CONTROL_PX)),
+    ("prism.radius.sheet", crate::Token::Number(prism::radius::SHEET_PX)),
+    ("prism.type.family", crate::Token::Names(prism::r#type::FAMILY)),
+    ("prism.type.mono", crate::Token::Names(prism::r#type::MONO)),
+    ("prism.type.small", crate::Token::Number(prism::r#type::SMALL_PX)),
+    ("prism.type.body", crate::Token::Number(prism::r#type::BODY_PX)),
+    ("prism.type.large", crate::Token::Number(prism::r#type::LARGE_PX)),
+    ("prism.type.title", crate::Token::Number(prism::r#type::TITLE_PX)),
+    ("prism.type.display", crate::Token::Number(prism::r#type::DISPLAY_PX)),
+    ("prism.type.lineHeight", crate::Token::Number(prism::r#type::LINE_HEIGHT)),
+    ("prism.type.tight", crate::Token::Number(prism::r#type::TIGHT)),
+    ("prism.type.tracking", crate::Token::Number(prism::r#type::TRACKING_EM)),
+    ("prism.motion.quick", crate::Token::Number(prism::motion::QUICK_MS)),
+    ("prism.motion.detent", crate::Token::Number(prism::motion::DETENT_MS)),
+    ("prism.motion.settle", crate::Token::Number(prism::motion::SETTLE_MS)),
+    ("prism.motion.curve", crate::Token::Curve(prism::motion::CURVE)),
+    ("prism.motion.edgeRest", crate::Token::Number(prism::motion::EDGE_REST_MS)),
+    ("prism.motion.mapHold", crate::Token::Number(prism::motion::MAP_HOLD_MS)),
 ];

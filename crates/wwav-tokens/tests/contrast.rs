@@ -122,8 +122,8 @@ fn every_text_pair_meets_its_bar_in_light_and_dark() {
             }
         }
     }
-    // 23 text pairs, each in two appearances; a pair the parse skipped shows here.
-    assert_eq!(checked, 46, "text pairs checked");
+    // 30 text pairs (23, and the Focus layout's 7), each in two appearances; a pair the parse skipped shows here.
+    assert_eq!(checked, 60, "text pairs checked");
     assert!(misses.is_empty(), "under the bar:\n{}", misses.join("\n"));
 }
 

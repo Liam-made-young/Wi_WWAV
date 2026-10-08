@@ -10,5 +10,6 @@ import './habits';
 import './public';
 import './claude';
 import './settings';
+import '../../focus/fake';
 
 export { createFake, type Fake } from './core';

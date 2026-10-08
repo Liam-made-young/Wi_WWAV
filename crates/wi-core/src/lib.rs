@@ -26,6 +26,8 @@ mod claude;
 mod claude_cli;
 pub mod engine;
 mod export;
+pub mod focus;
+mod focus_cmd;
 mod heat;
 mod heat_cmd;
 mod history;

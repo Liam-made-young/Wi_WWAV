@@ -4,10 +4,20 @@
 // everything and first launch. One keyboard router serves all of it, and the
 // app's menus (app/src-tauri) reach it as `menu` events: on Linux the menu
 // takes ⌘1 before the page does, so a key is a menu event there.
+//
+// In the Focus layout (docs/FOCUS.md) the case is quieter: the top bar is
+// the readout alone, the status bar is put away while Focus shows, and the
+// tools are summoned through what the shell adds here: the edge reveal, the
+// ⌘ map and one "Go to …" in ⌘K for every view in the registry.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { call } from '../bridge';
-import type { HeatHandle } from '../heat/HeatView';
+import { EdgeReveal } from '../focus/EdgeReveal';
+import { useFocusRoot, useReadout } from '../focus/hooks';
+import { KeyMap, useHeldCommand } from '../focus/KeyMap';
+import { useViews } from '../focus/registry';
+import { TopBar } from '../focus/TopBar';
+import type { HeatHandle, Layer } from '../heat/HeatView';
 import { idleGesture, stemGesture } from '../shared/stems/gesture';
 import { Capture, type CaptureHandle } from './Capture';
 import { listenForDrops } from './drop';
@@ -70,6 +80,18 @@ export function Shell() {
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
   const [drawerStatus, setDrawerStatus] = useState<ScreenStatus>({ count: null, act: null });
 
+  // The Focus layout: which layer Learn shows, and the tool list at the left edge.
+  const layout = useFocusRoot();
+  const focusLayout = layout === 'focus';
+  const [heatLayer, setHeatLayer] = useState<Layer>('focus');
+  const [heatView, setHeatView] = useState<string | null>(null);
+  const onLayer = useCallback((layer: Layer, view: string) => {
+    setHeatLayer(layer);
+    setHeatView(view);
+  }, []);
+  const [edge, setEdge] = useState(false);
+  const views = useViews();
+
   const narrow = useNarrow();
   const status = useStatus();
   const menus = useHistory();
@@ -102,6 +124,8 @@ export function Shell() {
 
   const top = stack.at(-1) ?? null;
   const shown = (o: Overlay) => stack.includes(o);
+  const held = useHeldCommand(focusLayout && top !== 'first');
+  const readout = useReadout(player.state.playing ? (player.state.title ?? null) : null);
   // ⌘Z acts on the view you are in; with the library drawer open, that is the library.
   const undoRoom: UndoRoom = shown('drawer') ? 'library' : room;
 
@@ -149,6 +173,16 @@ export function Shell() {
     if (id) setHeatOpen((was) => ({ id, n: (was?.n ?? 0) + 1 }));
   };
 
+  // Every summon path ends here: a registered view, opened in Learn.
+  const summon = (id: string) => {
+    setRoom('heat');
+    heat.current?.summon(id);
+  };
+  const toFocus = () => {
+    setRoom('heat');
+    heat.current?.toFocus();
+  };
+
   const isSong = (c: Clip) => c.kind === 'wwav' || c.kind === 'audio';
   const notInConsole = (c: Clip | null) =>
     say(
@@ -172,8 +206,10 @@ export function Shell() {
 
   const escape = () => {
     if (top === 'first') return;
+    if (top === null && edge) return setEdge(false);
     // Nothing open over the room: Esc is the room's own (Heat closes a sheet or Get Info, clears drafts).
-    if (top === null) return room === 'heat' ? heat.current?.escape() : undefined;
+    // In the Focus layout Learn's Esc ends in Focus, and from another view Esc goes there too.
+    if (top === null) return room === 'heat' ? heat.current?.escape() : focusLayout ? toFocus() : undefined;
     if (top === 'drawer' && drawer.current?.deselect()) return;
     close(top);
   };
@@ -309,7 +345,16 @@ export function Shell() {
 
   const undoLabel = menus[undoRoom]?.undo;
   const actions: Item[] = [
+    // The registry's views, so a tool that registers is in ⌘K with its key.
+    ...(focusLayout ? [{ label: 'Focus', hint: 'Esc', run: toFocus }] : []),
+    ...views.map((v) => ({
+      label: `Go to ${v.title}`,
+      hint: v.shortcut === null ? undefined : String(v.shortcut),
+      run: () => summon(v.id),
+    })),
     ...ROOMS.map((r, i) => ({ label: `Go to ${ROOM_NAMES[r]}`, hint: keys(`⌘${i + 1}`), run: () => setRoom(r) })),
+    { label: 'Sync calendars', hint: keys('⌥⌘R'), run: () => heat.current?.sync() },
+    ...(player.state.clip !== null ? [{ label: 'Show the player', run: () => open('player') }] : []),
     { label: 'Quick capture', hint: keys('⌘⇧N'), run: () => open('capture') },
     { label: 'Library', hint: keys('⌘L'), run: () => open('drawer') },
     { label: 'Export everything…', hint: keys('⌘⇧E'), run: () => open('export') },
@@ -340,26 +385,37 @@ export function Shell() {
   const menu = menus[undoRoom];
 
   return (
-    <div className="case">
-      <TitleBar
-        room={room}
-        narrow={narrow}
-        menuOpen={shown('menu')}
-        onRoom={setRoom}
-        onSearch={() => open('palette')}
-        onMenu={() => toggle('menu')}
-        strip={
-          <NowStrip
-            narrow={narrow}
-            task={half}
-            player={player}
-            room={room}
-            consoleTransport={null}
-            onTask={showTask}
-            onExpand={() => open('player')}
-          />
-        }
-      />
+    <div className="case" data-layout={layout} data-layer={room === 'heat' ? heatLayer : 'tool'}>
+      {focusLayout ? (
+        <TopBar
+          room={room}
+          text={readout}
+          playing={player.state.clip !== null}
+          onRoom={setRoom}
+          onPlayer={() => open('player')}
+          onSettings={() => open('settings')}
+        />
+      ) : (
+        <TitleBar
+          room={room}
+          narrow={narrow}
+          menuOpen={shown('menu')}
+          onRoom={setRoom}
+          onSearch={() => open('palette')}
+          onMenu={() => toggle('menu')}
+          strip={
+            <NowStrip
+              narrow={narrow}
+              task={half}
+              player={player}
+              room={room}
+              consoleTransport={null}
+              onTask={showTask}
+              onExpand={() => open('player')}
+            />
+          }
+        />
+      )}
       <div className="room-area">
         <Rooms
           current={room}
@@ -372,8 +428,19 @@ export function Shell() {
               setPane('heat');
               open('settings');
             },
+            layout,
+            onLayer,
           }}
         />
+        {focusLayout && top === null && (
+          <EdgeReveal
+            open={edge}
+            current={room === 'heat' && heatLayer === 'tool' ? heatView : null}
+            onOpen={setEdge}
+            onSummon={(v) => summon(v.id)}
+            onFocus={toFocus}
+          />
+        )}
         {top && MODAL.includes(top) && <div className="backdrop" data-overlay={top} onClick={() => close(top)} />}
         <LibraryDrawer
           ref={drawer}
@@ -455,6 +522,7 @@ export function Shell() {
             {toast.text}
           </p>
         )}
+        {focusLayout && <KeyMap shown={held && top === null} />}
       </div>
       <StatusBar screen={screen} undo={menu?.undo ?? menu?.cant ?? null} status={status} />
     </div>

@@ -5,6 +5,7 @@
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { call } from '../bridge';
+import { LayoutSettings } from '../focus/LayoutSettings';
 import { ClaudePane } from './ClaudePane';
 import { SHORTCUTS } from './keys';
 import { MailAccounts } from './MailAccounts';
@@ -343,6 +344,7 @@ function AppearancePane({ settings, onPatch }: { settings: SettingsValue; onPatc
           This Mac’s own Reduce Motion setting counts too.
         </p>
       </Row>
+      <LayoutSettings />
       <Row label="Keyboard">
         <table className="shortcuts">
           <tbody>

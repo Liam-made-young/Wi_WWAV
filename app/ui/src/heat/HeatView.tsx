@@ -7,7 +7,14 @@
 // The frame reads `heat.snapshot` through the store and refetches on the
 // `heat` event. It holds what every tab shares: the tab, the space, the
 // selection, the sheets, and the keyboard the shell hands it. What each tab
-// draws is in HEAT_TABS (heat/tabs.tsx).
+// draws is in HEAT_TABS (heat/tabs.tsx), and every tab is a view in the
+// registry (focus/registry.ts), which the toolbar and the number keys read.
+//
+// In the Focus layout (docs/FOCUS.md) the frame has two layers. Focus is the
+// default: the Now task, its timer and at most one interrupt line, and
+// nothing else. A tab is a tool, summoned over Focus and opened full width
+// under a small header; Esc goes back. The toolbar, the tab bar and the
+// right column are the Classic layout's.
 
 import {
   forwardRef,
@@ -21,6 +28,10 @@ import {
   useRef,
   useState,
 } from 'react';
+import { registerBuiltins } from '../focus/builtin';
+import { focusOf, FocusScreen } from '../focus/FocusScreen';
+import type { Layout } from '../focus/layout';
+import { useViews, viewById, viewByShortcut } from '../focus/registry';
 import { useMedia } from '../shell/hooks';
 import { IS_MAC, keys } from '../shell/platform';
 import type { ScreenStatus } from '../shell/StatusBar';
@@ -36,8 +47,6 @@ import {
   type TabActs,
   type TabId,
   type TabKeys,
-  TAB_IDS,
-  TAB_TABLE,
   TASK_DRAG,
 } from './frame';
 import './heat.css';
@@ -46,8 +55,13 @@ import { focusKind, type HeatCommand, heatRoute } from './keys';
 import { NewTaskSheet, TookSheet } from './sheets';
 import { SpacesFilter } from './SpacesFilter';
 import { useHeat } from './store';
-import { HEAT_TABS } from './tabs';
 import { Widgets } from './widgets/Widgets';
+
+// The tabs in TAB_IDS become views before anything draws.
+registerBuiltins();
+
+/** Which of the Focus layout's layers is showing: Focus itself, or a summoned tool. */
+export type Layer = 'focus' | 'tool';
 
 /** The Right column folds below this window width (3.3). */
 export const FOLD_BELOW = 1240;
@@ -59,6 +73,10 @@ export interface HeatProps {
   onStatus(status: ScreenStatus): void;
   /** "New space…" goes to Settings → Heat, where spaces are edited. */
   onSettings(): void;
+  /** `focus` draws Focus and one summoned tool; `classic`, the default, the toolbar, tabs and right column. */
+  layout?: Layout;
+  /** Tells the shell which layer shows and which view, so it can put the status bar away in Focus. */
+  onLayer?(layer: Layer, view: string): void;
 }
 
 export interface HeatHandle {
@@ -70,6 +88,12 @@ export interface HeatHandle {
   secondary(): void;
   /** ⌘I: Get Info for the selection. */
   getInfo(): void;
+  /** Opens a registered view by its id: ⌘K, the edge reveal and the ⌘ map come through here. */
+  summon(id: string): void;
+  /** Back to Focus (the Focus layout only). */
+  toFocus(): void;
+  /** ⌥⌘R, for ⌘K: sync the calendars. */
+  sync(): void;
 }
 
 type Sheet =
@@ -80,12 +104,22 @@ type Sheet =
 
 const NO_SELECTION: Selection = { taskId: null, blockId: null };
 
-export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ open, onStatus, onSettings }, ref) {
+export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView(
+  { open, onStatus, onSettings, layout = 'classic', onLayer },
+  ref,
+) {
   const heat = useHeat();
   const { snap, message } = heat;
   const folded = useMedia(`(max-width: ${FOLD_BELOW - 0.02}px)`);
 
-  const [tab, setTab] = useState<TabId>('today');
+  const [tab, showTab] = useState<TabId>('today');
+  // Showing a tab summons it: in the Focus layout that leaves Focus for the tool.
+  const [layer, setLayer] = useState<Layer>('focus');
+  const setTab = useCallback((id: TabId) => {
+    showTab(id);
+    setLayer('tool');
+  }, []);
+  const toFocus = useCallback(() => setLayer('focus'), []);
   const [spaceId, setSpace] = useState<Id | null>(null);
   const [selection, setSelection] = useState<Selection>(NO_SELECTION);
   const [sidebar, setSidebar] = useState<HTMLElement | null>(null);
@@ -150,7 +184,7 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
       registerKeys,
       touch,
     }),
-    [tab, spaceId, selection, selectTask, selectBlock, sidebar, sheet, focusLength, registerActs, registerKeys, drafts],
+    [tab, setTab, spaceId, selection, selectTask, selectBlock, sidebar, sheet, focusLength, registerActs, registerKeys, drafts],
   );
 
   // The frame's acts and keys live where the tabs are, so the tabs read them from the frame.
@@ -163,6 +197,10 @@ export const HeatView = forwardRef<HeatHandle, HeatProps>(function HeatView({ op
         open={open}
         onStatus={onStatus}
         onSettings={onSettings}
+        layout={layout}
+        layer={layout === 'focus' ? layer : 'tool'}
+        toFocus={toFocus}
+        onLayer={onLayer}
         setSidebar={setSidebar}
         handleRef={ref}
         message={message?.text ?? null}
@@ -187,6 +225,11 @@ interface FrameProps {
   open: HeatProps['open'];
   onStatus(status: ScreenStatus): void;
   onSettings(): void;
+  layout: Layout;
+  /** Always `tool` in the Classic layout, which has no Focus. */
+  layer: Layer;
+  toFocus(): void;
+  onLayer?(layer: Layer, view: string): void;
   setSidebar(el: HTMLElement | null): void;
   handleRef: React.ForwardedRef<HeatHandle>;
   message: string | null;
@@ -202,8 +245,15 @@ function Frame(p: FrameProps) {
   const actions = useActions();
   const panel = useRef<HTMLDivElement>(null);
 
+  const views = useViews();
+  const view = viewById(tab);
+  const classic = p.layout === 'classic';
+  const inFocus = p.layer === 'focus';
+  const { onLayer, layer } = p;
+  useEffect(() => onLayer?.(layer, tab), [onLayer, layer, tab]);
+
   const acts = p.actsRef.current[tab]?.current;
-  const plus = TAB_TABLE[tab].plus === null ? null : (acts?.plus ?? null);
+  const plus = !view?.plus ? null : (acts?.plus ?? null);
   const secondary = acts?.secondary && !acts.secondary.hidden && !acts.secondary.disabled ? acts.secondary : null;
   const drafts = snap?.heatState.planDrafts ?? [];
   void touched;
@@ -222,12 +272,14 @@ function Frame(p: FrameProps) {
   // What a click or a key runs is read when it happens, not when the frame last drew.
   const nowPlus = () => p.actsRef.current[tab]?.current.plus;
   const nowSecondary = () => p.actsRef.current[tab]?.current.secondary;
-  const secondaryName = secondary ? TAB_TABLE[tab].secondary : null;
+  const secondaryName = secondary ? (view?.secondary ?? null) : null;
   const count = acts?.count ?? null;
   const { onStatus } = p;
   useEffect(() => {
-    onStatus({ count: p.message ?? count, act: secondaryName, save: p.status });
-  }, [onStatus, p.message, count, secondaryName, p.status]);
+    // Focus has no count and no secondary act: the status bar is put away there.
+    if (inFocus) onStatus({ count: null, act: null, save: p.status });
+    else onStatus({ count: p.message ?? count, act: secondaryName, save: p.status });
+  }, [onStatus, inFocus, p.message, count, secondaryName, p.status]);
 
   const selectedTask =
     selection.taskId ?? (selection.blockId ? idx.block.get(selection.blockId)?.taskId : undefined) ?? null;
@@ -240,7 +292,7 @@ function Frame(p: FrameProps) {
       case 'new':
         {
           const now = nowPlus();
-          if (TAB_TABLE[tab].plus === null || !now) return;
+          if (!view?.plus || !now) return;
           if (now.disabled) say(now.disabled);
           else now.run();
         }
@@ -292,6 +344,38 @@ function Frame(p: FrameProps) {
     panel.current?.querySelector<HTMLElement>('[data-info-first]')?.focus();
   };
 
+  // Focus's own keys: they act on the Now task, never on a tool that is out of sight.
+  const focusKey = (k: HeatKey): boolean => {
+    const key = k.key.length === 1 ? k.key.toLowerCase() : k.key;
+    const nowTask = focusOf(snap)?.now.taskId ?? null;
+    if (k.command) {
+      if (key !== 'Enter' || k.shift || k.alt || !nowTask) return false;
+      void actions.toggleDone(nowTask);
+      return true;
+    }
+    if (k.alt || k.repeat) return false;
+    if (k.shift) {
+      if (key !== 'f') return false;
+      void actions.stopFocus();
+      return true;
+    }
+    switch (key) {
+      case 'f':
+        if (snap?.heatState.timer.phase === 'idle' && nowTask) {
+          void act(client.focus('start', { taskId: nowTask, length: frame.focusLength }));
+        } else void actions.focusKey();
+        return true;
+      case 'i':
+        void actions.pulledAway();
+        return true;
+      case 'n':
+        frame.newTask();
+        return true;
+      default:
+        return false;
+    }
+  };
+
   useImperativeHandle(p.handleRef, () => ({
     key(e) {
       const hk: HeatKey = {
@@ -304,7 +388,14 @@ function Frame(p: FrameProps) {
       };
       const focus = focusKind(document.activeElement);
       if (focus === 'text' || sheet) return false;
-      if (p.keysRef.current[tab]?.current.key?.(hk)) return true;
+      if (!inFocus && p.keysRef.current[tab]?.current.key?.(hk)) return true;
+      // A number is a view's key, read from the registry, so a view that registers has its key at once.
+      if (!hk.command && !hk.alt && !hk.shift && !hk.repeat && /^[1-9]$/.test(hk.key)) {
+        const to = viewByShortcut(Number(hk.key));
+        if (to) setTab(to.id as TabId);
+        return to !== undefined;
+      }
+      if (inFocus) return focusKey(hk);
       const cmd = heatRoute(hk, {
         tab,
         focus,
@@ -318,6 +409,7 @@ function Frame(p: FrameProps) {
     escape() {
       if (popover) return setPopover(null);
       if (sheet) return setSheet(null);
+      if (inFocus) return;
       if (p.keysRef.current[tab]?.current.escape?.()) return;
       if (drafts.length > 0) return void actions.clearDrafts();
       const inInfo = panel.current?.contains(document.activeElement);
@@ -326,6 +418,8 @@ function Frame(p: FrameProps) {
         return;
       }
       if (selection.taskId || selection.blockId) frame.selectTask(null);
+      // With nothing left to close, Esc is the way back to Focus.
+      if (!classic) p.toFocus();
     },
     secondary() {
       const now = nowSecondary();
@@ -335,68 +429,112 @@ function Frame(p: FrameProps) {
       if (selection.taskId || selection.blockId) focusInfo();
       else say('Select a task first.');
     },
+    summon(id) {
+      if (viewById(id)) setTab(id as TabId);
+    },
+    toFocus: p.toFocus,
+    sync() {
+      void sync();
+    },
   }));
 
-  const info = selection.taskId !== null || selection.blockId !== null;
-  const reason =
-    plus?.disabled ??
-    (plus === null && TAB_TABLE[tab].plus !== null ? `${TAB_TABLE[tab].name} isn’t built yet.` : null);
+  const info = !inFocus && (selection.taskId !== null || selection.blockId !== null);
+  const reason = plus?.disabled ?? (plus === null && view?.plus ? `${view.title} isn’t built yet.` : null);
 
   return (
-    <div className="heat register-desk" data-tab={tab} data-folded={folded} data-info={info}>
-      <header className="heat-toolbar" role="toolbar" aria-label="Learn">
-        {TAB_TABLE[tab].plus !== null && (
-          <button
-            type="button"
-            className="gel heat-plus"
-            aria-label={TAB_TABLE[tab].plus!}
-            title={`${TAB_TABLE[tab].plus} (N)`}
-            disabled={!plus || !!plus.disabled}
-            onClick={() => nowPlus()?.run()}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M7 1.5v11M1.5 7h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        )}
-        <div className="switcher heat-tabs" role="tablist" aria-label="Learn tabs">
-          {TAB_IDS.map((id, i) => (
+    <div
+      className="heat register-desk"
+      data-tab={tab}
+      data-folded={folded}
+      data-info={info}
+      data-layout={p.layout}
+      data-layer={classic ? undefined : p.layer}
+      data-sidebar={classic ? undefined : (view?.sidebar ?? false)}
+    >
+      {classic ? (
+        <header className="heat-toolbar" role="toolbar" aria-label="Learn">
+          {view?.plus && (
             <button
-              key={id}
               type="button"
-              role="tab"
-              id={`heat-tab-${id}`}
-              aria-controls={`heat-panel-${id}`}
-              className="segment"
-              aria-selected={id === tab}
-              title={`${TAB_TABLE[id].name} (${i + 1})`}
-              onClick={() => setTab(id)}
-              onDragEnter={(e) => springLoad(e, () => setTab(id), id === tab)}
-              onDragLeave={cancelSpring}
-              onDrop={cancelSpring}
+              className="gel heat-plus"
+              aria-label={view.plus}
+              title={`${view.plus} (N)`}
+              disabled={!plus || !!plus.disabled}
+              onClick={() => nowPlus()?.run()}
             >
-              {TAB_TABLE[id].name}
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <path d="M7 1.5v11M1.5 7h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
             </button>
-          ))}
-        </div>
-        <span className="heat-toolbar-gap" />
-        {reason && (
-          <span className="heat-why" data-text="secondary" role="status">
-            {reason}
-          </span>
-        )}
-        <button type="button" className="gel" title={`Sync calendars (${keys('⌥⌘R')})`} onClick={() => void sync()}>
-          Sync
-        </button>
-      </header>
+          )}
+          <div className="switcher heat-tabs" role="tablist" aria-label="Learn tabs">
+            {views.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                role="tab"
+                id={`heat-tab-${v.id}`}
+                aria-controls={`heat-panel-${v.id}`}
+                className="segment"
+                aria-selected={v.id === tab}
+                title={v.shortcut === null ? v.title : `${v.title} (${v.shortcut})`}
+                onClick={() => setTab(v.id as TabId)}
+                onDragEnter={(e) => springLoad(e, () => setTab(v.id as TabId), v.id === tab)}
+                onDragLeave={cancelSpring}
+                onDrop={cancelSpring}
+              >
+                {v.title}
+              </button>
+            ))}
+          </div>
+          <span className="heat-toolbar-gap" />
+          {reason && (
+            <span className="heat-why" data-text="secondary" role="status">
+              {reason}
+            </span>
+          )}
+          <button type="button" className="gel" title={`Sync calendars (${keys('⌥⌘R')})`} onClick={() => void sync()}>
+            Sync
+          </button>
+        </header>
+      ) : (
+        !inFocus && (
+          <header className="tool-head" aria-label={view?.title ?? 'Learn'}>
+            <h1 className="tool-name" id={`heat-tab-${tab}`}>
+              {view?.title}
+            </h1>
+            {reason && (
+              <span className="heat-why" role="status">
+                {reason}
+              </span>
+            )}
+            <span className="heat-toolbar-gap" />
+            {view?.plus && (
+              <button
+                type="button"
+                className="prism-plain"
+                title={`${view.plus} (N)`}
+                disabled={!plus || !!plus.disabled}
+                onClick={() => nowPlus()?.run()}
+              >
+                {view.plus}
+              </button>
+            )}
+            <button type="button" className="prism-plain tool-esc" onClick={p.toFocus}>
+              Esc to focus
+            </button>
+          </header>
+        )
+      )}
 
-      <aside className="heat-sidebar" aria-label="Sidebar">
+      <aside className="heat-sidebar" aria-label="Sidebar" inert={inFocus}>
         <SpacesFilter onNewSpace={p.onSettings} />
         <div className="heat-sidebar-slot" ref={p.setSidebar} />
       </aside>
 
       <main
         className="heat-main"
+        inert={inFocus}
         onClickCapture={(e) => {
           // ⇧-click is the other way to ⇧Return: the tab's one secondary act (2.7).
           const act = e.shiftKey ? nowSecondary() : undefined;
@@ -406,8 +544,9 @@ function Frame(p: FrameProps) {
           act.run();
         }}
       >
-        {TAB_IDS.map((id) => {
-          const Tab = HEAT_TABS[id];
+        {views.map((v) => {
+          const Tab = v.component;
+          const id = v.id as TabId;
           return (
             <section
               key={id}
@@ -418,7 +557,7 @@ function Frame(p: FrameProps) {
               data-current={id === tab}
               inert={id !== tab}
             >
-              <Scope tab={id} active={id === tab}>
+              <Scope tab={id} active={id === tab && !inFocus}>
                 <Tab />
               </Scope>
             </section>
@@ -426,7 +565,9 @@ function Frame(p: FrameProps) {
         })}
       </main>
 
-      <Widgets folded={folded} popover={popover} setPopover={setPopover} />
+      {inFocus && <FocusScreen summon={(id) => setTab(id as TabId)} />}
+
+      {classic && <Widgets folded={folded} popover={popover} setPopover={setPopover} />}
 
       {info && (
         <div className="heat-info-slot" ref={panel}>

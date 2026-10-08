@@ -104,6 +104,7 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             snap["mailAccounts"] = Value::Array(mail::accounts(&store).map_err(core_error)?);
             drop(store);
             crate::mail_cmd::for_snapshot(i, &mut snap)?;
+            crate::focus_cmd::for_snapshot(i, &mut snap)?;
             Ok(snap)
         }
         "heat.whatItWouldTake" => {
@@ -291,6 +292,12 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
         | "heat.task.setType"
         | "heat.task.reapplyDefaults"
         | "heat.tasks.score" => crate::homes_cmd::invoke(i, cmd, a),
+
+        "heat.focus.state"
+        | "heat.entropy"
+        | "heat.interrupt.dismiss"
+        | "heat.interrupt.raise"
+        | "heat.focus.snooze" => crate::focus_cmd::invoke(i, cmd, a),
 
         // ----- Settings → Claude -----
         "heat.claude.get" => claude::get(i),

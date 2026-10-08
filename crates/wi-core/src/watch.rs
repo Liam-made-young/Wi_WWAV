@@ -32,6 +32,7 @@ fn look(i: &Inner, after: Option<String>) -> Option<String> {
         }
     }
     if !docs.is_empty() {
+        crate::focus_cmd::noticed(i, &docs);
         let _ = announce(i, &docs, &[]);
     }
     last

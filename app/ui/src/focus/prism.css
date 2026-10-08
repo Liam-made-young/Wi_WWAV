@@ -1,0 +1,336 @@
+/* The prism skin (docs/FOCUS.md): what the Focus layout looks like, for
+   every view and sheet at once. At rest the app is white light, paper in
+   light and ink in dark; colour appears only where there is energy. Nothing
+   is a gradient, a gloss or a drop shadow.
+
+   It works by handing the desk's tokens the prism's values. Every shared
+   control already reads the desk's tokens (shell/shell.css, heat/heat.css),
+   so a view takes the look without being edited, and a view written later
+   takes it too. A gradient between two equal stops is a flat fill; a gloss
+   that is transparent is no gloss. What tokens can't say, a control's shape,
+   is said once below, for the shared controls only.
+
+   Every colour, size and duration is a token (design/tokens.json, `prism`).
+   The Classic layout reads none of this file. */
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/InstrumentSans-latin-wght.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2190-2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/InstrumentSans-latin-ext-wght.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/IBMPlexMono-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/IBMPlexMono-latin-500.woff2') format('woff2');
+}
+
+/* ---- The desk's tokens, given the prism's values --------------------------- */
+
+:root[data-layout='focus'] {
+  --desk-ink: var(--prism-ink);
+  --desk-ink2: var(--prism-ink2);
+  --desk-ink3: var(--prism-ink3);
+  --desk-well: var(--prism-ground);
+  --desk-stripe: var(--prism-raised);
+  --desk-case-metal: var(--prism-raised), var(--prism-raised);
+  --desk-deck-metal: var(--prism-raised), var(--prism-raised);
+  --desk-deck-edge: var(--prism-line);
+  --desk-deck-pinstripe: transparent;
+  --desk-deck-ink: var(--prism-ink);
+  --desk-deck-ink-soft: var(--prism-ink3);
+  /* Selection is a tonal shift and a mark in ink, not a field of blue. */
+  --desk-select: var(--prism-sunk);
+  --desk-select-ink: var(--prism-ink);
+  --desk-highlight: var(--prism-ink);
+  --desk-focus: var(--prism-focus);
+  --desk-focus-width: var(--prism-focus-width);
+  --desk-gel: var(--prism-ground), var(--prism-ground);
+  --desk-gel-blue: var(--prism-fill), var(--prism-fill), var(--prism-fill), var(--prism-fill);
+  --desk-gel-blue-ink: var(--prism-fill-ink);
+  --desk-gel-selected: var(--prism-sunk), var(--prism-sunk);
+  --desk-gel-press: 1;
+  --desk-backdrop: var(--prism-backdrop);
+  --desk-lcd-ground: var(--prism-raised), var(--prism-raised);
+  --desk-lcd-ink: var(--prism-ink);
+  --desk-lcd-dim: var(--prism-ink3);
+  --desk-source-list-ground: var(--prism-raised);
+  --desk-source-list-heading: var(--prism-ink3);
+  --gloss: transparent;
+
+  /* Heat is light intensity: a cool task is nearly neutral, a hot one
+     carries colour, and the risk colour is kept for what is overdue. */
+  --heat-cool: var(--prism-ink3);
+  --heat-warm: color-mix(in oklab, var(--prism-band-orange) 45%, var(--prism-ink3));
+  --heat-hot: var(--prism-band-orange);
+  --heat-overdue: var(--prism-risk);
+
+  --radius-chip: var(--prism-radius-control);
+  --radius-button: var(--prism-radius-control);
+  --radius-card: var(--prism-radius-sheet);
+  --radius-sheet: var(--prism-radius-sheet);
+  --radius-pill: var(--prism-radius-control);
+
+  --type-desk-family: var(--prism-type-family);
+  --type-mono-family: var(--prism-type-mono);
+  --type-desk-line-height: var(--prism-type-line-height);
+
+  --motion-rest: var(--prism-motion-curve);
+  --motion-sheet: var(--prism-motion-curve);
+  --motion-fade: var(--prism-motion-settle);
+
+  /* 0 to 1; the shell sets it from the core's entropy. */
+  --entropy: 0;
+  /* How much of a band's colour shows at this entropy: `rest` at 0, all of it at 1. */
+  --spectrum: calc(var(--prism-band-rest) + (1 - var(--prism-band-rest)) * var(--entropy));
+}
+
+:root[data-layout='focus'] body {
+  background: var(--prism-ground);
+  color: var(--prism-ink);
+  font-family: var(--prism-type-family);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Under Reduce Motion nothing in the layout moves. */
+:root[data-layout='focus'][data-reduce-motion='true'] *,
+:root[data-layout='focus'][data-reduce-motion='true'] *::before,
+:root[data-layout='focus'][data-reduce-motion='true'] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-layout='focus'] *,
+  :root[data-layout='focus'] *::before,
+  :root[data-layout='focus'] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+:root[data-layout='focus'] :focus-visible {
+  outline: var(--prism-focus-width) solid var(--prism-focus);
+  outline-offset: 2px;
+}
+
+/* ---- The two buttons ------------------------------------------------------- */
+
+/* The one filled button a screen has: its single main action. */
+.prism-fill {
+  min-width: 44px;
+  min-height: 40px;
+  padding: 0 var(--prism-s3);
+  border: 0;
+  border-radius: var(--prism-radius-control);
+  font-weight: 600;
+  color: var(--prism-fill-ink);
+  background: var(--prism-fill);
+  cursor: default;
+  transition: transform var(--prism-motion-quick) var(--prism-motion-curve);
+}
+
+.prism-fill:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.prism-fill:disabled {
+  color: var(--prism-ink3);
+  background: var(--prism-sunk);
+}
+
+/* Everything else: words you can press. */
+.prism-plain {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 var(--prism-s2);
+  border: 0;
+  border-radius: var(--prism-radius-control);
+  font-weight: 500;
+  color: var(--prism-ink2);
+  background: none;
+  cursor: default;
+  transition: background-color var(--prism-motion-quick) var(--prism-motion-curve);
+}
+
+.prism-plain:hover:not(:disabled),
+.prism-plain[aria-current='page'] {
+  color: var(--prism-ink);
+  background: var(--prism-sunk);
+}
+
+/* A chosen option is marked with a line as well as its ink. */
+.prism-plain[aria-checked='true'] {
+  color: var(--prism-ink);
+  box-shadow: inset 0 calc(var(--prism-band-width) * -1) 0 var(--prism-ink);
+}
+
+.prism-plain:disabled {
+  color: var(--prism-ink3);
+}
+
+/* ---- The shared controls, in the prism's shape ----------------------------- */
+
+/* A gel is a word you can press; the outline stays only where a plain word
+   would be ambiguous. A form's own Save is its one filled button. */
+:root[data-layout='focus'] .gel {
+  font-weight: 500;
+}
+
+:root[data-layout='focus'] .gel::before,
+:root[data-layout='focus'] .segment::before,
+:root[data-layout='focus'] .search-pill::before,
+:root[data-layout='focus'] .magnifier::before {
+  inset: 6px 0;
+  background: none;
+  border-color: var(--prism-line);
+  transition: background-color var(--prism-motion-quick) var(--prism-motion-curve);
+}
+
+:root[data-layout='focus'] .gel.plain::before {
+  border-color: transparent;
+}
+
+:root[data-layout='focus'] .gel:hover:not(:disabled)::before,
+:root[data-layout='focus'] .segment:hover::before {
+  background: var(--prism-sunk);
+}
+
+:root[data-layout='focus'] .gel:active:not(:disabled)::before {
+  filter: none;
+  background: var(--prism-sunk);
+}
+
+:root[data-layout='focus'] .gel:disabled {
+  color: var(--prism-ink3);
+}
+
+:root[data-layout='focus'] .gel:disabled::before {
+  background: none;
+  border-style: dashed;
+}
+
+:root[data-layout='focus'] form .gel[type='submit']:not(:disabled) {
+  color: var(--prism-fill-ink);
+  font-weight: 600;
+}
+
+:root[data-layout='focus'] form .gel[type='submit']:not(:disabled)::before {
+  background: var(--prism-fill);
+  border-color: var(--prism-fill);
+}
+
+:root[data-layout='focus'] .gel.heat-plus::before {
+  inset: 8px;
+  border-radius: var(--prism-radius-control);
+}
+
+:root[data-layout='focus'] .segment[aria-selected='true']::before,
+:root[data-layout='focus'] .segment[aria-checked='true']::before {
+  background: var(--prism-sunk);
+  border-color: var(--prism-line);
+}
+
+:root[data-layout='focus'] input:not([type='checkbox'], [type='radio'], [type='range']),
+:root[data-layout='focus'] select,
+:root[data-layout='focus'] textarea {
+  background: var(--prism-ground);
+  border-color: var(--prism-line);
+  border-radius: var(--prism-radius-control);
+}
+
+/* What opens over a view sits on a tonal shift and one hairline, not a shadow. */
+:root[data-layout='focus'] .sheet,
+:root[data-layout='focus'] .drawer,
+:root[data-layout='focus'] .heat-popover,
+:root[data-layout='focus'] .heat-info,
+:root[data-layout='focus'] .chip-menu,
+:root[data-layout='focus'] .first-card {
+  background: var(--prism-raised);
+  border-color: var(--prism-line);
+  box-shadow: none;
+}
+
+:root[data-layout='focus'] .sheet {
+  border-top: 1px solid var(--prism-line);
+  border-radius: var(--prism-radius-sheet);
+}
+
+:root[data-layout='focus'] .toast {
+  border: 1px solid var(--prism-line);
+  border-radius: var(--prism-radius-control);
+  color: var(--prism-ink);
+  background: var(--prism-raised);
+}
+
+/* A space's colour is a thin band beside its name, not a bead. */
+:root[data-layout='focus'] .heat-dot {
+  width: 3px;
+  height: 12px;
+  border: 0;
+  border-radius: 0;
+}
+
+/* A heat tube is a flat bar of light, as full as the task is hot. */
+:root[data-layout='focus'] .heat-tube {
+  border-color: var(--prism-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* An event on a calendar is a flat field, not a hatch. */
+:root[data-layout='focus'] .heat-event {
+  background: var(--prism-sunk);
+  border-left-color: var(--prism-ink3);
+}
+
+/* A beaded timeline's bead is a flat disc. */
+:root[data-layout='focus'] .heat-bead-glass {
+  background: var(--prism-ground);
+}
+
+:root[data-layout='focus'] .heat-bead[data-done='true'] .heat-bead-glass {
+  background: var(--prism-ink3);
+}
+
+/* Headings over tables and lists are type, not metal bars. */
+:root[data-layout='focus'] .heat-thead,
+:root[data-layout='focus'] .heat-month-heads,
+:root[data-layout='focus'] .heat-cal-heads {
+  background: var(--prism-ground);
+}
+
+:root[data-layout='focus'] .heat-lcd,
+:root[data-layout='focus'] .strip {
+  box-shadow: none;
+}
+
+/* Today is marked with the one fill, in ink; the risk colour is not a date's to wear. */
+:root[data-layout='focus'] .heat-cell[data-today='true'] .heat-cell-day,
+:root[data-layout='focus'] .heat-cal-dayhead[data-today='true'] .heat-cal-num {
+  color: var(--prism-fill-ink);
+  background: var(--prism-fill);
+}

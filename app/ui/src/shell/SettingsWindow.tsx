@@ -8,6 +8,7 @@
 // events: so it reads what it shows when it opens, and takes each change
 // from the answer to the command that made it.
 
+import { useFocusRoot } from '../focus/hooks';
 import { useEffect, useState } from 'react';
 import { call } from '../bridge';
 import { useAppearance } from './hooks';
@@ -19,6 +20,7 @@ export function SettingsWindow() {
   const [account, setAccount] = useState<Account>({ signedIn: false });
   const [pane, setPane] = useState<Pane>('account');
   useAppearance(settings);
+  useFocusRoot();
 
   useEffect(() => {
     document.title = 'Settings';

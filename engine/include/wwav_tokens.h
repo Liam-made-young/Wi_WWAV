@@ -34,8 +34,8 @@ struct Curve {
 };
 
 namespace desk {
-// Heat and the Console's chrome, Settings and every sheet (8.2). Light and
-// dark are Heat's tokens with 8.2's five fixes, and two inks moved so they
+// Learn and the Console's chrome, Settings and every sheet (8.2). Light and
+// dark are Learn's tokens with 8.2's five fixes, and two inks moved so they
 // hold on every stop of their ground (see $contrast). A gel pill draws its
 // stops top to bottom with a hard break at gelBreak: a plain gel's two as
 // first, first, second, first; a blue gel's four as listed. A segment or chip
@@ -76,7 +76,7 @@ inline constexpr float kGelPress = 0.88f;
 inline constexpr Color kBackdrop{0x00, 0x00, 0x00, 0.25f};
 
 namespace lcd {
-// The Now strip: Heat's olive LCD (2.2). Its dim text is darkened in light
+// The Now strip: Learn's olive LCD (2.2). Its dim text is darkened in light
 // (8.2) and lightened in dark, so it holds on both stops.
 inline constexpr Color kGroundLight[] = {{0xf2, 0xf4, 0xe4, 1.0f}, {0xdf, 0xe3, 0xc6, 1.0f}};
 inline constexpr Color kGroundDark[] = {{0x2c, 0x31, 0x21, 1.0f}, {0x20, 0x24, 0x1a, 1.0f}};
@@ -86,7 +86,7 @@ inline constexpr Themed<Color> kDim{{0x4b, 0x50, 0x34, 1.0f}, {0x9c, 0xa3, 0x82,
 }  // namespace lcd
 
 namespace sourceList {
-// The library drawer and Heat's sidebar, with headings darkened (8.2).
+// The library drawer and Learn's sidebar, with headings darkened (8.2).
 inline constexpr Themed<Color> kGround{{0xe7, 0xec, 0xf2, 1.0f}, {0x2e, 0x31, 0x36, 1.0f}};
 inline constexpr Themed<Color> kHeading{{0x4f, 0x57, 0x61, 1.0f}, {0x9a, 0xa3, 0xad, 1.0f}};
 }  // namespace sourceList
@@ -153,7 +153,7 @@ inline constexpr float kNotchPx = 2.0f;
 }  // namespace stem
 
 namespace heat {
-// Heat's level colours (3.1). They fill tubes, pill borders and dots; the
+// Learn's level colours (3.1). They fill tubes, pill borders and dots; the
 // level word is ink.
 inline constexpr Color kCool{0x4f, 0x9b, 0xe6, 1.0f};
 inline constexpr Color kWarm{0xef, 0xa4, 0x31, 1.0f};
@@ -287,6 +287,102 @@ inline constexpr float kMaxPx = 15.0f;
 inline constexpr float kTrackingEm = 0.34f;
 }  // namespace sign
 }  // namespace type
+
+namespace prism {
+// The Focus layout's look (docs/FOCUS.md): a prism instrument. At rest the app
+// is white light, paper in light and ink in dark, and colour appears only
+// where there is energy: a thin band for a space, a small field, a focus ring.
+// Nothing is a gradient, a gloss or a shadow. ink, ink2 and ink3 hold on
+// ground, raised and sunk; line is the only border, for a control that would
+// otherwise be ambiguous; fill is the one filled button a screen has.
+inline constexpr Themed<Color> kGround{{0xfa, 0xfa, 0xf7, 1.0f}, {0x0e, 0x0f, 0x12, 1.0f}};
+inline constexpr Themed<Color> kRaised{{0xf3, 0xf3, 0xef, 1.0f}, {0x15, 0x17, 0x1b, 1.0f}};
+inline constexpr Themed<Color> kSunk{{0xea, 0xea, 0xe5, 1.0f}, {0x1d, 0x20, 0x25, 1.0f}};
+inline constexpr Themed<Color> kInk{{0x12, 0x13, 0x16, 1.0f}, {0xed, 0xed, 0xe8, 1.0f}};
+inline constexpr Themed<Color> kInk2{{0x3f, 0x41, 0x46, 1.0f}, {0xc2, 0xc3, 0xbe, 1.0f}};
+inline constexpr Themed<Color> kInk3{{0x5c, 0x5f, 0x64, 1.0f}, {0x9a, 0x9c, 0x96, 1.0f}};
+inline constexpr Themed<Color> kLine{{0x12, 0x13, 0x16, 0.16f}, {0xed, 0xed, 0xe8, 0.18f}};
+inline constexpr Themed<Color> kFill{{0x12, 0x13, 0x16, 1.0f}, {0xed, 0xed, 0xe8, 1.0f}};
+inline constexpr Themed<Color> kFillInk{{0xfa, 0xfa, 0xf7, 1.0f}, {0x0e, 0x0f, 0x12, 1.0f}};
+inline constexpr Themed<Color> kFocus{{0x29, 0x46, 0xff, 1.0f}, {0x8c, 0x9b, 0xff, 1.0f}};
+inline constexpr float kFocusWidthPx = 2.0f;
+inline constexpr Themed<Color> kBackdrop{{0x12, 0x13, 0x16, 0.18f}, {0x00, 0x00, 0x00, 0.5f}};
+inline constexpr Themed<Color> kRisk{{0xb3, 0x26, 0x1e, 1.0f}, {0xf0, 0x76, 0x6c, 1.0f}};
+
+namespace band {
+// The spectrum: the four WWAV anchors a space's band of light is placed on or
+// between, in order round the wheel. A band is a mark, never text and never a
+// large fill, and it always sits beside the space's name. width is the band's
+// thickness; rest is how much of its colour a band keeps when entropy is 0,
+// and it reaches full colour at entropy 1 (heat scales it again, task by
+// task).
+inline constexpr Color kBlue{0x29, 0x46, 0xff, 1.0f};
+inline constexpr Color kGreen{0x73, 0x86, 0x78, 1.0f};
+inline constexpr Color kOrange{0xe2, 0x53, 0x1f, 1.0f};
+inline constexpr Color kRed{0xd2, 0x1f, 0x2b, 1.0f};
+inline constexpr float kWidthPx = 2.0f;
+inline constexpr float kRest = 0.35f;
+}  // namespace band
+
+namespace readout {
+// The readout: the device's character LCD, drawn dot by dot. A dark field in
+// both appearances, the same everywhere, with every unlit dot faintly there. A
+// character is a 5 by 8 cell of dots; cells are a dot apart.
+inline constexpr Color kField{0x0b, 0x0c, 0x0e, 1.0f};
+inline constexpr Color kUnlit{0x1e, 0x20, 0x24, 1.0f};
+inline constexpr Color kLit{0xf2, 0xf2, 0xec, 1.0f};
+inline constexpr Color kDim{0x8b, 0x8d, 0x88, 1.0f};
+inline constexpr float kDotPx = 2.0f;
+inline constexpr float kPitchPx = 3.0f;
+inline constexpr float kHeightPx = 40.0f;
+}  // namespace readout
+inline constexpr float kS1Px = 8.0f;
+inline constexpr float kS2Px = 16.0f;
+inline constexpr float kS3Px = 24.0f;
+inline constexpr float kS4Px = 32.0f;
+inline constexpr float kS5Px = 48.0f;
+inline constexpr float kS6Px = 64.0f;
+inline constexpr float kS7Px = 96.0f;
+inline constexpr float kS8Px = 128.0f;
+
+namespace radius {
+// Corners are nearly square: a machined edge, not a pill.
+inline constexpr float kControlPx = 4.0f;
+inline constexpr float kSheetPx = 6.0f;
+}  // namespace radius
+
+namespace type {
+// One grotesk for words, one mono for numbers, times and the readout, and
+// Hiragino Sans for Japanese (it follows the grotesk in the stack, so 第2課 is
+// set in it). Both faces are bundled (app/ui/src/focus/fonts, SIL Open Font
+// License). Numbers that line up are tabular.
+inline constexpr const char* kFamilyItems[] = {"Instrument Sans", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "sans-serif"};
+inline constexpr List<const char*> kFamily{kFamilyItems, 5};
+inline constexpr const char* kMonoItems[] = {"IBM Plex Mono", "Hiragino Sans", "Menlo", "Consolas", "monospace"};
+inline constexpr List<const char*> kMono{kMonoItems, 5};
+inline constexpr float kSmallPx = 12.0f;
+inline constexpr float kBodyPx = 14.0f;
+inline constexpr float kLargePx = 17.0f;
+inline constexpr float kTitlePx = 22.0f;
+inline constexpr float kDisplayPx = 40.0f;
+inline constexpr float kLineHeight = 1.45f;
+inline constexpr float kTight = 1.12f;
+inline constexpr float kTrackingEm = 0.06f;
+}  // namespace type
+
+namespace motion {
+// Instrument motion: a part settles with slight weight and stops, like a knob
+// reaching a detent. Nothing bounces, and under Reduce Motion nothing moves.
+// edgeRest is how long the cursor rests on the left edge before the tool list
+// comes out; mapHold is how long the command key is held before the map shows.
+inline constexpr float kQuickMs = 150.0f;
+inline constexpr float kDetentMs = 180.0f;
+inline constexpr float kSettleMs = 240.0f;
+inline constexpr Curve kCurve{0.2f, 0.0f, 0.0f, 1.0f};
+inline constexpr float kEdgeRestMs = 150.0f;
+inline constexpr float kMapHoldMs = 600.0f;
+}  // namespace motion
+}  // namespace prism
 
 }  // namespace wwav::tokens
 

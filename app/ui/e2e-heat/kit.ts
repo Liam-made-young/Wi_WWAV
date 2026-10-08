@@ -13,7 +13,11 @@ export const MORNING = '2026-10-07T10:00:00-04:00';
 
 export const test = base.extend({
   page: async ({ page }, use) => {
-    await page.addInitScript(() => localStorage.setItem('wi.firstLaunch', 'done'));
+    await page.addInitScript(() => {
+      localStorage.setItem('wi.firstLaunch', 'done');
+      // These specs walk the Classic layout; the Focus layout has its own (e2e-heat/focus.spec.ts).
+      localStorage.setItem('wi.layout', 'classic');
+    });
     await use(page);
   },
 });

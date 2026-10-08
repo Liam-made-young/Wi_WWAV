@@ -4,6 +4,7 @@
 mod account;
 mod common;
 mod export;
+mod focus;
 mod heat;
 mod heat_calendars;
 mod heat_commands;

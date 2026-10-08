@@ -18,7 +18,7 @@ interface Props {
   /** The task the strip's task half opened Heat on. */
   heatTask: string | null;
   /** Heat's own: the task to open, the keyboard handle, and what it tells the status bar. */
-  heat: Pick<HeatProps, 'open' | 'onStatus' | 'onSettings'> & { handle: Ref<HeatHandle> };
+  heat: Pick<HeatProps, 'open' | 'onStatus' | 'onSettings' | 'layout' | 'onLayer'> & { handle: Ref<HeatHandle> };
 }
 
 export function Rooms({ current, heatTask, heat }: Props) {
@@ -36,7 +36,14 @@ export function Rooms({ current, heatTask, heat }: Props) {
           inert={id !== current}
         >
           {id === 'heat' ? (
-            <HeatView ref={heat.handle} open={heat.open} onStatus={heat.onStatus} onSettings={heat.onSettings} />
+            <HeatView
+              ref={heat.handle}
+              open={heat.open}
+              onStatus={heat.onStatus}
+              onSettings={heat.onSettings}
+              layout={heat.layout}
+              onLayer={heat.onLayer}
+            />
           ) : (
             BODIES[id]
           )}

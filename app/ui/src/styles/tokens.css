@@ -2,7 +2,7 @@
    Don't edit it: change the JSON and run the compiler again. */
 
 :root {
-  /* desk: Heat and the Console's chrome, Settings and every sheet (8.2).
+  /* desk: Learn and the Console's chrome, Settings and every sheet (8.2).
      Light and dark are Learn's tokens with 8.2's five fixes, and two inks
      moved so they hold on every stop of their ground (see $contrast). A gel
      pill draws its stops top to bottom with a hard break at gelBreak: a
@@ -34,14 +34,14 @@
   --desk-gel-press: 0.88;
   --desk-backdrop: rgb(0 0 0 / 0.25);
 
-  /* desk.lcd: The Now strip: Heat's olive LCD (2.2). Its dim text is
+  /* desk.lcd: The Now strip: Learn's olive LCD (2.2). Its dim text is
      darkened in light (8.2) and lightened in dark, so it holds on both
      stops. */
   --desk-lcd-ground: #f2f4e4, #dfe3c6;
   --desk-lcd-ink: #262a17;
   --desk-lcd-dim: #4b5034;
 
-  /* desk.sourceList: The library drawer and Heat's sidebar, with headings
+  /* desk.sourceList: The library drawer and Learn's sidebar, with headings
      darkened (8.2). */
   --desk-source-list-ground: #e7ecf2;
   --desk-source-list-heading: #4f5761;
@@ -96,7 +96,7 @@
   --stem-silent-fill: 0.45;
   --stem-notch: 2px;
 
-  /* heat: Heat's level colours (3.1). They fill tubes, pill borders and
+  /* heat: Learn's level colours (3.1). They fill tubes, pill borders and
      dots; the level word is ink. */
   --heat-cool: #4f9be6;
   --heat-warm: #efa431;
@@ -187,6 +187,92 @@
   --type-sign-min: 11px;
   --type-sign-max: 15px;
   --type-sign-tracking: 0.34em;
+
+  /* prism: The Focus layout's look (docs/FOCUS.md): a prism instrument. At
+     rest the app is white light, paper in light and ink in dark, and colour
+     appears only where there is energy: a thin band for a space, a small
+     field, a focus ring. Nothing is a gradient, a gloss or a shadow. ink,
+     ink2 and ink3 hold on ground, raised and sunk; line is the only border,
+     for a control that would otherwise be ambiguous; fill is the one filled
+     button a screen has. */
+  --prism-ground: #fafaf7;
+  --prism-raised: #f3f3ef;
+  --prism-sunk: #eaeae5;
+  --prism-ink: #121316;
+  --prism-ink2: #3f4146;
+  --prism-ink3: #5c5f64;
+  --prism-line: rgb(18 19 22 / 0.16);
+  --prism-fill: #121316;
+  --prism-fill-ink: #fafaf7;
+  --prism-focus: #2946ff;
+  --prism-focus-width: 2px;
+  --prism-backdrop: rgb(18 19 22 / 0.18);
+  --prism-risk: #b3261e;
+
+  /* prism.band: The spectrum: the four WWAV anchors a space's band of light
+     is placed on or between, in order round the wheel. A band is a mark,
+     never text and never a large fill, and it always sits beside the space's
+     name. width is the band's thickness; rest is how much of its colour a
+     band keeps when entropy is 0, and it reaches full colour at entropy 1
+     (heat scales it again, task by task). */
+  --prism-band-blue: #2946ff;
+  --prism-band-green: #738678;
+  --prism-band-orange: #e2531f;
+  --prism-band-red: #d21f2b;
+  --prism-band-width: 2px;
+  --prism-band-rest: 0.35;
+
+  /* prism.readout: The readout: the device's character LCD, drawn dot by
+     dot. A dark field in both appearances, the same everywhere, with every
+     unlit dot faintly there. A character is a 5 by 8 cell of dots; cells are
+     a dot apart. */
+  --prism-readout-field: #0b0c0e;
+  --prism-readout-unlit: #1e2024;
+  --prism-readout-lit: #f2f2ec;
+  --prism-readout-dim: #8b8d88;
+  --prism-readout-dot: 2px;
+  --prism-readout-pitch: 3px;
+  --prism-readout-height: 40px;
+  --prism-s1: 8px;
+  --prism-s2: 16px;
+  --prism-s3: 24px;
+  --prism-s4: 32px;
+  --prism-s5: 48px;
+  --prism-s6: 64px;
+  --prism-s7: 96px;
+  --prism-s8: 128px;
+
+  /* prism.radius: Corners are nearly square: a machined edge, not a pill. */
+  --prism-radius-control: 4px;
+  --prism-radius-sheet: 6px;
+
+  /* prism.type: One grotesk for words, one mono for numbers, times and the
+     readout, and Hiragino Sans for Japanese (it follows the grotesk in the
+     stack, so 第2課 is set in it). Both faces are bundled
+     (app/ui/src/focus/fonts, SIL Open Font License). Numbers that line up
+     are tabular. */
+  --prism-type-family: "Instrument Sans", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --prism-type-mono: "IBM Plex Mono", "Hiragino Sans", "Menlo", "Consolas", monospace;
+  --prism-type-small: 12px;
+  --prism-type-body: 14px;
+  --prism-type-large: 17px;
+  --prism-type-title: 22px;
+  --prism-type-display: 40px;
+  --prism-type-line-height: 1.45;
+  --prism-type-tight: 1.12;
+  --prism-type-tracking: 0.06em;
+
+  /* prism.motion: Instrument motion: a part settles with slight weight and
+     stops, like a knob reaching a detent. Nothing bounces, and under Reduce
+     Motion nothing moves. edgeRest is how long the cursor rests on the left
+     edge before the tool list comes out; mapHold is how long the command key
+     is held before the map shows. */
+  --prism-motion-quick: 150ms;
+  --prism-motion-detent: 180ms;
+  --prism-motion-settle: 240ms;
+  --prism-motion-curve: cubic-bezier(0.2, 0, 0, 1);
+  --prism-motion-edge-rest: 150ms;
+  --prism-motion-map-hold: 600ms;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -210,6 +296,18 @@
     --desk-lcd-dim: #9ca382;
     --desk-source-list-ground: #2e3136;
     --desk-source-list-heading: #9aa3ad;
+    --prism-ground: #0e0f12;
+    --prism-raised: #15171b;
+    --prism-sunk: #1d2025;
+    --prism-ink: #edede8;
+    --prism-ink2: #c2c3be;
+    --prism-ink3: #9a9c96;
+    --prism-line: rgb(237 237 232 / 0.18);
+    --prism-fill: #edede8;
+    --prism-fill-ink: #0e0f12;
+    --prism-focus: #8c9bff;
+    --prism-backdrop: rgb(0 0 0 / 0.5);
+    --prism-risk: #f0766c;
   }
 }
 
@@ -233,4 +331,16 @@
   --desk-lcd-dim: #9ca382;
   --desk-source-list-ground: #2e3136;
   --desk-source-list-heading: #9aa3ad;
+  --prism-ground: #0e0f12;
+  --prism-raised: #15171b;
+  --prism-sunk: #1d2025;
+  --prism-ink: #edede8;
+  --prism-ink2: #c2c3be;
+  --prism-ink3: #9a9c96;
+  --prism-line: rgb(237 237 232 / 0.18);
+  --prism-fill: #edede8;
+  --prism-fill-ink: #0e0f12;
+  --prism-focus: #8c9bff;
+  --prism-backdrop: rgb(0 0 0 / 0.5);
+  --prism-risk: #f0766c;
 }

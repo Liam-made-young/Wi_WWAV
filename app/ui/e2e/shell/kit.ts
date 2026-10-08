@@ -16,7 +16,11 @@ export { expect } from '@playwright/test';
 /** A page whose first launch is already through (first-launch.spec.ts walks it). */
 export const test = base.extend<{ core: Core }>({
   page: async ({ page }, use) => {
-    await page.addInitScript(() => localStorage.setItem('wi.firstLaunch', 'done'));
+    await page.addInitScript(() => {
+      localStorage.setItem('wi.firstLaunch', 'done');
+      // These specs walk the Classic layout; the Focus layout has its own (e2e-heat/focus.spec.ts).
+      localStorage.setItem('wi.layout', 'classic');
+    });
     await use(page);
   },
   core: async ({}, use) => {
