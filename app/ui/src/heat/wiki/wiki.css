@@ -81,7 +81,7 @@
 .wiki-crumb {
   padding: 0;
   font: inherit;
-  color: var(--desk-select);
+  color: var(--learn-accent);
   background: none;
   border: 0;
   text-decoration: underline;
@@ -289,7 +289,7 @@
 .wiki-j,
 .wiki-x,
 .wiki-ref a {
-  color: var(--desk-select);
+  color: var(--learn-accent);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
