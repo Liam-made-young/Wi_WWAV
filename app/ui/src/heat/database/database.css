@@ -4,9 +4,10 @@
    series colours. */
 
 /* The Database and the Wiki use the whole width: no widgets column, and the
-   sidebar lists tables or contents instead of spaces. */
-.heat[data-tab='database'],
-.heat[data-tab='wiki'] {
+   sidebar lists tables or contents instead of spaces. The columns are the
+   Classic frame's; the Focus layout lays a tool out itself. */
+.heat:not([data-layout='focus'])[data-tab='database'],
+.heat:not([data-layout='focus'])[data-tab='wiki'] {
   grid-template-columns: 190px minmax(0, 1fr) 0;
 }
 
@@ -116,7 +117,7 @@
 .db-quiet {
   background: none;
   border-color: transparent;
-  color: var(--desk-select);
+  color: var(--learn-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -232,7 +233,7 @@
 
 .db-th-sort {
   font-size: 9px;
-  color: var(--desk-select);
+  color: var(--learn-accent);
 }
 
 .db-resize {
@@ -331,15 +332,15 @@
 }
 
 .db-row .db-cell[data-selected] {
-  background: color-mix(in srgb, var(--desk-select) 16%, var(--desk-well));
+  background: color-mix(in srgb, var(--learn-accent) 16%, var(--desk-well));
 }
 
 .db-row .db-cell[data-active] {
-  box-shadow: inset 0 0 0 2px var(--desk-select);
+  box-shadow: inset 0 0 0 2px var(--learn-accent);
 }
 
 .db-link {
-  color: var(--desk-select);
+  color: var(--learn-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -353,10 +354,10 @@
 }
 
 .db-check[data-on] {
-  border-color: var(--desk-select);
+  border-color: var(--learn-accent);
   background:
-    linear-gradient(45deg, transparent 43%, var(--desk-select-ink) 43% 57%, transparent 57%) 50% 60% / 7px 7px no-repeat,
-    var(--desk-select);
+    linear-gradient(45deg, transparent 43%, var(--learn-accent-ink) 43% 57%, transparent 57%) 50% 60% / 7px 7px no-repeat,
+    var(--learn-accent);
 }
 
 .db-check[data-on]::after {
@@ -366,11 +367,11 @@
   font-size: 11px;
   line-height: 14px;
   text-align: center;
-  color: var(--desk-select-ink);
+  color: var(--learn-accent-ink);
 }
 
 .db-check[data-on] {
-  background: var(--desk-select);
+  background: var(--learn-accent);
 }
 
 .db-editor {
@@ -400,7 +401,7 @@
 }
 
 .db-new-input:focus {
-  box-shadow: inset 0 0 0 2px var(--desk-select);
+  box-shadow: inset 0 0 0 2px var(--learn-accent);
 }
 
 .db-total {
@@ -428,7 +429,7 @@
 
 .db-total:hover,
 .db-total:focus-within {
-  box-shadow: inset 0 0 0 1px var(--desk-select);
+  box-shadow: inset 0 0 0 1px var(--learn-accent);
 }
 
 .db-total-value {
