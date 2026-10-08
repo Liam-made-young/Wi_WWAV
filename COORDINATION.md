@@ -365,7 +365,8 @@ one list of threads"). Started 7 Oct 2026.
 files, `app/ui/src/shell/`, `app/ui/src/heat/mail/`, `grades/`, `tasks/`,
 `habits/`, `info/`, `widgets/`, `app/ui/src/ask/`.
 
-**Status** (7 Oct, evening)
+**Status** (7 Oct, night): everything below is on the branch, committed,
+not pushed.
 
 - [x] Coordination file
 - [x] Core: commitments, breaks, exceptions, free time, planning
@@ -373,16 +374,31 @@ files, `app/ui/src/shell/`, `app/ui/src/heat/mail/`, `grades/`, `tasks/`,
 - [x] Core: notes on disk, links, search
 - [x] Core: the capture inbox, reading on this Mac, filing
 - [x] UI: commitments in Calendar and Today, the sheets
-- [ ] UI: Notes (in progress)
+- [x] UI: Notes, the quiet notices, the guide
 - [x] The Shortcut and its guide (`tools/shortcut/`)
 - [x] Tools for ⌘K (`crates/wi-core/src/learn_tools.rs`)
+- [x] `app/ui/e2e/heat/commitments-notes.spec.ts`: the real core and the
+      real views together (a class in Calendar; a real photo read by Vision
+      and filed; `[[`, backlinks, a checkbox made a task)
 
-Known, and not mine: `player::every_verdict_is_the_reference_tools_word_for_word`
-and `review::review_get_info_says_what_wwav_pack_says_of_a_plain_wav` fail on
-`8f4ea3a` too (they want the reference format tools).
-`mail::sending_and_reading_are_two_runs_that_share_no_tool` reads its
-stand-in's log while the stand-in is still writing it, and fails now and then
-when the machine is busy.
+Tests that fail and aren't mine, for whoever runs the core's suite:
+
+- `player::every_verdict_is_the_reference_tools_word_for_word` and
+  `review::review_get_info_says_what_wwav_pack_says_of_a_plain_wav` fail on
+  `8f4ea3a` too (they want the reference format tools).
+- `heat.snapshot` now and then answers "library.sqlite: database is locked"
+  in the signed-in tests (`heat_public::*`). It is there on `8f4ea3a`: 1 run
+  in 30 of `heat_public::` alone. On this branch I counted 2 in 14, and 1 in
+  14 with my two workers switched off, so I may make it likelier and I
+  didn't cause it. The error is rusqlite's own, so it comes from the `kv`
+  connection or a bare call in the core, not from `wi-store`. I haven't
+  found which.
+- `mail::sending_and_reading_are_two_runs_that_share_no_tool` reads its
+  stand-in's log while the stand-in is still writing it, and fails now and
+  then when the machine is busy.
+- The Commitments UI agent reported four `e2e-heat` specs failing on the
+  "Hot tasks" widget on Today (`widgets/Widgets.tsx` hides it there, and
+  nothing of mine touches that file). I haven't run them on `8f4ea3a`.
 
 **Requests to me**
 
