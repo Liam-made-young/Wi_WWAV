@@ -42,7 +42,7 @@ while it waits to be filed. A line of front matter Learn didn't write is
 kept word for word.
 
 The same note is a `note` record (`title`, `markdown`, and beside what it
-had: `courseId`, `spaceId`, `file`, `capturedAt`, `inbox`, `attachments`,
+had: `courseId`, `spaceId`, `capturedAt`, `inbox`, `attachments`,
 `createdAt`, `updatedAt`), so ⌘K, the MCP tools and undo work on notes as
 they do on anything else. **The record is what the app writes; the file is
 what the folder holds; the core makes them agree** (`notes_cmd::reconcile`):
@@ -57,7 +57,18 @@ what the folder holds; the core makes them agree** (`notes_cmd::reconcile`):
 | The record was deleted | moves the file to `Notes/.trash/` |
 
 It runs after every note command, when another process or an undo changes a
-note, and every few seconds for the folder. `noteFile` records (outside the
+note, and every few seconds for the folder. So a note made any other way
+(`heat.put {kind: "note"}`, the Database tab, Claude's `add_note`) has its
+file a moment later, with nothing more to call.
+
+`Config::notes_dir` names the folder; the app and the dev bridge name
+`Notes` in the library folder. With none, notes are records only: a test's
+core writes no files unless it asks to.
+
+**What syncs is as it was.** A `note` record syncs to the person's account
+when they are signed in, as it did before Notes, because a public note has
+to go up to be shown. A captured page's text is in its note, so it syncs
+with it; its image never does. `noteFile` records (outside the
 journal) hold what was last seen of each file, so an unchanged file is never
 read twice.
 
@@ -127,8 +138,13 @@ With nowhere to put it, it stays in the Notes inbox, to be filed with one
 click. What Claude suggested (`noteSuggestion`) is shown under the note and
 never applied: a suggested task becomes a task only when it is clicked.
 
-**The image is the page. The text is what makes it searchable.** Nothing
-leaves this Mac except the run of Claude in step 4, which can be switched off.
+**The image is the page. The text is what makes it searchable.** Reading
+and filing happen on this Mac; the one thing that goes out is the run of
+Claude in step 4, which can be switched off. (The note itself syncs as any
+note does: see "What syncs is as it was" above.)
+
+A class places a page only when it names a course: a class commitment with
+no course has nowhere to file to.
 
 ### Reading on this Mac
 
@@ -196,6 +212,8 @@ A box that is a task carries `taskId`, and its `done` is the task's.
 | `heat.capture.inbox.add` | `{paths}` or `{name, base64}` | `{added}`: copies files, or a pasted image, into the inbox |
 | `heat.capture.settings.set` | `{claude}` | `{}`: whether a captured page may be sent to Claude |
 | `heat.notice.dismiss` | `{id}` | `{}` |
+| `heat.tools.list` | `{}` | `{tools: [{name, mcpName, effect, doing, description, inputSchema}]}` |
+| `heat.tools.call` | `{name, args, stage?}` | a tool that reads or drafts: `{cmd, line, result}`. One that changes: the same, or with `stage` only `{staged: {cmd, args, line}}`, checked and not written |
 
 ## The tools for ⌘K
 

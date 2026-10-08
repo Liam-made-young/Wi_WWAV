@@ -346,6 +346,32 @@ Grades: a category's percentage drops its `dropLowest` lowest scores when it
 has more than that many; a pending grade's category is the one its
 assignment type counts toward, else the categories' keywords.
 
+## Commitments, and Notes
+
+Two parts of Learn have files of their own, written the way this one is:
+
+- `docs/COMMITMENTS.md`: classes, shifts and commutes; how a schedule gets in
+  (a sheet, pasted text, a photo, an `.ics` file or address); what a plan
+  steps around; free time; mail that cancels a class. Records `commitment`
+  and `termBreak`; commands `heat.commitment.*`, `heat.planner.freeTime`,
+  `heat.sleep.set`; `commitments` in the snapshot.
+- `docs/NOTES.md`: notes as markdown files kept the same as their `note`
+  records; links, backlinks, tags, a checkbox made a task; the capture inbox
+  and the text reader; the quiet notices. Commands `heat.note.*`,
+  `heat.capture.process`, `heat.capture.inbox.add`,
+  `heat.capture.settings.set`, `heat.notice.dismiss`, `heat.tools.*`; `notes`
+  and `notices` in the snapshot.
+
+Their labels in the journal: `add commitment`, `edit commitment`,
+`skip class` (and `shift`, `commute`, `commitment`; `move`, `restore`),
+`import schedule`, `this week's shifts`, `import breaks`, `schedule sync`,
+`add term break`; `add note`, `edit note`, `rename note`, `add daily note`,
+`link note`, `file note`, `task from note`, `check box`, `uncheck box`,
+`capture`, `notes from disk`, `move daily notes into Notes`.
+
+A daily note is now the note titled with its day; `dailyNote` records are
+moved over once and nothing writes the kind after (`docs/NOTES.md`).
+
 ## The MCP server
 
 `wi-mcp` speaks MCP over stdio: one JSON-RPC 2.0 message per line on stdin

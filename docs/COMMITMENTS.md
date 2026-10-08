@@ -71,7 +71,9 @@ takes all of it back.
 | An `.ics` file or address | `heat.commitment.importIcs {path \| url \| text}` | in Rust; `subscribe: true` keeps the address in the Keychain and reads it again every hour |
 
 `mode` is `schedule` (what repeats every week), `week` (this week's shifts,
-each on its own day) or `breaks` (an academic calendar: whole days off).
+each on its own day) or `breaks` (an academic calendar: whole days off). A
+calendar file read as `week` keeps only what falls in that week, as work.
+A calendar's event named by a course's code (`JPN 101`) is a class.
 
 - **A week's shifts** carry `weekOf`, the week's Monday. Accepting a `week`
   draft deletes the work commitments of that `weekOf` and adds the new ones,
@@ -95,8 +97,11 @@ and a day it meets on ("Thursday", "tomorrow", "Oct 9", or with none named
 the next time it meets). "Not canceled" finds nothing.
 
 What it finds is a `pendingException`, and a line: "EGR 101 is canceled
-Thursday, Oct 8. Skip it?" It is offered through `heat.interrupt.raise` when
-the Focus layout is there, and as a quiet notice otherwise. One tap is
+Thursday, Oct 8. Skip it?" It is a quiet notice with its one act, and it is
+raised through `heat.interrupt.raise` too (`{id, source: "commitments",
+line, action: {label, do: "command", cmd, args}, changesNext: true}`), which
+answers nothing until the Focus layout is merged. `heat.commitment.mail.check`
+looks now and answers what waits; the worker looks every twenty seconds. One tap is
 `heat.commitment.exception.confirm {id}`, which writes the exception as one
 entry ("skip class"). Nothing is ever applied without the tap.
 
@@ -172,7 +177,7 @@ break and term end already applied: a view draws what it is given.
 | `heat.put`, `heat.patch`, `heat.delete` | `{kind: "termBreak", …}` | a break by hand |
 | `heat.commitment.importText` | `{text, mode?, weekOf?}`, or `{json, mode?, weekOf?}` when the caller read it itself | `{draft}`: `reading` (the `heat` event says when it turns), or `ready` at once with `json` |
 | `heat.commitment.importImage` | `{path, mode?, weekOf?}` | `{draft}`, `reading` |
-| `heat.commitment.importIcs` | `{path \| url \| text, mode?, subscribe?, name?}` | `{draft}`, `ready`; with `subscribe`, `{feed, changed, undo}`: the address is kept and its commitments are written at once, as "schedule sync" |
+| `heat.commitment.importIcs` | `{path \| url \| text, mode?, weekOf?, subscribe?, name?}` | `{draft}`, `ready`; with `subscribe`, `{feed, changed, undo}`: the address is kept and its commitments are written at once, as "schedule sync" |
 | `heat.commitment.draft.accept` | `{draftId, skip?}` (`skip`: places in `items` to leave out) | `{commitments, breaks, replaced, courses, undo}`. "import schedule", "this week's shifts", "import breaks" |
 | `heat.commitment.draft.discard` | `{draftId}` | `{}` |
 | `heat.commitment.exception.confirm` | `{id}` | `{commitment, line, undo}` |

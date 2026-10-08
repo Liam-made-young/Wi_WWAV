@@ -540,10 +540,13 @@ pub(crate) fn look_folder(i: &Inner, id: &str) -> Result<std::path::PathBuf, Cor
 
 /// Asks the shell to show one line as an interrupt, when the Focus layout's
 /// door is there (docs/FOCUS.md). Until it is, the quiet notice is all.
-pub(crate) fn raise(i: &Inner, id: &str, line: &str, action: Option<Value>) {
+/// `act` is a notice's one act, `{label, cmd, args}`; the shell's own shape
+/// for it is `{label, do: "command", cmd, args}`.
+pub(crate) fn raise(i: &Inner, id: &str, line: &str, act: Option<&Value>) {
     let mut args = json!({"id": id, "source": "commitments", "line": line, "changesNext": true});
-    if let Some(action) = action {
-        args["action"] = action;
+    if let Some(act) = act {
+        args["action"] =
+            json!({"label": act["label"], "do": "command", "cmd": act["cmd"], "args": act["args"]});
     }
     let _ = crate::heat_cmd::invoke(
         i,
@@ -573,7 +576,7 @@ pub(crate) fn look_at_mail(i: &Inner) {
             line,
             json!({"act": act, "pendingId": id}),
         );
-        raise(i, &key, line, Some(act));
+        raise(i, &key, line, Some(&act));
     }
     wrote_outside(i, &[PENDING, NOTICE]);
 }
