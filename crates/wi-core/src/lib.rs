@@ -36,6 +36,7 @@ mod heat_cmd;
 mod history;
 mod homes_cmd;
 mod kv;
+mod learn_tools;
 mod library;
 mod mail_cmd;
 mod net;

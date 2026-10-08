@@ -96,6 +96,37 @@ fn schedule_from_ics(i: &Inner, bytes: &[u8], mode: Mode) -> Result<rules::Sched
     Ok(rules::from_ical(&events, mode, &zone))
 }
 
+/// A calendar read as one week's shifts: what falls in that week, each on
+/// its own day, as work. What repeats, or is on another week's day, is
+/// counted as unread: a week's import never reaches past its week.
+fn for_week(
+    mut schedule: rules::Schedule,
+    mode: Mode,
+    week_of: Option<&str>,
+    clock: &wi_heat_store::Clock,
+) -> rules::Schedule {
+    if mode != Mode::Week {
+        return schedule;
+    }
+    let monday = rules::monday_of(week_of.unwrap_or(&clock.today()));
+    let sunday = wi_heat::model::zone::add_days(&monday, 6.0);
+    let before = schedule.items.len();
+    schedule.items.retain(|item| {
+        item.rrule.is_none()
+            && item
+                .date
+                .as_deref()
+                .is_some_and(|d| d >= monday.as_str() && d <= sunday.as_str())
+    });
+    schedule.unread += before - schedule.items.len();
+    for item in &mut schedule.items {
+        if item.kind == rules::Kind::Other {
+            item.kind = rules::Kind::Work;
+        }
+    }
+    schedule
+}
+
 /// Reads a subscribed calendar now and writes what changed, as one entry.
 fn feed_sync(i: &Inner, feed: &Value) -> Result<Value, CoreError> {
     let id = feed["id"].as_str().unwrap_or_default().to_string();
@@ -280,14 +311,15 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
                         "Couldn't read that calendar. Check the connection and the address.",
                     )
                 })?;
-                let schedule = schedule_from_ics(i, &bytes, mode)?;
                 let clock = i.clock();
+                let week = a.opt_str("weekOf");
+                let schedule = for_week(schedule_from_ics(i, &bytes, mode)?, mode, week, &clock);
                 let draft = commit::draft_from(
                     &mut i.store(),
                     &clock,
                     mode,
                     "ics",
-                    None,
+                    week,
                     "calendar",
                     &schedule,
                 )
@@ -310,10 +342,11 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
                     ))
                 }
             };
-            let schedule = schedule_from_ics(i, &bytes, mode)?;
             let clock = i.clock();
+            let week = a.opt_str("weekOf");
+            let schedule = for_week(schedule_from_ics(i, &bytes, mode)?, mode, week, &clock);
             let draft =
-                commit::draft_from(&mut i.store(), &clock, mode, "ics", None, &name, &schedule)
+                commit::draft_from(&mut i.store(), &clock, mode, "ics", week, &name, &schedule)
                     .map_err(core_error)?;
             answer_draft(i, &draft)
         }

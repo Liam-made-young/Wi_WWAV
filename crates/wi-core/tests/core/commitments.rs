@@ -1167,3 +1167,132 @@ fn commitments_stay_on_this_mac() {
         "a commitment went up"
     );
 }
+
+#[test]
+fn the_prompt_boxs_tools_stage_a_change_and_run_what_only_reads() {
+    let setup = Setup::new();
+    let core = heat_core(&setup, NOW);
+    school(&core);
+    let tools = ok(&core, "heat.tools.list", json!({}))["tools"].clone();
+    assert_eq!(tools.as_array().unwrap().len(), 12);
+    assert_eq!(tools[0]["mcpName"], "commitment_create");
+    // "I work Saturday 9 to 5." Staged: checked, described, not written.
+    let work = json!({"title": "Bookstore", "kind": "work", "date": "2026-10-10", "start": "9am", "end": "5pm"});
+    let staged = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "commitment.create", "args": work, "stage": true}),
+    );
+    assert_eq!(
+        staged["staged"]["line"],
+        "New commitment: Bookstore, Sat Oct 10, 9:00 AM to 5:00 PM."
+    );
+    assert_eq!(staged["staged"]["cmd"], "heat.commitment.create");
+    assert!(records(&snap(&core, DAY), "commitment").is_empty());
+    // Applied, it is the command it named, with the arguments it gave.
+    let applied = ok(
+        &core,
+        "heat.commitment.create",
+        staged["staged"]["args"].clone(),
+    );
+    assert_eq!(applied["undo"], "Undo add commitment");
+    // What can't be done is refused when it is staged, in the core's own sentence.
+    let bad = json!({"title": "Backwards", "start": "17:00", "end": "09:00"});
+    assert_eq!(
+        refused(
+            &core,
+            "heat.tools.call",
+            json!({"name": "commitment_create", "args": bad, "stage": true})
+        )
+        .1,
+        "A commitment ends after it starts. One that runs past midnight is two."
+    );
+    let skip = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "commitment.add_exception", "args": {"commitment": "Bookstore", "date": "2026-10-10", "kind": "skip"}, "stage": true}),
+    );
+    assert_eq!(
+        skip["staged"]["line"],
+        "Bookstore on Saturday, Oct 10 is skipped."
+    );
+    let change = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "commitment.update", "args": {"commitment": "Bookstore", "set": {"end": "4pm", "buffer_before_min": 20}}, "stage": true}),
+    );
+    assert_eq!(
+        change["staged"]["line"],
+        "Change to: Bookstore, Sat Oct 10, 9:00 AM to 4:00 PM."
+    );
+    assert_eq!(change["staged"]["args"]["set"]["bufferBefore"], 20);
+    // A tool that reads runs at once, staged or not.
+    let free = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "planner.free_time", "args": {"date": "2026-10-10"}, "stage": true}),
+    );
+    assert_eq!(free["result"]["days"][0]["line"], "8h free Saturday.");
+    // "Find my notes on te-form." "Move this note to EGR 101."
+    ok(
+        &core,
+        "heat.commitment.create",
+        json!({"course": "EGR 101", "days": ["TU"], "start": "11:00", "end": "12:15"}),
+    );
+    let made = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "note.create", "args": {"title": "Te-form", "markdown": "Group one verbs."}}),
+    );
+    assert_eq!(made["result"]["note"]["title"], "Te-form");
+    let found = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "note.search", "args": {"query": "te-form"}}),
+    );
+    assert_eq!(found["result"]["hits"][0]["title"], "Te-form");
+    let moved = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "note.file", "args": {"note": "Te-form", "course": "EGR 101"}, "stage": true}),
+    );
+    assert_eq!(moved["staged"]["line"], "Te-form: file to EGR 101");
+    assert_eq!(
+        ok(&core, "heat.note.file", moved["staged"]["args"].clone())["line"],
+        "Filed to EGR 101"
+    );
+    let linked = ok(
+        &core,
+        "heat.tools.call",
+        json!({"name": "note.link", "args": {"note": "Te-form", "to": "EGR 101"}}),
+    );
+    assert_eq!(linked["result"]["line"], "Linked to EGR 101");
+    assert_eq!(
+        refused(
+            &core,
+            "heat.tools.call",
+            json!({"name": "note.file", "args": {"note": "Nowhere", "course": "EGR 101"}})
+        )
+        .1,
+        "No note is called Nowhere."
+    );
+    assert_eq!(
+        refused(
+            &core,
+            "heat.tools.call",
+            json!({"name": "note.delete", "args": {}})
+        )
+        .0,
+        "unknown_tool"
+    );
+    // A calendar file read as one week's shifts keeps to that week.
+    let week = ok(
+        &core,
+        "heat.commitment.importIcs",
+        json!({"text": TIMETABLE, "mode": "week", "weekOf": "2026-10-07"}),
+    );
+    assert_eq!(
+        week["draft"]["line"], "1 shift. For the week of Oct 5. 1 line couldn't be read.",
+        "the shift made by hand isn't a week's import, so it isn't replaced"
+    );
+}

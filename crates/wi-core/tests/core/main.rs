@@ -2,6 +2,7 @@
 //! of docs/PLAN.md, written as what a fail looks like.
 
 mod account;
+mod capture;
 mod commitments;
 mod common;
 mod export;
@@ -14,6 +15,7 @@ mod heat_watch;
 mod history;
 mod library;
 mod mail;
+mod notes;
 mod player;
 mod review;
 mod supervisor;

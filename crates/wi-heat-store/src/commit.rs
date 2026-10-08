@@ -563,6 +563,26 @@ pub fn create(
     ))
 }
 
+/// What `create` (with no `id`) or `update` would leave, in words, with
+/// nothing written: the checks run, and the line a preview shows comes back.
+pub fn describe(
+    store: &Store,
+    clock: &Clock,
+    id: Option<&str>,
+    args: &Map<String, Value>,
+) -> Result<String> {
+    let world = World::load(store)?;
+    let base = match id {
+        Some(id) => find(store, id)?.as_object().cloned().unwrap_or_default(),
+        None => Map::new(),
+    };
+    let (mut m, writes) = record_from(&world, clock, base, args)?;
+    m.retain(|_, v| !v.is_null());
+    m.entry("id").or_insert_with(|| json!("new"));
+    check(&mut m, &world, clock, &new_ids(&writes))?;
+    Ok(said(&Value::Object(m)))
+}
+
 /// "JPN 101, MWF 10:00 AM to 10:50 AM."
 fn said(record: &Value) -> String {
     match serde_json::from_value::<Commitment>(record.clone()) {

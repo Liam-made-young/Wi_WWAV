@@ -313,6 +313,8 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             crate::capture::invoke(i, cmd, a)
         }
 
+        "heat.tools.list" | "heat.tools.call" => crate::learn_tools::invoke(i, cmd, a),
+
         // ----- Settings → Claude -----
         "heat.claude.get" => claude::get(i),
         "heat.claude.setTool" => claude::set_tool(i, a),
