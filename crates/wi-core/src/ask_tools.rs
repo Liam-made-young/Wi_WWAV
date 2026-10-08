@@ -92,6 +92,8 @@ pub(crate) struct Tool {
     pub schema: fn() -> Value,
 }
 
+const OUTWARD_NOTE: &str = "Not done. This leaves this Mac, so the person is asked about it on its own and decides. Tell them it is waiting for their answer.";
+
 const STAGED_NOTE: &str = "Staged, not done. Nothing has changed yet: the person sees a preview and applies it with one click.";
 
 fn object(properties: Value, required: &[&str]) -> Value {
@@ -390,6 +392,39 @@ pub(crate) const TOOLS: &[Tool] = &[
             }},
             "rows": {"type": "array", "maxItems": 500, "items": values_schema("One row's cells.")}
         }), &["name", "columns"]),
+    },
+    Tool {
+        name: "mail_send",
+        effect: Effect::LeavesThisMac,
+        doing: "Asking to send mail",
+        description: "Write a new mail for the person to send from Learn's Mail. It leaves this Mac, so it is never part of the one-click apply: the person reads the whole mail and is asked about it on its own, every time. Write the mail exactly as it should be sent, in their voice, with no placeholders.",
+        schema: || object(json!({
+            "to": {"type": "string", "description": "The address, or addresses separated by commas."},
+            "cc": {"type": "string"},
+            "subject": {"type": "string"},
+            "body": {"type": "string", "description": "Plain text."},
+            "account": {"type": "string", "description": "Which of their addresses it goes from. Left out: their first."}
+        }), &["to", "subject", "body"]),
+    },
+    Tool {
+        name: "mail_reply",
+        effect: Effect::LeavesThisMac,
+        doing: "Asking to send a reply",
+        description: "Write a reply on a mail thread that is in Learn's Mail. It leaves this Mac, so the person reads the whole reply and is asked about it on its own, every time. Read the thread first (get_row on Mail) so the reply answers what was said.",
+        schema: || object(json!({
+            "thread": {"type": "string", "description": "The Mail row's id."},
+            "body": {"type": "string", "description": "Plain text."}
+        }), &["thread", "body"]),
+    },
+    Tool {
+        name: "mail_file",
+        effect: Effect::LeavesThisMac,
+        doing: "Asking to change a thread",
+        description: "Archive a mail thread, bring it back to the inbox, or mark it read or unread. This changes their mailbox, which is not on this Mac, so the person is asked about each one, every time.",
+        schema: || object(json!({
+            "thread": {"type": "string", "description": "The Mail row's id."},
+            "action": {"type": "string", "enum": ["archive", "unarchive", "mark_read", "mark_unread"]}
+        }), &["thread", "action"]),
     },
     Tool {
         name: "make_public",
@@ -1081,6 +1116,104 @@ pub(crate) fn call(i: &Inner, run: &Run, name: &str, args: &Value) -> Result<Val
         }
 
         // ----- leaving this Mac: asked about one by one -----
+        "mail_send" => {
+            let (to, subject, body) = (
+                text(args, "to")?,
+                text(args, "subject")?,
+                text(args, "body")?,
+            );
+            let mut mail = json!({"to": to, "subject": subject, "body": body});
+            let mut line = format!("Send this mail?\nTo: {to}\n");
+            if let Some(cc) = args["cc"].as_str().filter(|c| !c.trim().is_empty()) {
+                mail["cc"] = json!(cc);
+                line.push_str(&format!("Cc: {cc}\n"));
+            }
+            if let Some(account) = args["account"].as_str().filter(|c| !c.trim().is_empty()) {
+                mail["account"] = json!(account);
+                line.push_str(&format!("From: {account}\n"));
+            }
+            line.push_str(&format!("Subject: {subject}\n\n{body}"));
+            lock(&run.outward).push(Staged {
+                cmd: "heat.mail.send".into(),
+                args: mail,
+                line: line.clone(),
+                counts: Vec::new(),
+                makes: Vec::new(),
+            });
+            Ok(json!({"asked": true, "preview": [line], "note": OUTWARD_NOTE}))
+        }
+        "mail_reply" | "mail_file" => {
+            let row = text(args, "thread")?;
+            // The Mail row names the thread as Gmail does: that is what Mail's commands take.
+            let found = invoke(
+                i,
+                "db.query",
+                &json!({"table": "mailThread", "spec": {"rows": [row]}}),
+            )
+            .map_err(said)?;
+            let thread = db::rows_as_objects(
+                &found,
+                Some(&[
+                    "Gmail thread".to_string(),
+                    "Subject".to_string(),
+                    "From".to_string(),
+                ]),
+            )
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                format!(
+                    "Mail has no row with the id '{row}'. Find the thread with list_rows on Mail."
+                )
+            })?;
+            let gmail = thread["Gmail thread"]
+                .as_str()
+                .ok_or("That row has no thread to act on.")?;
+            let subject = thread["Subject"].as_str().unwrap_or("(no subject)");
+            let (cmd, send, line) = if name == "mail_reply" {
+                let body = text(args, "body")?;
+                let from = thread["From"].as_str().unwrap_or("");
+                (
+                    "heat.mail.reply",
+                    json!({"threadId": gmail, "body": body}),
+                    format!("Send this reply?\nTo: {from}\nSubject: Re: {subject}\n\n{body}"),
+                )
+            } else {
+                match text(args, "action")? {
+                    "archive" => (
+                        "heat.mail.archive",
+                        json!({"threadId": gmail, "archived": true}),
+                        format!("Archive '{subject}' in your mailbox?"),
+                    ),
+                    "unarchive" => (
+                        "heat.mail.archive",
+                        json!({"threadId": gmail, "archived": false}),
+                        format!("Move '{subject}' back to the inbox in your mailbox?"),
+                    ),
+                    "mark_read" => (
+                        "heat.mail.mark",
+                        json!({"threadId": gmail, "unread": false}),
+                        format!("Mark '{subject}' read in your mailbox?"),
+                    ),
+                    "mark_unread" => (
+                        "heat.mail.mark",
+                        json!({"threadId": gmail, "unread": true}),
+                        format!("Mark '{subject}' unread in your mailbox?"),
+                    ),
+                    other => return Err(format!(
+                        "Mail can archive, unarchive, mark_read and mark_unread, not '{other}'."
+                    )),
+                }
+            };
+            lock(&run.outward).push(Staged {
+                cmd: cmd.into(),
+                args: send,
+                line: line.clone(),
+                counts: Vec::new(),
+                makes: Vec::new(),
+            });
+            Ok(json!({"asked": true, "preview": [line], "note": OUTWARD_NOTE}))
+        }
         "make_public" => {
             let (table, id) = (text(args, "table")?, text(args, "id")?);
             let public = args["public"]
@@ -1104,9 +1237,7 @@ pub(crate) fn call(i: &Inner, run: &Run, name: &str, args: &Value) -> Result<Val
                 counts: Vec::new(),
                 makes: Vec::new(),
             });
-            Ok(
-                json!({"asked": true, "preview": [line], "note": "Not done. This leaves this Mac, so the person is asked about it on its own and decides. Tell them it is waiting for their answer."}),
-            )
+            Ok(json!({"asked": true, "preview": [line], "note": OUTWARD_NOTE}))
         }
         other => Err(format!("There is no tool called '{other}'.")),
     }

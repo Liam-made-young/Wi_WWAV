@@ -96,6 +96,17 @@ const scenarios = {
     await tool('update_rows', { table: 'Tasks', changes: [{ id, set: { Due: '2026-10-08' } }] });
     return JSON.stringify([first.error, second.error, third.error]);
   },
+  // Mail leaves this Mac: a reply, a thread filed and a new mail, each asked about on its own.
+  async mail() {
+    const threads = await tool('list_rows', { table: 'Mail', columns: ['Subject', 'From'] });
+    const id = threads.rows[0].id;
+    const out = { row: await tool('get_row', { table: 'Mail', id }) };
+    out.reply = await tool('mail_reply', { thread: id, body: 'Thank you.\nI will be there at 2.' });
+    out.filed = await tool('mail_file', { thread: id, action: 'archive' });
+    out.sent = await tool('mail_send', { to: 'p@uri.edu', subject: 'Office hours', body: 'Could we meet Tuesday?' });
+    out.missing = await tool('mail_reply', { thread: 'nope', body: 'x' });
+    return JSON.stringify(out);
+  },
   async public() {
     const found = await tool('search', { query: 'essay' });
     const asked = await tool('make_public', { table: 'Tasks', id: found.results[0].id, public: true });
@@ -174,6 +185,7 @@ let request = '';
 process.stdin.setEncoding('utf8');
 for await (const chunk of process.stdin) request += chunk;
 const tag = /#([a-z-]+)\s*$/.exec(request.trim())?.[1] ?? 'plain';
-await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'fake-claude', version: '0' } });
+// A run with no tools of the core's (Mail's own worker, say) has nobody to greet.
+if (server.url) await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'fake-claude', version: '0' } });
 const result = await scenarios[tag](request);
 console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result, num_turns: 2 }));

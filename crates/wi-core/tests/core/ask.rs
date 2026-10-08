@@ -450,6 +450,100 @@ fn what_leaves_this_mac_waits_for_its_own_click_every_time() {
 }
 
 #[test]
+fn mail_is_shown_whole_and_goes_only_on_its_own_yes() {
+    let setup = Setup::new();
+    let core = asking_core(&setup, None);
+    snap(&core, "2026-10-07");
+    // A thread as Claude records it when it reads mail.
+    {
+        let mut store = wi_store::Store::open(&setup.library()).unwrap();
+        let clock = wi_heat_store::Clock::system();
+        let thread = json!({"thread_id": "g-thread-1", "subject": "Office hours moved", "from": "Prof Tanaka <p@uri.edu>",
+            "received_at": "2026-10-07T08:00:00-04:00", "state": "nothing", "unread": true, "reason": "Nothing to do."});
+        wi_heat_store::mcp::call(
+            &mut store,
+            &clock,
+            "record_mail_thread",
+            thread.as_object().unwrap(),
+        )
+        .unwrap();
+    }
+    let outbox = |core: &Core| {
+        ok(core, "heat.mail.outbox", json!({}))["actions"]
+            .as_array()
+            .cloned()
+            .unwrap()
+    };
+
+    let r = ask(
+        &core,
+        "reply that I'll be there, archive it, and ask about Tuesday #mail",
+    );
+    let out: Value = serde_json::from_str(r["answer"].as_str().unwrap()).unwrap();
+    assert_eq!(out["row"]["Subject"], "Office hours moved");
+    assert_eq!(
+        out["missing"]["error"],
+        "Mail has no row with the id 'nope'. Find the thread with list_rows on Mail."
+    );
+    assert_eq!(out["reply"]["asked"], true);
+    // Nothing is part of the one-click apply, and each is shown as it will go.
+    assert_eq!(r["change"], Value::Null);
+    let lines: Vec<&str> = r["outward"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| o["line"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        lines,
+        [
+            "Send this reply?\nTo: Prof Tanaka <p@uri.edu>\nSubject: Re: Office hours moved\n\nThank you.\nI will be there at 2.",
+            "Archive 'Office hours moved' in your mailbox?",
+            "Send this mail?\nTo: p@uri.edu\nSubject: Office hours\n\nCould we meet Tuesday?",
+        ]
+    );
+    // Asking sent nothing.
+    assert!(outbox(&core).is_empty());
+    assert!(core.invoke("ask.apply", json!({"id": r["id"]})).is_err());
+    assert!(outbox(&core).is_empty());
+
+    // Yes to the reply, and only the reply goes to the outbox, word for word.
+    ok(
+        &core,
+        "ask.applyOutward",
+        json!({"id": r["id"], "index": 0}),
+    );
+    let sent = outbox(&core);
+    assert_eq!(sent.len(), 1);
+    assert_eq!(
+        (
+            sent[0]["kind"].clone(),
+            sent[0]["threadId"].clone(),
+            sent[0]["body"].clone()
+        ),
+        (
+            json!("reply"),
+            json!("g-thread-1"),
+            json!("Thank you.\nI will be there at 2.")
+        )
+    );
+    // The same yes twice sends once.
+    assert!(core
+        .invoke("ask.applyOutward", json!({"id": r["id"], "index": 0}))
+        .is_err());
+    assert_eq!(outbox(&core).len(), 1);
+    // The new mail is its own yes; the archive, never answered, never happens.
+    ok(
+        &core,
+        "ask.applyOutward",
+        json!({"id": r["id"], "index": 2}),
+    );
+    let kinds: Vec<Value> = outbox(&core).iter().map(|a| a["kind"].clone()).collect();
+    assert_eq!(kinds.len(), 2);
+    assert!(kinds.contains(&json!("send")) && !kinds.contains(&json!("archive")));
+}
+
+#[test]
 fn every_kind_of_change_stages_and_applies_as_one_step() {
     let setup = Setup::new();
     let core = asking_core(&setup, None);
@@ -585,7 +679,7 @@ fn claude_is_given_the_screen_the_tables_and_only_these_tools() {
             .iter()
             .filter(|t| t["effect"] == "leaves this Mac")
             .count(),
-        1
+        4
     );
 }
 
