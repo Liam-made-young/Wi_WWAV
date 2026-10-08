@@ -69,6 +69,9 @@ in the current spec (Decided, Proposed, Open, Exists today).
 
 ## Space: the social view
 
+**Superseded on 8 Oct 2026** by `docs/SPACE.md`: every link is a planet. What
+follows is the old Space.
+
 - **Real 3D is a necessity (Decided)**, with three.js in the web view (WebGPU
   where available, WebGL 2 otherwise). Keep 4.5's "text stays flat" DOM labels.
 - **Keep:** the universe → galaxy → solar system → planet model, the 21-world
