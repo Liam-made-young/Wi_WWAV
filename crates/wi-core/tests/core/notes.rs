@@ -162,7 +162,8 @@ fn what_changes_in_the_folder_reaches_the_library_and_one_undo_takes_it_back() {
             "voltage law: the sum around a loop is zero. #ele",
         );
     std::fs::write(&path, &edited).unwrap();
-    assert_eq!(ok(&core, "heat.note.sync", json!({}))["changed"], 1);
+    // The worker may have seen the edit first: either way it is in the library now.
+    ok(&core, "heat.note.sync", json!({}));
     assert_eq!(
         note(&core, &id)["markdown"],
         "Kirchhoff's voltage law: the sum around a loop is zero. #ele\n"
