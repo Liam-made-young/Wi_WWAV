@@ -4,9 +4,11 @@ import { join } from 'node:path';
 import { CMD, dropFiles, expect, openShell, packSong, plainWav, test } from './kit';
 
 // docs/PLAN.md S1.6 and S1.7 on the UI's side, ⌘K, ⌘⇧N and ⌘L (docs/SPEC.md
-// 2.5, 2.7). What a fail looks like: the palette not finding a task, a
-// clip, a setting or an action, reading a filter as a search word, or
-// letting Return and ⌘Return do the same thing to a song; capture closing
+// 2.5, 2.7; docs/ASK.md). What a fail looks like: the prompt box not finding
+// a task, a clip, a setting or an action as it is typed, reading a filter as
+// a search word, opening a result on Return when none was picked (Return
+// then asks Claude), or letting Return and ⌘Return do the same thing to a
+// picked song; capture closing
 // on Enter or not reading "N in inbox · captured ✓"; the drawer anything
 // but 280 pt, or not over every view; an import that copies before it says
 // what it brings, or a plain WAV that comes in without "master only" being
@@ -44,6 +46,8 @@ test('⌘K finds tasks, clips, settings and actions; filters narrow; the newest 
   await page.keyboard.press(`${CMD}+k`);
   const box = page.getByRole('combobox');
   const results = page.getByRole('listbox', { name: 'Results' });
+  // The first row sends what was typed to Claude; what was found is under it.
+  const found = results.locator('.palette-row:not(.ask-send)');
 
   await box.fill('palette');
   await expect(results.getByRole('option', { name: /Palette quiz/ })).toBeVisible();
@@ -54,21 +58,26 @@ test('⌘K finds tasks, clips, settings and actions; filters narrow; the newest 
   await expect(results.getByRole('option', { name: /Quick capture/ })).toBeVisible();
 
   await box.fill('tag:live-drums key:D-minor bpm:90-95');
-  await expect(results.getByRole('option')).toHaveText([/^Palette Song/]);
+  await expect(found).toHaveText([/^Palette Song/]);
   await box.fill('tag:no-such-tag');
-  await expect(results).toContainText('Nothing here right now.');
+  await expect(results).toContainText('Nothing on this Mac matches.');
   await box.fill('is:hot');
-  await expect(results.getByRole('option')).toContainText(['Palette quiz']);
+  await expect(found).toContainText(['Palette quiz']);
   await box.fill('is:remix');
   await expect(results).toContainText('is:remix finds nothing yet');
 
-  // Return on a song plays it; ⌘Return opens it in its other room.
+  // With nothing picked, Return is for Claude: the first row says so and is the one selected.
   await box.fill('Palette Song');
   await expect(results.getByRole('option', { name: /Palette Song/ })).toBeVisible();
+  await expect(results.locator('.ask-send')).toHaveAttribute('aria-selected', 'true');
+  await expect(results.locator('.ask-send')).toContainText('Palette Song');
+  // ↓ picks the song. Return on it plays it; ⌘Return opens it in its other room.
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press(`${CMD}+Enter`);
   await expect(page.locator('.toast')).toContainText('Console');
   await page.keyboard.press(`${CMD}+k`);
   await expect(results.getByRole('option', { name: /Palette Song/ })).toBeVisible();
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.locator('.strip-title')).toHaveText('Palette Song');
   await page.keyboard.press(' ');

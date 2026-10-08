@@ -43,7 +43,8 @@ import { Grid, type GridHandle } from './Grid';
 const QUIET = new Set([
   'id', 'sourceId', 'claudeReason', 'estBy', 'estReason', 'adjustMin', 'tag', 'link', 'source', 'resultType',
   'resultId', 'triagedAt', 'origin', 'room', 'view', 'public', 'groupKind', 'groupLabel', 'persona', 'hue',
-  'parentTaskId', 'milestoneId', 'group', 'rrule', 'doneAt', 'postedAt', 'order',
+  'parentTaskId', 'milestoneId', 'group', 'rrule', 'doneAt', 'postedAt', 'order', 'typeBy', 'difficultyBy',
+  'syllabusSource', 'file', 'createdAt', 'updatedAt', 'capturedAt', 'noteId',
 ]);
 
 interface Meta {

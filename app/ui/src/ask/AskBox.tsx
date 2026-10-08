@@ -435,7 +435,7 @@ export const AskBox = forwardRef<AskHandle, Props>(function AskBox(
               </div>
             );
           })}
-          {results.length === 0 && why && <p className="palette-empty">{why}</p>}
+          {results.length === 0 && <p className="palette-empty">{why ?? 'Nothing on this Mac matches. Return asks Claude.'}</p>}
         </div>
       ) : (
         <div id="palette-results" className="ask-thread" ref={thread} aria-live="polite" aria-label="Claude’s answers">
