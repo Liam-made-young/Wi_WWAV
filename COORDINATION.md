@@ -1022,3 +1022,38 @@ still prepares a local package, not a live post; AV timeline/3D remain empty.
 
 Liam has redirected work to merging, committing, pushing and building the
 combined app for testing. No new phase starts as part of this integration.
+
+
+## Combined native test build, 8 Oct 2026
+
+Liam requested all completed work merged, committed, pushed and built for
+immediate testing. `codex/integrated-test` starts from Space `b6d4fb9`, which
+already contains combined Focus/Ask/Database/Wiki/Notes `eaec951` and founder
+Space decisions. It merges Console Phase 2 `624c35d` (including Phases 0/1)
+and Rust audio 3a `a0f1150`; all existing local branch commits are ancestors.
+Other worktrees and the audio worktree's untracked, unused `spikes/` remain
+untouched. Coordination and decision-log merges preserve each agent's report.
+
+Combined verification: 981 UI tests passed, one existing skip; 37 Console
+Rust tests; all 11 Console real-core browser tests; audio engine/wire/decode
+tests passed outside the sandbox (shared-memory tests need that permission).
+Production UI build/typecheck and native Tauri debug build succeeded. Bundle
+signatures verify deeply. A separate-Library native launch starts the bundled
+Rust engine successfully; real microphone timing and live Claude still need
+user testing. The pre-existing broad core flaky tests noted above were not
+rerun as part of this focused integration.
+
+`bash tools/build-local-macos.sh` is the repeatable local build entry, with
+`docs/LOCAL_BUILD.md`. It fixes the build hook's UI working directory and
+bundles Rust wwav-engine, wi-mcp and wi-ocr. The legacy unbuilt JUCE scanner
+is omitted locally; the notarized universal release script still needs its
+own Rust migration. Native-architecture debug app, ad-hoc signed, not notarized:
+`~/Library/Developer/wi-wwav-build/target-space/debug/bundle/macos/Wi_WWAV.app`.
+
+The test instance uses `/private/tmp/wi-wwav-native-integration-smoke`, not
+Liam's ordinary Library. The previously open app and installed bundle have
+not been replaced or quit. AV's timeline/recording UI and 3D remain future
+phases; Image/Write are usable now. Console's Space action still prepares
+local packages. The UI bundle remains large (about 552 kB gzip); code splitting
+and cold-launch budgets need a separate performance pass. No new phase is
+started; wait for Liam's next go after this build delivery.
