@@ -52,7 +52,17 @@ pub fn open<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<dyn Core>, CoreError> 
     config.auto_score = true;
     // The app reads mail on its own while it is open (3.10); a test's core doesn't.
     config.background_mail = true;
-    let core = wi_core::Core::open(&paths::library(app.path().audio_dir().ok()), config)?;
+    let library = paths::library(app.path().audio_dir().ok());
+    // Notes are markdown files in a folder beside the library file, and a
+    // photo put in a capture inbox becomes one (docs/NOTES.md). The app may
+    // build the text reader, ask Claude about a page when the person lets
+    // it, and say when it is time to leave for something.
+    config.notes_dir = Some(library.join("Notes"));
+    config.capture_inboxes = wi_core::icloud_capture_inboxes();
+    config.capture_claude = true;
+    config.ocr_build = true;
+    config.leave_notices = true;
+    let core = wi_core::Core::open(&library, config)?;
 
     let (events, meters) = (core.events(), core.meters());
     let to_window = app.clone();

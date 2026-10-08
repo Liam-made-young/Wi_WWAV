@@ -106,6 +106,10 @@ fn main() {
         Arc::new(open_browser),
     );
     config.device = Some("null".into());
+    // Notes are files here too, and the reader is built if it is missing;
+    // the person's own iCloud inboxes are the app's to watch, not this one's.
+    config.notes_dir = Some(args.library.join("Notes"));
+    config.ocr_build = true;
     let core = Core::open(&args.library, config).unwrap_or_else(|e| {
         eprintln!("wi-devbridge: {e}");
         std::process::exit(1)

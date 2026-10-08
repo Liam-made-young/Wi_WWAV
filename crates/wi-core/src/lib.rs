@@ -234,6 +234,30 @@ impl Config {
     }
 }
 
+/// The name of the folder captures are put in (docs/NOTES.md).
+pub const CAPTURE_INBOX: &str = "Wi-WWAV Inbox";
+
+/// The capture inboxes in iCloud Drive, made if iCloud Drive is there: the
+/// one at its top, for the Mac (drag and drop, AirDrop, Continuity Camera),
+/// and the one inside the Shortcuts folder, which is the only place a
+/// shared Shortcut can save to without asking each time. Empty on a Mac
+/// with no iCloud Drive, and anywhere else.
+pub fn icloud_capture_inboxes() -> Vec<PathBuf> {
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+        return Vec::new();
+    };
+    let clouds = home.join("Library/Mobile Documents");
+    [
+        clouds.join("com~apple~CloudDocs"),
+        clouds.join("iCloud~is~workflow~my~workflows/Documents"),
+    ]
+    .into_iter()
+    .filter(|drive| drive.is_dir())
+    .map(|drive| drive.join(CAPTURE_INBOX))
+    .filter(|inbox| std::fs::create_dir_all(inbox).is_ok())
+    .collect()
+}
+
 pub(crate) struct Inner {
     root: PathBuf,
     store: Mutex<Store>,
