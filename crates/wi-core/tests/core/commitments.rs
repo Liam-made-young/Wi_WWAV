@@ -1325,12 +1325,12 @@ fn time_to_leave_is_said_once_when_the_travel_time_starts() {
     assert!(leave(&core).is_empty());
     // 9:36: the 25 minutes of travel have started.
     core.set_now(Some(ny("2026-10-07 09:36")));
-    // Any write wakes the worker; left alone it looks every twenty seconds.
-    ok(
-        &core,
-        "heat.put",
-        json!({"kind": "termBreak", "record": {"title": "Reading day", "from": "2026-12-12"}}),
-    );
+    // A write that syncs wakes the worker; left alone it looks every twenty seconds.
+    let space = records(&snap(&core, DAY), "space")[0]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    add_task(&core, &space, "Pack the bag", json!({}));
     assert!(
         eventually(Duration::from_secs(30), || !leave(&core).is_empty()),
         "it was never time to leave"
