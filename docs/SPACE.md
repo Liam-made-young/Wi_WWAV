@@ -1,6 +1,7 @@
 # Space: every link is a planet
 
-Written 8 Oct 2026 from the founder's brief of that day. Where this file and
+Written 8 Oct 2026 from the founder's brief of that day, and brought up to
+his twelve answers of the same day (section 8). Where this file and
 `docs/SPEC.md` chapter 4, `docs/SCOPE_CUT.md` ("Space: the social view") or
 `docs/PLAN.md` Stage 5 disagree, this file is right and the others are the
 old Space.
@@ -15,7 +16,14 @@ Three labels are used throughout:
 ## 1. What Space is (Decided)
 
 Space is something different from what it was, and new: a space between a
-browser and social media, in 3D, that you explore by moving through it.
+browser and social media, in 3D, that you explore by moving through it. It
+is a search engine, a browser and a social medium wrapped into one. **The
+search engine and the browser are built first.** The social half comes later,
+and there is no posting yet.
+
+**Why that order.** A social medium needs people to get people, and is dull
+when nobody is around. So Space has to be worth using with one person in it,
+the founder, and get more interesting from there.
 
 **The defining rule.** Every link is a planet. That holds for a link posted
 through Wi-WWAV's social side, for a work uploaded straight to the platform,
@@ -28,14 +36,45 @@ YouTube can't be counted: it changes by hundreds of thousands or millions a
 day. So a planet is sized by a rough algorithm, and the algorithm has to be
 clear about how it arrived at a size.
 
+**The scale runs galaxy, sun, planet, moon.** A song is a planet or a sun; a
+service that plays it is a planet or a moon. How each kind of link fits the
+scale is left to the agents to propose (section 2) and to the founder to
+agree to.
+
+**You are an astronaut, seen from your own eyes.** "FPS: first person
+space." You float, and you move. Things may move around you.
+
+**A web page is a planet, and you go into it.** Opening a link doesn't leave
+Space. The page itself, its real HTML, CSS and JavaScript, is enclosed in the
+body. Zoom in and the page grows until it fills the screen, and you read and
+search it like any web page. Zoom out and it falls away into space.
+
 **Search moves you.** A search's results appear as planets, and your view is
-taken to them. The results are not brought to you.
+taken to them. The results are not brought to you. They are also gathered
+where you arrive, if that can be made to work with their staying at home
+(section 4).
 
 **No feed.** Space is searched, not scrolled.
 
-**The big platforms come first,** searchable from inside Space and drawn as
-solar systems, planets and moons. Everything that can be fitted in through an
-embed is fitted in through an embed.
+**It is a desktop.** The old limit of 21 worlds to a solar system came from
+the iPhone and is gone.
+
+**Home** is the founder's own solar system, the one at
+`https://www.mi-wwav.com/summer_26/g/liam-made-young`, for the prototype. It
+also holds the history of where he has travelled, in his orbit.
+
+**Staying signed in.** You can sign in to Spotify, Apple Music and the rest
+inside Space for whole songs, and Space keeps accounts the way Safari and
+Chrome do: signed in to Wi-WWAV, and to every other site once you have signed
+in there once.
+
+**People still have galaxies,** but that is not the next move.
+
+**It is a prototype,** not a live product: it has to work as well as it can
+for one person. Section 12 says what changes for many.
+
+**The big platforms come first,** searchable from inside Space. Everything
+that can be fitted in through an embed is fitted in through an embed.
 
 | Order | Platform | What the founder asked for |
 |---|---|---|
@@ -45,20 +84,45 @@ embed is fitted in through an embed.
 | soon | Wikipedia, Substack | The next two to sweep through |
 | also | RSS blogs, podcasts | Their embeds should work |
 | also | Apple Music | Should work through WebKit |
+| also | The rest of the web | Through a general web search provider, a free one, chosen to suit Space (section 5) |
 | wanted | X | Without paying for its API. No feed. Searchable posts, maybe. See section 6 |
 
 "This will get better and better as we build."
 
-## 2. Words (Proposed)
+## 2. Words, and where each kind of link sits (Proposed)
 
 - **Link**: one canonical address. Two addresses that lead to the same thing
   (a tracking parameter, `youtu.be` and `youtube.com/watch`) are one link.
-- **Body**: what a link is drawn as. Moon, planet or sun is a matter of its
-  size, not of what kind of thing it is.
+- **Body**: what a link is drawn as.
 - **Mass**: how many links a link connects, as an order of magnitude.
-- **Parent**: the bigger link a link orbits. A video orbits its channel, and
-  the channel orbits YouTube.
+- **Parent**: the bigger body a body orbits.
+- **Home**: the one place a body is. A link has one home, however many things
+  point to it.
 - **Native platform**: one Space can search and play by itself (section 5).
+
+The founder left the hierarchy for any one link to be proposed. One rule
+covers every row below: **a galaxy is a place with a search of its own, a
+sun is what gathers things there, a planet is one thing you can open, and a
+moon is a link that hangs off it.**
+
+| Where | Galaxy | Sun | Planet | Moon |
+|---|---|---|---|---|
+| Music, on any service | Music | An artist | A song | Each service's link to that song (YouTube, Spotify, Apple Music, Bandcamp, SoundCloud) |
+| YouTube, what isn't a song | YouTube | A channel | A video | The links in its description |
+| Wikipedia | Wikipedia | Open (question 17) | An article | The outside links it cites |
+| Substack, blogs, feeds | Writing | A publication | A post | The links in the post |
+| Podcasts | Podcasts | A show | An episode | Each service's link to it |
+| The rest of the web | The web | A site | A page | The links on it that lead elsewhere |
+| mi-wwav.com | A person's galaxy | A solar system (an album, a project) | A work | Its forks |
+| X | X | An account | A post | The links in the post |
+
+**Seen from where you stand, each step moves up one.** Arrive at a song and
+it reads as the sun of what it holds, with its services as planets around it.
+That is what "a song is a planet or a sun" means here: its place doesn't
+change, your distance does.
+
+Within a tier, size still comes from mass (section 3): a channel with ten
+thousand videos is a bigger sun than one with ten.
 
 ## 3. How a link gets its size (Proposed)
 
@@ -77,7 +141,7 @@ that the sizing must be rough but clear. This is one way to do that.
    - for any other page, the links found on it when it is fetched, plus the
      links to it that Space already knows;
    - for the native platforms themselves, a short table written by hand, in
-     magnitudes, so YouTube is a sun from the first launch.
+     magnitudes, so YouTube is as big as it should be from the first launch.
 3. **A body can say why it is its size,** in one line: "About 10,000 links:
    12,300 videos on this channel." That line is the clarity the founder asked
    for, and it is shown wherever a body's details are.
@@ -85,63 +149,70 @@ that the sizing must be rough but clear. This is one way to do that.
    nothing else.
 5. **A magnitude moves a whole step or not at all,** so a body doesn't
    flicker between sizes as its count drifts.
-6. **Moon, planet and sun are ranges of magnitude.** Where the lines fall is
-   set by looking at a real sky, not decided here.
-7. **A link orbits the nearest bigger link that holds it:** a video its
-   channel, a channel its platform, an article its wiki, a post its
-   publication, an episode its show.
 
-What gravity does to the person travelling (pulls the camera, slows you
-near a sun, holds orbits together) is Open.
+**Gravity (Decided, answer 3).** It bends and slows the traveller near big
+bodies and holds orbits together. It never moves a body, so a link is in the
+same place for everyone.
 
 ## 4. Search (rule Decided, mechanics Proposed)
 
-Decided: results are planets, and you are moved to them.
+Decided: results are planets, and you are moved to them. Results both stay at
+home and are gathered, if that works.
 
-Proposed:
+Proposed, as the way to have both:
 
-- A result has a home, which is its orbit around its parent. A YouTube search
-  takes you to YouTube's system, and the planets that match are the ones lit.
-- Arriving at a planet opens what it holds, flat and facing you: the
-  platform's embed, drawn as the platform requires (not covered, not hidden,
-  not shrunk below its minimum). Text stays flat, as `docs/SPEC.md` 4.5 said.
-- A song found on several services is one work with a link on each service.
-  Whether that is one planet with a moon per service, or a planet per link,
-  is Open (section 8).
+- Every result keeps its home, which is its orbit around its parent.
+- When the results share a home (a YouTube search, a song and its services),
+  you are flown there and the bodies that match are lit. Home and gathered
+  are the same place.
+- When they are scattered (a web search), you are flown to the home of the
+  best one, and the rest stand around you as beacons: a light and a name in
+  the direction of each one's home. Choosing a beacon flies you there. A
+  beacon is not a second body; the link still has one home.
+- Arriving at a planet and going on in opens it (section 11).
 - Every search is a core command (`space.search`), so Claude can call what a
   person can click.
 
 ## 5. The platforms
 
 The list is Decided. The rest of each row was written from memory on 8 Oct
-2026 and **has not been checked against the platform's current terms**. The
-first agent to build on a row checks it, corrects it here, and dates the
-correction.
+2026 and, except where a row gives a date, **has not been checked against the
+platform's current terms**. The first agent to build on a row checks it,
+corrects it here, and dates the correction.
 
 | Platform | Finding | Playing or reading | A size signal | Needs, and what to check |
 |---|---|---|---|---|
-| YouTube | Data API v3 search | IFrame Player | A channel's video count; a playlist's length | A free API key. The default quota is small: a search costs 100 units of 10,000 a day, so about 100 searches a day for one key until more is granted. The player may refuse to play in a page with no web address of its own, which the app's window is. Prove playback in the Mac app first |
-| Spotify | Web API search, with a registered app | The embed, and its iFrame API | An album's or a playlist's length | Whole songs play only for a listener signed in to Spotify inside that same web view; otherwise a preview. A registered app in development mode serves only a few listeners |
+| YouTube | Data API v3 search | IFrame Player | A channel's video count; a playlist's length | A free API key. The default quota is small: a search costs 100 units of 10,000 a day, so about 100 searches a day for one key until more is granted. **Checked 8 Oct 2026:** the player answers "Error 153" in a WebKit view when the page holding it sends no referrer, which an app's own page does not. The known cure is to hold the player in a page served from a real web address, with `referrerpolicy="strict-origin"` on the frame. Prove it in the Mac app first |
+| Spotify | Web API search, with a registered app | The embed, and its iFrame API | An album's or a playlist's length | Whole songs play only for a listener signed in to Spotify in that same web view; otherwise a preview. A registered app in development mode serves only a few listeners |
 | Apple Music | iTunes Search API, no key | The `embed.music.apple.com` embed | An album's length | Previews unless signed in. Whether signing in and protected playback work in the app's WebKit view is untested |
-| Bandcamp | No public search | Its embedded player, by the id on the album's or track's page | An album's length | Finding has to come from a pasted link or a general web search |
+| Bandcamp | No public search | Its embedded player, by the id on the album's or track's page | An album's length | Finding comes from a pasted link or the general web search |
 | SoundCloud | oEmbed for any link; search needs a registered app | The widget, and its Widget API | A playlist's length | |
-| Wikipedia | Its search, no key | Text, with the reader the Wiki tab already has (`crates/wi-wiki`) | An article's links out and links in: the closest fit to the defining rule | A contact in the User-Agent, which the Wiki tab already sends |
-| Substack | No official API. Every publication has a feed at `/feed` | The post's embed, or the feed's text | Posts in the feed | Finding has to come from a pasted link or a general web search |
-| RSS blogs | The feed's address, found from the page | The item's text | Items in the feed | |
+| Wikipedia | Its search, no key | The page itself, or text with the reader the Wiki tab already has (`crates/wi-wiki`) | An article's links out and links in: the closest fit to the defining rule | A contact in the User-Agent, which the Wiki tab already sends |
+| Substack | No official API. Every publication has a feed at `/feed` | The post's page, or the feed's text | Posts in the feed | Finding comes from a pasted link or the general web search |
+| RSS blogs | The feed's address, found from the page | The item's page or text | Items in the feed | |
 | Podcasts | iTunes Search API (no key), or Podcast Index (free key) | The episode's audio file plays as it is | Episodes in the show | |
 | X | Nothing without paying | The post's embed, by its address, no key | | Section 6 |
 | One song across services | A matching service that takes one link and answers the others, or the recording's ISRC | | | Rate limits and terms |
 
+**The general web search (Decided: one, free, suited to Space. Which one:
+Proposed).**
+
+| Provider | What it is | Cost, checked 8 Oct 2026 | Fit |
+|---|---|---|---|
+| Marginalia Search | An independent, open-source search engine for the small, hand-made, text-first web | Free. A key for non-commercial use is given on request by email; the shared key `public` works at once but is often rate-limited | The proposed general search. It finds the part of the web no platform already covers, which is the part worth exploring, and its code can be run by us if Space grows |
+| Brave Search | An independent index of the whole web | $5 of credit each month, about 1,000 searches, then $5 per 1,000. A card is required even to use the credit. The older no-card free plan is closed to new accounts | The proposed finder for what Marginalia leaves out on purpose: a Bandcamp album, a Substack post, a post on X. Free only while under the credit, and only if a card on file is acceptable (question 20) |
+
 ## 6. X, without paying for its API (Open)
 
 What is free: showing any post whose address you have, through X's own
-embed. What is not free: searching or reading posts through the API.
+embed, and opening x.com itself as a page (section 11), signed in as
+yourself. What is not free: searching or reading posts through the API.
 
 | Way | What you get | What it costs |
 |---|---|---|
-| A. Links only | Any X link put into Space is a planet that opens as the post's embed. Space's search finds the posts Space has been given | Nothing. No discovery of posts nobody has brought in |
-| B. A web search kept to x.com | Posts found by a general search engine's API, each opened through the embed | A search provider's free allowance; results are partial and late |
-| C. X in its own web view | The real site, signed in as the person, in a browser pane. Space reads nothing from it | Nothing. It is a browser, not a search |
+| A. Links only | Any X link put into Space is a planet that opens as the post. Space's search finds the posts Space has been given | Nothing. No discovery of posts nobody has brought in |
+| B. The general web search, kept to x.com | Posts found by the search provider, each opened as the post | The provider's allowance; results are partial and late |
+| C. X as a page | The real site, signed in as the person, as a body you go into. Space reads nothing from it | Nothing. It is browsing, not searching |
 | Not recommended | Scraping the site or a mirror of it | Breaks often, is against X's terms, and risks the person's account |
 
 Recommended: A and C first, B as a trial. Bluesky and Mastodon have open
@@ -157,42 +228,64 @@ work published to mi-wwav.com. What is in the repository from it is a frame
 model beside it (`app/ui/src/space/model/`), and the mock server's `/api/v2`
 routes (`tools/mock-server/routes/space.js`).
 
-Proposed to keep, because the new Space needs the same things:
+Kept, because the new Space needs the same things (Proposed):
 
-- the sky in three.js with flat labels over it, drawn only when something
-  changes;
+- the sky in three.js with flat labels over it;
 - placement from a stable hash, so a link sits in the same place on every
   machine (the hash is of the link, where it was of an id);
 - the orbit, Kepler, camera, label and hit-testing maths;
 - the stem gesture (`app/ui/src/shared/stems/gesture.ts`) for works that come
   apart;
 - works published to mi-wwav.com: each is a link like any other, so each is a
-  planet, and a fork is a link between two of them.
+  planet, and a fork is a link between two of them. The founder's galaxy read
+  from `/api/v2/galaxies/liam-made-young` is home (section 1).
 
-Open, because the brief doesn't say (section 8): people's galaxies, the
-21-world cap, suns as a person's page and letters, Newest and "Since you last
-looked" (which are close to a feed), and the Stage 5 milestones as written.
+Gone (Decided): the 21-world cap, and with it the refusal sentence and
+milestone S5.4. The rule that nothing moves while nothing plays, and the
+drawing only on a change that kept it: you move now, so the sky is drawn as
+you do.
+
+Set aside with the social half, not deleted (follows from answers 4 and 11):
+Newest and "Since you last looked", lineage links and their consent, letters
+on a sun, Add and Add galaxy, the message door. The other Stage 5 milestones
+are the old Space's and are not targets.
 
 Don't delete old model code until what replaces it is in and the founder has
 seen it. A test goes in the same commit as the code it tests, with a line
 saying why.
 
-## 8. Open questions for the founder
+## 8. Questions
+
+### Answered by the founder, 8 Oct 2026
+
+| # | Question | His answer |
+|---|---|---|
+| 1 | Do results stay in their home orbit, lit, or get gathered where you arrive? | "Both if u think that works." Section 4 proposes how |
+| 2 | A song on four services: one planet with four moons, or four planets? | A song is a planet or sun, a playback service is a planet or moon. The scale is galaxy, sun, planet, moon. The hierarchy for any one link is left to be proposed (section 2) |
+| 3 | What does gravity do to the traveller? | As proposed: it bends and slows the camera near big bodies and holds orbits, and never moves a body |
+| 4 | Do people still have galaxies? | Yes, but not the most important move yet. Search engine and browser first. Maybe whole web pages enclosed in planets |
+| 5 | Does the 21-world cap still apply? | No. "Mega defunct." This is a desktop, not an iPhone |
+| 6 | A link with no embed: open the real page? | Yes, as a 3D view of the page: the page is shown as a moon, planet or sun; zoom in until it fills the screen, zoom out into space |
+| 7 | May Space use a general web search provider? | Yes, and first. A cool one that suits this software, and free |
+| 8 | Whose API keys? | It is a prototype for one person. Make it work as well as it can for him, and say in a doc where it changes for scale (section 12) |
+| 9 | Signing in inside the app's web view for whole songs? | Yes. And account management like Safari's or Chrome's: signed in to Wi-WWAV and to every other site after signing in once |
+| 10 | Does "nothing moves while nothing plays" still hold? | No. The app is the first-person view of an astronaut floating in space; movement is fine |
+| 11 | Is posting a link placing a planet? | Not yet. Browser and search engine for now; no posting |
+| 12 | What is in the sky before you have searched? | His own solar system as home, taken from mi-wwav.com, and the history of where he has travelled, in his orbit |
+
+### New, from those answers (Open)
 
 | # | Question | Recommendation |
 |---|---|---|
-| 1 | Does a result stay in its home orbit and get lit, or are results gathered in front of you where you arrive? | Home orbit, lit. A place you can go back to is what makes it a space and not a results page |
-| 2 | A song on four services: one planet with four moons, or four planets? | One planet for the work, a moon per service. Each link is still a body |
-| 3 | What does gravity do to the traveller? | It bends and slows the camera near big bodies and holds orbits. It never moves a body, so the sky stays the same for everyone |
-| 4 | Do people still have galaxies? Where does a person's page and public Learn view live? | Undecided. A person could be a link too: their page is a body that grows with what they have posted |
-| 5 | Does the 21-world cap still apply to anything? | Drop it. A channel has thousands of videos |
-| 6 | A link with no embed: does Space open the real page in a browser pane? | Yes. That is the browser half of "between a browser and social media" |
-| 7 | Bandcamp, Substack and X have no search of their own that Space can use. May Space use a general web search provider? | Yes, on a free allowance, with the provider named in Settings |
-| 8 | Whose API keys? One key bundled with the app shares one quota among everyone (about 100 YouTube searches a day) | The founder's own keys in the Keychain while it is "for myself first"; later, searches go through the server, which caches them |
-| 9 | Signing in to Spotify or Apple Music inside the app's web view, for whole songs: acceptable? | Try it in the first spike and decide on what it shows |
-| 10 | The old rule that nothing moves while nothing plays: does it hold now that you travel? | The sky is still when you are; it moves when you move |
-| 11 | Posting through the social side: is posting a link the same as placing a planet, and whose orbit is it in? | Undecided |
-| 12 | What is in the sky before you have searched anything? | The native platforms as suns and a few thousand well-known sites. Everything else appears when it is found |
+| 13 | His galaxy on mi-wwav.com has two solar systems: "listen to this when the world is ending" (24 worlds) and "Miscellaneous" (5). Is home the whole galaxy, or one of them? | The whole galaxy, starting beside the first |
+| 14 | Travel history "in my orbit": does every place visited leave a mark around home, or only what he chooses to keep? Does the link itself move there? | Every visit leaves a mark in an outer ring; keeping one pulls it closer. A mark is a way back to the body's home, not the body, so a link still has one home |
+| 15 | A song's YouTube video has two possible homes: with the song, as its moon, or with its channel in YouTube's galaxy. Which? | With the song. From the channel it shows as a beacon |
+| 16 | Is Music its own galaxy with artists as suns (section 2), or does a song live inside one service's galaxy? And where is an album? | Its own galaxy. An album is the group of its songs around the artist, drawn as one ring |
+| 17 | The web and Wikipedia are webs, not trees: a page is linked from many bigger pages. What is its one parent? | For a site, its address: site, then section, then page. For Wikipedia, undecided: its broadest category is one candidate |
+| 18 | Flying: keys and mouse as in a game, or the trackpad? And once a page fills the screen, scrolling and typing belong to the page, so what leaves it? | Both ways to fly. Inside a page, pinch out or Esc pushes off; plain scrolling and typing are the page's |
+| 19 | A real page can be live only when it faces you up close; from afar it is a picture of itself on the body (section 11). And one page live at a time in the prototype. Acceptable? | Yes for the prototype |
+| 20 | "Free" for the search provider: is a card on file acceptable when the monthly credit covers the use (Brave), or must it be free with no card (Marginalia only)? | Marginalia now. Add Brave only if finding Bandcamp, Substack and X posts proves too thin |
+| 21 | How much of a browser in the prototype: back and forward, downloads, pop-ups, blocking ads, filling passwords? | Back, forward and staying signed in. The rest later |
 
 ## 9. Protocol for any Claude or Codex instance working on Space
 
@@ -229,55 +322,121 @@ saying why.
 7. Before editing, write under the Space section of the shared
    `COORDINATION.md` the piece you are taking and the files you expect to
    touch. Don't edit a file another section claims: write a request under
-   that section and work around it.
+   that section and work around it. If the Space section is missing from the
+   shared file, another agent's rewrite dropped it: put it back from your
+   branch's copy and leave everything else as you found it.
 8. In shared files (`crates/wi-core/src/lib.rs`, the shell, the schema,
-   `docs/COMMANDS.md`): add, don't rename or remove, and list each addition
-   in the Space section.
+   `docs/COMMANDS.md`, `app/src-tauri/`): add, don't rename or remove, and
+   list each addition in the Space section.
 
 **Rules of the build**
 
 9. Everything a person can do in Space is a core command (`space.*`), so
    Claude can call it and ⌘Z can undo it.
 10. No key, token or cookie in the repository or in the web bundle. Keys live
-    in the Keychain, as the calendar addresses do.
+    in the Keychain, as the calendar addresses do. What a person is signed in
+    to, and where they have travelled, stays on their Mac.
 11. Before building on a platform, check its current terms and limits, and
     correct its row in section 5 with the date. Draw an embed the way its
     platform requires.
 12. No scraping behind a sign-in, and no paid API, without the founder's
     word.
-13. Only the founder makes something Decided. What you choose while building
+13. It is a prototype for one person. Where you build something that only
+    works for one, add its row to section 12.
+14. Only the founder makes something Decided. What you choose while building
     goes in `docs/DECISIONS.md`; what you can't choose goes in section 8.
 
 **Checking and handing over**
 
-14. Run what covers your change and say what you ran. From `app/ui`:
+15. Run what covers your change and say what you ran. From `app/ui`:
     `npx vitest run src/space`. From `tools/mock-server`:
     `node --test test/space.test.js`. On 8 Oct 2026 these passed 119 and 22
     (at `8f4ea3a`). Failing tests that are not Space's are listed in
     `COORDINATION.md`.
-15. In a browser, use installed Chrome (`channel: 'chrome'`); Playwright's
+16. In a browser, use installed Chrome (`channel: 'chrome'`); Playwright's
     own browser is not installed. Check a port with `lsof` before using it,
-    and never stop a server you did not start.
-16. Commit after every piece of work and push your branch. `main` moves by a
+    and never stop a server you did not start. What depends on the Mac app's
+    WebKit view (embeds, sign-in, pages) is proved in the Mac app, not in
+    Chrome.
+17. Commit after every piece of work and push your branch. `main` moves by a
     pull request the founder merges; an agent's push to `main` is refused.
-17. Don't install a build over the app on this Mac unless asked. If asked,
+18. Don't install a build over the app on this Mac unless asked. If asked,
     build from a branch that holds everything in `claude/focus-ask-notes`, or
     the Focus layout, the prompt box, Database, Wiki, commitments and notes go
     away.
-18. When you stop, bring the Space section of `COORDINATION.md` up to date
+19. When you stop, bring the Space section of `COORDINATION.md` up to date
     (what is built, what is not, requests), and copy the shared file into
     your branch with your last commit.
 
 ## 10. A first order of work (Proposed)
 
-1. **Prove the embeds in the Mac app.** A YouTube video, a Spotify song and
-   an Apple Music song each playing inside the installed app's window. If
-   YouTube refuses the app's page, find what page it accepts. Everything else
-   rests on this.
-2. **YouTube search to planets.** `space.search`, results as bodies around
-   their channels, the camera taken to them, arriving opens the player.
-3. **Mass and parents,** with YouTube channels and Wikipedia articles, which
+Nothing here is started. The founder is still deciding (section 8).
+
+1. **Prove the web views in the Mac app.** A YouTube video, a Spotify song
+   and an Apple Music song each playing inside the installed app; a real page
+   (Wikipedia, then x.com) opened as a web view of its own; signing in once
+   and still being signed in after a restart. Everything else rests on this.
+2. **Home and flight.** The founder's galaxy from mi-wwav.com as the place
+   you start, and moving through it in first person.
+3. **YouTube search to planets.** `space.search`, results as bodies around
+   their channels, the flight to them, going in opens the player.
+4. **A page as a planet.** The picture from afar, the live page up close, and
+   the way out.
+5. **Mass and parents,** with YouTube channels and Wikipedia articles, which
    both give a count for nothing.
-4. **One song, every service.**
-5. **Wikipedia, feeds and podcasts, Substack.**
-6. **X, by link.**
+6. **One song, every service.**
+7. **The general web search,** then Wikipedia, feeds and podcasts, Substack.
+8. **The history of where you have been,** around home.
+9. **X, by link and as a page.**
+
+## 11. A page inside a planet: how (Proposed)
+
+Decided: a page is a body, with its real HTML, CSS and JavaScript; zoom in
+until it fills the screen, zoom out into space; and you stay signed in.
+
+What follows was written from memory on 8 Oct 2026 and is unchecked except
+where dated. Step 1 of section 10 is there to check it.
+
+- **Most sites refuse to be drawn inside another page.** YouTube's, Google's
+  and X's own pages can't be put in a frame in Space's window. So a real page
+  needs a web view of its own, which the Mac app can open beside its main one
+  (in Tauri this is still marked unstable).
+- **A web view is a flat rectangle.** It can't be wrapped around a sphere or
+  sit behind other bodies. So a body has two states: from afar it is a
+  sphere in the sky wearing a picture of its page; as you close in and it
+  turns to face you, the picture gives way to the live page, which grows
+  until it fills the screen. Zooming out does the reverse.
+- **Embeds are pages too.** A platform's embed address can be the whole page
+  of a web view. That matters for signing in: WebKit keeps a site's cookies
+  from a frame inside someone else's page, so a Spotify embed framed in
+  Space's own window would not know you are signed in to Spotify. As the top
+  page of its own web view it does.
+- **One store of sign-ins for every Space web view,** kept on the Mac and
+  surviving restarts, gives "sign in once, signed in everywhere". Filling in
+  saved passwords, as Safari does, is a separate piece and is not in the
+  prototype.
+- **Google may refuse to sign in inside an app's web view.** YouTube plays
+  without signing in, so this blocks nothing at first.
+- **Live pages are heavy.** The prototype keeps one live and the rest as
+  pictures.
+
+## 12. The prototype, and what changes at scale
+
+Decided: build for the founder as the only user, and say here where that
+stops being enough. Agents add a row when they build something that only
+works for one.
+
+| Piece | For one person, now | For many |
+|---|---|---|
+| API keys (YouTube, Spotify, search) | His own keys, in the Keychain on his Mac | The server holds the keys, makes the searches and caches them. Nobody's key ships in the app |
+| YouTube's quota | About 100 searches a day is enough | A cache in front of it, and a request to YouTube for more, which they audit |
+| Spotify's app | Development mode, a handful of listeners | Their review for wider access |
+| The general web search | A free non-commercial key | A commercial agreement or paid plan, or running the open-source engine ourselves |
+| Mass and the link graph | Worked out on his Mac from what he has seen | Worked out on the server, so everyone sees the same sky |
+| Home | Fixed to `liam-made-young` | Each person's own galaxy |
+| Travel history | A file on his Mac | Still private to each person; sent nowhere unless they choose |
+| Sign-ins | Cookies in the app's own store on his Mac | The same, never sent anywhere; several people on one Mac need profiles; filling passwords |
+| The page that holds an embed | Whatever real address makes the players accept it | A fixed address on wi-wwav.com that the platforms can be told about |
+| Platform terms | Personal use | Each platform's terms for a product given to others, read before release |
+| Where a page takes you | He chooses where to go | Blocking of harmful pages, pop-ups, and what is shown to whom |
+| The Mac's WebKit | The only target | Windows draws pages with a different engine; every web-view rule here is re-proved there |
