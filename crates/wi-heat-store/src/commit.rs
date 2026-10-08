@@ -369,6 +369,9 @@ pub(crate) fn check_break(m: &mut Map<String, Value>) -> Result<()> {
 
 // ----- writing one commitment -----
 
+/// Records to write beside a commitment: a stub course, and its term.
+type Writes = Vec<(&'static str, Value)>;
+
 /// The course a commitment names by its code: its id, and what has to be
 /// written for it to exist. A class naming a course Learn doesn't hold makes
 /// a stub, as a sync does.
@@ -417,7 +420,7 @@ fn record_from(
     clock: &Clock,
     base: Map<String, Value>,
     args: &Map<String, Value>,
-) -> Result<(Map<String, Value>, Vec<(&'static str, Value)>)> {
+) -> Result<(Map<String, Value>, Writes)> {
     let mut m = base;
     let mut writes = Vec::new();
     const PLAIN: [&str; 14] = [
@@ -888,11 +891,17 @@ fn item_course(world: &World, item: &Item) -> Option<String> {
     if let Some(c) = item.course.as_deref().filter(|c| !c.trim().is_empty()) {
         return Some(c.trim().to_string());
     }
-    if item.kind != Kind::Class {
+    // A class is its course; so is anything a calendar names by a course's
+    // code alone, or by an offering's full name.
+    if !matches!(item.kind, Kind::Class | Kind::Other) {
         return None;
     }
     let pattern = &school_of(world).course_pattern;
-    offering_in(pattern, &item.title.to_uppercase()).map(|o| o.code)
+    offering_in(pattern, &item.title.to_uppercase())
+        .filter(|o| {
+            item.kind == Kind::Class || o.is_whole() || squash(&o.code) == squash(&item.title)
+        })
+        .map(|o| o.code)
 }
 
 /// The same thing at the same time: a schedule applied twice adds nothing.
@@ -1005,6 +1014,9 @@ fn preview(store: &Store, world: &World, clock: &Clock, draft: &Value) -> Result
                 }
             }
         }
+        if code.is_some() {
+            args.insert("kind".into(), json!("class"));
+        }
         let (mut m, _) = record_from(world, clock, Map::new(), &args)?;
         m.insert("id".into(), json!(ulid()));
         check(&mut m, world, clock, &new_ids(&courses))?;
@@ -1100,13 +1112,17 @@ fn draft_shown(store: &Store, world: &World, clock: &Clock, draft: &Value) -> Re
             })
         })
         .collect();
-    let new_items: Vec<Item> =
-        typed::<Item>(draft["items"].as_array().map_or(&[][..], Vec::as_slice))
-            .into_iter()
-            .zip(&p.records)
-            .filter(|(_, (_, is_new, _))| *is_new)
-            .map(|(i, _)| i)
-            .collect();
+    // Counted by what each will be kept as: a calendar's event named for a
+    // course is a class.
+    let new_items: Vec<Item> = p
+        .records
+        .iter()
+        .filter(|(_, is_new, _)| *is_new)
+        .map(|(r, _, _)| Item {
+            kind: r["kind"].as_str().and_then(Kind::parse).unwrap_or_default(),
+            ..Item::default()
+        })
+        .collect();
     let new_breaks = p.breaks.iter().filter(|(_, n)| *n).count();
     let mut line = format!("{}.", rules::count_line(&new_items, new_breaks));
     let already = p.records.iter().filter(|(_, n, _)| !*n).count() + p.breaks.len() - new_breaks;
@@ -1519,17 +1535,12 @@ pub fn for_snapshot(
     let fixed = world.fixed.clone();
     let date = snap["date"].as_str().unwrap_or_default().to_string();
     let today = clock.today();
-    let lo = if date.as_str() < from {
-        date.as_str()
-    } else {
-        from
-    };
-    let hi = if date.as_str() > to {
-        date.as_str()
-    } else {
-        to
-    };
-    let occurrences = fixed.occurrences(clock, lo, hi);
+    // The window's days, and the snapshot's own day when it lies outside.
+    let outside = date.as_str() < from || date.as_str() > to;
+    let mut occurrences = fixed.occurrences(clock, from, to);
+    if outside {
+        occurrences.extend(fixed.occurrences(clock, &date, &date));
+    }
     let labels: BTreeMap<&str, Value> = fixed
         .commitments
         .iter()
@@ -1567,20 +1578,20 @@ pub fn for_snapshot(
         })
         .collect();
     let now_min = zone::minute_of_day(clock.now_ms, &clock.zone);
-    let next = rules::next_up(&occurrences, &today, now_min);
+    let next = rules::next_up(&fixed.occurrences(clock, &today, &today), &today, now_min);
     let mut conflicts = Vec::new();
-    let mut day = lo.to_string();
-    while day.as_str() <= hi {
-        let blocks: Vec<(String, f64, f64)> = world
-            .blocks
-            .iter()
-            .filter(|b| b.date == day)
-            .map(|b| (b.id.clone(), b.start, b.minutes))
-            .collect();
-        if !blocks.is_empty() {
-            conflicts.extend(rules::conflicts(&blocks, &occurrences, &day));
+    let mut by_day: BTreeMap<&str, Vec<(String, f64, f64)>> = BTreeMap::new();
+    for b in &world.blocks {
+        let inside = b.date.as_str() >= from && b.date.as_str() <= to;
+        if inside || b.date == date {
+            by_day
+                .entry(b.date.as_str())
+                .or_default()
+                .push((b.id.clone(), b.start, b.minutes));
         }
-        day = zone::add_days(&day, 1.0);
+    }
+    for (day, blocks) in &by_day {
+        conflicts.extend(rules::conflicts(blocks, &occurrences, day));
     }
     let mut drafts = Vec::new();
     for d in all(store, kind::COMMITMENT_DRAFT)? {

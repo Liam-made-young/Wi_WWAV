@@ -66,6 +66,16 @@ fn local_only(kind: &str) -> bool {
         "mailState",
         "mailAction",
         "syllabusDraft",
+        // Commitments and what is read toward them stay on this Mac
+        // (docs/COMMITMENTS.md), as does what Learn keeps beside a note.
+        "commitment",
+        "termBreak",
+        "commitmentDraft",
+        "pendingException",
+        "commitmentFeed",
+        "noteSuggestion",
+        "notice",
+        "noteFile",
     ]
     .iter()
     .any(|k| kind.eq_ignore_ascii_case(k))

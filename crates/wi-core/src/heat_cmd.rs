@@ -75,7 +75,9 @@ pub(crate) fn open_heat(i: &Inner) -> Result<(), CoreError> {
         i.bus.emit("heat", json!({"kinds": ["space"]}));
     }
     // A library from before homes and types is brought over, once.
-    crate::homes_cmd::tidy_once(i)
+    crate::homes_cmd::tidy_once(i)?;
+    // And daily notes from before Notes become notes titled with their day.
+    crate::notes_cmd::bring_daily_notes(i)
 }
 
 pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError> {
@@ -102,8 +104,14 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             snap["school"] = school;
             // The mail accounts for Mail's switcher and Settings → Learn (3.10).
             snap["mailAccounts"] = Value::Array(mail::accounts(&store).map_err(core_error)?);
+            // Commitments: each day of the window, what is next, what the day has left.
+            let (from, to) = snapshot::window_of(&clock, &window);
+            wi_heat_store::commit::for_snapshot(&store, &clock, &mut snap, &from, &to)
+                .map_err(core_error)?;
             drop(store);
             crate::mail_cmd::for_snapshot(i, &mut snap)?;
+            // Notes: links, backlinks, the inbox, the capture folders, the quiet notices.
+            crate::notes_cmd::for_snapshot(i, &mut snap)?;
             Ok(snap)
         }
         "heat.whatItWouldTake" => {
@@ -291,6 +299,19 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
         | "heat.task.setType"
         | "heat.task.reapplyDefaults"
         | "heat.tasks.score" => crate::homes_cmd::invoke(i, cmd, a),
+
+        // ----- commitments, free time, notes, the capture inbox -----
+        c if c.starts_with("heat.commitment.")
+            || matches!(c, "heat.planner.freeTime" | "heat.sleep.set") =>
+        {
+            crate::commit_cmd::invoke(i, c, a)
+        }
+        c if c.starts_with("heat.note.") || c == "heat.notice.dismiss" => {
+            crate::notes_cmd::invoke(i, c, a)
+        }
+        "heat.capture.process" | "heat.capture.inbox.add" | "heat.capture.settings.set" => {
+            crate::capture::invoke(i, cmd, a)
+        }
 
         // ----- Settings → Claude -----
         "heat.claude.get" => claude::get(i),

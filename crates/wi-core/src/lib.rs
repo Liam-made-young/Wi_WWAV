@@ -16,14 +16,19 @@
 //! - `heat_cmd`, `calendars`, `claude`, `watch`: Heat's `heat.*` commands,
 //!   its iCal calendars, Settings → Claude, and noticing the MCP helper
 //!   (docs/HEAT.md).
+//! - `commit_cmd`: commitments (docs/COMMITMENTS.md). `notes_cmd`, `capture`
+//!   and `ocr`: notes as files in a folder, and the capture inbox
+//!   (docs/NOTES.md).
 //! - `export`: Export everything (2.9).
 
 mod account;
 mod args;
 mod bus;
 mod calendars;
+mod capture;
 mod claude;
 mod claude_cli;
+mod commit_cmd;
 pub mod engine;
 mod export;
 mod heat;
@@ -34,6 +39,8 @@ mod kv;
 mod library;
 mod mail_cmd;
 mod net;
+mod notes_cmd;
+mod ocr;
 mod player;
 mod settings;
 mod upload;
@@ -174,6 +181,25 @@ pub struct Config {
     /// after a sync, without being asked (homes_cmd.rs). Off unless the app
     /// turns it on: a test's core never starts Claude by itself.
     pub auto_score: bool,
+    /// The folder notes are kept in as markdown files (docs/NOTES.md). None:
+    /// notes are records only, and nothing is written beside the library.
+    /// The app names `Notes` inside the library folder.
+    pub notes_dir: Option<PathBuf>,
+    /// Folders watched for photos and PDFs to capture, besides the one
+    /// inside the notes folder. The app names the two in iCloud Drive.
+    pub capture_inboxes: Vec<PathBuf>,
+    /// Whether a captured page may be sent to Claude: to read what this Mac
+    /// couldn't, to pick where it goes, to suggest tasks. Off unless the app
+    /// says so (and then the person's own switch decides).
+    pub capture_claude: bool,
+    /// `wi-ocr`, the text reader. None: `WI_WWAV_OCR`, else beside the app.
+    pub ocr: Option<PathBuf>,
+    /// Whether the core may build the text reader itself when it finds
+    /// none (ocr.rs). Off unless the app says so.
+    pub ocr_build: bool,
+    /// Whether "time to leave" is said, and subscribed calendars are read
+    /// again, while the app is open. Off unless the app says so.
+    pub leave_notices: bool,
 }
 
 impl Config {
@@ -197,6 +223,12 @@ impl Config {
             claude: None,
             background_mail: false,
             auto_score: false,
+            notes_dir: None,
+            capture_inboxes: Vec::new(),
+            capture_claude: false,
+            ocr: None,
+            ocr_build: false,
+            leave_notices: false,
         }
     }
 }
@@ -215,6 +247,15 @@ pub(crate) struct Inner {
     /// The Claude Code command line, when the config names one.
     claude: Option<PathBuf>,
     auto_score: bool,
+    /// The notes folder, when notes are kept as files.
+    notes_dir: Option<PathBuf>,
+    capture_inboxes: Vec<PathBuf>,
+    capture_claude: bool,
+    ocr_path: Option<PathBuf>,
+    ocr_build: bool,
+    /// What the capture inbox is doing, and what is known of the reader.
+    capture: capture::Capture,
+    ocr: ocr::Ocr,
     /// What Mail's worker has been asked for, and what it is doing.
     mail: mail_cmd::Mailbox,
     /// The journal entries this process made, so the watcher tells the views
@@ -337,6 +378,13 @@ impl Core {
             helper: config.helper.clone(),
             claude: config.claude.clone(),
             auto_score: config.auto_score,
+            notes_dir: config.notes_dir.clone(),
+            capture_inboxes: config.capture_inboxes.clone(),
+            capture_claude: config.capture_claude,
+            ocr_path: config.ocr.clone(),
+            ocr_build: config.ocr_build,
+            capture: capture::Capture::default(),
+            ocr: ocr::Ocr::default(),
             mail: mail_cmd::Mailbox::default(),
             own: Mutex::new(BTreeSet::new()),
             fixed_now: Mutex::new(config.now),
@@ -355,6 +403,8 @@ impl Core {
             calendars::start(&inner),
             homes_cmd::start(&inner),
             mail_cmd::start(&inner, config.background_mail),
+            commit_cmd::start(&inner, config.leave_notices),
+            notes_cmd::start(&inner),
         ];
         Ok(Core { inner, workers })
     }

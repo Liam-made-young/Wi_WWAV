@@ -98,8 +98,6 @@ pub mod kind {
     pub const NOTICE: &str = "notice";
     /// Outside the journal: what the core last saw of a note's file.
     pub const NOTE_FILE: &str = "noteFile";
-    /// Outside the journal: a file from the capture inbox, and the note it became.
-    pub const CAPTURE_FILE: &str = "captureFile";
 }
 
 #[derive(Debug, thiserror::Error)]

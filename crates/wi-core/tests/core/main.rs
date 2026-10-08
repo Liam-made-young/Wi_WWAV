@@ -2,6 +2,7 @@
 //! of docs/PLAN.md, written as what a fail looks like.
 
 mod account;
+mod commitments;
 mod common;
 mod export;
 mod heat;
