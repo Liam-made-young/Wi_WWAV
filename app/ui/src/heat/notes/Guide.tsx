@@ -4,7 +4,7 @@
 // page, the switch for what Claude may read, and whether the reader on this
 // Mac is there.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useHeat } from '../store';
 
 const READER = {
@@ -20,6 +20,12 @@ export function GuideSheet({ onClose }: { onClose(): void }) {
   const capture = snap?.notes?.capture;
   const folders = capture?.folders ?? [];
 
+  const [where, setWhere] = useState<string | null>(null);
+  const getShortcut = async () => {
+    const r = await act(client.pages.shortcut());
+    if (r) setWhere(r.inICloud ? 'It is in iCloud Drive, in Wi-WWAV Inbox.' : `It is at ${r.path}.`);
+  };
+
   const setClaude = async (on: boolean) => {
     if (await act(client.pages.setClaude(on))) await refetch();
   };
@@ -31,8 +37,18 @@ export function GuideSheet({ onClose }: { onClose(): void }) {
       <h3 className="notes-guide-step">On your iPhone or iPad</h3>
       <ol className="notes-guide-list">
         <li>
-          Get the Shortcut. The file is <code>tools/shortcut/Send to Wi-WWAV.shortcut</code>: AirDrop it to your phone or
-          open it from iCloud Drive, then Add Shortcut.
+          Get the Shortcut.{' '}
+          <button type="button" className="gel" data-dense onClick={() => void getShortcut()}>
+            Show the Shortcut
+          </button>{' '}
+          puts it in your capture folder and shows it in the Finder. AirDrop it to your phone, or open it there in
+          Files, then Add Shortcut.
+          {where && (
+            <span className="why" data-text="secondary" role="status">
+              {' '}
+              {where}
+            </span>
+          )}
         </li>
         <li>Take a photo of a page.</li>
         <li>Share, then Send to Wi-WWAV.</li>

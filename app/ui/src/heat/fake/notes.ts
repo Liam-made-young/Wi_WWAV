@@ -525,6 +525,8 @@ register('heat.capture.process', (args, fake) => {
   return args.wait === true ? { notes: [] } : { started: waiting > 0, waiting };
 });
 
+register('heat.capture.shortcut', () => ({ path: '/Users/you/Music/Wi_WWAV/Notes/Send to Wi-WWAV.shortcut', inICloud: false }));
+
 register('heat.capture.settings.set', (args, fake) => {
   extra(fake).capture.claude = args.claude === true;
   fake.emit([]);

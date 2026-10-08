@@ -211,6 +211,7 @@ A box that is a task carries `taskId`, and its `done` is the task's.
 | `heat.capture.process` | `{path?, wait?}` | with `path`, that one file (left where it is unless it is in an inbox); without, everything waiting. `{started, waiting}`, or with `wait` `{notes: [{id, title, line}]}` once it is done |
 | `heat.capture.inbox.add` | `{paths}` or `{name, base64}` | `{added}`: copies files, or a pasted image, into the inbox |
 | `heat.capture.settings.set` | `{claude}` | `{}`: whether a captured page may be sent to Claude |
+| `heat.capture.shortcut` | `{}` | `{path, inICloud}`: writes the "Send to Wi-WWAV" Shortcut (the app carries it) into the capture folder in iCloud Drive, or the notes folder with no iCloud, and shows it in the Finder |
 | `heat.notice.dismiss` | `{id}` | `{}` |
 | `heat.tools.list` | `{}` | `{tools: [{name, mcpName, effect, doing, description, inputSchema}]}` |
 | `heat.tools.call` | `{name, args, stage?}` | a tool that reads or drafts: `{cmd, line, result}`. One that changes: the same, or with `stage` only `{staged: {cmd, args, line}}`, checked and not written |

@@ -51,6 +51,11 @@ const CLAUDE_TIMEOUT: Duration = Duration::from_secs(240);
 /// The largest file the inbox takes.
 const FILE_MAX_BYTES: u64 = 80 * 1024 * 1024;
 
+/// The Shortcut that sends a photo from an iPhone or iPad, as Apple signed
+/// it (tools/shortcut/): the app carries it, so the guide can hand it over.
+const SHORTCUT: &[u8] = include_bytes!("../../../tools/shortcut/Send to Wi-WWAV.shortcut");
+const SHORTCUT_NAME: &str = "Send to Wi-WWAV.shortcut";
+
 /// One capture is read at a time, whoever asked for it.
 static ONE: Mutex<()> = Mutex::new(());
 
@@ -689,6 +694,26 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             i.capture.asked.store(true, Ordering::Relaxed);
             wrote_outside(i, &["notice"]);
             Ok(json!({ "added": added }))
+        }
+        // `heat.capture.shortcut {quiet?}`: puts the "Send to Wi-WWAV"
+        // Shortcut where a phone can open it (the capture inbox in iCloud
+        // Drive, else the notes folder) and shows it in the Finder, to be
+        // AirDropped or opened from Files on the phone.
+        "heat.capture.shortcut" => {
+            let dir = match i.capture_inboxes.first() {
+                Some(inbox) => inbox.clone(),
+                None => notes_cmd::folder(i)?,
+            };
+            std::fs::create_dir_all(&dir)?;
+            let path = dir.join(SHORTCUT_NAME);
+            std::fs::write(&path, SHORTCUT)?;
+            if cfg!(target_os = "macos") && !a.opt_bool("quiet")?.unwrap_or(false) {
+                let _ = std::process::Command::new("/usr/bin/open")
+                    .arg("-R")
+                    .arg(&path)
+                    .spawn();
+            }
+            Ok(json!({"path": path, "inICloud": !i.capture_inboxes.is_empty()}))
         }
         "heat.capture.settings.set" => {
             let on = a.opt_bool("claude")?.ok_or_else(|| {

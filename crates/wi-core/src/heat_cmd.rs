@@ -308,9 +308,10 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
         c if c.starts_with("heat.note.") || c == "heat.notice.dismiss" => {
             crate::notes_cmd::invoke(i, c, a)
         }
-        "heat.capture.process" | "heat.capture.inbox.add" | "heat.capture.settings.set" => {
-            crate::capture::invoke(i, cmd, a)
-        }
+        "heat.capture.process"
+        | "heat.capture.inbox.add"
+        | "heat.capture.settings.set"
+        | "heat.capture.shortcut" => crate::capture::invoke(i, cmd, a),
 
         "heat.tools.list" | "heat.tools.call" => crate::learn_tools::invoke(i, cmd, a),
 

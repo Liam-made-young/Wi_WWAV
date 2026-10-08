@@ -971,6 +971,8 @@ export function heatClient(t: Transport = real) {
       /** Copies files, or a pasted image, into the inbox, where they are read like any other. */
       add: (from: { paths: string[] } | { name: string; base64: string }) => c<{ added: number }>('heat.capture.inbox.add', from),
       setClaude: (on: boolean) => c<Record<string, never>>('heat.capture.settings.set', { claude: on }),
+      /** Puts the "Send to Wi-WWAV" Shortcut where a phone can open it, and shows it in the Finder. */
+      shortcut: () => c<{ path: string; inICloud: boolean }>('heat.capture.shortcut'),
     },
     notices: {
       dismiss: (id: string) => c<Record<string, never>>('heat.notice.dismiss', { id }),

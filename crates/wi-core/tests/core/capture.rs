@@ -521,6 +521,20 @@ fn with_no_reader_the_page_is_still_kept_image_on_top() {
         files(&d.notes.join("attachments")),
         ["2026-10-07-1005-jpn101.png"]
     );
+    // The guide hands over the Shortcut: in the capture folder, where a phone's Files can open it.
+    let handed = ok(&d.core, "heat.capture.shortcut", json!({"quiet": true}));
+    assert_eq!(
+        handed["path"],
+        json!(d.inbox.join("Send to Wi-WWAV.shortcut"))
+    );
+    assert!(
+        std::fs::metadata(d.inbox.join("Send to Wi-WWAV.shortcut"))
+            .unwrap()
+            .len()
+            > 1000
+    );
+    // It is not a capture: the watcher leaves it where it is.
+    assert_eq!(snap(&d.core, DAY)["notes"]["capture"]["waiting"], 0);
     // A file the reader refuses is said once, and left where it is.
     let broken = script(
         setup.dir.path(),

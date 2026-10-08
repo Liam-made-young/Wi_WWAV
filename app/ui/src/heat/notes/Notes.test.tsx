@@ -692,8 +692,11 @@ describe('capture', () => {
     await click(side('Send to Wi-WWAV'));
     const sheet = () => $(rig, '.notes-guide')!;
     expect(sheet().getAttribute('role')).toBe('dialog');
-    expect(text(sheet())).toContain('tools/shortcut/Send to Wi-WWAV.shortcut');
-    expect(text(sheet())).toContain('AirDrop it to your phone or open it from iCloud Drive, then Add Shortcut.');
+    // The app carries the Shortcut: the guide hands it over, and says where it put it.
+    expect(text(sheet())).toContain('AirDrop it to your phone, or open it there in Files, then Add Shortcut.');
+    await click(button(sheet(), 'Show the Shortcut'));
+    expect(called('heat.capture.shortcut')).toHaveLength(1);
+    expect(text(sheet())).toContain('It is at /Users/you/Music/Wi_WWAV/Notes/Send to Wi-WWAV.shortcut.');
     expect($$(sheet(), '.notes-guide-folders code').map((c) => c.textContent)).toEqual([
       '/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Wi-WWAV Inbox',
       '/Users/you/Library/Mobile Documents/com~apple~CloudDocs/Shortcuts/Wi-WWAV Inbox',
