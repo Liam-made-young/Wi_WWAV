@@ -1,231 +1,147 @@
-// The Console's frame (docs/SPEC.md 5.2): the transport, the browser, the
-// arrangement with its OUTPUT row, the inspector and the bottom panel, in
-// metal with DMG screens inside. This build is the frame only: the browser
-// lists the real library and the engine's state is real, and every control
-// the Console stage fills is shown disabled with the sentence that says so,
-// so nothing pretends.
-
-import { useEffect, useRef, useState } from 'react';
-import { call } from '../bridge';
-import { useCoreEvent } from '../shell/hooks';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, CircleHelp, Eye, Library, Plus, Search, Upload, X } from 'lucide-react';
+import { on } from '../bridge';
 import { useCurrentView } from '../shell/useCurrentView';
+import { api, errorText, type Listing, type ToolId, type Workspace } from './client';
+import { CONSOLE_CONTEXT_EVENT, CONSOLE_TOOLS, toolById } from './registry';
+import { Reader } from './Reader';
+import { ClaudePanel, HistoryPanel, IconButton, Modal, NameDialog, type NameSheet } from './Panels';
+import { DocumentWorkspace } from './DocumentWorkspace';
 import './console.css';
 
-const LATER = 'Arrives with the Console stage.';
-
-type Browser = 'library' | 'plugins' | 'takes';
-type Panel = 'editor' | 'chain' | 'mixer';
-
-interface Clip {
-  id: string;
-  kind: string;
-  title: string;
-  artist?: string | null;
-  bpm?: number | null;
-  key?: string | null;
-  duration?: number | null;
-}
-
-interface EngineStatus {
-  state: 'starting' | 'running' | 'restarting' | 'stopped';
-  sampleRate?: number | null;
-  block?: number | null;
-}
-
-const BARS = 32;
+type Panel = { kind: 'history' | 'provenance' | 'reader' | 'claude'; id: string; version?: string } | null;
 
 export function ConsoleView({ active: forced }: { active?: boolean }) {
   const root = useRef<HTMLDivElement>(null);
-  const seen = useCurrentView(root);
-  const active = forced ?? seen;
-  const [browser, setBrowser] = useState<Browser>('library');
-  const [showBrowser, setShowBrowser] = useState(true);
-  const [showInspector, setShowInspector] = useState(true);
-  const [panel, setPanel] = useState<Panel | null>('mixer');
-  const [clips, setClips] = useState<Clip[] | null>(null);
-  const [engine, setEngine] = useState<EngineStatus | null>(null);
+  const current = useCurrentView(root);
+  const active = forced ?? current;
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [library, setLibrary] = useState<Listing | null>(null);
+  const [filtered, setFiltered] = useState<Listing | null>(null);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<ToolId | ''>('');
+  const [libraryOpen, setLibraryOpen] = useState(() => typeof matchMedia === 'undefined' || !matchMedia('(max-width: 760px)').matches);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [panel, setPanel] = useState<Panel>(null);
+  const [nameSheet, setNameSheet] = useState<NameSheet | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState<Record<string, boolean>>({});
+  const importInput = useRef<HTMLInputElement>(null);
+  const serial = useRef(0);
+  const refresh = useCallback(async () => {
+    const n = ++serial.current;
+    try {
+      const [w, l] = await Promise.all([api.workspace(), api.library()]);
+      if (n !== serial.current) return;
+      setWorkspace(w.workspace); setLibrary(l); setError('');
+    } catch (e) { if (n === serial.current) setError(errorText(e)); }
+  }, []);
+  useEffect(() => { if (active) void refresh(); }, [active, refresh]);
+  useEffect(() => on('console', payload => {
+    const event = payload as { command?: string; workspace?: Workspace };
+    if (event.command === 'console.selection' && event.workspace) setWorkspace(event.workspace);
+    else void refresh();
+  }), [refresh]);
+  useEffect(() => { if (!active) { setPanel(null); setNameSheet(null); } }, [active]);
+  useEffect(() => {
+    let live = true;
+    const timer = setTimeout(() => {
+      api.library(filter || undefined, query).then(l => { if (live) setFiltered(l); }, e => { if (live) setError(errorText(e)); });
+    }, 120);
+    return () => { live = false; clearTimeout(timer); };
+  }, [filter, query, library]);
+  const act = async (action: () => Promise<unknown>, said?: string) => {
+    setBusy(true); setError('');
+    try { await action(); await refresh(); if (said) setMessage(said); }
+    catch (e) { setError(errorText(e)); }
+    finally { setBusy(false); }
+  };
+  const selectedTool = workspace?.tool ?? 'write';
+  const selectedId = workspace?.tools[selectedTool]?.active;
+  const selected = library?.documents.find(d => d.id === selectedId);
+  const openClaude = () => { if (selected) setPanel({ kind: 'claude', id: selected.id }); else setMessage('Open a document first.'); };
+  useEffect(() => {
+    if (!active || !workspace) return;
+    window.dispatchEvent(new CustomEvent(CONSOLE_CONTEXT_EVENT, { detail: { tool: selectedTool, documentId: selectedId ?? null, selection: workspace.tools[selectedTool].selection } }));
+  }, [active, workspace, selectedTool, selectedId]);
 
+  // Capture only Console's additions, and leave the enclosing shell's keys
+  // alone whenever another view or overlay owns focus.
   useEffect(() => {
     if (!active) return;
-    call<{ clips: Clip[] }>('library.list', { limit: 200 })
-      .then((r) => setClips(r.clips))
-      .catch(() => setClips([]));
-    call<EngineStatus>('engine.status')
-      .then(setEngine)
-      .catch(() => setEngine(null));
-  }, [active]);
-  useCoreEvent<unknown>('engine.stopped', () => setEngine((e) => (e ? { ...e, state: 'restarting' } : e)));
-  useCoreEvent<unknown>('engine.back', () => call<EngineStatus>('engine.status').then(setEngine).catch(() => {}));
-
-  // ⌥⌘B the browser, ⌘I the inspector, ⌥1–⌥3 the bottom panel; the open
-  // one again closes it (5.2). Only while the Console is the view.
-  useEffect(() => {
-    if (!active) return;
-    const keys = (e: KeyboardEvent) => {
-      if (e.metaKey && e.altKey && e.code === 'KeyB') {
-        setShowBrowser((v) => !v);
-        e.preventDefault();
-      } else if (e.metaKey && !e.altKey && !e.shiftKey && e.code === 'KeyI') {
-        setShowInspector((v) => !v);
-        e.preventDefault();
-      } else if (e.altKey && !e.metaKey && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) {
-        const next = (['editor', 'chain', 'mixer'] as const)[Number(e.code.slice(5)) - 1];
-        setPanel((p) => (p === next ? null : next));
-        e.preventDefault();
-      }
+    const key = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.repeat || busy) return;
+      const target = e.target as HTMLElement;
+      const elsewhere = target !== document.body && target !== document.documentElement && !root.current?.contains(target);
+      if (elsewhere || document.querySelector('.backdrop[data-overlay], .first-launch')) return;
+      const field = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
+      const command = e.metaKey || e.ctrlKey;
+      if (e.key === 'Escape' && (panel || nameSheet)) { setPanel(null); setNameSheet(null); e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (panel || nameSheet) return;
+      if (command && e.code === 'KeyT' && !e.shiftKey && !e.altKey) { openClaude(); }
+      else if (command && e.code === 'KeyS' && !e.altKey) { root.current?.querySelector<HTMLButtonElement>('[data-active="true"] [data-save]')?.click(); }
+      else if (command && e.code === 'KeyZ' && !field && selected && !dirty[selected.id]) { void act(() => api.restore(selected, e.shiftKey)); }
+      else if (!command && !field && !e.altKey && !e.shiftKey && /^[1-4]$/.test(e.key)) { void act(() => api.select(CONSOLE_TOOLS[Number(e.key) - 1].id)); }
+      else return;
+      e.preventDefault(); e.stopImmediatePropagation();
     };
-    window.addEventListener('keydown', keys);
-    return () => window.removeEventListener('keydown', keys);
-  }, [active]);
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  });
 
-  const engineLine = engineText(engine);
-
-  return (
-    <div
-      ref={root}
-      className="console"
-      data-browser={showBrowser}
-      data-inspector={showInspector}
-      data-panel={panel ?? 'none'}
-    >
-      <header className="console-transport metal" aria-label="Transport">
-        <div className="transport-buttons">
-          <button type="button" className="metal-button" disabled title={LATER} aria-label="Return to zero">⏮</button>
-          <button type="button" className="metal-button" disabled title={LATER} aria-label="Play">▶</button>
-          <button type="button" className="metal-button record" disabled title={LATER} aria-label="Record">●</button>
-          <button type="button" className="metal-button" disabled title={LATER} aria-label="Loop">⟲</button>
-        </div>
-        <output className="dmg transport-screen" aria-label="Position, tempo, key and meter">
-          <span>BAR 001.1.000</span>
-          <span>00:00:00:00</span>
-          <span>/ 120.00 BPM</span>
-          <span>— KEY</span>
-          <span>4/4</span>
-        </output>
-        <span className="dmg transport-chip" aria-label="Grid off">GRID ○</span>
-        <output className="dmg transport-engine" aria-label={`Engine: ${engineLine}`} data-state={engine?.state ?? 'none'}>
-          {engineLine}
-        </output>
-      </header>
-
-      {showBrowser && (
-        <nav className="console-browser metal" aria-label="Browser">
-          <div className="segmented" role="tablist">
-            {(['library', 'plugins', 'takes'] as const).map((b) => (
-              <button
-                key={b}
-                type="button"
-                role="tab"
-                aria-selected={browser === b}
-                className={browser === b ? 'selected' : ''}
-                onClick={() => setBrowser(b)}
-              >
-                {b === 'library' ? 'Library' : b === 'plugins' ? 'Plugins' : 'Takes'}
-              </button>
-            ))}
+  const docs = library?.documents ?? [];
+  return <div className="console-studio" ref={root} data-library={libraryOpen} aria-label="Console">
+    <header className="console-topbar">
+      <div className="console-name">Console <span>Studio</span></div>
+      <div className="console-tool-switch" role="tablist" aria-label="Creative tools">
+        {CONSOLE_TOOLS.map(({ id, title, key, Icon }) => <button type="button" role="tab" key={id} aria-selected={selectedTool === id} aria-controls={`console-tool-${id}`} title={`${title} (${key})`} disabled={busy || !workspace} onClick={() => void act(() => api.select(id))}><Icon size={18} /><span>{title}</span></button>)}
+      </div>
+      <div className="console-top-actions">
+        <IconButton label="New document" disabled={!workspace || busy} onClick={() => setNameSheet({ tool: selectedTool })}><Plus size={19} /></IconButton>
+        <IconButton label="Import file" disabled={!workspace || busy} onClick={() => importInput.current?.click()}><Upload size={18} /></IconButton>
+        <IconButton label="Toggle Console Library" aria-pressed={libraryOpen} onClick={() => setLibraryOpen(v => !v)}><Library size={19} /></IconButton>
+      </div>
+      <input ref={importInput} className="console-file-input" type="file" aria-label="Import into Console" accept=".md,.txt,.fountain,.json,.gltf,.obj,.png,.jpg,.jpeg,.webp,.gif,.wav,.wwav,.mp3,.m4a,.ogg,.flac,.mp4,.swav,.webm" onChange={e => { const f = e.target.files?.[0]; if (f) void act(() => api.import(f), 'Imported on this Mac'); e.target.value = ''; }} />
+    </header>
+    <main className="console-workbench">
+      {CONSOLE_TOOLS.map(tool => {
+        const state = workspace?.tools[tool.id];
+        const openDocs = (state?.open ?? []).flatMap(id => docs.find(d => d.id === id) ?? []);
+        return <section key={tool.id} id={`console-tool-${tool.id}`} role="tabpanel" aria-label={tool.title} hidden={selectedTool !== tool.id} inert={selectedTool !== tool.id} className="console-tool">
+          <div className="console-document-tabs" aria-label={`${tool.title} documents`}>
+            {openDocs.map(d => <div key={d.id} className="console-document-tab" data-selected={state?.active === d.id}>
+              <button type="button" aria-pressed={state?.active === d.id} onClick={() => void act(() => api.open(d.id))}>{d.title}{dirty[d.id] ? ' *' : ''}</button>
+              <IconButton label={`Close ${d.title}`} disabled={dirty[d.id] || busy} onClick={() => void act(() => api.close(d.id))}><X size={13} /></IconButton>
+            </div>)}
+            <span className="console-tab-spacer" /><span className="console-tool-label">{tool.title}</span>
           </div>
-          <div className="browser-list">
-            {browser === 'library' && <LibraryList clips={clips} />}
-            {browser === 'plugins' && <p className="empty">Your VST3 and AU plugins appear here once the engine scans them. {LATER}</p>}
-            {browser === 'takes' && <p className="empty">No takes yet. Arm a track and play: what you play is a take.</p>}
-          </div>
-        </nav>
-      )}
-
-      <section className="console-arrangement" aria-label="Arrangement">
-        <div className="ruler" aria-hidden="true">
-          <div className="ruler-head" />
-          <div className="ruler-bars">
-            {Array.from({ length: BARS }, (_, i) => (
-              <span key={i} className="ruler-bar">{i + 1}</span>
-            ))}
-          </div>
-        </div>
-        <div className="lanes">
-          <p className="empty lanes-empty">Drop a .wwav here to make a stem group, or any audio to make a track. {LATER}</p>
-        </div>
-        <div className="output-row" role="row" aria-label="OUTPUT: select it and press Return to export">
-          <div className="track-head">OUTPUT</div>
-          <div className="output-lane dmg">EXPORT · .WWAV · .SWAV · WAV</div>
-        </div>
-      </section>
-
-      {showInspector && (
-        <aside className="console-inspector metal" aria-label="Inspector">
-          <h2 className="inspector-title">Inspector</h2>
-          <p className="empty">Select a clip, a track or a note to see every field of it here.</p>
-        </aside>
-      )}
-
-      {panel && (
-        <section className="console-panel metal" aria-label="Bottom panel">
-          <div className="segmented" role="tablist">
-            {(['editor', 'chain', 'mixer'] as const).map((p, i) => (
-              <button
-                key={p}
-                type="button"
-                role="tab"
-                aria-selected={panel === p}
-                className={panel === p ? 'selected' : ''}
-                onClick={() => setPanel(p)}
-                title={`⌥${i + 1}`}
-              >
-                {p === 'editor' ? 'Editor' : p === 'chain' ? 'Chain' : 'Mixer'}
-              </button>
-            ))}
-          </div>
-          {panel === 'mixer' ? (
-            <div className="mixer">
-              {(['vocals', 'drums', 'other', 'bass'] as const).map((stem) => (
-                <div key={stem} className={`strip stem-${stem}`} aria-label={`${stem} bus`}>
-                  <div className="dmg meter" aria-hidden="true" />
-                  <span className="strip-name">{stem.toUpperCase()}</span>
-                </div>
-              ))}
-              <div className="strip master" aria-label="Master">
-                <div className="dmg meter" aria-hidden="true" />
-                <span className="strip-name">MASTER</span>
-              </div>
-            </div>
-          ) : (
-            <p className="empty">
-              {panel === 'editor'
-                ? 'The piano roll for an instrument clip, or the waveform for an audio clip. '
-                : "The selected track's devices: plugins and the six built-in effects. "}
-              {LATER}
-            </p>
-          )}
-        </section>
-      )}
-    </div>
-  );
-}
-
-function LibraryList({ clips }: { clips: Clip[] | null }) {
-  if (clips === null) return <p className="empty">Reading the library…</p>;
-  if (clips.length === 0) return <p className="empty">Nothing in the library yet. Import a song with File → Import, or drop one on the window.</p>;
-  return (
-    <ul className="clips">
-      {clips.map((c) => (
-        <li key={c.id} className="clip" draggable={false} title={LATER}>
-          <span className="clip-title">{c.title || 'Untitled'}</span>
-          <span className="clip-facts">{[c.kind, c.key, c.bpm ? `${Math.round(c.bpm)} BPM` : null].filter(Boolean).join(' · ')}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function engineText(e: EngineStatus | null): string {
-  if (!e) return 'ENGINE —';
-  switch (e.state) {
-    case 'running':
-      return e.sampleRate ? `${Math.round(e.sampleRate / 100) / 10} KHZ · ${e.block ?? '—'} SMP` : 'ENGINE ON';
-    case 'starting':
-      return 'ENGINE STARTING';
-    case 'restarting':
-      return 'ENGINE RESTARTING';
-    default:
-      return 'ENGINE OFF';
-  }
+          {!state?.active && <div className="console-empty-canvas"><tool.Icon size={40} strokeWidth={1} aria-hidden /><h1>{tool.title}</h1><button type="button" className="console-primary" disabled={!workspace || busy} onClick={() => setNameSheet({ tool: tool.id })}><Plus size={16} /> New document</button></div>}
+          {openDocs.map(d => <DocumentWorkspace key={d.id} document={d} visible={state?.active === d.id && selectedTool === tool.id && active} busy={busy} onDirty={v => setDirty(was => was[d.id] === v ? was : { ...was, [d.id]: v })} onSave={async (base, title, text) => { await api.save(d.id, base, title, text); await refresh(); setMessage('Version saved'); }} onError={setError} onPanel={kind => setPanel({ kind, id: d.id })} onVariation={() => setNameSheet({ tool: d.tool, parent: d })} onUndo={redo => void act(() => api.restore(d, redo))} onPost={() => void act(async () => { const r = await api.post(d); setMessage(`${r.message} ${r.path}`); })} />)}
+        </section>;
+      })}
+    </main>
+    {libraryOpen && <aside className="console-library" aria-label="Console Library">
+      <header><h2>Library</h2><IconButton label="Close Library" onClick={() => setLibraryOpen(false)}><X size={17} /></IconButton></header>
+      <label className="console-search"><Search size={16} /><input aria-label="Search Console Library" placeholder="Search your work" value={query} onChange={e => setQuery(e.target.value)} /></label>
+      <select aria-label="Filter Library by tool" value={filter} onChange={e => setFilter(e.target.value as ToolId | '')}><option value="">All tools</option>{CONSOLE_TOOLS.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}</select>
+      <div className="console-library-list">
+        {(filtered ?? library)?.documents.map(d => { const t = toolById(d.tool); return <article key={d.id} className="console-library-item" data-selected={selectedId === d.id}>
+          <button className="console-library-open" type="button" aria-label={`Open ${d.title}`} onClick={() => { void act(() => api.open(d.id)); if (window.innerWidth <= 760) setLibraryOpen(false); }}>
+            <div className="console-file-preview"><t.Icon size={20} strokeWidth={1.3} /><span>{d.asset.preview.replace(/\s+/g, ' ').slice(0, 120) || (d.asset.mime === 'application/json' ? t.title : d.asset.name)}</span></div>
+            <strong>{d.title}</strong><span className="console-file-facts">{t.title} <span>v{d.versions}</span></span>
+          </button>
+          <div className="console-library-bottom"><button type="button" className="console-provenance" onClick={() => setPanel({ kind: 'provenance', id: d.id })}>{d.marker === 'Made by hand' ? <Check size={12} /> : <CircleHelp size={12} />}{d.marker}</button><IconButton label={`Preview ${d.title}`} onClick={() => setPanel({ kind: 'reader', id: d.id })}><Eye size={15} /></IconButton></div>
+        </article>; })}
+        {(filtered ?? library)?.documents.length === 0 && <p className="console-empty-list">{query || filter ? 'No matching files' : 'No files yet'}</p>}
+      </div>
+      {!!library?.issues.length && <details className="console-issues"><summary>{library.issues.length} unreadable bundle(s)</summary>{library.issues.map(i => <p key={i.file}>{i.file}: {i.message}</p>)}</details>}
+      <footer title={library?.root}>Saved on this Mac</footer>
+    </aside>}
+    <footer className="console-status" role="status"><span>{error || message || (workspace ? 'Saved on this Mac' : 'Connecting to Console...')}</span>{error && <button type="button" onClick={() => void refresh()}>Retry</button>}</footer>
+    {nameSheet && <NameDialog sheet={nameSheet} busy={busy} onClose={() => setNameSheet(null)} onSubmit={title => void act(async () => { if (nameSheet.parent) await api.variation(nameSheet.parent.id, nameSheet.parent.head, title); else await api.create(nameSheet.tool, title); setNameSheet(null); })} />}
+    {panel && <Modal title={panel.kind === 'reader' ? 'Reader' : panel.kind === 'claude' ? 'Claude' : panel.kind === 'history' ? 'Versions' : 'Provenance'} onClose={() => setPanel(null)} wide={panel.kind === 'reader'}>
+      {panel.kind === 'reader' ? <Reader id={panel.id} version={panel.version} /> : panel.kind === 'claude' ? <ClaudePanel document={docs.find(d => d.id === panel.id)} dirty={!!dirty[panel.id]} onApplied={async () => { await refresh(); setMessage('Claude edit saved as a new version'); }} /> : <HistoryPanel id={panel.id} provenance={panel.kind === 'provenance'} onRead={version => setPanel({ kind: 'reader', id: panel.id, version })} />}
+    </Modal>}
+  </div>;
 }
