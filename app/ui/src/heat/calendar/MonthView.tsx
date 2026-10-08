@@ -7,6 +7,7 @@ import { type DragEvent } from 'react';
 import { longDay } from '../../shared/time/format';
 import { type DayKey, keyParts } from '../../shared/time/zone';
 import { useActions } from '../actions';
+import { CommitmentDots } from '../commitments/CommitmentLayer';
 import { copy } from '../fmt';
 import { useSelection } from '../frame';
 import { useHeat } from '../store';
@@ -77,6 +78,7 @@ export function MonthView({ days, anchor, selected, due, onPick, onMore }: Props
               >
                 {keyParts(day).day}
               </button>
+              <CommitmentDots day={day} />
               {items.slice(0, PILLS).map((i) => (
                 <Pill
                   key={`${i.taskId}-${i.day}`}

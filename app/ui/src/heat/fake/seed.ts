@@ -1,11 +1,12 @@
 // A sample for `npm run dev` on the fake core: the three spaces of 3.4, a
 // course and a few grades, a dozen tasks (one recurring, one with subtasks,
 // one Claude added, one done with focus logged), blocks and a grey event
-// on today's column, an inbox, habits and school mail. Everything is placed
-// relative to `now`, so the sample reads sensibly whenever it is run.
+// on today's column, an inbox, habits and school mail, and two commitments
+// (a class on Tuesdays and Thursdays, a shift this evening). Everything is
+// placed relative to `now`, so the sample reads sensibly whenever it is run.
 
-import { addDays, atMinute, type DayKey, dayKey } from '../../shared/time/zone';
-import type { CalendarEvent, Id, Kind, Records, Task } from '../client';
+import { addDays, atMinute, type DayKey, dayKey, weekdayOf } from '../../shared/time/zone';
+import type { CalendarEvent, Id, Kind, Note, Records, Task } from '../client';
 import { defaultSpaces } from '../model/spaces';
 import { ulidAt } from '../ulid';
 
@@ -15,6 +16,8 @@ export interface Seeded {
   records: Seed;
   events: CalendarEvent[];
   currentTaskId: Id;
+  /** A few notes that link to each other, to a course and to a task, with one page waiting in the Notes inbox. Beside the records, for whoever wants them in the store. */
+  notes: Note[];
 }
 
 const SPACE_IDS = ['sp-classes', 'sp-wwav', 'sp-personal'];
@@ -192,8 +195,75 @@ export function seed(now: number, tz: string): Seeded {
 
   const habitLog = (back: number[]) => Object.fromEntries(back.map((n) => [day(-n), true as const]));
 
+  const note = (id: Id, title: string, hoursAgo: number, markdown: string, over: Partial<Note> = {}): Note => ({
+    id,
+    title,
+    markdown,
+    createdAt: now - (hoursAgo + 1) * 3_600_000,
+    updatedAt: now - hoursAgo * 3_600_000,
+    public: false,
+    ...over,
+  });
+  const notes: Note[] = [
+    note(
+      'n-verbs',
+      'Verb groups',
+      30,
+      [
+        '# Verb groups',
+        '',
+        'Group one verbs end in an う sound; group two drop る. #grammar',
+        '',
+        '| Group | Example | Te-form |',
+        '|---|---|---|',
+        '| One | 書く | 書いて |',
+        '| Two | 食べる | 食べて |',
+        '',
+        'See [[Te-form drills]] for practice.',
+      ].join('\n'),
+      { courseId: 'c-jpn201', spaceId: classes.id },
+    ),
+    note(
+      'n-drills',
+      'Te-form drills',
+      20,
+      [
+        'Drills for the rule in [[Verb groups]]. #grammar #practice',
+        '',
+        '- [ ] Do worksheet 4',
+        '- [x] Read section 3.2',
+        '- [ ] Ask about [[Grammar quiz 4]] in [[JPN 201]]',
+        '',
+        'More at [[Keigo]], once it is written.',
+      ].join('\n'),
+      { courseId: 'c-jpn201', spaceId: classes.id },
+    ),
+    note(
+      'n-mix',
+      'Mix notes',
+      6,
+      [
+        'Vocals sit **too far back** after the bridge. See [[Mix the second verse]].',
+        '',
+        '```',
+        'EQ: -2 dB at 300 Hz',
+        '```',
+        '',
+        '> Less is more. #mixing',
+      ].join('\n'),
+      { spaceId: wwav.id },
+    ),
+    note('n-page', 'IMG_2211', 1, ['![](attachments/IMG_2211.jpg)', '', 'Te-form: 食べる becomes 食べて.'].join('\n'), {
+      inbox: true,
+      capturedAt: now - 3_600_000,
+      attachments: ['attachments/IMG_2211.jpg'],
+      source: 'capture',
+    }),
+  ];
+
   return {
     currentTaskId: 't-verse',
+    notes,
     events: [
       {
         id: 'ev-lecture',
@@ -338,6 +408,41 @@ export function seed(now: number, tz: string): Seeded {
         },
         { id: 'h-stretch', title: 'Stretch', log: habitLog([1, 3]), showCounter: false, public: false },
         { id: 'h-read', title: 'Read ten pages', log: habitLog([0, 1, 2]), showCounter: false, public: false },
+      ],
+      commitment: [
+        {
+          id: 'cm-mth142',
+          title: 'MTH 142',
+          kind: 'class',
+          location: 'Lippitt Hall 205',
+          start: 9 * 60 + 30,
+          end: 10 * 60 + 45,
+          rrule: 'FREQ=WEEKLY;BYDAY=TU,TH',
+          from: day(-28),
+          exceptions: [],
+          bufferBefore: 15,
+          bufferAfter: 10,
+          hardness: 'fixed',
+          courseId: 'c-mth142',
+          source: 'you',
+        },
+        {
+          // A shift on today's weekday, so the sample's Today always has something coming.
+          id: 'cm-store',
+          title: 'Campus store',
+          kind: 'work',
+          location: 'Memorial Union',
+          start: 18 * 60,
+          end: 21 * 60,
+          rrule: `FREQ=WEEKLY;BYDAY=${['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][weekdayOf(today)]}`,
+          from: day(-28),
+          exceptions: [],
+          bufferBefore: 20,
+          bufferAfter: 20,
+          hardness: 'fixed',
+          spaceId: personal.id,
+          source: 'you',
+        },
       ],
       capture: [
         { id: 'cap-1', text: 'fix the snare at 1:32' },

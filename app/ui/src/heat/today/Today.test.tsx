@@ -74,8 +74,10 @@ describe('Today’s header and plan list', () => {
     await escape(rig);
     expect($(rig, '.heat-note-field')).toBeNull();
     expect($(rig, '.heat-note-line')!.textContent).toBe('Mixed the bridge.');
-    expect(rig.fake.store.dailyNote.get('2026-10-07')!.markdown).toBe('Mixed the bridge.\nMore tomorrow.');
-    expect(await undoLabel()).toBe('Undo add dailyNote');
+    // The day's note is the note titled with the day (docs/NOTES.md).
+    const note = [...rig.fake.store.note.values()].find((n) => n.title === '2026-10-07')!;
+    expect(note.markdown).toBe('Mixed the bridge.\nMore tomorrow.');
+    expect(await undoLabel()).toBe('Undo add note');
   });
 });
 

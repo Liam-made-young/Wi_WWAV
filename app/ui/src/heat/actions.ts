@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { shortMonthDay } from '../shared/time/format';
 import { type DayKey, minuteOfDay } from '../shared/time/zone';
 import type { Id, Snapshot, Task, TimeBlock } from './client';
+import { busyEvents } from './commitments/busy';
 import { clock, copy, formatMinutes } from './fmt';
 import { useFrame } from './frame';
 import {
@@ -90,7 +91,9 @@ export function useActions() {
         const t = from?.records.task.find((x) => x.id === taskId);
         if (!t || !from) return;
         const length = blockLength(from.derived.tasks[taskId]?.estimate.min ?? 30);
-        const start = nextGap(from.records.timeBlock, from.events, date, tz, minuteOfDay(now(), tz), length);
+        // A class, a shift, its travel and sleep are as busy as another calendar's event.
+        const busy = [...from.events, ...busyEvents(from.commitments, date, tz)];
+        const start = nextGap(from.records.timeBlock, busy, date, tz, minuteOfDay(now(), tz), length);
         if (start === null) {
           say('No free gap is left today.');
           return;
