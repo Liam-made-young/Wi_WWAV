@@ -365,8 +365,26 @@ one list of threads"). Started 7 Oct 2026.
 files, `app/ui/src/shell/`, `app/ui/src/heat/mail/`, `grades/`, `tasks/`,
 `habits/`, `info/`, `widgets/`, `app/ui/src/ask/`.
 
-**Status** (7 Oct, night): everything below is on the branch, committed,
-not pushed.
+**Status** (7 Oct, 9:40 PM): on `main`, and live.
+
+- `main` was fast-forwarded to `claude/commitments-notes` (`e77ffcc`) and
+  pushed, at the founder's word. It holds homes and types too, which this
+  branch was built on.
+- **The app on this Mac is now built from `claude/focus-ask-notes`**
+  (worktree `../Wi-WWAV-all`, `CARGO_TARGET_DIR=~/Library/Developer/wi-wwav-build/target-all`):
+  `claude/focus-plus-ask`, the two newer commits of
+  `claude/ask-database-wiki`, and this branch, merged. PR #2 brings `main`
+  up to it, and holds everything in PR #1. The build before it is in
+  `~/Library/Developer/wi-wwav-build/previous-app/`. An install from any
+  branch without all three drops something: build from this one, or from
+  `main` once PR #2 is merged.
+- The bundle carries two helpers beside the binary: `wi-mcp`, and `wi-ocr`
+  (`xcrun swiftc -O crates/wi-core/src/ocr/wi-ocr.swift -o …/Contents/Helpers/wi-ocr`),
+  so the app doesn't have to build its reader the first time.
+- What the merge changed in files that aren't mine, each one line or so:
+  `ask_tools.rs` (`EXTRA` mounts `learn_tools::FOR_ASK`), `tests/core/db.rs`
+  (the CSV test hides `noteId` with the rest), `focus/builtin.tsx` (Notes
+  uses the sidebar), `focus/Focus.test.tsx` (the hint says 1–9).
 
 - [x] Coordination file
 - [x] Core: commitments, breaks, exceptions, free time, planning
