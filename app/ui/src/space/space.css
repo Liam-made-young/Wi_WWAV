@@ -1,20 +1,83 @@
-/* Space wears the night (docs/SPEC.md 4.3, 7.2): #070A18 ground, warm ink,
-   amber suns, and royal blue for exactly three uses. Labels and cards are
-   DOM, flat over the 3D sky (4.5). */
+/* Space wears the night (docs/SPEC.md 7.2): a ground darker than the
+   window's, warm ink, and each body the colour of its own link. Names and
+   the strip are DOM, flat over the 3D sky (docs/SPEC.md 4.5). The live page
+   is not drawn here at all: the app lays it over the sky (pages.ts). */
 
 .space {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--night-ground);
+  background: var(--night-deep);
   color: var(--night-ink);
   font: 13px/1.35 Inter, system-ui, sans-serif;
 }
 
+/* Space's own strip: where you are, and the way out of a page. It is never
+   under a page, so it is always there to press. */
+.space-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 12px;
+  background: var(--night-ground);
+  border-bottom: 1px solid var(--night-ink-12);
+}
+.crumb {
+  font-size: 13px;
+  color: var(--night-ink);
+}
+.space-sample {
+  flex: none;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--night-ink-35);
+  border-radius: 999px;
+  color: var(--night-ink-70);
+}
+.space-where {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.space-where strong {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.space-url {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--night-ink-70);
+  font-size: 12px;
+}
+.space-acts {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
 .space-sky {
-  position: absolute;
-  inset: 0;
-  cursor: default;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+}
+.space-sky:active {
+  cursor: grabbing;
+}
+.space-sky:focus-visible {
+  box-shadow: inset 0 0 0 var(--night-focus-width) var(--night-ink-35);
 }
 
 .space-canvas {
@@ -29,10 +92,10 @@
   left: 0;
   white-space: nowrap;
   font-size: 12px;
-  color: var(--night-ink-70);
+  color: var(--night-ink);
   pointer-events: none;
   translate: -50% 0;
-  text-shadow: 0 0 6px var(--night-ground);
+  text-shadow: 0 0 6px var(--night-deep), 0 0 2px var(--night-deep);
 }
 
 .space-failed {
@@ -42,61 +105,20 @@
   color: var(--night-ink-70);
 }
 
-.space-breadcrumb {
+.space-hint {
   position: absolute;
-  top: 16px;
   left: 16px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.crumb {
-  font-size: 13px;
-  color: var(--night-ink);
-}
-.space-sample {
-  font-size: 11px;
-  padding: 2px 8px;
-  border: 1px solid var(--night-ink-35);
-  border-radius: 10px;
-  color: var(--night-ink-70);
-}
-
-.space-card {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 240px;
-  padding: 14px;
-  border-radius: 12px;
-  background: rgb(26 33 66 / 0.72);
-  border: 1px solid var(--night-ink-12);
-  backdrop-filter: blur(10px);
-}
-.card-orb {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 40%, #fff8e6, #ffd89a 30%, #f0a23c 60%, #b25f12);
-}
-.card-title {
-  font-style: italic;
-  font-weight: 500;
-  font-size: 17px;
-  margin: 10px 0 2px;
-}
-.card-line,
-.card-empty {
-  color: var(--night-ink-70);
-  margin: 0 0 10px;
-}
-.card-empty {
+  bottom: 12px;
   margin: 0;
+  font-size: 11px;
+  color: var(--night-ink-50);
+  pointer-events: none;
+  text-shadow: 0 0 6px var(--night-deep);
 }
 
 .night-button {
   min-width: 44px;
-  min-height: 32px;
+  min-height: 44px;
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid var(--night-ink-35);
@@ -110,18 +132,4 @@
 .night-button:focus-visible {
   outline: var(--night-focus-width) solid var(--night-ink);
   outline-offset: 2px;
-}
-
-.space-newest {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-}
-
-.space-zoom {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  display: flex;
-  gap: 6px;
 }

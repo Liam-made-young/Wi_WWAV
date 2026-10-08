@@ -47,6 +47,11 @@ The settings window loads `index.html?window=settings`.
   pages (`tauri://localhost`, or `tauri.localhost` on Windows; the Vite
   server in a development build) is cancelled (`src/fence.rs`, 9.8: "no
   remote scripts load").
+- One web view is the exception, because Space is a browser
+  (`docs/SPACE.md` 11): `space-page`, a child of the main window, opened by
+  `space.page.open` (`src/space_pages.rs`). It may go to http and https
+  addresses and nowhere else, and it is in no capability file, so the page
+  in it can call nothing. Tauri's `unstable` feature is on for it.
 
 `build.rs` declares `core` in the app's manifest; without that, Tauri lets
 every local window call it.

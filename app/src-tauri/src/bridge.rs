@@ -14,6 +14,8 @@
 //! - `shell.room {room}` says which view is showing (`heat`, `space`,
 //!   `console`, or `library` for the drawer over them), so the Edit menu can
 //!   name that view's undo (docs/SPEC.md 2.7).
+//! - `space.page.*` moves the web view Space opens a page in, and
+//!   `space.fly` moves you (`space_pages.rs`, docs/SPACE.md 11).
 
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -22,7 +24,7 @@ use serde_json::{json, Value};
 use tauri::ipc::{Channel, CommandScope, InvokeResponseBody, JavaScriptChannelId};
 use tauri::{AppHandle, Emitter, Manager, Runtime, Webview};
 
-use crate::menu;
+use crate::{menu, space_pages};
 
 /// What the shell asks of the core. `wi_core::Core` answers it in the app;
 /// the tests give the shell a stand-in, so the fencing can be checked
@@ -154,6 +156,9 @@ pub async fn core<R: Runtime>(
     match cmd.as_str() {
         "meters.listen" => app.state::<Bridge>().listen_meters(&webview, &args),
         "shell.room" => menu::show_room(&app, &args).await,
+        space if space.starts_with("space.page.") || space == "space.fly" => {
+            space_pages::command(&app, space, &args)
+        }
         _ => Bridge::invoke(&app, cmd, args).await,
     }
 }

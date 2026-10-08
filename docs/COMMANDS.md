@@ -224,8 +224,16 @@ none of them: a browser has no menus.
 |---|---|---|
 | `meters.listen` | `{channel}` | `{}`: meters arrive on that channel, as raw bytes |
 | `shell.room` | `{room}` | `{}`: the view now showing (`heat`, `space`, `console`, or `library`), so the Edit menu names its undo and View ticks it |
+| `space.page.open` | `{url, x, y, width, height, zoom?}` | `{loading}`: the one web view Space opens a page in goes to a link, at a place in the window (points from its top left). `loading` is what was loaded for the link: the platform's embed where it has one (docs/SPACE.md 11). Only http and https |
+| `space.page.place` | `{x, y, width, height, zoom, shown}` | `{}`: the page follows its body. `zoom` scales its content with its size; `shown: false` puts it out of sight |
+| `space.page.dock` | `{docked}` | `{}`: you are in the page (it has the keyboard and its own scrolling), or back in the sky |
+| `space.page.close`, `.back`, `.forward`, `.reload` | — | `{}` |
+| `space.fly` | `{url, enter?}` | `{}`: the sky flies you to the body that is that link, and into its page when `enter` is true. Sent on to the UI as the event `space.fly` |
 
 Events `menu` `{action}` (`room.heat`, `room.space`, `room.console` on
 ⌘1–⌘3, `history.undo`, `history.redo`, `library.toggle`, `export.everything`,
-`session.new`) and `open` `{clips} \| {sessions} \| {error}` (files opened from
-outside).
+`session.new`), `open` `{clips} \| {sessions} \| {error}` (files opened from
+outside), and `space.page`: `{what: "loading" \| "loaded", url}` as the page
+in Space loads, and `{what: "said", said}` for whatever the page itself
+wrote (its title, scrolling over it, a click, Esc), which is never trusted
+for more than that.

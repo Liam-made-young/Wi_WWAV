@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>YouTube</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #player, #veil { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* Out in the sky the player can't be pressed or scrolled: the veil takes
+     the pointer, and the page's own script (space_page.js) hears it. */
+  #veil { z-index: 2; }
+  #veil[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div id="player"></div>
+<div id="veil"></div>
+<script>
+  var veil = document.getElementById('veil');
+  var space = window.__wwavSpace;
+  function say(line) { if (space) space.say(line); }
+  veil.hidden = !!(space && space.docked());
+  window.addEventListener('wwavspace-dock', function (e) { veil.hidden = !!e.detail; });
+
+  var player;
+  var tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+  function onYouTubeIframeAPIReady() {
+    player = new YT.Player('player', {
+      videoId: '__ID__',
+      width: '100%',
+      height: '100%',
+      playerVars: { playsinline: 1, rel: 0, origin: window.location.origin },
+      events: {
+        onReady: function () {
+          var data = player.getVideoData ? player.getVideoData() : {};
+          document.title = (data && data.title) || 'YouTube';
+          say({ title: document.title, url: 'https://www.youtube.com/watch?v=__ID__' });
+          say({ youtube: 'ready' });
+        },
+        onStateChange: function (e) { say({ youtube: 'state', state: e.data }); },
+        onError: function (e) { say({ youtube: 'error', code: e.data }); }
+      }
+    });
+    window.__wwavYouTube = player;
+  }
+</script>
+</body>
+</html>

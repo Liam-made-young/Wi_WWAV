@@ -1,7 +1,7 @@
 # Space: every link is a planet
 
 Written 8 Oct 2026 from the founder's brief of that day, and brought up to
-his answers of the same day, in three rounds (section 8). Where this file and
+his answers of the same day, in four rounds (section 8). Where this file and
 `docs/SPEC.md` chapter 4, `docs/SCOPE_CUT.md` ("Space: the social view") or
 `docs/PLAN.md` Stage 5 disagree, this file is right and the others are the
 old Space.
@@ -68,6 +68,9 @@ where you arrive, if that can be made to work with their staying at home
 (section 4).
 
 **No feed.** Space is searched, not scrolled.
+
+**It is the first good 3D browser.** Every browser today is 2D. This is 3D
+space, not 2D space with depth drawn on.
 
 **It is a desktop.** The old limit of 21 worlds to a solar system came from
 the iPhone and is gone.
@@ -154,6 +157,7 @@ met in several contexts.
 The founder's rule is that connecting many links makes a link bigger, and
 that the sizing must be rough but clear. This is one way to do that.
 
+0. **Decided:** orders of magnitude are the levels of gravity.
 1. **Mass is a magnitude, not a count.** A link's magnitude is the power of
    ten of the links it connects: about 10 links is 1, about 10,000 is 4. A
    whole number, 0 and up. Nothing in Space claims an exact count.
@@ -209,16 +213,16 @@ corrects it here, and dates the correction.
 
 | Platform | Finding | Playing or reading | A size signal | Needs, and what to check |
 |---|---|---|---|---|
-| YouTube | Data API v3 search | IFrame Player | A channel's video count; a playlist's length | A free API key. The default quota is small: a search costs 100 units of 10,000 a day, so about 100 searches a day for one key until more is granted. **Checked 8 Oct 2026:** the player answers "Error 153" in a WebKit view when the page holding it sends no referrer, which an app's own page does not. The known cure is to hold the player in a page served from a real web address, with `referrerpolicy="strict-origin"` on the frame. Prove it in the Mac app first |
-| Spotify | Web API search, with a registered app | The embed, and its iFrame API | An album's or a playlist's length | Whole songs play only for a listener signed in to Spotify in that same web view; otherwise a preview. A registered app in development mode serves only a few listeners |
-| Apple Music | iTunes Search API, no key | The `embed.music.apple.com` embed | An album's length | Previews unless signed in. Whether signing in and protected playback work in the app's WebKit view is untested |
+| YouTube | Data API v3 search | IFrame Player | A channel's video count; a playlist's length | A free API key. The default quota is small: a search costs 100 units of 10,000 a day, so about 100 searches a day for one key until more is granted. **Proved in the Mac app, 8 Oct 2026:** the player plays, with sound, when the page holding it is served from this Mac at `http://127.0.0.1` (section 13). No "Error 153" |
+| Spotify | Web API search, with a registered app | The embed, and its iFrame API | An album's or a playlist's length | **Proved in the Mac app, 8 Oct 2026:** the embed, as a page of its own, plays a 30-second preview with nobody signed in. Whole songs need a listener signed in to Spotify in that web view; the sign-in would last (section 13), but nobody has signed in yet. A registered app in development mode serves only a few listeners (unchecked) |
+| Apple Music | iTunes Search API, no key (used 8 Oct 2026 to find the proof's song) | The `embed.music.apple.com` embed | An album's length | **Proved in the Mac app, 8 Oct 2026:** the embed, as a page of its own, plays a 90-second preview with nobody signed in, and shows its own Sign In. Whether a signed-in listener gets the whole song there is untested |
 | Bandcamp | No public search | Its embedded player, by the id on the album's or track's page | An album's length | Finding comes from a pasted link or the general web search |
 | SoundCloud | oEmbed for any link; search needs a registered app | The widget, and its Widget API | A playlist's length | |
-| Wikipedia | Its search, no key | The page itself, or text with the reader the Wiki tab already has (`crates/wi-wiki`) | An article's links out and links in: the closest fit to the defining rule | A contact in the User-Agent, which the Wiki tab already sends |
+| Wikipedia | Its search, no key | The page itself (**proved in the Mac app, 8 Oct 2026**: the Saturn article, with its 2,370 links), or text with the reader the Wiki tab already has (`crates/wi-wiki`) | An article's links out and links in: the closest fit to the defining rule | A contact in the User-Agent, which the Wiki tab already sends |
 | Substack | No official API. Every publication has a feed at `/feed` | The post's page, or the feed's text | Posts in the feed | Finding comes from a pasted link or the general web search |
 | RSS blogs | The feed's address, found from the page | The item's page or text | Items in the feed | |
 | Podcasts | iTunes Search API (no key), or Podcast Index (free key) | The episode's audio file plays as it is | Episodes in the show | |
-| X | Nothing without paying | The post's embed, by its address, no key | | Section 6 |
+| X | Nothing without paying | The post's embed, by its address, no key. The site itself as a page: **proved in the Mac app, 8 Oct 2026** (a profile loads with nobody signed in) | | Section 6 |
 | One song across services | A matching service that takes one link and answers the others, or the recording's ISRC | | | Rate limits and terms |
 
 **The general web search (Decided: DuckDuckGo, read from its own page,
@@ -226,12 +230,12 @@ nothing paid and no card).**
 
 | Way | What it is | Cost | Fit |
 |---|---|---|---|
-| DuckDuckGo's own page | DuckDuckGo opened as a page in Space, like any page. The results page is a body, and Space reads the links on the page in front of you and draws them around it, as it does for every page (section 2) | Nothing: no key, no quota, no card | Decided. It covers the whole web, Bandcamp, Substack and X included, asks for no sign-in, and has a plain HTML results page that is easy to read. Its `!` shortcuts (`!w`, `!yt`) send a search straight to a site's own search, which suits a place where you travel to sites. Fine for one person browsing; its terms are read before anyone else uses it (section 12). Unchecked: how soon it slows down a web view that searches often |
+| DuckDuckGo's own page | DuckDuckGo opened as a page in Space, like any page. The results page is a body, and Space reads the links on the page in front of you and draws them around it, as it does for every page (section 2) | Nothing: no key, no quota, no card | Decided. It covers the whole web, Bandcamp, Substack and X included, asks for no sign-in, and has a plain HTML results page that is easy to read. Its `!` shortcuts (`!w`, `!yt`) send a search straight to a site's own search, which suits a place where you travel to sites. **Proved in the Mac app, 8 Oct 2026:** a search's results page loads, with about a hundred links on it. Fine for one person browsing; its terms are read before anyone else uses it (section 12). Unchecked: how soon it slows down a web view that searches often |
 | Marginalia Search, by its API | An independent, open-source search engine for the small, hand-made, text-first web | Free. A key for non-commercial use is given on request by email; the shared key `public` works at once but is often rate-limited (checked 8 Oct 2026) | Proposed as a second search, later: a different sky, the part of the web no platform covers |
 | Google's own page | The same as the first row, with Google | Nothing | Not used. The founder steers away from Google |
 | Brave Search, by its API | An independent index of the whole web | A card is required even for its free credit (checked 8 Oct 2026) | Out. It is not free in the founder's sense |
 
-## 6. X, without paying for its API (Open)
+## 6. X, without paying for its API
 
 What is free: showing any post whose address you have, through X's own
 embed, and opening x.com itself as a page (section 11), signed in as
@@ -244,7 +248,8 @@ yourself. What is not free: searching or reading posts through the API.
 | C. X as a page | The real site, signed in as the person, as a body you go into. Space reads nothing from it | Nothing. It is browsing, not searching |
 | Not recommended | Scraping the site or a mirror of it | Breaks often, is against X's terms, and risks the person's account |
 
-Recommended: A and C first, B as a trial. Bluesky and Mastodon have open
+**Decided:** A and C. B, through DuckDuckGo, comes with the general web
+search. Bluesky and Mastodon have open
 search and would give "searchable posts" for nothing, if the founder wants
 posts from somewhere now.
 
@@ -327,14 +332,22 @@ saying why.
 | 26 | Is an artist joined across services, or shown as the service you came through shows them? | As recommended for the prototype: as that service shows them; only songs are joined. And the general answer to questions like these: context dependence, and close up most useful, far away what makes most sense |
 | | "One rule under all of it": where you are is the centre | "For the most part yes", and: when you zoom out things shift to make more sense, when you are close they shift to be most useful |
 
+### Answered by the founder, 8 Oct 2026, fourth round
+
+| On | His answer |
+|---|---|
+| The first step: proving players, real pages and sign-in inside the Mac app | A good first step, "but also make it really space and really 3d" |
+| Quitting his installed app while a test build runs | Fine |
+| Keys for YouTube and Spotify being his to make, later | Fine |
+| X: links as planets that open as the post, and the real site as a page; no scraping | "Sounds great" |
+| Sizing by order of magnitude | Orders of magnitude make sense as levels of gravity |
+| How the sky shifts between far and near | "It's 3d space not 2d space." Kept vague on purpose: every browser today is 2D, and this is the first good 3D browser |
+
 ### Still open
 
 - **How the sky shifts between far and near.** The rule is Decided; what
-  shifts, and when, is to be found by building and showing him.
-- **X** (section 6): links and the real page first, as recommended, has not
-  been confirmed.
-- **Sizing by order of magnitude** (section 3) is a proposal he has not
-  spoken to, beyond gravity.
+  shifts, and when, is to be found by building and showing him. Whatever is
+  built has to be 3D in fact, not a flat page with depth drawn on.
 - **Keys.** A YouTube Data API key and a registered Spotify app are his to
   make. Neither is needed for step 1 of section 10.
 
@@ -368,7 +381,8 @@ saying why.
 **What is yours and what is shared**
 
 6. Space's files: `app/ui/src/space/`, `crates/wi-core/src/space/` and its
-   tests, `tools/mock-server/routes/space.js` and `test/space.test.js`,
+   tests, `app/src-tauri/src/space_pages.rs` and the `space_*` files beside
+   it, `tools/mock-server/routes/space.js` and `test/space.test.js`,
    `app/ui/e2e/space-*.spec.ts`, and this file.
 7. Before editing, write under the Space section of the shared
    `COORDINATION.md` the piece you are taking and the files you expect to
@@ -400,10 +414,11 @@ saying why.
 **Checking and handing over**
 
 15. Run what covers your change and say what you ran. From `app/ui`:
-    `npx vitest run src/space`. From `tools/mock-server`:
-    `node --test test/space.test.js`. On 8 Oct 2026 these passed 119 and 22
-    (at `8f4ea3a`). Failing tests that are not Space's are listed in
-    `COORDINATION.md`.
+    `npx vitest run src/space` (139 passed on 8 Oct 2026). From the
+    repository's root: `cargo test -p wi-core --lib space` (5). From
+    `tools/mock-server`: `node --test test/space.test.js` (22). What touches
+    pages is proved in the Mac app with `WI_WWAV_SPACE_PROOF` (section 13).
+    Failing tests that are not Space's are listed in `COORDINATION.md`.
 16. In a browser, use installed Chrome (`channel: 'chrome'`); Playwright's
     own browser is not installed. Check a port with `lsof` before using it,
     and never stop a server you did not start. What depends on the Mac app's
@@ -419,61 +434,68 @@ saying why.
     (what is built, what is not, requests), and copy the shared file into
     your branch with your last commit.
 
-## 10. A first order of work (Proposed)
+## 10. The order of work
 
-Nothing here is started.
+Step 1 is done (section 13). The rest is Proposed.
 
-1. **Prove the web views in the Mac app.** A YouTube video, a Spotify song
-   and an Apple Music song each playing inside the installed app; a real page
-   (Wikipedia, then x.com) opened as a web view of its own; signing in once
-   and still being signed in after a restart. Everything else rests on this.
-2. **Home and flight.** The founder's galaxy from mi-wwav.com as the place
-   you start, and moving through it in first person.
+1. ~~**Prove the web views in the Mac app.**~~ Done 8 Oct 2026, and made
+   "really space and really 3D" as the founder asked: you fly a proving
+   ground of real sites in first person and go into their pages.
+2. **Home.** The founder's galaxy from mi-wwav.com as the place you start,
+   in place of the proving ground.
 3. **YouTube search to planets.** `space.search`, results as bodies around
-   their channels, the flight to them, going in opens the player.
-4. **A page as a planet.** The picture from afar, the live page up close, and
-   the way out.
+   their channels, the flight to them (`space.fly` is there already), going
+   in opens the player. Needs his YouTube key.
+4. **A picture of the page on its body** when it is too far to be live, and
+   more than one page kept.
 5. **Mass and parents,** with YouTube channels and Wikipedia articles, which
-   both give a count for nothing.
+   both give a count for nothing; and the links on the page in front of you
+   as the bodies around it.
 6. **One song, every service.**
-7. **The general web search,** then Wikipedia, feeds and podcasts, Substack.
+7. **The general web search,** then feeds and podcasts, Substack.
 8. **The history of where you have been,** around home.
 9. **X, by link and as a page.**
 
-## 11. A page inside a planet: how (Proposed)
+## 11. A page inside a planet: how
 
 Decided: a page is a body, with its real HTML, CSS and JavaScript; zoom in
 until it fills the screen, zoom out into space; and you stay signed in.
 
-What follows was written from memory on 8 Oct 2026 and is unchecked except
-where dated. Step 1 of section 10 is there to check it.
+How it is built (section 13 has the proof). What is marked unchecked was
+written from memory on 8 Oct 2026.
 
-- **Most sites refuse to be drawn inside another page.** YouTube's, Google's
-  and X's own pages can't be put in a frame in Space's window. So a real page
-  needs a web view of its own, which the Mac app can open beside its main one
-  (in Tauri this is still marked unstable).
-- **A web view is a flat rectangle.** It can't be wrapped around a sphere or
-  sit behind other bodies. So a body has two states: from afar it is a
-  sphere in the sky wearing a picture of its page; as you close in and it
-  turns to face you, the picture gives way to the live page, which grows
-  until it fills the screen. Zooming out does the reverse.
-- **Embeds are pages too.** A platform's embed address can be the whole page
-  of a web view. That matters for signing in: WebKit keeps a site's cookies
-  from a frame inside someone else's page, so a Spotify embed framed in
-  Space's own window would not know you are signed in to Spotify. As the top
-  page of its own web view it does.
-- **One store of sign-ins for every Space web view,** kept on the Mac and
-  surviving restarts, gives "sign in once, signed in everywhere". Filling in
-  saved passwords, as Safari does, is a separate piece and is not in the
-  prototype.
-- **Google may refuse to sign in inside an app's web view.** YouTube plays
-  without signing in, so this blocks nothing at first.
-- **Live pages are heavy.** The prototype keeps one live and the rest as
-  pictures (Decided for the prototype, answer 19).
-- **Reading the links on the page in front of you** is what makes any page a
-  centre with bodies around it. A small script in the page's own web view
-  lists its links to the core. Nothing is fetched that the person did not
-  open.
+- **A real page needs a web view of its own.** Most sites refuse to be drawn
+  inside another page, so each page Space opens is a web view the Mac app
+  lays over the sky (in Tauri this is still marked unstable).
+- **A web view is a flat rectangle, so the page is one too.** A body is a
+  sphere of glass with its page at its core, and the page always faces you
+  squarely. From anywhere it is then a plain rectangle on the screen, which
+  is where the live web view is put. The page is scaled with its size, so it
+  shrinks into the distance whole instead of folding up, and at full size it
+  is exactly the view. When the page fills the view you are inside the
+  sphere.
+- **The live page is always in front.** Nothing drawn in the sky can pass in
+  front of it, and it can't be cut off at the view's edge, so it is shown
+  only while all of it is in view. The picture of the page on its body, for
+  when it is too far or half out of view, is not built yet.
+- **Out in the sky the page is part of the sky.** Scrolling and pinching
+  over it move you, and a click goes in. Once you are in, the page has its
+  own scrolling and keys, and Esc, a pinch outward, ⌘2 or "Back out" brings
+  you out.
+- **Embeds are pages too.** A platform's embed is loaded as the whole page
+  of the web view, not framed in Space's own window. Unchecked: that this is
+  what lets the embed see a sign-in, as WebKit keeps a site's cookies from a
+  frame inside someone else's page.
+- **One store of sign-ins,** kept on the Mac and surviving restarts, gives
+  "sign in once, signed in everywhere". Proved for cookies and local storage
+  (section 13). Filling in saved passwords, as Safari does, is a separate
+  piece and is not in the prototype.
+- **Unchecked: Google may refuse to sign in inside an app's web view.**
+  YouTube plays without signing in, so this blocks nothing yet.
+- **One page is live at a time** (Decided for the prototype).
+- **Reading the links on the page in front of you** is what will make any
+  page a centre with bodies around it. The page already has a way to say
+  things to the app; the links are not read yet.
 
 ## 12. The prototype, and what changes at scale
 
@@ -497,3 +519,66 @@ works for one.
 | Platform terms | Personal use | Each platform's terms for a product given to others, read before release |
 | Where a page takes you | He chooses where to go | Blocking of harmful pages, pop-ups, and what is shown to whom |
 | The Mac's WebKit | The only target | Windows draws pages with a different engine; every web-view rule here is re-proved there |
+| The page that holds YouTube's player | Served from this Mac, at `http://127.0.0.1` on a port chosen at launch | Whether YouTube's terms accept that for a product given to others is read first; otherwise a fixed page on wi-wwav.com |
+| The proving ground | Ten links written by hand | Gone: home and search fill the sky |
+| How the page talks to the app | By asking to go to an address the app refuses | The same, unless a site is found that it breaks |
+
+## 13. What is built, and how it was proved
+
+**Flying.** `app/ui/src/space/flight/`: `model.ts` is the arithmetic (where
+you are, how keys, dragging and scrolling move you, where a body's page is
+on the screen, when you are in it), `scene.ts` draws it in three.js (far
+stars, dust that streams past as you move, each body a sphere of glass with
+a screen at its core), and `ground.ts` is the proving ground: YouTube,
+Spotify, Apple Music, Wikipedia, DuckDuckGo and X as bodies, with a video,
+two songs and an article beside them, each where its link's hash puts it.
+`SpaceView.tsx` is the view: a strip of its own along the top, and the sky.
+
+| To | Do |
+|---|---|
+| Move | W A S D, R and F for up and down, Q and E to roll |
+| Look | Drag the sky, or the arrow keys |
+| Fly toward what you face | Scroll, or pinch. The body's gravity turns you to face it as you come |
+| Go to a body | Click it. Double-click, Return or "Go in" goes into its page |
+| Come out of a page | Esc, a pinch outward, ⌘2, or "Back out" |
+
+**Pages.** `app/src-tauri/src/space_pages.rs` and the three files beside it:
+the one web view a page is opened in, the cmds that move it
+(`space.page.*`, `space.fly`; docs/COMMANDS.md), the script put in every
+page, and the page on this Mac that holds YouTube's player. What a link's
+page loads, and what a page may say back, are `crates/wi-core/src/space/`.
+
+**The proof** is a run of the app itself. `WI_WWAV_SPACE_PROOF=<file>` opens
+each kind of link in turn, asks the page what happened, writes the answers
+and quits. Run four times in the Mac app on 8 Oct 2026, on a scratch
+library:
+
+| Link | What the page answered |
+|---|---|
+| A YouTube video | Playing, unmuted, 7.4 seconds in, seven seconds after play was pressed |
+| A Spotify song | Its own play button pressed; a 30-second preview playing, 7.6 seconds in |
+| An Apple Music song | Its own play button pressed; a 90-second preview playing, 7.2 seconds in |
+| A Wikipedia article | Loaded: "Saturn - Wikipedia", 2,370 links |
+| A profile on X | Loaded: "NASA (@NASA) / X", nobody signed in |
+| A DuckDuckGo search | Loaded: "saturn at DuckDuckGo", about 100 links |
+| Staying signed in | A cookie and a stored value set by one launch were there in the next, on every one of the six sites |
+
+`WI_WWAV_SPACE_TOUR=<folder>` is the same for the eye: the app shows Space,
+flies to the video, goes in, comes out, goes into the article, and takes a
+picture of the screen at each stop. Looked at on 8 Oct 2026: the sky with
+its bodies and names; the player live inside its sphere at a little over
+half size; the article live and whole at the same size; the article filling
+the view with the strip above it.
+
+**Not proved, and why.**
+
+- Nobody has signed in to anything in it. That the store lasts is proved;
+  that Spotify or Apple Music then plays whole songs is not.
+- Flying by hand (keys, dragging, scrolling, pinching, Esc inside a page)
+  has only been driven by the tests and the tour, not by a person.
+- After the link rules moved into the core, the app was rebuilt and the
+  rules' tests pass, but the proof was not run a fifth time: the Mac's
+  screen had locked, and a locked Mac doesn't load pages.
+- The shell's own Rust tests don't build on a Mac (two of Tauri's contexts
+  in one test binary, from before this work), so `space_pages.rs`'s one test
+  runs only on Linux.

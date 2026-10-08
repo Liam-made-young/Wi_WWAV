@@ -30,6 +30,8 @@ base64 = "0.22"
 jiff = { version = "0.2", default-features = false, features = ["std", "tz-system", "tzdb-bundle-always"] }
 libc = "0.2"
 ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+# Space reads links apart (docs/SPACE.md); ureq already brings this crate in.
+url = "2"
 zip = { version = "8", default-features = false }
 pdf-extract = "0.12.1"
 

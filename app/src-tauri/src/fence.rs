@@ -5,6 +5,10 @@
 //! capabilities would still refuse that page's calls to the core, but its
 //! own scripts would run in a window that looks like the app's. So a
 //! navigation to anything but the app's own pages is cancelled.
+//!
+//! One web view is not the app's page and is meant to leave: the one Space
+//! opens a link in (`space_pages.rs`). It is in no capability file, so it
+//! can call nothing, and it may go to http and https addresses only.
 
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::{Manager, Runtime, Url};
@@ -31,6 +35,9 @@ pub fn allowed(url: &Url, dev: Option<&Url>) -> bool {
 pub fn plugin<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("fence")
         .on_navigation(|webview, url| {
+            if webview.label() == crate::space_pages::LABEL {
+                return crate::space_pages::may_go(webview, url);
+            }
             let dev = cfg!(dev)
                 .then(|| webview.app_handle().config().build.dev_url.clone())
                 .flatten();

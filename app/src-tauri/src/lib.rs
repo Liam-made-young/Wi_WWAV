@@ -11,6 +11,7 @@ mod paths;
 #[cfg(test)]
 mod review_tests;
 mod secrets;
+mod space_pages;
 mod update;
 
 use std::path::Path;
@@ -52,6 +53,11 @@ pub fn run() {
         .on_page_load(|webview, load| {
             if webview.label() == "main" && load.event() == PageLoadEvent::Finished {
                 open::page_loaded(webview.app_handle());
+                space_pages::proof::start(webview.app_handle());
+                space_pages::proof::tour(webview.app_handle());
+            }
+            if webview.label() == space_pages::LABEL {
+                space_pages::page_load(webview, load);
             }
         })
         .setup(|app| {

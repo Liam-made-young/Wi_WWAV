@@ -20,6 +20,8 @@
 //!   and `ocr`: notes as files in a folder, and the capture inbox
 //!   (docs/NOTES.md).
 //! - `export`: Export everything (2.9).
+//! - `space`: what a link's page loads, and what a page says back
+//!   (docs/SPACE.md 11).
 
 mod account;
 mod args;
@@ -52,6 +54,7 @@ mod notes_cmd;
 mod ocr;
 mod player;
 mod settings;
+pub mod space;
 mod upload;
 mod watch;
 mod wiki;
