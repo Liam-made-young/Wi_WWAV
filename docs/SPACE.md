@@ -1,7 +1,7 @@
 # Space: every link is a planet
 
 Written 8 Oct 2026 from the founder's brief of that day, and brought up to
-his twelve answers of the same day (section 8). Where this file and
+his answers of the same day, in two rounds (section 8). Where this file and
 `docs/SPEC.md` chapter 4, `docs/SCOPE_CUT.md` ("Space: the social view") or
 `docs/PLAN.md` Stage 5 disagree, this file is right and the others are the
 old Space.
@@ -37,9 +37,16 @@ day. So a planet is sized by a rough algorithm, and the algorithm has to be
 clear about how it arrived at a size.
 
 **The scale runs galaxy, sun, planet, moon.** A song is a planet or a sun; a
-service that plays it is a planet or a moon. How each kind of link fits the
-scale is left to the agents to propose (section 2) and to the founder to
-agree to.
+service that plays it is a planet or a moon. An album is a solar system in
+its artist's galaxy, and Spotify is a bigger galaxy than any one artist.
+
+**The browser is law.** Space invents no categories. There is no "Music"
+galaxy: nothing on the web is called that, and it would be far too big. What
+holds what is what the web itself says.
+
+**Where a link appears depends on how you came to it.** Looking for a YouTube
+video, you find it with its channel. Looking for the song, you find it with
+the song.
 
 **You are an astronaut, seen from your own eyes.** "FPS: first person
 space." You float, and you move. Things may move around you.
@@ -59,9 +66,11 @@ where you arrive, if that can be made to work with their staying at home
 **It is a desktop.** The old limit of 21 worlds to a solar system came from
 the iPhone and is gone.
 
-**Home** is the founder's own solar system, the one at
+**Home** is the founder's own galaxy, the whole of the one at
 `https://www.mi-wwav.com/summer_26/g/liam-made-young`, for the prototype. It
-also holds the history of where he has travelled, in his orbit.
+also holds the history of where he has travelled, in his orbit: every visit
+leaves a mark in an outer ring, and keeping one pulls it closer. A mark is a
+way back to the body, not a copy of it.
 
 **Staying signed in.** You can sign in to Spotify, Apple Music and the rest
 inside Space for whole songs, and Space keeps accounts the way Safari and
@@ -71,7 +80,11 @@ in there once.
 **People still have galaxies,** but that is not the next move.
 
 **It is a prototype,** not a live product: it has to work as well as it can
-for one person. Section 12 says what changes for many.
+for one person, with the fewest moves for the greatest return and no polish
+for its own sake. Section 12 says what changes for many.
+
+**Free the way Chrome and Google Search are free,** for now. Nothing in the
+prototype is paid for.
 
 **The big platforms come first,** searchable from inside Space. Everything
 that can be fitted in through an embed is fitted in through an embed.
@@ -89,40 +102,44 @@ that can be fitted in through an embed is fitted in through an embed.
 
 "This will get better and better as we build."
 
-## 2. Words, and where each kind of link sits (Proposed)
+## 2. Words, and where a link sits
 
 - **Link**: one canonical address. Two addresses that lead to the same thing
   (a tracking parameter, `youtu.be` and `youtube.com/watch`) are one link.
-- **Body**: what a link is drawn as.
+- **Body**: what a link is drawn as. One link is one body, with one mass and
+  one mark in your history, wherever it is shown.
 - **Mass**: how many links a link connects, as an order of magnitude.
-- **Parent**: the bigger body a body orbits.
-- **Home**: the one place a body is. A link has one home, however many things
-  point to it.
+- **Orbit**: where a body is shown, around the thing you reached it through.
+  One body can be met in more than one orbit (Decided: it depends on how you
+  came).
 - **Native platform**: one Space can search and play by itself (section 5).
 
-The founder left the hierarchy for any one link to be proposed. One rule
-covers every row below: **a galaxy is a place with a search of its own, a
-sun is what gathers things there, a planet is one thing you can open, and a
-moon is a link that hangs off it.**
+**The scale.** The Music column is the founder's. The others are Proposed by
+the same pattern, and every name in the table is something the web itself
+has: a site, a page on it, a link on that page.
 
-| Where | Galaxy | Sun | Planet | Moon |
+| Size | Music | YouTube | Writing | Any other site |
 |---|---|---|---|---|
-| Music, on any service | Music | An artist | A song | Each service's link to that song (YouTube, Spotify, Apple Music, Bandcamp, SoundCloud) |
-| YouTube, what isn't a song | YouTube | A channel | A video | The links in its description |
-| Wikipedia | Wikipedia | Open (question 17) | An article | The outside links it cites |
-| Substack, blogs, feeds | Writing | A publication | A post | The links in the post |
-| Podcasts | Podcasts | A show | An episode | Each service's link to it |
-| The rest of the web | The web | A site | A page | The links on it that lead elsewhere |
-| mi-wwav.com | A person's galaxy | A solar system (an album, a project) | A work | Its forks |
-| X | X | An account | A post | The links in the post |
+| A massive galaxy | A service: Spotify, bigger than any one artist | YouTube | Substack; Wikipedia | A very large site |
+| A galaxy | An artist | A channel | A publication | A site |
+| A solar system | An album, in its artist's galaxy | A playlist | A series or section | A section of the site |
+| A planet | A song | A video | A post or an article | A page |
+| A moon | Each service's link to the song | The links in its description | The links in it | The links on it |
 
-**Seen from where you stand, each step moves up one.** Arrive at a song and
-it reads as the sun of what it holds, with its services as planets around it.
-That is what "a song is a planet or a sun" means here: its place doesn't
-change, your distance does.
+Which of these a thing is drawn as also follows its mass (section 3): a
+channel with ten videos is not a galaxy yet.
 
-Within a tier, size still comes from mass (section 3): a channel with ten
-thousand videos is a bigger sun than one with ten.
+**One rule under all of it (Proposed).** Where you are is the centre, and
+what it links to orbits it. A site's own structure gives the big steps
+(service, artist, album, song), and the links on a page give the rest. Go to
+one of the orbiting bodies and it becomes the centre. That is how a song is
+"a planet or a sun": seen from its album it is a planet, and when you are at
+it, it is the sun of its services.
+
+**The same orbit is always in the same place (Proposed).** A body's position
+around a given centre comes from a stable hash of the two links. So a context
+looks the same every time and on every machine, even though one link can be
+met in several contexts.
 
 ## 3. How a link gets its size (Proposed)
 
@@ -161,14 +178,16 @@ home and are gathered, if that works.
 
 Proposed, as the way to have both:
 
-- Every result keeps its home, which is its orbit around its parent.
-- When the results share a home (a YouTube search, a song and its services),
-  you are flown there and the bodies that match are lit. Home and gathered
-  are the same place.
-- When they are scattered (a web search), you are flown to the home of the
-  best one, and the rest stand around you as beacons: a light and a name in
-  the direction of each one's home. Choosing a beacon flies you there. A
-  beacon is not a second body; the link still has one home.
+- A result is shown in the orbit that fits what you searched for (section
+  2): a video search shows a video with its channel, a song search shows it
+  with the song.
+- When the results share a centre (a YouTube search, a song and its
+  services), you are flown there and the bodies that match are lit. Home and
+  gathered are the same place.
+- When they are scattered (a web search), you are flown to the best one, and
+  the rest stand around you as beacons: a light and a name in the direction
+  of each. Choosing a beacon flies you there. A beacon is the same body seen
+  from far off, not a copy.
 - Arriving at a planet and going on in opens it (section 11).
 - Every search is a core command (`space.search`), so Claude can call what a
   person can click.
@@ -194,13 +213,14 @@ corrects it here, and dates the correction.
 | X | Nothing without paying | The post's embed, by its address, no key | | Section 6 |
 | One song across services | A matching service that takes one link and answers the others, or the recording's ISRC | | | Rate limits and terms |
 
-**The general web search (Decided: one, free, suited to Space. Which one:
-Proposed).**
+**The general web search (Decided: free the way Chrome and Google Search are
+free, so nothing paid and no card. Which way: Proposed).**
 
-| Provider | What it is | Cost, checked 8 Oct 2026 | Fit |
+| Way | What it is | Cost, checked 8 Oct 2026 | Fit |
 |---|---|---|---|
-| Marginalia Search | An independent, open-source search engine for the small, hand-made, text-first web | Free. A key for non-commercial use is given on request by email; the shared key `public` works at once but is often rate-limited | The proposed general search. It finds the part of the web no platform already covers, which is the part worth exploring, and its code can be run by us if Space grows |
-| Brave Search | An independent index of the whole web | $5 of credit each month, about 1,000 searches, then $5 per 1,000. A card is required even to use the credit. The older no-card free plan is closed to new accounts | The proposed finder for what Marginalia leaves out on purpose: a Bandcamp album, a Substack post, a post on X. Free only while under the credit, and only if a card on file is acceptable (question 20) |
+| The search engine's own page | Google or DuckDuckGo opened as a page in Space, like any page. The results page is a body, and Space reads the links on the page in front of you and draws them around it, as it does for every page (section 2) | Nothing: no key, no quota, no card | Proposed first (question 23). It is "free as Chrome" exactly, it covers the whole web, Bandcamp, Substack and X included, and it needs nothing built that Space doesn't need anyway. Fine for one person browsing; the engine's terms are read before anyone else uses it (section 12) |
+| Marginalia Search, by its API | An independent, open-source search engine for the small, hand-made, text-first web | Free. A key for non-commercial use is given on request by email; the shared key `public` works at once but is often rate-limited | Proposed second: a different sky, the part of the web no platform covers, with clean results. Its code can be run by us if Space grows |
+| Brave Search, by its API | An independent index of the whole web | $5 of credit a month, about 1,000 searches, but a card is required to use it | Out. It is not free in the founder's sense |
 
 ## 6. X, without paying for its API (Open)
 
@@ -273,19 +293,29 @@ saying why.
 | 11 | Is posting a link placing a planet? | Not yet. Browser and search engine for now; no posting |
 | 12 | What is in the sky before you have searched? | His own solar system as home, taken from mi-wwav.com, and the history of where he has travelled, in his orbit |
 
+### Answered by the founder, 8 Oct 2026, second round
+
+| # | Question | His answer |
+|---|---|---|
+| 13 | Is home his whole galaxy, or one of its two solar systems? | The whole galaxy |
+| 14 | Does every visit leave a mark around home, or only what he keeps? | As proposed: every visit leaves a mark in an outer ring, keeping one pulls it closer, and a mark is a way back, not the body |
+| 15 | A song's YouTube video: with the song, or with its channel? | It depends on the context. Looking for the video, it comes from the channel; looking for the song, it comes from the song |
+| 16 | Is Music its own galaxy, and where is an album? | No. "No fake categories, the browser is law"; Music would be far too big a galaxy. An album is a solar system orbiting in its artist's galaxy, and Spotify is a bigger galaxy than any one artist. Context decides here too |
+| 17 | What is a Wikipedia article's one parent? | He asked for the question to be made clearer. It is now question 22 |
+| 18 | Flying by keys and mouse or by trackpad; and what leaves a page? | "You're getting the idea nicely": both ways to fly; inside a page, pinch out or Esc pushes off, and plain scrolling and typing are the page's |
+| 19 | One page live at a time, the rest as pictures? | Yes for the prototype, not for production. Fewest moves for the greatest return |
+| 20 | Is a card on file acceptable for a "free" search provider? | He asked for this to be made clearer too, and said everything should be as free as Chrome and Google Search for now. So no card: Brave is out (section 5). Question 23 follows from it |
+| 21 | How much of a browser in the prototype? | Back, forward and staying signed in. Polish is not the priority |
+
 ### New, from those answers (Open)
 
 | # | Question | Recommendation |
 |---|---|---|
-| 13 | His galaxy on mi-wwav.com has two solar systems: "listen to this when the world is ending" (24 worlds) and "Miscellaneous" (5). Is home the whole galaxy, or one of them? | The whole galaxy, starting beside the first |
-| 14 | Travel history "in my orbit": does every place visited leave a mark around home, or only what he chooses to keep? Does the link itself move there? | Every visit leaves a mark in an outer ring; keeping one pulls it closer. A mark is a way back to the body's home, not the body, so a link still has one home |
-| 15 | A song's YouTube video has two possible homes: with the song, as its moon, or with its channel in YouTube's galaxy. Which? | With the song. From the channel it shows as a beacon |
-| 16 | Is Music its own galaxy with artists as suns (section 2), or does a song live inside one service's galaxy? And where is an album? | Its own galaxy. An album is the group of its songs around the artist, drawn as one ring |
-| 17 | The web and Wikipedia are webs, not trees: a page is linked from many bigger pages. What is its one parent? | For a site, its address: site, then section, then page. For Wikipedia, undecided: its broadest category is one candidate |
-| 18 | Flying: keys and mouse as in a game, or the trackpad? And once a page fills the screen, scrolling and typing belong to the page, so what leaves it? | Both ways to fly. Inside a page, pinch out or Esc pushes off; plain scrolling and typing are the page's |
-| 19 | A real page can be live only when it faces you up close; from afar it is a picture of itself on the body (section 11). And one page live at a time in the prototype. Acceptable? | Yes for the prototype |
-| 20 | "Free" for the search provider: is a card on file acceptable when the monthly credit covers the use (Brave), or must it be free with no card (Marginalia only)? | Marginalia now. Add Brave only if finding Bandcamp, Substack and X posts proves too thin |
-| 21 | How much of a browser in the prototype: back and forward, downloads, pop-ups, blocking ads, filling passwords? | Back, forward and staying signed in. The rest later |
+| 22 | Question 17 again, plainly. A YouTube video has an obvious thing to orbit, its channel. A Wikipedia article doesn't: "Saturn" is linked from thousands of articles and belongs to none of them. So when you search Wikipedia for Saturn and arrive, what is around you? | The article is the centre and the articles it links to orbit it, with Wikipedia as the galaxy all of it sits in. Fly to one and it becomes the centre. Under "where you are is the centre" (section 2) this stops being a special case |
+| 23 | "Free as Google Search" can be had literally: open Google's or DuckDuckGo's own results page inside Space and draw the links on it as planets, with no key at all. Do you want that as the general web search, and which engine first? | Yes. Try Google first, since it is the one you named, and DuckDuckGo if Google's page keeps asking whether you are a robot inside the app |
+| 24 | The same could be done for YouTube: its own results page in place of its API's search, which lifts the limit of about 100 searches a day. | The API first: it is free, clean, and enough for one person. The results page only if the limit is ever hit |
+| 25 | A page can hold hundreds of links (a Wikipedia article, about 500). How many orbit it? | The biggest few dozen by mass, and the rest as a faint belt you can ask to see |
+| 26 | An artist has a page on every service, like a song. Reached through a song search, is the artist one galaxy joined across services, or the artist as the service you came through shows them? Songs can be matched across services reliably; artists only by name, which can be wrong | For the prototype, the artist as that service shows them, and only songs are joined |
 
 ## 9. Protocol for any Claude or Codex instance working on Space
 
@@ -418,7 +448,11 @@ where dated. Step 1 of section 10 is there to check it.
 - **Google may refuse to sign in inside an app's web view.** YouTube plays
   without signing in, so this blocks nothing at first.
 - **Live pages are heavy.** The prototype keeps one live and the rest as
-  pictures.
+  pictures (Decided for the prototype, answer 19).
+- **Reading the links on the page in front of you** is what makes any page a
+  centre with bodies around it. A small script in the page's own web view
+  lists its links to the core. Nothing is fetched that the person did not
+  open.
 
 ## 12. The prototype, and what changes at scale
 
@@ -431,7 +465,9 @@ works for one.
 | API keys (YouTube, Spotify, search) | His own keys, in the Keychain on his Mac | The server holds the keys, makes the searches and caches them. Nobody's key ships in the app |
 | YouTube's quota | About 100 searches a day is enough | A cache in front of it, and a request to YouTube for more, which they audit |
 | Spotify's app | Development mode, a handful of listeners | Their review for wider access |
-| The general web search | A free non-commercial key | A commercial agreement or paid plan, or running the open-source engine ourselves |
+| The general web search | The engine's own results page, read as he browses; a free non-commercial key | The engine's terms read first. If they don't allow it: a commercial agreement, a paid plan, or running the open-source engine ourselves |
+| Live pages | One at a time, the rest as pictures | Several, with their memory managed |
+| Browser chores | Back, forward, staying signed in | Downloads, pop-ups, blocking, filling passwords, profiles |
 | Mass and the link graph | Worked out on his Mac from what he has seen | Worked out on the server, so everyone sees the same sky |
 | Home | Fixed to `liam-made-young` | Each person's own galaxy |
 | Travel history | A file on his Mac | Still private to each person; sent nowhere unless they choose |
