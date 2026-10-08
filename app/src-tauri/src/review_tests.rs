@@ -71,11 +71,7 @@ fn choosing_the_room_already_showing_keeps_its_tick() {
     let app = app();
     assert_eq!(ticked(&app), ["Learn"]);
     choose(&app, "room.heat");
-    assert_eq!(
-        ticked(&app),
-        ["Learn"],
-        "⌘1 in Learn took Learn's tick away"
-    );
+    assert_eq!(ticked(&app), ["Learn"], "⌘1 in Learn took Learn's tick away");
 }
 
 /// ⌘2 from Heat, before (or without) the UI answering with `shell.room`
