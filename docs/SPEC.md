@@ -2412,6 +2412,8 @@ A direct download, not the Mac App Store, whose sandbox blocks plugin hosting (*
 | Audio Units | Apple's SDK | no fee |
 | FFmpeg | LGPL 2.1 or later | built `--disable-gpl --disable-nonfree --enable-shared`, dylibs in `Contents/Frameworks`, no libx264, libx265 or fdk-aac, source and build script published. A user may swap the libraries if they re-sign them; the notes say how. |
 | Tauri, wgpu, three.js, Rust crates | MIT or Apache-2.0 | credited in About |
+| cpal, rtrb (the Rust engine's sound cards and its queues) | Apache-2.0; MIT or Apache-2.0 | credited in About |
+| symphonia (decoding FLAC, ALAC, AIFF, CAF, MP3, AAC, Vorbis in `wwav-decode`) | MPL-2.0 | not GPL: it asks only that changes to its own source files be published, and Wi_WWAV changes none. It decodes AAC in software, which the codec-patent question below covers |
 | Surge XT | GPLv3 | tests only, never shipped |
 
 Codec patents (H.264, HEVC, AAC) are a question for a lawyer, logged in `docs/DECISIONS.md`. Encoding through the operating system's encoders means the app ships none of its own.

@@ -1,12 +1,13 @@
 # The engine contract
 
-How `Wi_WWAV.app` and `wwav-engine` talk (`docs/SPEC.md` 9.1–9.3). Three
+How `Wi_WWAV.app` and `wwav-engine` talk (`docs/SPEC.md` 9.1–9.3). These
 programs implement it and must agree byte for byte:
 
 | Program | Side | Where |
 |---|---|---|
 | the app's Rust core | client | `crates/wi-core` (`engine` module), over `crates/wwav-wire` |
-| `wwav-engine` | server | `engine/` (JUCE 8 + `prana/core`) |
+| `wwav-engine` | server | `crates/wwav-engine` (Rust; the one the app runs) |
+| `wwav-engine`, the first cut | server | `engine/` (JUCE 8 + `prana/core`; kept, not built on) |
 | `mock-engine` | server, for tests | `crates/mock-engine` |
 | `wwav-engine-cli` | client, for a terminal | `crates/wwav-engine-cli` |
 
@@ -30,7 +31,7 @@ Then it runs:
 
 ```
 wwav-engine --socket <dir>/engine-<n>.sock --shm <name> [--device <name|null>]
-            [--rate 48000] [--block 128] [--test]
+            [--rate 48000] [--block 128] [--cache <dir>] [--test]
 ```
 
 `<n>` is the region's (`/wwav-<app pid>-<n>`), so every engine the app
@@ -44,6 +45,12 @@ starts has a socket and a region of its own.
 - `--device null` opens no hardware. A timer thread calls the graph every
   block at the nominal rate, so playback, the clock and meters behave as with
   a real device. Tests and CI use it.
+- With no `--device`, the engine opens the system's default output. A
+  device that won't open is said on stderr and the same timer runs unnamed
+  (`hello`'s `device` is null), so there is always a clock; `device.open`
+  can try again.
+- `--cache` names the folder for audio made ready to play (§3.3). Without
+  it: `$TMPDIR/wwav-engine-cache`.
 - `--test` enables the `debug.*` ops (§3.9). Without it they return
   `{"code": "unknown_op"}`.
 - On macOS the engine is `Contents/Helpers/wwav-engine.app` with
@@ -97,6 +104,11 @@ input audio, the crumb) never travels as frames: it is in shared memory (§4).
 | `hello` | `{"protocol": 1, "client": "wi_wwav 0.1.0"}` | `{"protocol": 1, "engine": "wwav-engine 0.1.0", "pid": 1234, "sample_rate": 48000, "block": 128, "device": "null", "shm_layout": 1}` |
 | `ping` | — | `{"t": <engine monotonic ns>}` |
 | `shutdown` | — | `{}`, then the engine stops audio and exits |
+
+The Rust engine's `hello` also carries `"features": ["decode", "resample",
+"record", "wwav.write"]`: what it does beyond the first cut of this contract
+(§3.3's clips in other formats and at other rates, §3.10, §3.11). A client,
+or a test both engines share, asks there instead of guessing.
 
 `hello` must be the first request. A client whose `protocol` differs gets
 `{"code": "protocol", "message": "This engine speaks protocol 1; the app speaks 2."}`
@@ -169,8 +181,20 @@ Device {
 - Every track routes to the stem bus of its `role`. Each stem bus has its own
   reverb and delay returns fed only by its tracks' sends; the master is the sum
   of the four buses, then `master.devices` (the fold rule, 5.3 and 6.6).
-- Clip times are in samples at `sample_rate`. A clip whose file is at another
-  rate is resampled as it plays.
+- Clip times are in samples at `sample_rate`: `at` and `len` count the
+  session's samples, `in` the file's own frames.
+- WAV (16-, 24- or 32-bit PCM, 32-bit float; mono or stereo) and `.wwav` at
+  the session's rate are read where they lie. Anything else is made ready
+  first: a file at another rate is resampled (`wwav-dsp`'s resampler, the
+  export's), and FLAC, ALAC, AIFF, CAF, MP3, AAC in MP4, Ogg Vorbis and the
+  other WAVE codings are decoded (`wwav-decode`). Each becomes one 32-bit
+  float WAV at the session's rate in the cache folder (§1), keyed by the
+  file's path, size and modified time, and is played from there, so a seek,
+  a loop and a render of it are as exact as of any WAV. `session.load`
+  answers once every clip is ready; while a long file is being made it sends
+  `{"ev": "convert.progress", "path": "…", "done": <source frames>, "total": <frames | null>}`.
+  A file that can't be made ready is refused: `unsupported` (a format or
+  more than two channels), `bad_clip` (damaged) or `no_such_file`.
 
 ### 3.4 Parameters
 
@@ -250,6 +274,75 @@ Events: `{"ev": "midi.device", "id": "…", "name": "KeyStep", "connected": true
 
 The test plugins `crasher` (dies on a note) and `hanger` (never returns from
 its process call) do the same from inside a real plugin.
+
+### 3.10 Recording
+
+One take at a time, written as it comes to a 32-bit float WAVE file at the
+device's rate. The input never touches the audio thread's timing: it goes
+through a ring to a writer thread.
+
+| Op | Args | Result |
+|---|---|---|
+| `record.start` | `{"path": "/abs/take.wav", "input": "<name>" \| null}` | `{"path": "…", "input": "MacBook Pro Microphone", "channels": 1, "sample_rate": 48000, "at": <session sample>, "input_latency": 480}` |
+| `record.stop` | — | `{"path": "…", "frames": <n>, "at": <session sample>, "sample_rate": 48000, "channels": 1, "input": "…", "input_latency": 480, "peak": 0.71, "dropped": 0}` |
+
+- `input` null is the system's default input. On the null device it is
+  `"null"`: the null device's input is its own output, the master, frame for
+  frame, so a take can be held against what was played without hardware.
+  (`"input": "null"` asks for that loopback on any device.)
+- `at` is where the take's first frame belongs in the session: the sample
+  that was being heard when that frame was captured. The audio thread says
+  which sample reaches the speaker at which moment (the clock's own facts,
+  §4.2), the input stamps each buffer with when it was captured, and the
+  engine places the take by the two. With the transport stopped, `at` is the
+  playhead. It can be below 0 for a take begun at the very start.
+- A take has the input's one or two channels (the first two of a wider one).
+- `dropped` counts input frames lost because the writer fell more than five
+  seconds behind. It should be 0.
+- While a take is being recorded and the transport plays, the clock's
+  `state` is 2.
+- `device.open` and a second `record.start` are refused with `recording`;
+  `record.stop` with no take, `not_recording`. A path that can't be written
+  is `record_failed`, before any input is opened.
+- An engine told to exit finishes the take's header first.
+
+Events: `{"ev": "record", "state": "recording", "path": "…", "at": <n>}` and
+`{"ev": "record", "state": "stopped", "path": "…", "at": <n>, "frames": <n>}`.
+
+### 3.11 Writing a .wwav
+
+| Op | Args | Result |
+|---|---|---|
+| `wwav.write` | `{"path": "/abs/Low Tide.wwav", "start": <n>, "len": <n>, "meta": Meta, "creator": "liam_made_young", "parent": Parent \| null, "dither": true}` | `{"path": "…", "song_id": "<32 hex>", "frames": <n at 44.1 kHz>, "bytes": <n>, "sample_rate": 44100, "folds": true, "fold_dbfs": -138.5 \| null, "peak": 0.82}` |
+
+```
+Meta   { "song_id": "<32 hex>", "title": "Low Tide", "artist": "…", "bpm": 86.0, "key": "…",
+         "type": "original" | "split" | "remix", "splitter": "…", "created": "2026-10-08" }
+Parent { "song_id": "<32 hex>", "root_id": "<32 hex>", "generation": 2 }
+```
+
+The four stem buses and the master of session samples `start` to `start +
+len`, rendered by the graph that plays them as `render` does (playback stops
+for it and comes back stopped), resampled to 44.1 kHz when the session is at
+another rate, taken to 16 bits once at the last step, and laid out by
+`wwav-formats`, which owns the format: the file is written beside its path
+and renamed into place when whole.
+
+- `song_id` and `created` are made up when left out (a new id; today).
+  `parent` makes the song a child: its parent's root, one generation on.
+  What `wwav-formats` refuses is refused here as `write_failed` with its
+  words: an original without a title, an id that isn't 32 hex, a song over
+  what one RIFF file holds.
+- `dither` (the default) adds TPDF dither, each stem and the master with its
+  own noise, seeded from the song's id so the same song written twice is the
+  same bytes. Without it samples are rounded, which gives 16-bit stems at
+  unity back bit for bit.
+- `folds` is the fold check (`docs/SPEC.md` 6.6): whether the master is the
+  sum of the four stems to within −80 dBFS, measured before either is taken
+  to 16 bits. `fold_dbfs` is how far apart they are at worst, null when not
+  at all. The file is written either way; the export sheet decides what to
+  say. `peak` over 1.0 means samples were clipped.
+- Progress: `{"ev": "render.progress", "stage": "wwav", "done": <session frames>, "total": <len>}`.
 
 ## 4. Shared memory
 
@@ -333,10 +426,41 @@ bytes on a Tauri channel, never JSON.
 
 ### 4.5 Peaks and input rings
 
-After the meters, the peaks ring (waveform peaks of takes being recorded) and
-the input ring (raw input audio while recording, 2 s deep at the session rate,
-interleaved f32) follow, at sizes given in the header. Their layouts are
-specified with recording (Stage 3) and are reserved space until then.
+After the meters come the peaks ring, then the input ring, at the sizes in
+the header. Each starts with a 64-byte header. The take's writer thread
+fills them as a take is recorded (§3.10); a reader loads `write`, copies,
+loads `write` and `take` again, and throws the copy away if the ring came
+round or another take began.
+
+**Peaks** (at 256 + `MR` × (32 + `MS` × 16); 64 KiB): the take's waveform.
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u64 | `write`: peaks written since the take began |
+| 8 | u64 | `take`: counts takes; `write` starts over with each |
+| 16 | i64 | `at`: the session sample of the take's first frame |
+| 24 | u32 | frames per peak, 256 |
+| 28 | u32 | the take's channels |
+| 32 | 32 bytes | reserved |
+| 64 + 16·(i mod 4092) | 4 × f32 | peak `i`: least L, most L, least R, most R of its frames |
+
+A mono take has the same on both sides. 4092 peaks are about 22 s at 48 kHz;
+a reader that draws a take keeps what it has read.
+
+**Input** (after the peaks; 2 × 96000 × 2 × 4 bytes): the take's audio.
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | u64 | `write`: frames written since the take began |
+| 8 | u64 | `take` |
+| 16 | u32 | sample rate |
+| 20 | u32 | the take's channels |
+| 24 | 40 bytes | reserved |
+| 64 + 8·(i mod 191992) | 2 × f32 | frame `i`, left and right |
+
+Two samples a frame whatever the take's channels. `crates/wwav-wire`'s
+`PeaksRing` and `InputRing` are this layout, with both sides' reads and
+writes.
 
 ## 5. When the engine falls over
 

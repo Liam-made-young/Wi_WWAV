@@ -185,14 +185,14 @@ release and written here beside the budget.
 
 | What | Budget | Measured |
 |---|---|---|
-| Audio callback | 2.67 ms at 128 frames, 48 kHz; DSP load ≤ 70% at p99.9 | — |
-| Dropouts | none in an hour of the reference session | — |
+| Audio callback | 2.67 ms at 128 frames, 48 kHz; DSP load ≤ 70% at p99.9 | 1.4% at the worst of 480 readings: four stems, 128 frames at 44.1 kHz, the timer device (the Rust engine, 8 Oct, on a MacBook Pro, not the reference machine) |
+| Dropouts | none in an hour of the reference session | none in 2 minutes (41,393 blocks) of a four-stem song looping on the timer device; the hour hasn't been run |
 | Click to sound | 10 ms at most | — |
 | UI | 60 fps; 120 fps on ProMotion for timeline scrolling and the Space camera | — |
 | Space | 60 fps at 2560 × 1600 with up to 2,000 galaxies as instanced points | — |
 | Video | a 4K stream with cuts, no dropped frames; over 1080p scrubs on proxies | — |
 | Cold launch | Learn usable in 1.5 s; engine opens its device in 0.8 s alongside | — |
-| Engine restart | 2 s plus plugin load | — |
-| Offline render | 10× real time or faster for built-ins | — |
+| Engine restart | 2 s plus plugin load | 29 ms from kill -9 to stopped at the playhead, on the null device (`engine/tests/test_restart.py`) |
+| Offline render | 10× real time or faster for built-ins | 139× for a four-stem session written as five float files (no effects exist yet) |
 | Library search | 50 ms at 50,000 clips | 12–13.5 ms on the Linux CI box (not the reference machine) |
 | Memory | app 300 MB idle; engine 150 MB empty | — |

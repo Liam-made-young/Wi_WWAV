@@ -393,6 +393,161 @@ impl Region {
     }
 }
 
+/// Both rings start with a header of this many bytes (§4.5).
+pub const RING_HEADER: usize = 64;
+/// Peaks the ring holds: at 256 frames a peak and 48 kHz, about 22 s.
+pub const PEAK_ENTRIES: usize = (PEAKS_BYTES - RING_HEADER) / 16;
+/// Stereo frames the input ring holds: 2 s at 96 kHz, less its header.
+pub const INPUT_FRAMES: usize = (INPUT_BYTES - RING_HEADER) / 8;
+
+/// One peak: the least and the most of each side over `frames_per_peak`
+/// frames of a take, as f32 bits. A mono take has the same on both sides.
+#[repr(C)]
+pub struct PeakEntry {
+    pub min_l: AtomicU32,
+    pub max_l: AtomicU32,
+    pub min_r: AtomicU32,
+    pub max_r: AtomicU32,
+}
+
+/// `wwav_shm_peaks` (§4.5): the waveform of the take being recorded. Peak
+/// `i` of the take is entry `i mod PEAK_ENTRIES`; `write` counts the peaks
+/// written since the take began.
+#[repr(C)]
+pub struct PeaksRing {
+    pub write: AtomicU64,
+    /// Counts takes, so a reader knows when `write` started over.
+    pub take: AtomicU64,
+    /// The session sample of the take's first frame.
+    pub at: AtomicI64,
+    pub frames_per_peak: AtomicU32,
+    pub channels: AtomicU32,
+    _reserved: [AtomicU8; 32],
+    pub entries: [PeakEntry; PEAK_ENTRIES],
+}
+
+/// `wwav_shm_input` (§4.5): the take's audio as it comes in, interleaved
+/// f32 bits, two samples a frame whatever the take's channels. Frame `i` of
+/// the take is at `i mod INPUT_FRAMES`; `write` counts the frames written.
+#[repr(C)]
+pub struct InputRing {
+    pub write: AtomicU64,
+    pub take: AtomicU64,
+    pub sample_rate: AtomicU32,
+    pub channels: AtomicU32,
+    _reserved: [AtomicU8; 40],
+    pub samples: [AtomicU32; INPUT_FRAMES * 2],
+}
+
+const _: () = assert!(std::mem::size_of::<PeaksRing>() == PEAKS_BYTES);
+const _: () = assert!(std::mem::size_of::<InputRing>() == INPUT_BYTES);
+
+/// A take's first frame and its format, as `PeaksRing::begin` and
+/// `InputRing::begin` publish them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TakeFields {
+    pub at: i64,
+    pub sample_rate: u32,
+    pub channels: u32,
+    pub frames_per_peak: u32,
+}
+
+impl PeaksRing {
+    /// The engine: a take begins. Readers see `write` at 0 under a new `take`.
+    pub fn begin(&self, f: &TakeFields) {
+        let r = Ordering::Relaxed;
+        self.write.store(0, r);
+        self.at.store(f.at, r);
+        self.frames_per_peak.store(f.frames_per_peak, r);
+        self.channels.store(f.channels, r);
+        self.take.fetch_add(1, Ordering::Release);
+    }
+
+    /// The engine: the take's next peak, `[min L, max L, min R, max R]`.
+    pub fn push(&self, peak: [f32; 4]) {
+        let r = Ordering::Relaxed;
+        let i = self.write.load(r);
+        let e = &self.entries[(i % PEAK_ENTRIES as u64) as usize];
+        e.min_l.store(peak[0].to_bits(), r);
+        e.max_l.store(peak[1].to_bits(), r);
+        e.min_r.store(peak[2].to_bits(), r);
+        e.max_r.store(peak[3].to_bits(), r);
+        self.write.store(i + 1, Ordering::Release);
+    }
+
+    /// The app: peaks `from..` of the take, or `None` when the ring has
+    /// come round past `from` (or a new take began while it was read).
+    pub fn read(&self, from: u64) -> Option<Vec<[f32; 4]>> {
+        let r = Ordering::Relaxed;
+        let take = self.take.load(Ordering::Acquire);
+        let end = self.write.load(Ordering::Acquire);
+        if from > end || end - from > PEAK_ENTRIES as u64 {
+            return None;
+        }
+        let peaks = (from..end)
+            .map(|i| {
+                let e = &self.entries[(i % PEAK_ENTRIES as u64) as usize];
+                [
+                    e.min_l.load(r),
+                    e.max_l.load(r),
+                    e.min_r.load(r),
+                    e.max_r.load(r),
+                ]
+                .map(f32::from_bits)
+            })
+            .collect();
+        fence(Ordering::Acquire);
+        let lapped = self.write.load(r) > from + PEAK_ENTRIES as u64;
+        (!lapped && self.take.load(r) == take).then_some(peaks)
+    }
+}
+
+impl InputRing {
+    pub fn begin(&self, f: &TakeFields) {
+        let r = Ordering::Relaxed;
+        self.write.store(0, r);
+        self.sample_rate.store(f.sample_rate, r);
+        self.channels.store(f.channels, r);
+        self.take.fetch_add(1, Ordering::Release);
+    }
+
+    /// The engine: the take's next frames, left and right interleaved.
+    pub fn push(&self, stereo: &[f32]) {
+        let r = Ordering::Relaxed;
+        let frame = self.write.load(r);
+        let mut at = (frame % INPUT_FRAMES as u64) as usize * 2;
+        for s in stereo {
+            self.samples[at].store(s.to_bits(), r);
+            at += 1;
+            if at == INPUT_FRAMES * 2 {
+                at = 0;
+            }
+        }
+        self.write
+            .store(frame + stereo.len() as u64 / 2, Ordering::Release);
+    }
+
+    /// The app: frames `from..` of the take, interleaved, or `None` when the
+    /// ring has come round past `from` (or a new take began meanwhile).
+    pub fn read(&self, from: u64) -> Option<Vec<f32>> {
+        let r = Ordering::Relaxed;
+        let take = self.take.load(Ordering::Acquire);
+        let end = self.write.load(Ordering::Acquire);
+        if from > end || end - from > INPUT_FRAMES as u64 {
+            return None;
+        }
+        let mut out = Vec::with_capacity((end - from) as usize * 2);
+        for i in from..end {
+            let at = (i % INPUT_FRAMES as u64) as usize * 2;
+            out.push(f32::from_bits(self.samples[at].load(r)));
+            out.push(f32::from_bits(self.samples[at + 1].load(r)));
+        }
+        fence(Ordering::Acquire);
+        let lapped = self.write.load(r) > from + INPUT_FRAMES as u64;
+        (!lapped && self.take.load(r) == take).then_some(out)
+    }
+}
+
 /// The monotonic clock both processes stamp the clock with: `CLOCK_MONOTONIC`
 /// on Linux, and on macOS `CLOCK_UPTIME_RAW`, which is `mach_absolute_time`,
 /// the host time CoreAudio stamps its buffers with.
@@ -419,7 +574,9 @@ pub use mapping::Shm;
 // descriptor, and QueryPerformanceCounter behind `monotonic_ns`.
 #[cfg(unix)]
 mod mapping {
-    use super::{Region, FIXED_BYTES, TOTAL_BYTES};
+    use super::{
+        InputRing, PeaksRing, Region, FIXED_BYTES, PEAKS_BYTES, PEAKS_OFFSET, TOTAL_BYTES,
+    };
     use std::ffi::CString;
     use std::io;
     use std::ptr::NonNull;
@@ -555,6 +712,23 @@ mod mapping {
             // (the size of Region), and lives as long as self. All-zero is a
             // valid Region, and other writers only ever use atomics.
             unsafe { &*(self.ptr.as_ptr() as *const Region) }
+        }
+
+        /// The peaks ring (§4.5), when the region is whole.
+        pub fn peaks(&self) -> Option<&PeaksRing> {
+            // SAFETY: a region of TOTAL_BYTES holds a PeaksRing at
+            // PEAKS_OFFSET, which is a multiple of 8; all-zero is a valid
+            // one, and every access to it is through atomics.
+            (self.len >= TOTAL_BYTES)
+                .then(|| unsafe { &*(self.ptr.as_ptr().add(PEAKS_OFFSET) as *const PeaksRing) })
+        }
+
+        /// The input ring (§4.5), when the region is whole.
+        pub fn input(&self) -> Option<&InputRing> {
+            // SAFETY: as `peaks`, at the offset after it.
+            (self.len >= TOTAL_BYTES).then(|| unsafe {
+                &*(self.ptr.as_ptr().add(PEAKS_OFFSET + PEAKS_BYTES) as *const InputRing)
+            })
         }
     }
 

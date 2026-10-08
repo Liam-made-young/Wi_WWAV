@@ -151,3 +151,50 @@ fn no_reader_sees_a_torn_meter_entry_under_a_writer_at_full_rate() {
     assert_eq!(torn, 0, "torn meter entries were read");
     assert!(changes > 1000, "the writer barely raced the reader");
 }
+
+#[test]
+fn a_takes_frames_and_peaks_read_back_until_the_ring_comes_round() {
+    use wwav_wire::shm::{TakeFields, INPUT_FRAMES, PEAK_ENTRIES};
+    let shm = Shm::create_for_app().unwrap();
+    let (peaks, input) = (shm.peaks().unwrap(), shm.input().unwrap());
+    let take = TakeFields {
+        at: 44_100,
+        sample_rate: 48_000,
+        channels: 2,
+        frames_per_peak: 256,
+    };
+    peaks.begin(&take);
+    input.begin(&take);
+    assert_eq!(peaks.read(0), Some(vec![]));
+    let frames: Vec<f32> = (0..2000).map(|i| i as f32).collect();
+    input.push(&frames);
+    assert_eq!(input.read(0).unwrap(), frames);
+    assert_eq!(input.read(990).unwrap(), frames[1980..]);
+    assert_eq!(input.read(1001), None, "frames that aren't written yet");
+    peaks.push([-0.5, 0.25, -1.0, 1.0]);
+    assert_eq!(peaks.read(0).unwrap(), vec![[-0.5, 0.25, -1.0, 1.0]]);
+    assert_eq!(
+        (
+            peaks.at.load(std::sync::atomic::Ordering::Relaxed),
+            peaks.take.load(std::sync::atomic::Ordering::Relaxed)
+        ),
+        (44_100, 1)
+    );
+    // Round the ring: the oldest frames and peaks are gone, and a reader is told.
+    for _ in 0..INPUT_FRAMES / 1000 {
+        input.push(&frames);
+    }
+    assert_eq!(input.read(0), None);
+    let newest = input
+        .read(input.write.load(std::sync::atomic::Ordering::Relaxed) - 1000)
+        .unwrap();
+    assert_eq!(newest, frames);
+    for _ in 0..PEAK_ENTRIES {
+        peaks.push([0.0; 4]);
+    }
+    assert_eq!(peaks.read(0), None);
+    assert_eq!(peaks.read(1).unwrap().len(), PEAK_ENTRIES);
+    // A new take starts both over.
+    input.begin(&take);
+    assert_eq!(input.read(0), Some(vec![]));
+}

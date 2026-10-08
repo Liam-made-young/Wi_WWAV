@@ -346,8 +346,10 @@ class Playback(unittest.TestCase):
         cases = [("duplicate ids", dup, "bad_session"), ("an unknown role", role, "bad_session"),
                  ("an id over 1 KiB", long_id, "bad_session"), ("a clip past 2^50 frames", far, "bad_session"),
                  ("a stem of a plain WAV", stem_of_plain, "bad_clip"),
-                 ("a session rate the device isn't at", at_48k, "rate_mismatch"),
-                 ("a clip at another rate", clip_48k, "unsupported")]
+                 ("a session rate the device isn't at", at_48k, "rate_mismatch")]
+        # An engine that resamples plays such a clip (test_convert.py); one that doesn't yet says so.
+        if "resample" not in self.c.hello().get("features", []):
+            cases.append(("a clip at another rate", clip_48k, "unsupported"))
         for name, graph, code in cases:
             with self.subTest(name):
                 with self.assertRaises(EngineError) as e:
