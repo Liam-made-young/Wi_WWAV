@@ -1296,3 +1296,61 @@ fn the_prompt_boxs_tools_stage_a_change_and_run_what_only_reads() {
         "the shift made by hand isn't a week's import, so it isn't replaced"
     );
 }
+
+#[test]
+fn time_to_leave_is_said_once_when_the_travel_time_starts() {
+    let setup = Setup::new();
+    let mut config = setup.config(NO_SERVER, no_browser());
+    config.now = Some(ny("2026-10-07 09:00"));
+    config.leave_notices = true;
+    let core = Core::open(&setup.library(), config).unwrap();
+    ok(
+        &core,
+        "app.settings.set",
+        json!({"patch": {"heat": {"timeZone": "America/New_York"}}}),
+    );
+    school(&core);
+    jpn(&core);
+    let leave = |core: &Core| -> Vec<Value> {
+        snap(core, DAY)["notices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|n| n["kind"] == "leave")
+            .cloned()
+            .collect()
+    };
+    // An hour ahead there is nothing to say.
+    std::thread::sleep(Duration::from_millis(2500));
+    assert!(leave(&core).is_empty());
+    // 9:36: the 25 minutes of travel have started.
+    core.set_now(Some(ny("2026-10-07 09:36")));
+    // Any write wakes the worker; left alone it looks every twenty seconds.
+    ok(
+        &core,
+        "heat.put",
+        json!({"kind": "termBreak", "record": {"title": "Reading day", "from": "2026-12-12"}}),
+    );
+    assert!(
+        eventually(Duration::from_secs(30), || !leave(&core).is_empty()),
+        "it was never time to leave"
+    );
+    let said = leave(&core);
+    assert_eq!(said.len(), 1);
+    assert_eq!(
+        said[0]["text"],
+        "Time to leave for JPN 101 (10:00 AM, Swan Hall 201)."
+    );
+    // Dismissed, it isn't said again for that class that day.
+    ok(&core, "heat.notice.dismiss", json!({"id": said[0]["id"]}));
+    ok(&core, "heat.sleep.set", json!({"from": 1380, "to": 420}));
+    std::thread::sleep(Duration::from_millis(4500));
+    assert!(leave(&core).is_empty(), "said twice");
+    // A core that wasn't told to never says it.
+    let quiet = Setup::new();
+    let other = heat_core(&quiet, "2026-10-07 09:36");
+    school(&other);
+    jpn(&other);
+    std::thread::sleep(Duration::from_millis(2500));
+    assert!(leave(&other).is_empty());
+}

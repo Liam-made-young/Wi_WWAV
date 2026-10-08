@@ -43,6 +43,8 @@ const IMAGE_TIMEOUT: Duration = Duration::from_secs(240);
 
 /// How often the worker looks: for a leave time, and for new mail.
 const LOOK_EVERY: Duration = Duration::from_secs(20);
+/// The least time between two looks, however often the worker is woken.
+const LOOK_SOONEST: Duration = Duration::from_secs(2);
 /// How often a subscribed calendar is read again.
 const FEED_EVERY_MS: f64 = 3_600_000.0;
 
@@ -629,7 +631,7 @@ pub(crate) fn start(inner: &Arc<Inner>, leave_notices: bool) -> JoinHandle<()> {
     std::thread::Builder::new()
         .name("heat commitments".into())
         .spawn(move || {
-            let mut looked = Instant::now() - LOOK_EVERY;
+            let mut looked = Instant::now() - LOOK_SOONEST;
             while !i.closing() {
                 // A draft left half read, or just dropped: read it now.
                 // Read first, then let go of the library: reading a draft takes it again.
@@ -640,7 +642,10 @@ pub(crate) fn start(inner: &Arc<Inner>, leave_notices: bool) -> JoinHandle<()> {
                     }
                     read_draft(&i, &draft);
                 }
-                if looked.elapsed() >= LOOK_EVERY {
+                // A look every twenty seconds, and soon after anything is
+                // written (new mail, a commitment), but never in a tight loop.
+                let due = looked.elapsed() >= LOOK_SOONEST;
+                if due {
                     looked = Instant::now();
                     look_at_mail(&i);
                     if leave_notices {
@@ -648,7 +653,7 @@ pub(crate) fn start(inner: &Arc<Inner>, leave_notices: bool) -> JoinHandle<()> {
                         look_at_feeds(&i);
                     }
                 }
-                i.nap(LOOK_EVERY);
+                i.nap(if due { LOOK_EVERY } else { LOOK_SOONEST });
             }
         })
         .expect("a thread for Learn's commitments")
