@@ -46,7 +46,7 @@ const ICONS: Record<string, ReactNode> = {
 const PLAIN = <rect x="4.5" y="4.5" width="11" height="11" rx="1" {...line} />;
 
 /** The tabs that use the left sidebar: the spaces filter, and a tab's own sections under it. */
-const SIDEBAR = new Set(['today', 'tasks', 'calendar', 'mail']);
+const SIDEBAR = new Set(['today', 'tasks', 'calendar', 'mail', 'database', 'wiki']);
 
 /** The interrupt sources each tab is the place for (focus/model.ts). */
 const INTERRUPTS: Record<string, string[]> = {
