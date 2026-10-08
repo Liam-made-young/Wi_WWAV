@@ -260,7 +260,7 @@ class Client:
 class Engine:
     """A running wwav-engine with --device null, as the app starts it."""
 
-    def __init__(self, shm, rate=44100, block=1024, test=True, device="null", sock_dir=None):
+    def __init__(self, shm, rate=44100, block=1024, test=True, device="null", sock_dir=None, extra=()):
         if not ENGINE:
             raise RuntimeError("set WWAV_ENGINE to the wwav-engine binary")
         self.dir = sock_dir or tempfile.mkdtemp(prefix=f"wwav-{os.getpid()}-")
@@ -271,6 +271,7 @@ class Engine:
             args += ["--device", device]
         if test:
             args.append("--test")
+        args += list(extra)
         self.clients = []
         self.proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         try:

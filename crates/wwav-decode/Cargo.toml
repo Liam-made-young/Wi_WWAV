@@ -1,0 +1,35 @@
+[package]
+name = "wwav-decode"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Decodes the common audio formats to float frames, and to a WAV at a session's rate (docs/ENGINE.md 3.3)"
+
+[dependencies]
+wwav-dsp.workspace = true
+# The decoders, all in Rust (MPL-2.0). Only the formats named here are built;
+# the README lists what each one reads.
+symphonia = { version = "0.5.5", default-features = false, features = [
+  "wav",
+  "aiff",
+  "caf",
+  "isomp4",
+  "mkv",
+  "ogg",
+  "pcm",
+  "adpcm",
+  "flac",
+  "alac",
+  "mp3",
+  "aac",
+  "vorbis",
+] }
+
+[dev-dependencies]
+tempfile.workspace = true
+# Reads the WAVs `to_wav` writes, as a second opinion on their headers.
+hound = "3.5.1"
+# Measures the pitch of what the lossy formats and the resampler give back.
+rustfft = "6.4"

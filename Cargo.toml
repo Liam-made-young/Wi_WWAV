@@ -13,6 +13,8 @@ members = [
   "crates/wi-heat-store",
   "crates/mock-engine",
   "crates/wwav-engine-cli",
+  "crates/wwav-decode",
+  "crates/wwav-engine",
   "crates/wi-core",
   "crates/wi-devbridge",
   "crates/wi-formula",
