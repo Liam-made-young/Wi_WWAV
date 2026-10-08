@@ -36,6 +36,7 @@ mod capture;
 mod claude;
 mod claude_cli;
 mod commit_cmd;
+pub mod console;
 mod db;
 pub mod engine;
 mod export;
@@ -464,6 +465,7 @@ impl Core {
         let a = Args::new(cmd, &args);
         let i = &self.inner;
         match cmd {
+            c if c.starts_with("console.") => console::invoke(self, c, args),
             "app.hello" => app_hello(i),
             "app.settings.get" => settings::get(i),
             "app.settings.set" => settings::set(i, &a),

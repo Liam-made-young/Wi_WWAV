@@ -990,3 +990,35 @@ From the other agents, as they wrote them:
   `wi_heat_store::commit::busy(store, clock, events, date)`, and inside the
   store `World::busy(clock, date)`; either gives `atRisk` the day with a
   class, its travel and sleep taken out.
+
+
+### Console Phase 2 delivery and integration, 8 Oct 2026
+
+Image is built on `codex/console-phase-2`: pixel/vector layers, pressure-aware
+brush/eraser/fill, Bezier pen, shapes/text, groups/locks/blends/transforms,
+selections/masks, adjustments/curves, palettes, bounded Rust previews and
+PNG/JPG/SVG/PDF exports. `wi-image/1` stores ordinary PNG/SVG assets plus a
+manifest; every art edit versions through the existing Library, with forks,
+undo and honest hand/Claude provenance. Claude may adjust/select/arrange/make
+vectors but cannot generate pixels. `console.image.*` exposes the same Rust
+functions to UI and tools. `console.read` keeps the absolute asset path for
+3a while returning bounded previews for native Image bundles.
+
+Verification: 37 Console Rust tests; 948 UI tests and one existing skip;
+production typecheck/build; all 11 real-core browser tests passed, including
+Write/shell regressions, poster exports, photo adjustments/masks, Claude
+proposals/undo, mobile layout, Bezier/group/lock workflows and 16 MP navigation.
+Desktop/mobile screenshots and a PDF raster were inspected. Latest 4096-square
+import/save/preview: 2271 ms; pan p95: 17.6 ms on this Mac, not a guarantee.
+
+Limits: 16 MP, 8192-pixel edges, 64 layers, four group levels, 4096 objects,
+64 MiB Image imports (generic Library imports remain 24 MiB), 128 MiB assets.
+Full-resolution saves can take seconds. No ICC workflow or crash autosave.
+PDF is rasterized; non-normal blended SVGs flatten to preserve appearance.
+Rust core minimum is now 1.88 for image 0.25.10; audited dependency notices
+ship at `public/licenses/image.txt`. No GPL or ffmpeg was added. Live Claude
+service behavior is not verified by fake-CLI browser tests. Space publishing
+still prepares a local package, not a live post; AV timeline/3D remain empty.
+
+Liam has redirected work to merging, committing, pushing and building the
+combined app for testing. No new phase starts as part of this integration.
