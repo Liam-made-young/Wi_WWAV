@@ -70,6 +70,32 @@ pub fn category_pct(category_id: &str, grades: &[Grade]) -> Option<f64> {
     Some((score / out_of) * 100.0)
 }
 
+/// A category's percentage with its lowest scores dropped, when the course
+/// drops any (`dropLowest`, from a syllabus). The lowest are the lowest by
+/// score over what it was out of, and one item always stays: a category with
+/// two quizzes that drops two still counts its better one.
+pub fn category_pct_of(category: &GradeCategory, grades: &[Grade]) -> Option<f64> {
+    let drop = category
+        .drop_lowest
+        .map_or(0, |n| js::max2(0.0, n.floor()) as usize);
+    if drop == 0 {
+        return category_pct(&category.id, grades);
+    }
+    let mut items: Vec<&Grade> = grades
+        .iter()
+        .filter(|g| g.category_id.as_deref() == Some(category.id.as_str()) && counts(g))
+        .collect();
+    if items.is_empty() {
+        return None;
+    }
+    let share = |g: &Grade| g.score.unwrap_or(0.0) / g.out_of;
+    items.sort_by(|a, b| share(a).total_cmp(&share(b)));
+    let kept = &items[drop.min(items.len() - 1)..];
+    let score = kept.iter().fold(0.0, |sum, g| sum + g.score.unwrap_or(0.0));
+    let out_of = kept.iter().fold(0.0, |sum, g| sum + g.out_of);
+    Some((score / out_of) * 100.0)
+}
+
 fn graded<'a>(course: &'a Course, grades: &[Grade]) -> Vec<(&'a GradeCategory, f64)> {
     let own: Vec<Grade> = grades
         .iter()
@@ -79,7 +105,7 @@ fn graded<'a>(course: &'a Course, grades: &[Grade]) -> Vec<(&'a GradeCategory, f
     course
         .categories
         .iter()
-        .filter_map(|category| category_pct(&category.id, &own).map(|pct| (category, pct)))
+        .filter_map(|category| category_pct_of(category, &own).map(|pct| (category, pct)))
         .collect()
 }
 
@@ -147,9 +173,14 @@ pub fn based_on_line(course: &Course, grades: &[Grade]) -> String {
     copy::grades::based_on(&pct(decided_pct(course, grades)))
 }
 
+/// The weights' sum, to one decimal: 0 for a course no one has given weights.
+pub fn weights_total(course: &Course) -> f64 {
+    js::round(total_weight(course) * 10.0) / 10.0
+}
+
 /// "Weights add to 95%. The other 5% is unassigned." None when they add to 100.
 pub fn weights_line(course: &Course) -> Option<String> {
-    let total = js::round(total_weight(course) * 10.0) / 10.0;
+    let total = weights_total(course);
     if total == 100.0 {
         return None;
     }

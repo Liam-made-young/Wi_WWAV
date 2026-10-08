@@ -54,6 +54,7 @@ fn cat_with(id: &str, weight: f64, keywords: &[&str]) -> GradeCategory {
         name: id.into(),
         weight,
         keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
+        drop_lowest: None,
     }
 }
 

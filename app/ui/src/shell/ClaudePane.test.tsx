@@ -27,7 +27,7 @@ describe('Settings → Claude', () => {
     });
     const switches = $$(rig, '.claude-tools input') as HTMLInputElement[];
     expect(switches.map((s) => s.getAttribute('aria-label'))).toEqual(CLAUDE_TOOLS.map((t) => t.name));
-    expect(switches).toHaveLength(21);
+    expect(switches).toHaveLength(23);
     expect(switches.every((s) => s.checked)).toBe(true);
     // Every tool says what it does.
     expect($$(rig, '.claude-tools li').every((li) => li.querySelector('span')!.textContent !== '')).toBe(true);

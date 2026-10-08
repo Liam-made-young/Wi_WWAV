@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 pub const WRITE_PREAMBLE: &str = "Estimates and drafts. Never decides: the person accepts, edits or undoes every change.\nNever invent metrics: only restate numbers this app returned.";
 
 /// Tool names, in the order 3.13's table gives them.
-pub const NAMES: [&str; 21] = [
+pub const NAMES: [&str; 23] = [
     "list_tasks",
     "add_task",
     "update_task",
@@ -34,6 +34,8 @@ pub const NAMES: [&str; 21] = [
     "list_mail_accounts",
     "list_mail",
     "save_mail_text",
+    "list_mail_outbox",
+    "finish_mail_action",
 ];
 
 /// What changing a tool leaves in the journal: `Undo ` + this.
@@ -54,7 +56,7 @@ pub fn undo_label(tool: &str) -> Option<&'static str> {
 
 /// The pure reads: they write nothing at all.
 pub fn is_pure_read(tool: &str) -> bool {
-    matches!(tool, "list_tasks" | "get_grades" | "get_schedule" | "list_habits" | "list_projects" | "get_notes" | "list_inbox" | "list_mail_accounts" | "list_mail")
+    matches!(tool, "list_tasks" | "get_grades" | "get_schedule" | "list_habits" | "list_projects" | "get_notes" | "list_inbox" | "list_mail_accounts" | "list_mail" | "list_mail_outbox")
 }
 
 /// Changes nothing the journal keeps. `plan_day` and `draft_block` write only
@@ -107,7 +109,7 @@ pub fn input_schema(tool: &str) -> Value {
                 "title": text(200, "The task, as the person would write it."),
                 "space": text(100, "A space's name or id. Default: the person's first space."),
                 "type": text(60, "The task's type, such as Homework or Reading; one of the space's types."),
-                "course": text(40, "A course code, such as JPN 201."),
+                "course": text(40, "A course code, such as JPN 201, for a task that is schoolwork. A code Learn doesn't hold yet makes the course, to be filled in from its syllabus. Leave it out for work and personal tasks."),
                 "due": instant("When it's due"),
                 "notes": {"type": "string", "maxLength": 4000, "description": "Plain text. Notes from mail start \"From mail:\"."},
                 "source_id": text(200, "Where it came from, such as a Gmail message id. The same source_id never makes a second task."),
@@ -173,6 +175,7 @@ pub fn input_schema(tool: &str) -> Value {
                              "description": "urgent: the person must act today or tomorrow. high: they must act this week, or a person is waiting on them. normal: worth knowing, nothing to do. low: bulk mail, promotions, automatic notices. Default normal."},
                 "category": {"type": "string", "enum": ["school", "work", "money", "people", "updates", "promotions", "other"],
                              "description": "What it is about. school: courses, grades, the university. work: jobs, internships, clients. money: bills, aid, payments. people: a person writing to them. updates: accounts, bookings, receipts. promotions: marketing."},
+                "unread": {"type": "boolean", "description": "Whether Gmail has the thread unread: true if any of its messages carries the UNREAD label."},
                 "reason": reason()
             }),
             &["thread_id", "subject", "from", "received_at", "state", "reason"],
@@ -199,6 +202,15 @@ pub fn input_schema(tool: &str) -> Value {
                 }
             }),
             &["thread_id", "messages"],
+        ),
+        "list_mail_outbox" => object(json!({}), &[]),
+        "finish_mail_action" => object(
+            json!({
+                "id": text(100, "The action's id, from list_mail_outbox."),
+                "result": {"type": "string", "enum": ["done", "failed"], "description": "done: Gmail took it. failed: it didn't."},
+                "error": {"type": "string", "maxLength": 300, "description": "For failed: one sentence saying why, for the person to read."}
+            }),
+            &["id", "result"],
         ),
         "list_mail" => object(
             json!({
@@ -295,6 +307,8 @@ fn summary(tool: &str) -> &'static str {
         "record_mail_thread" => "Records a mail thread for Learn's Mail tab: which account it is from, subject, sender, time, how pressing it is, what it is about, and what was done with it. Never the message body. The same thread_id again updates the row and leaves one.",
         "list_mail_accounts" => "Reads the mail accounts the person set up, with the Gmail search that finds each account's mail and no other's, how many threads are recorded from each, and the priorities and categories to sort into. Read only. Call it before reading mail.",
         "list_mail" => "Reads the threads already recorded, newest first, with their account, priority, category and state, and whether each has its text saved. Read only. Use it to see what has been through and to answer what needs the person's attention.",
+        "list_mail_outbox" => "Reads what the person has asked for in Learn's Mail and is waiting to be done in Gmail: a mail to send, a reply, a thread to archive or mark. Read only. Each is done exactly as written, with your Gmail tools, then finished with finish_mail_action.",
+        "finish_mail_action" => "Says one outbox action is done in Gmail, or failed and why. Call it once for each action, straight after you try it. A done action is never done again. Not an undo step: the mail has gone.",
         "save_mail_text" => "Saves a thread's messages as plain text so the person can read them in Learn's Mail, which shows them in a reader view. The thread must be recorded first. The text is the mail's own words, never a summary. It stays on this Mac: it is not synced or exported. Saving a thread again replaces what was saved. Not an undo step.",
         "get_schedule" => "Reads what the time column and Calendar show between two days: the blocks already planned, calendar events, open tasks due, and drafts waiting to be accepted. Read only. Read it before draft_block, to find a free time.",
         "draft_block" => "Drafts one block for a task at a time you name, for when the person asks for a specific time rather than Learn's own rule. The block is a draft the person accepts or clears; this changes nothing. A time already held by a block, a draft or a calendar event is refused. A second draft for the same task and day replaces the first.",
@@ -342,6 +356,8 @@ fn title(tool: &str) -> &'static str {
         "list_mail_accounts" => "List mail accounts",
         "list_mail" => "List recorded mail",
         "save_mail_text" => "Save a thread's text",
+        "list_mail_outbox" => "Read the outbox",
+        "finish_mail_action" => "Finish an outbox action",
         _ => "",
     }
 }

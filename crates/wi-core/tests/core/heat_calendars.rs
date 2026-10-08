@@ -207,13 +207,37 @@ fn s2_5_the_feed_becomes_tasks_by_heats_rules_with_the_uid_as_the_id() {
             course,
             "{title}"
         );
+        // Each starts with what its type says: the minutes, the difficulty,
+        // and who made them. A type no level gives numbers ("Reading") gets
+        // the catch-all's, marked as the default for Claude to better.
+        let (minutes, difficulty, by) = match kind {
+            "Quiz" => (20, 2, "type"),
+            "Listening" => (30, 2, "type"),
+            "Homework" => (90, 3, "type"),
+            "Lab" => (120, 3, "type"),
+            "Project" => (240, 4, "type"),
+            _ => (45, 2, "default"),
+        };
         assert_eq!(
             (
                 t["done"].clone(),
                 t["public"].clone(),
-                t["difficulty"].clone()
+                t["estMin"].clone(),
+                t["difficulty"].clone(),
+                t["estBy"].clone(),
+                t["difficultyBy"].clone(),
+                t["typeBy"].clone()
             ),
-            (json!(false), json!(false), json!(3))
+            (
+                json!(false),
+                json!(false),
+                json!(minutes),
+                json!(difficulty),
+                json!(by),
+                json!(by),
+                json!("rule")
+            ),
+            "{title}"
         );
     }
     for uid in OUT_OF_WINDOW.into_iter().chain(DROPPED) {

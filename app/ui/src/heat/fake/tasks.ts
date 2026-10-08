@@ -119,14 +119,16 @@ register('heat.estimate', (args, fake) => {
     const d = Math.min(5, Math.max(1, Math.round(args.difficulty)));
     clamped ||= d !== args.difficulty;
     record.difficulty = d;
+    record.difficultyBy = 'you';
   }
   if (typeof args.estMin === 'number') {
     const m = Math.min(600, Math.max(5, Math.round(args.estMin)));
     clamped ||= m !== args.estMin;
     record.estMin = m;
+    // Minutes typed are the person's own from here on, no longer Claude's or a type's.
+    record.estBy = 'you';
+    delete record.estReason;
   }
-  record.estBy = 'you';
-  delete record.estReason;
   const { undo } = fake.write('estimate', ['task'], () => fake.store.task.set(record.id, record));
   return { task: record, clamped, undo };
 });

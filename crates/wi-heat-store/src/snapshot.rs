@@ -142,6 +142,7 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
     // Heat, task by task: as heat sees it (a recurring task by its next open
     // occurrence), what has been spent, and the estimate with who made it.
     let ctx = world.estimates();
+    let homes = crate::homes::Ctx::load(&world);
     let mut tasks = Map::new();
     for (i, t) in world.tasks.iter().enumerate() {
         let effective = recurrence::with_effective_due(t, &world.occurrences, now, tz);
@@ -153,10 +154,16 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
         } else {
             "default"
         };
+        // Where a type-made estimate's type is kept: the task's home, its space, or the defaults.
+        let type_from = (by == "type")
+            .then(|| homes.level_of(t))
+            .flatten()
+            .map_or(Value::Null, |l| json!(l.as_str()));
         let mut entry = json!({
             "heat": {"v": h.v.map_or(Value::Null, num), "level": h.level.as_str()},
             "actualMin": num(wi_heat::model::estimate::actual_min(t, &world.sessions)),
-            "estimate": {"min": num(computed), "by": by, "reason": raw.get("estReason").cloned().unwrap_or(Value::Null)},
+            "estimate": {"min": num(computed), "by": by, "reason": raw.get("estReason").cloned().unwrap_or(Value::Null), "typeFrom": type_from},
+            "home": crate::homes::home_of(&world, t).unwrap_or(Value::Null),
         });
         if recurrence::recurs(t) {
             let next = recurrence::next_open_occurrence(t, &world.occurrences, now, tz);
@@ -282,14 +289,40 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
     for c in &world.courses {
         let scale = c.scale.clone().unwrap_or_else(grades::default_scale);
         let current = grades::current_pct(c, &world.grades);
+        let mine: Vec<_> = world
+            .grades
+            .iter()
+            .filter(|g| g.course_id == c.id)
+            .cloned()
+            .collect();
+        let categories: Map<String, Value> = c
+            .categories
+            .iter()
+            .map(|k| {
+                let pct = grades::category_pct_of(k, &mine);
+                (k.id.clone(), pct.map_or(Value::Null, num))
+            })
+            .collect();
+        // A course nobody has weighted can't say what a grade would take:
+        // it asks for its syllabus instead.
+        let unweighted = grades::weights_total(c) <= 0.0;
+        let raw = world.raw_courses.iter().find(|r| r["id"] == json!(c.id));
+        let status = raw
+            .and_then(|r| r["status"].as_str())
+            .unwrap_or(if unweighted { "stub" } else { "confirmed" });
         courses.insert(
             c.id.clone(),
             json!({
                 "currentPct": current.map_or(Value::Null, num),
                 "decidedPct": num(grades::decided_pct(c, &world.grades)),
                 "letter": current.map_or(Value::Null, |p| json!(grades::letter_for(p, &scale))),
-                "weights": grades::weights_line(c).map_or(Value::Null, |w| json!(w)),
+                "weights": if unweighted { Value::Null } else { grades::weights_line(c).map_or(Value::Null, |w| json!(w)) },
                 "basedOn": grades::based_on_line(c, &world.grades),
+                "categories": categories,
+                "label": wi_heat::homes::course_label(&c.code, &c.name),
+                "needsSyllabus": unweighted,
+                "status": status,
+                "term": world.terms.iter().find(|t| t.id == c.term_id).map_or("", |t| t.name.as_str()),
             }),
         );
     }
@@ -319,6 +352,7 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
         "records": records,
         "heatState": public_state(&st),
         "events": events,
+        "syllabus": {"drafts": crate::homes::drafts(store, &world, clock)?},
         "derived": {
             "tasks": tasks,
             "today": today_part,
@@ -335,6 +369,8 @@ pub fn snapshot(store: &Store, clock: &Clock, window: &Window) -> Result<Value> 
             "occurrences": occurrences,
             "averages": averages,
             "courses": courses,
+            "types": homes.type_names(),
+            "unscored": crate::homes::unscored_count(&world),
             "habits": habit_lines,
             "timer": {
                 "digits": lcd.digits, "line": lcd.line, "note": lcd.note, "meter": num(lcd.meter), "paused": lcd.paused,

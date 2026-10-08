@@ -20,7 +20,8 @@
 //! One file per TypeScript module: [`records`], [`heat`], [`estimate`],
 //! [`grades`], [`plan`], [`focus`], [`habits`], [`recurrence`], [`calendar`],
 //! [`review`], [`spaces`], [`import_artifact`], and [`lcd`] for the Now
-//! strip's task half. [`zone`] and [`format`] are `shared/time` (the zone
+//! strip's task half. [`types`] has no TypeScript behind it: task types, the
+//! minutes and difficulty they give, and the ratio that calibrates them. [`zone`] and [`format`] are `shared/time` (the zone
 //! maths and the clock), and [`copy`] holds the sentences the functions here
 //! build. Left in TypeScript, because it is only labels, colours and layout:
 //! the tab bar, the rest of `copy.ts`, the level colours and tube, the letter
@@ -42,4 +43,5 @@ pub mod records;
 pub mod recurrence;
 pub mod review;
 pub mod spaces;
+pub mod types;
 pub mod zone;

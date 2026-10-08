@@ -7,6 +7,7 @@
 // call it.
 
 import type { Grade, Id, Task } from '../client';
+import { courseLabel } from '../fmt';
 import {
   categoryPct,
   currentPct,
@@ -26,13 +27,20 @@ derive((snap) => {
   for (const course of snap.records.course) {
     const own = snap.records.grade.filter((g) => g.courseId === course.id);
     const pct = currentPct(asCourse(course), asGrades(own));
+    // Weights that add to nothing give no grade to work out: the course waits for its syllabus.
+    const needsSyllabus = course.categories.reduce((sum, c) => sum + (Number(c.weight) || 0), 0) === 0;
     snap.derived.courses[course.id] = {
       currentPct: pct,
       decidedPct: decidedPct(asCourse(course), asGrades(own)),
       // A course with no scale of its own (absent, or cleared with null) uses the usual one.
       letter: pct === null ? null : letterFor(pct, asCourse(course).scale ?? undefined),
-      weights: weightsLine(asCourse(course)),
+      // A course waiting for its syllabus isn't told its weights add to 0%: the ask for the syllabus covers it.
+      weights: needsSyllabus ? null : weightsLine(asCourse(course)),
       categories: Object.fromEntries(course.categories.map((c) => [c.id, categoryPct(c.id, asGrades(own))])),
+      label: courseLabel(course),
+      needsSyllabus,
+      status: course.status ?? 'confirmed',
+      term: snap.records.term.find((t) => t.id === course.termId)?.name ?? '',
     };
   }
 });

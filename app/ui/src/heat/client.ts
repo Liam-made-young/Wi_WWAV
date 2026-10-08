@@ -19,6 +19,20 @@ export interface Link {
   id: Id;
 }
 
+/**
+ * A task type: what a kind of work usually takes. The words in `patterns` pick
+ * it when a title holds one whole; a number it leaves out comes from the same
+ * type a level down (a course or project, then the space, then the defaults).
+ */
+export interface TypeDef {
+  name: string;
+  patterns: string[];
+  estMin: number | null;
+  difficulty: number | null;
+  /** The grade category this type's items count toward, by name. Courses only. */
+  category?: string;
+}
+
 export interface Space {
   id: Id;
   name: string;
@@ -26,6 +40,8 @@ export interface Space {
   groupKind: 'course' | 'milestone' | 'free';
   groupLabel: string;
   types: string[];
+  /** The space's own types, between a home's and the defaults. */
+  typeDefs?: TypeDef[];
   persona: string;
 }
 
@@ -45,9 +61,13 @@ export interface Task {
   due: number | null;
   scheduledDate?: DayKey;
   rrule?: string;
+  /** Who picked the type: you, Claude, or the title's words. */
+  typeBy?: 'you' | 'claude' | 'rule';
   difficulty: number;
+  difficultyBy?: 'you' | 'claude' | 'type' | 'default';
   estMin: number | null;
-  estBy?: 'you' | 'claude' | 'default';
+  /** `type`: the task's type gave the minutes. `default`: no type matched, and they are the catch-all's. */
+  estBy?: 'you' | 'claude' | 'type' | 'default';
   estReason?: string;
   adjustMin: number;
   notes: string;
@@ -98,6 +118,8 @@ export interface Project {
   status: 'active' | 'on_hold' | 'someday' | 'archived';
   targetDate?: DayKey;
   link?: Link;
+  /** The project's own task types. */
+  types?: TypeDef[];
   public?: boolean;
 }
 
@@ -132,6 +154,8 @@ export interface GradeCategory {
   name: string;
   weight: number;
   keywords: string[];
+  /** How many of the category's lowest scores the course drops, when its syllabus says so. */
+  dropLowest?: number;
 }
 
 export interface LetterStep {
@@ -147,6 +171,12 @@ export interface Course {
   categories: GradeCategory[];
   scale?: LetterStep[];
   notes: string;
+  /** `stub`: found from a calendar or a task, and still waiting for its syllabus. None reads as confirmed. */
+  status?: 'stub' | 'confirmed';
+  /** The course's own task types. */
+  types?: TypeDef[];
+  /** The syllabus its weights and types were read from. */
+  syllabusSource?: { name: string; pages: number; importedAt: number };
   public?: boolean;
 }
 
@@ -192,6 +222,37 @@ export interface MailMessage {
   to?: string;
   sentAt: number;
   text: string;
+}
+
+/** Where a thread sits in the mailbox. A thread with no entry is read and in the inbox. */
+export interface MailPlace {
+  unread: boolean;
+  archived: boolean;
+}
+
+/** Something asked for in Mail, waiting for Claude to do it in Gmail, or done, or failed. */
+export interface MailAction {
+  id: Id;
+  kind: 'send' | 'reply' | 'archive' | 'unarchive' | 'markRead' | 'markUnread';
+  status: 'queued' | 'done' | 'failed';
+  threadId?: string;
+  to?: string;
+  cc?: string;
+  subject?: string;
+  body?: string;
+  error?: string;
+  createdAt: number;
+  doneAt?: number;
+}
+
+/** How mail is kept in step: the last read's line, what a run is doing now, and the outbox's counts. */
+export interface MailSync {
+  line: string | null;
+  at: number | null;
+  doing: 'reading' | 'sending' | null;
+  background: boolean;
+  queued: number;
+  failed: number;
 }
 
 /** A mail account Claude reads (docs/SPEC.md 3.10). Learn holds no password for it. */
@@ -314,13 +375,83 @@ export type Kind = keyof Records;
 
 export type HeatLevel = 'Overdue' | 'Hot' | 'Warm' | 'Cool' | 'Done';
 
+/** Where a task belongs: its course or its project. A task with neither just lives in its space. */
+export interface TaskHome {
+  kind: 'course' | 'project';
+  id: Id;
+  label: string;
+}
+
+/** A task's minutes, who gave them, and for a type's the level the type was found at. */
+export interface TaskEstimate {
+  min: number;
+  by: 'you' | 'claude' | 'type' | 'default';
+  reason: string | null;
+  typeFrom?: 'course' | 'project' | 'space' | 'global' | null;
+}
+
 export interface TaskDerived {
   heat: { v: number | null; level: HeatLevel };
   actualMin: number;
-  estimate: { min: number; by: 'you' | 'claude' | 'default'; reason: string | null };
+  estimate: TaskEstimate;
+  home?: TaskHome | null;
   /** A recurring task's next occurrence. */
   next?: DayKey | null;
 }
+
+export interface CourseDerived {
+  currentPct: number | null;
+  decidedPct: number;
+  letter: string | null;
+  /** The sentence for weights that don't add to 100; null when they do, and while the course waits for its syllabus. */
+  weights: string | null;
+  /** Each category's percentage so far, null while nothing in it is graded. */
+  categories?: Record<Id, number | null>;
+  /** "ELE 209 · Intro to Computer Systems Lab", or the code alone when the name is empty or says the same. */
+  label?: string;
+  /** The weights add to 0: there is nothing to work a grade out from until a syllabus is imported. */
+  needsSyllabus?: boolean;
+  status?: 'stub' | 'confirmed';
+  /** The term's name. */
+  term?: string;
+}
+
+/**
+ * A syllabus read and waiting to be accepted. Nothing in it is written until
+ * `heat.syllabus.accept`; the fields below `error` are there once it is ready.
+ */
+export interface SyllabusDraft {
+  id: Id;
+  courseId: Id | null;
+  fileName: string;
+  pages: number;
+  createdAt: number;
+  state: 'reading' | 'ready' | 'failed';
+  /** One sentence, when it failed. */
+  error?: string;
+  course?: { code: string; name: string; term: string; label: string; isNew: boolean };
+  weights?: { category: string; percent: number; dropLowest: number | null }[];
+  weightsTotal?: number;
+  /** "Weights add to 95%. The other 5% is unassigned.", or null when they add to 100. */
+  weightsFlag?: string | null;
+  types?: TypeDef[];
+  newTasks?: { title: string; type: string; due: number | null; estMin: number }[];
+  dateChanges?: { taskId: Id; title: string; from: number | null; to: number }[];
+  /** "ELE 209 · Intro to Computer Systems Lab. Labs 40%, Quizzes 20%, Final 40%. 5 types. 3 new tasks, 2 dates changed." */
+  line?: string;
+}
+
+/** Which tasks `heat.task.reapplyDefaults` goes over. */
+export type ReapplyTarget = { taskId: Id } | { courseId: Id } | { projectId: Id } | { spaceId: Id } | { all: true };
+
+/**
+ * What `heat.put` takes: a record with or without its id. A new task may leave
+ * out its type, difficulty and minutes, and the core fills them in; whatever
+ * is sent is taken as the person's own choice.
+ */
+export type PutRecord<K extends Kind> = K extends 'task'
+  ? Omit<Task, 'id' | 'type' | 'difficulty' | 'estMin'> & Partial<Pick<Task, 'id' | 'type' | 'difficulty' | 'estMin'>>
+  : Omit<Records[K], 'id'> & { id?: Id };
 
 /** The School sheet's values (3.11). The iCal address itself is in the Keychain: only whether one is saved is read back. */
 export interface School {
@@ -343,6 +474,11 @@ export interface Snapshot {
   school?: School | null;
   /** The mail accounts, for Mail's switcher; beyond docs/HEAT.md. */
   mailAccounts?: MailAccount[];
+  /** Syllabuses read and waiting for Accept or Discard. */
+  syllabus?: { drafts: SyllabusDraft[] };
+  /** Each thread's place, by Gmail's thread id. */
+  mailState?: Record<string, MailPlace>;
+  mailSync?: MailSync;
   derived: {
     tasks: Record<Id, TaskDerived>;
     today: {
@@ -355,21 +491,15 @@ export interface Snapshot {
     hotTasks: Id[];
     lists: Record<'inbox' | 'allOpen' | 'hot' | 'dueThisWeek' | 'scheduled' | 'someday' | 'done', Id[]>;
     averages: { space?: string | null; type: string; minutes: number; count: number }[];
-    courses: Record<
-      Id,
-      {
-        currentPct: number | null;
-        decidedPct: number;
-        letter: string | null;
-        weights: string | null;
-        /** Each category's percentage so far, null while nothing in it is graded; beyond docs/HEAT.md. */
-        categories?: Record<Id, number | null>;
-      }
-    >;
+    courses: Record<Id, CourseDerived>;
     habits: Record<Id, { today: boolean; record: string; /** The streak sentence, only for a habit whose counter is switched on; beyond docs/HEAT.md. */ counter?: string }>;
     status: string;
     /** A recurring task's occurrences in the snapshot's window, for Calendar's pills and flags. */
     occurrences?: { taskId: Id; date: DayKey; done: boolean }[];
+    /** The type names a picker may offer, by where each is defined. */
+    types?: { global: string[]; spaces: Record<Id, string[]>; courses: Record<Id, string[]>; projects: Record<Id, string[]> };
+    /** How many tasks still wait for an estimate better than the catch-all. */
+    unscored?: number;
   };
 }
 
@@ -390,6 +520,11 @@ export interface ClaudeSettings {
 /** What every write answers: the Edit menu's text for it, or null if nothing changed. */
 export interface Undo {
   undo: string | null;
+}
+
+/** A course, project or space saved: how many tasks and grades its types and categories moved. Other kinds leave it out. */
+export interface Retimed {
+  retimed?: number;
 }
 
 /** The two things a client needs: a call, and an event to listen to. */
@@ -416,15 +551,43 @@ export function heatClient(t: Transport = real) {
     /** Your galaxy's solar systems, for the sidebar's drop targets and a project's timeline; beyond docs/HEAT.md. */
     galaxy: () => c<{ systems: { id: Id; title: string }[] }>('heat.galaxy'),
 
-    put: <K extends Kind>(kind: K, record: Omit<Records[K], 'id'> & { id?: Id }) =>
-      c<{ record: Records[K] } & Undo>('heat.put', { kind, record }),
-    patch: <K extends Kind>(kind: K, id: Id, set: Partial<Records[K]>) => c<{ record: Records[K] } & Undo>('heat.patch', { kind, id, set }),
+    put: <K extends Kind>(kind: K, record: PutRecord<K>) => c<{ record: Records[K] } & Retimed & Undo>('heat.put', { kind, record }),
+    patch: <K extends Kind>(kind: K, id: Id, set: Partial<Records[K]>) =>
+      c<{ record: Records[K] } & Retimed & Undo>('heat.patch', { kind, id, set }),
     delete: (kind: Kind, id: Id) => c<Undo>('heat.delete', { kind, id }),
 
     done: (taskId: Id, done: boolean, date?: DayKey) => c<{ task: Task; took?: string } & Undo>('heat.done', { taskId, done, date }),
     estimate: (taskId: Id, set: { difficulty?: number; estMin?: number }) =>
       c<{ task: Task; clamped: boolean } & Undo>('heat.estimate', { taskId, ...set }),
     tookTime: (taskId: Id, minutes: number) => c<{ task: Task } & Undo>('heat.tookTime', { taskId, minutes }),
+    /** A task's type, as the person's own choice; null hands it back to the title's words. */
+    setType: (taskId: Id, type: string | null) => c<{ task: Task } & Undo>('heat.task.setType', { taskId, type }),
+    /** The types' minutes and difficulty again, for the tasks named; `force` drops what was set by hand on them. */
+    reapplyDefaults: (target: ReapplyTarget & { force?: boolean }) =>
+      c<{ changed: number } & Undo>('heat.task.reapplyDefaults', target),
+    /** Asks Claude once, in the background, to estimate the tasks no type matched. */
+    scoreTasks: () => c<{ asked: number; line: string }>('heat.tasks.score'),
+
+    /** A course's fields; its types are then applied again to its tasks that nothing was set by hand on. */
+    updateCourse: (id: Id, set: Partial<Course>) =>
+      c<{ record: Course; retimed: number } & Undo>('heat.course.update', { id, set }),
+    updateProject: (id: Id, set: Partial<Project>) =>
+      c<{ record: Project; retimed: number } & Undo>('heat.project.update', { id, set }),
+    /**
+     * Reads a syllabus into a draft. A PDF's draft answers `reading` and turns
+     * `ready` or `failed` later, with a `heat` event; nothing is written until it is accepted.
+     */
+    importSyllabus: (from: ({ path: string } | { json: unknown }) & { courseId?: Id }) =>
+      c<{ draft: SyllabusDraft }>('heat.course.importSyllabus', from),
+    syllabus: {
+      /** The draft's weights, types, tasks and dates, as one undo step. */
+      accept: (draftId: Id) =>
+        c<{ course: Course; counts: { newTasks: number; dateChanges: number; retimed: number } } & Undo>(
+          'heat.syllabus.accept',
+          { draftId },
+        ),
+      discard: (draftId: Id) => c<Record<string, never>>('heat.syllabus.discard', { draftId }),
+    },
 
     planMake: (date: DayKey, dayEnds?: number) => c<{ drafts: Draft[]; unplanned: Id[]; minutesLeft: number }>('heat.plan.make', { date, dayEnds }),
     planAccept: (date: DayKey, taskIds?: Id[]) => c<{ blocks: TimeBlock[] } & Undo>('heat.plan.accept', { date, taskIds }),
@@ -454,6 +617,21 @@ export function heatClient(t: Transport = real) {
     mail: {
       /** A thread's saved text, by Gmail's thread id; null before Claude has saved it. */
       text: (threadId: string) => c<{ messages: MailMessage[] | null }>('heat.mail.text', { threadId }),
+      /** A new mail, into the outbox and out at once. */
+      send: (mail: { to: string; cc?: string; subject: string; body: string }) =>
+        c<{ action: MailAction }>('heat.mail.send', mail),
+      reply: (threadId: string, body: string, to?: string, cc?: string) =>
+        c<{ action: MailAction }>('heat.mail.reply', { threadId, body, to, cc }),
+      archive: (threadId: string, archived: boolean) => c<{ action: MailAction }>('heat.mail.archive', { threadId, archived }),
+      mark: (threadId: string, unread: boolean) => c<{ action: MailAction }>('heat.mail.mark', { threadId, unread }),
+      /** Threads whose subject, sender or saved text hold every word. */
+      search: (q: string) => c<{ threadIds: string[] }>('heat.mail.search', { q }),
+      outbox: () => c<{ actions: MailAction[] }>('heat.mail.outbox'),
+      retry: (id: Id) => c<Record<string, never>>('heat.mail.outbox.retry', { id }),
+      discard: (id: Id) => c<Record<string, never>>('heat.mail.outbox.discard', { id }),
+      /** Sends what waits, then reads what is new. Answers at once; `mailSync` says how it goes. */
+      sync: () => c<{ started: boolean }>('heat.mail.sync'),
+      setBackground: (on: boolean) => c<Record<string, never>>('heat.mail.background.set', { on }),
     },
     calendars: {
       add: (name: string, kind: Calendar['kind'], url: string) => c<{ calendar: Calendar }>('heat.calendars.add', { name, kind, url }),

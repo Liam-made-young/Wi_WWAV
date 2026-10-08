@@ -154,7 +154,7 @@ export const widgets = {
   nowEmpty: 'Nothing is current. Pick a task and press C, or drag one here.',
   habitsEmpty: 'No habits yet.',
   hotEmpty: 'Nothing is hot.',
-  mailEmpty: 'No new school mail.',
+  mailEmpty: 'No mail recorded.',
   startFocus: 'Start focus',
   done: 'Done',
   openLink: 'Open link',
@@ -372,6 +372,59 @@ export const gradesUi = {
   aimFor: 'Aim for',
   noScale: 'This course uses the usual scale.',
   scaleOwn: 'This course has its own scale',
+};
+
+// --- Homes, task types and a course's syllabus ---------------------------------------------
+//
+// A task belongs to a course or a project, or just lives in its space. A type
+// says what a kind of work usually takes; a syllabus gives a course its
+// weights and its types.
+
+export const homes = {
+  label: (code: string, name: string) => `${code} · ${name}`,
+  in: (label: string) => `In ${label}`,
+};
+
+export const types = {
+  automatic: 'Automatic',
+  automaticAs: (type: string) => `Automatic (${type})`,
+  fromType: (type: string, where: string | null) => `From the type ${type}${where ? ` (${where})` : ''}.`,
+  yourDefaults: 'your defaults',
+  noMatch: 'No type matched. Claude will estimate it.',
+  useDefault: 'Use the type’s default',
+  heading: 'Assignment types',
+  hint: 'A task whose title holds one of a type’s words starts with its minutes and difficulty. Minutes or a difficulty you set on a task stay as you set them.',
+  add: 'Add type',
+  needsName: 'Give every type a name.',
+  minutesRange: 'A type’s minutes are between 5 and 600.',
+  noCategory: 'No category',
+  retimed: (n: number) => `${plural(n, 'task')} retimed`,
+};
+
+export const syllabus = {
+  import: 'Import syllabus',
+  needs: 'Needs syllabus',
+  needsHint: 'No weights yet. Import the syllabus, or add the categories by hand.',
+  reading: (file: string) => `Reading ${file}…`,
+  ready: (file: string) => `${file} is read and waits for you.`,
+  review: 'Review',
+  dismiss: 'Dismiss',
+  asPdf: 'Drop the syllabus as a PDF.',
+  dropHere: 'Drop the syllabus PDF on the course’s card in Grades. Dropped on the page instead, it makes the course it names.',
+  newCourse: 'New course',
+  dropsLowest: (n: number) => `drops lowest ${n}`,
+  total: (pct: string) => `Total ${pct}%`,
+  noWeights: 'The syllabus gives no weights.',
+  weights: 'Weights',
+  types: 'Types',
+  newTasks: 'New tasks',
+  dateChanges: 'Date changes',
+  noDue: 'No due date',
+  accept: 'Accept',
+  discard: 'Discard',
+  imported: (undoKey: string) => `Syllabus imported. ${undoKey} undoes it.`,
+  discarded: 'Syllabus discarded. Nothing changed.',
+  nothingBefore: 'Nothing is written until you accept.',
 };
 
 // --- Habits, as the tab words it (3.9) ---------------------------------------------------

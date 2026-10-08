@@ -21,6 +21,7 @@ use wi_heat::model::zone;
 use wi_store::{Actor, Store};
 
 use crate::derive::World;
+use crate::homes::{self, Sighting};
 use crate::schema::is_day;
 use crate::{
     all, commit, kind, num, one, refused, search_text, set_setting, setting, ulid, Clock, Result,
@@ -180,15 +181,8 @@ fn stamp(ms: f64) -> Option<Timestamp> {
     Timestamp::from_millisecond(ms as i64).ok()
 }
 
-fn squash(s: &str) -> String {
-    s.chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>()
-        .to_ascii_uppercase()
-}
-
 /// "Fall 2026", from a day: the term a first sync makes when there is none.
-fn term_name(day: &str) -> String {
+pub(crate) fn term_name(day: &str) -> String {
     let (year, month, _) = zone::key_parts(day);
     let season = match month as i32 {
         1..=5 => "Spring",
@@ -247,6 +241,14 @@ pub fn apply_brightspace(
             TaskSource::Ical => Some(t.source_id.clone().unwrap_or_else(|| t.id.clone())),
             // Through Google Calendar before (the artifact's own path): no UID yet.
             TaskSource::Calendar => None,
+            // From a syllabus: the same deadline, once Brightspace posts it.
+            TaskSource::Claude
+                if t.source_id
+                    .as_deref()
+                    .is_some_and(|s| s.starts_with("syl-")) =>
+            {
+                None
+            }
             _ => continue,
         };
         known.push(Known {
@@ -318,54 +320,36 @@ pub fn apply_brightspace(
         }
     }
 
+    // The courses the feed names: one Learn doesn't hold yet is made, a stub
+    // until its syllabus comes, and one still named by its code takes the
+    // name the feed gives it. Every item says so, not only the new ones.
+    let sightings: Vec<Sighting> = items
+        .iter()
+        .filter_map(|it| {
+            it.course.as_ref().map(|code| Sighting {
+                code: code.clone(),
+                name: it.course_name.clone(),
+                term: it.course_term.clone(),
+                sure: true,
+            })
+        })
+        .collect();
+    let found = homes::courses_from(&world, clock, &sightings);
+    let mut ctx = homes::Ctx::load(&world);
+    found.courses.iter().for_each(|c| ctx.set_course(c));
+
     // New items become tasks in the space that groups by course, each in its
-    // course, which is made (once) if no course of that code is there.
+    // course, with the type its title picks and that type's minutes.
     let space = world
         .spaces
         .iter()
         .find(|s| s.group_kind == wi_heat::model::records::GroupKind::Course)
         .or_else(|| world.spaces.first());
-    let mut made_courses: Vec<Value> = Vec::new();
-    let mut made_term: Option<Value> = None;
     if !report.new.is_empty() && space.is_none() {
         return refused("There's no space yet. Open Learn in Wi_WWAV once.");
     }
     for item in &report.new {
         let space = space.expect("checked above");
-        let mut course_id: Option<String> = None;
-        if let Some(code) = &item.course {
-            let want = squash(code);
-            let found = world
-                .courses
-                .iter()
-                .map(|c| (c.id.as_str(), c.code.as_str()))
-                .chain(made_courses.iter().map(|c| {
-                    (
-                        c["id"].as_str().unwrap_or(""),
-                        c["code"].as_str().unwrap_or(""),
-                    )
-                }))
-                .find(|(_, c)| squash(c) == want)
-                .map(|(id, _)| id.to_string());
-            course_id = match found {
-                Some(id) => Some(id),
-                None => {
-                    let term = match world.terms.last() {
-                        Some(t) => t.id.clone(),
-                        None => {
-                            let t = made_term.get_or_insert_with(
-                                || json!({"id": ulid(), "name": term_name(&clock.today())}),
-                            );
-                            t["id"].as_str().unwrap_or_default().to_string()
-                        }
-                    };
-                    let course = json!({"id": ulid(), "termId": term, "code": code, "name": code, "categories": [], "notes": "", "public": false});
-                    let id = course["id"].as_str().map(str::to_string);
-                    made_courses.push(course);
-                    id
-                }
-            };
-        }
         let mut notes = item.notes.clone();
         if let Some(url) = &item.url {
             if !notes.contains(url.as_str()) {
@@ -376,20 +360,24 @@ pub fn apply_brightspace(
             }
         }
         let mut task = json!({
-            "id": item.uid, "spaceId": space.id, "title": item.title, "type": item.kind,
-            "due": num(ms_of(item.due)), "difficulty": 3, "estMin": null, "estBy": "default", "adjustMin": 0,
+            "id": item.uid, "spaceId": space.id, "title": item.title,
+            "due": num(ms_of(item.due)), "adjustMin": 0,
             "notes": notes, "done": false, "doneAt": null, "source": "ical", "sourceId": item.uid, "public": false,
-        });
-        if let Some(id) = course_id {
-            task["courseId"] = json!(id);
+        })
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+        if let Some(id) = item
+            .course
+            .as_ref()
+            .and_then(|code| found.id_of(&world, code))
+        {
+            task.insert("courseId".into(), json!(id));
         }
-        writes.push((kind::TASK, task));
+        homes::inherit(&mut task, &ctx, true, false);
+        writes.push((kind::TASK, Value::Object(task)));
     }
-    let mut first: Vec<(&'static str, Value)> = Vec::new();
-    if let Some(t) = made_term {
-        first.push((kind::TERM, t));
-    }
-    first.extend(made_courses.into_iter().map(|c| (kind::COURSE, c)));
+    let mut first = found.writes();
     first.extend(writes);
     let writes = first;
     let c = commit(store, "calendar sync", Actor::You, |txn| {

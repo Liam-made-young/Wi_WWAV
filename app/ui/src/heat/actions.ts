@@ -172,13 +172,10 @@ export function useActions() {
         if (r) selectBlock(r.block.id);
       },
 
+      /** A new task. Its type, difficulty and minutes go only when chosen: the core fills in what is left out. */
       async makeTask(fields: NewTask) {
-        const space = idx.space.get(fields.spaceId);
         const record = {
-          type: space?.types[0] ?? 'Other',
           due: null,
-          difficulty: 3,
-          estMin: null,
           adjustMin: 0,
           notes: '',
           done: false,

@@ -35,8 +35,10 @@ mod export;
 mod heat;
 mod heat_cmd;
 mod history;
+mod homes_cmd;
 mod kv;
 mod library;
+mod mail_cmd;
 mod net;
 mod player;
 mod settings;
@@ -175,6 +177,10 @@ pub struct Config {
     /// Whether mail is read on its own while the app is open (3.10). Off
     /// unless the app says so: a test's core never starts a run by itself.
     pub background_mail: bool,
+    /// Whether tasks no type matched are sent to Claude for an estimate
+    /// after a sync, without being asked (homes_cmd.rs). Off unless the app
+    /// turns it on: a test's core never starts Claude by itself.
+    pub auto_score: bool,
     /// Where the Wiki tab reads from. None: en.wikipedia.org. A test names
     /// a server of its own.
     pub wiki_url: Option<String>,
@@ -200,6 +206,7 @@ impl Config {
             now: None,
             claude: None,
             background_mail: false,
+            auto_score: false,
             wiki_url: None,
         }
     }
@@ -218,6 +225,9 @@ pub(crate) struct Inner {
     helper: Option<PathBuf>,
     /// The Claude Code command line, when the config names one.
     claude: Option<PathBuf>,
+    auto_score: bool,
+    /// What Mail's worker has been asked for, and what it is doing.
+    mail: mail_cmd::Mailbox,
     /// The Wiki tab's reader and its cache (wiki.rs).
     wiki: wiki::Wiki,
     /// The prompt box's runs and the port its tools answer on (ask.rs).
@@ -344,6 +354,8 @@ impl Core {
             secrets,
             helper: config.helper.clone(),
             claude: config.claude.clone(),
+            auto_score: config.auto_score,
+            mail: mail_cmd::Mailbox::default(),
             wiki,
             ask: ask::State::default(),
             own: Mutex::new(BTreeSet::new()),
@@ -361,6 +373,8 @@ impl Core {
             heat::start(&inner),
             watch::start(&inner),
             calendars::start(&inner),
+            homes_cmd::start(&inner),
+            mail_cmd::start(&inner, config.background_mail),
         ];
         Ok(Core { inner, workers })
     }

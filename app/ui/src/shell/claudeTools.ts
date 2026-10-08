@@ -24,4 +24,6 @@ export const CLAUDE_TOOLS: readonly { name: string; does: string }[] = [
   { name: 'list_mail_accounts', does: 'reads your mail accounts and how to find each one’s mail' },
   { name: 'list_mail', does: 'reads the threads already recorded, with how they were sorted' },
   { name: 'save_mail_text', does: 'saves a thread’s text on this Mac, for Mail’s reader' },
+  { name: 'list_mail_outbox', does: 'reads what you asked for in Mail: mail to send, threads to archive' },
+  { name: 'finish_mail_action', does: 'says an outbox action is done in Gmail, or why it failed' },
 ];

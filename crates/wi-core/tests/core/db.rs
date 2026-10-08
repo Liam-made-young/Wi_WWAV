@@ -80,7 +80,8 @@ fn world(core: &Core) -> World {
         "Essay draft",
         json!({"courseId": jpn, "due": ny("2026-10-12 23:59"), "estMin": 90}),
     );
-    let laundry = task("Laundry", json!({}));
+    // Its own estimate, so nothing here leans on what Learn fills in for a task without one.
+    let laundry = task("Laundry", json!({"estMin": 15}));
     for (task, at, minutes) in [
         (&kanji, "2026-10-05 10:00", 25),
         (&kanji, "2026-10-06 10:00", 50),
@@ -478,11 +479,11 @@ fn filters_sorts_groups_and_the_summary_row() {
             s["count"].clone(),
             s["filled"].clone()
         ),
-        (json!(255), json!(85), json!(4), json!(3))
+        (json!(270), json!(67.5), json!(4), json!(4))
     );
     assert_eq!(
         (s["min"].clone(), s["max"].clone(), s["median"].clone()),
-        (json!(45), json!(120), json!(90))
+        (json!(15), json!(120), json!(67.5))
     );
     assert_eq!(q["summary"]["due"]["min"], "2026-10-06 17:00");
     assert_eq!(q["summary"]["due"]["sum"], Value::Null);
@@ -832,10 +833,10 @@ fn a_pivot_and_a_charts_numbers() {
         [
             (json!("JPN 101"), json!(2), json!([135, 67.5])),
             (json!("PHY 204"), json!(1), json!([120, 120])),
-            (json!(""), json!(1), json!([null, null])),
+            (json!(""), json!(1), json!([15, 15])),
         ]
     );
-    assert_eq!(p["total"], json!({"count": 4, "values": [255, 85]}));
+    assert_eq!(p["total"], json!({"count": 4, "values": [270, 67.5]}));
     // Two columns deep, through a filter.
     let p = ok(
         &core,
@@ -901,8 +902,8 @@ fn a_pivot_and_a_charts_numbers() {
         json!({"table": "Tasks", "x": "Estimate (min)", "y": ["Logged (min)"]}),
     );
     assert_eq!(c["x"]["kind"], "number");
-    assert_eq!(c["xs"], json!([45, 90, 120, null]));
-    assert_eq!(c["series"][0]["values"], json!([75, 25, 25, 0]));
+    assert_eq!(c["xs"], json!([15, 45, 90, 120]));
+    assert_eq!(c["series"][0]["values"], json!([0, 75, 25, 25]));
     let c = ok(
         &core,
         "db.chart",
@@ -973,10 +974,9 @@ fn a_formula_a_pivot_a_chart_and_a_view_are_there_after_a_restart() {
         cells(&q, "title"),
         ["Lab report", "Kanji quiz", "Essay draft", "Laundry"]
     );
-    // An empty cell counts as zero in arithmetic, as in a spreadsheet.
     assert_eq!(
         cells(&q, "Hours"),
-        [json!(2), json!(0.75), json!(1.5), json!(0)]
+        [json!(2), json!(0.75), json!(1.5), json!(0.25)]
     );
     let p = ok(
         &core,
@@ -992,7 +992,7 @@ fn a_formula_a_pivot_a_chart_and_a_view_are_there_after_a_restart() {
         "db.chart",
         json!({"table": "Tasks", "view": view_id, "x": "courseId", "y": ["estMin"], "agg": "sum"}),
     );
-    assert_eq!(c["series"][0]["values"], json!([135, 120, null]));
+    assert_eq!(c["series"][0]["values"], json!([135, 120, 15]));
     // A view is saved over, and deleted, and the delete undoes.
     ok(
         &core,
@@ -1029,7 +1029,7 @@ fn csv_goes_out_and_comes_back() {
             "sorts": [{"column": "title"}], "order": ["title", "courseId", "due", "estMin", "done"],
             "hidden": ["id", "spaceId", "type", "projectId", "milestoneId", "group", "parentTaskId", "scheduledDate",
                        "rrule", "difficulty", "estBy", "estReason", "adjustMin", "notes", "link", "doneAt", "source",
-                       "sourceId", "claudeReason", "tag", "public", "~heat", "~level", "~planned", "~logged", "~next"],
+                       "sourceId", "claudeReason", "tag", "public", "typeBy", "difficultyBy", "~heat", "~level", "~planned", "~logged", "~next"],
         }}),
     );
     assert_eq!(out["name"], "Tasks.csv");
@@ -1040,7 +1040,7 @@ fn csv_goes_out_and_comes_back() {
          Essay draft,JPN 101,2026-10-12 23:59,90,FALSE\r\n\
          Kanji quiz,JPN 101,2026-10-09 23:59,45,FALSE\r\n\
          Lab report,PHY 204,2026-10-06 17:00,120,FALSE\r\n\
-         Laundry,,,,FALSE\r\n"
+         Laundry,,,15,FALSE\r\n"
     );
     // To a file, when one is named.
     let path = setup.dir.path().join("tasks.csv");

@@ -132,7 +132,7 @@ fn claude_entries(root: &Path) -> Vec<wi_store::EntryInfo> {
 fn every_tool_answers_and_each_write_is_one_entry_by_claude() {
     let (_dir, root) = seeded();
     let mut h = Helper::start(&root);
-    assert_eq!(h.tools().len(), 21);
+    assert_eq!(h.tools().len(), 23);
 
     let before = dump(&root);
     let listed = h.call("list_tasks", json!({})).unwrap();
@@ -394,6 +394,69 @@ fn mail_is_recorded_per_account_with_a_priority_and_a_category() {
     }
 }
 
+/// The outbox: what the person asked for in Mail waits for Claude, is done
+/// once, and a thread's place (unread, archived) is kept on this Mac.
+#[test]
+fn the_outbox_holds_what_to_do_in_gmail_and_each_is_done_once() {
+    use wi_heat_store::{mail, Clock};
+    let (_dir, root) = seeded();
+    let mut h = Helper::start(&root);
+    assert_eq!(h.call("list_mail_outbox", json!({})).unwrap(), json!({"actions": []}));
+    h.call("record_mail_thread", json!({"thread_id": "th-1", "subject": "Quiz", "from": "Prof <p@uri.edu>", "received_at": "2026-10-07T09:00:00-04:00", "state": "nothing", "unread": true, "reason": "Nothing to do."})).unwrap();
+    let clock = Clock::system();
+    let queue = |a: Value| mail::queue(&mut Store::open(&root).unwrap(), &clock, a.as_object().unwrap());
+    assert_eq!(mail::states(&Store::open(&root).unwrap()).unwrap(), json!({"th-1": {"unread": true, "archived": false}}));
+    for (bad, why) in [
+        (json!({"kind": "delete", "threadId": "th-1"}), "Mail can send, reply, archive and mark a thread read or unread."),
+        (json!({"kind": "archive", "threadId": "nope"}), "That thread isn't in Mail."),
+        (json!({"kind": "reply", "threadId": "th-1", "body": "  "}), "Write the mail first."),
+        (json!({"kind": "send", "subject": "Hi", "body": "x"}), "Say who the mail is to."),
+        (json!({"kind": "send", "to": "p@uri.edu", "body": "x"}), "Give the mail a subject."),
+        (json!({"kind": "send", "to": "not an address", "subject": "Hi", "body": "x"}), "\"not an address\" isn't a mail address (To)."),
+    ] {
+        assert_eq!(queue(bad).unwrap_err().to_string(), why);
+    }
+    let entries = claude_entries(&root).len();
+    let reply = queue(json!({"kind": "reply", "threadId": "th-1", "body": "Thank you.\r\nLiam\n\n"})).unwrap();
+    let sent = queue(json!({"kind": "send", "to": "Prof <p@uri.edu>; ta@uri.edu", "subject": "Lab 6", "body": "When is it due?"})).unwrap();
+    queue(json!({"kind": "markRead", "threadId": "th-1"})).unwrap();
+    queue(json!({"kind": "archive", "threadId": "th-1"})).unwrap();
+    // The local part is done at once, whatever Gmail does later.
+    assert_eq!(mail::states(&Store::open(&root).unwrap()).unwrap(), json!({"th-1": {"unread": false, "archived": true}}));
+    // A change of mind replaces the one still waiting.
+    queue(json!({"kind": "unarchive", "threadId": "th-1"})).unwrap();
+
+    let waiting = h.call("list_mail_outbox", json!({})).unwrap();
+    let kinds: Vec<_> = waiting["actions"].as_array().unwrap().iter().map(|a| a["kind"].as_str().unwrap().to_string()).collect();
+    assert_eq!(kinds, ["reply", "send", "markRead", "unarchive"]);
+    assert_eq!(waiting["actions"][0]["body"], "Thank you.\nLiam", "the body as written, less trailing blank lines");
+    assert_eq!(waiting["actions"][1]["to"], "Prof <p@uri.edu>, ta@uri.edu");
+
+    let id = reply["id"].as_str().unwrap();
+    assert_eq!(h.call("finish_mail_action", json!({"id": id, "result": "done"})).unwrap()["status"], "done");
+    assert_eq!(h.call("finish_mail_action", json!({"id": id, "result": "done"})).unwrap_err(), "That action is done already. Don't do it twice.");
+    let failed = h.call("finish_mail_action", json!({"id": sent["id"], "result": "failed", "error": "Gmail refused the address."})).unwrap();
+    assert_eq!(failed["status"], "failed");
+    assert_eq!(h.call("finish_mail_action", json!({"id": "nope", "result": "done"})).unwrap_err(), "No action in the outbox has that id.");
+    let left: Vec<_> = h.call("list_mail_outbox", json!({})).unwrap()["actions"].as_array().unwrap().iter().map(|a| a["kind"].clone()).collect();
+    assert_eq!(left, [json!("markRead"), json!("unarchive")], "done and failed ones no longer wait");
+    // The person tries the failed one again, or throws it away.
+    let store = || Store::open(&root).unwrap();
+    assert_eq!(mail::actions(&store()).unwrap().iter().find(|a| a["id"] == sent["id"]).unwrap()["error"], "Gmail refused the address.");
+    mail::retry_or_discard(&mut store(), sent["id"].as_str().unwrap(), true).unwrap();
+    assert_eq!(mail::outbox(&store()).unwrap().len(), 3);
+    mail::retry_or_discard(&mut store(), sent["id"].as_str().unwrap(), false).unwrap();
+    assert_eq!(mail::outbox(&store()).unwrap().len(), 2);
+    assert_eq!(claude_entries(&root).len(), entries, "the outbox is no journal entry");
+
+    // Search reads the subject, the sender and the saved text.
+    h.call("save_mail_text", json!({"thread_id": "th-1", "messages": [{"from": "Prof", "sent_at": "2026-10-07T09:00:00-04:00", "text": "The quiz moves to Thursday in Swan Hall."}]})).unwrap();
+    assert_eq!(mail::search(&store(), "swan THURSDAY").unwrap(), ["th-1"]);
+    assert_eq!(mail::search(&store(), "prof quiz").unwrap(), ["th-1"]);
+    assert!(mail::search(&store(), "swan friday").unwrap().is_empty());
+    assert!(mail::search(&store(), "   ").unwrap().is_empty());
+}
+
 #[test]
 fn the_same_source_never_makes_a_second_row() {
     let (_dir, root) = seeded();
@@ -442,7 +505,12 @@ fn rules_that_need_the_library_answer_in_one_sentence() {
     let clamped = h.call("update_task", json!({"id": "t-essay", "estimate_min": 9000, "reason": "Long."})).unwrap();
     assert_eq!(clamped["clamped"], true);
     assert_eq!(clamped["task"]["estimate_min"], 600);
-    assert_eq!(h.call("add_task", json!({"title": "x", "course": "BIO 100", "reason": "r"})).unwrap_err(), "No course has the code BIO 100.");
+    // What isn't a course code names no course; a code Learn doesn't hold yet makes one, a stub that needs its syllabus.
+    assert_eq!(h.call("add_task", json!({"title": "x", "course": "Biology", "reason": "r"})).unwrap_err(), "No course has the code Biology.");
+    let made = h.call("add_task", json!({"title": "Lab report 2", "course": "bio100", "reason": "r"})).unwrap();
+    assert_eq!((made["task"]["course"].as_str(), made["task"]["type"].as_str(), made["task"]["estimate_min"].as_i64()), (Some("BIO 100"), Some("Lab"), Some(120)));
+    let stub = wi_heat_store::all(&Store::open(&root).unwrap(), "course").unwrap().into_iter().find(|c| c["code"] == "BIO 100").unwrap();
+    assert_eq!((stub["status"].as_str(), stub["name"].as_str()), (Some("stub"), Some("BIO 100")));
     assert_eq!(h.call("add_task", json!({"title": "x", "space": "Gym", "reason": "r"})).unwrap_err(), "No space is called Gym.");
     assert_eq!(h.call("log_focus", json!({"task_id": "nope", "minutes": 5, "reason": "r"})).unwrap_err(), "No task has that id.");
 }
@@ -452,7 +520,7 @@ fn with_no_library_every_call_says_to_open_the_app_and_nothing_is_made() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("Wi_WWAV");
     let mut h = Helper::start(&root);
-    assert_eq!(h.tools().len(), 21);
+    assert_eq!(h.tools().len(), 23);
     assert_eq!(h.call("list_tasks", json!({})).unwrap_err(), "No Wi_WWAV library yet. Open the app once.");
     assert!(!root.exists(), "the helper never makes a library");
 }

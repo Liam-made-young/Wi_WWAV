@@ -220,6 +220,9 @@ pub(crate) fn sync_calendars(i: &Inner, only: Option<&str>) -> Result<String, Co
         }
         line.push_str(&f);
     }
+    // What the sync brought, and the mail and events read since the last
+    // one, may name courses Learn doesn't hold yet, and tasks without a type.
+    let _ = crate::homes_cmd::tidy(i);
     i.bus.status("calendar", &line);
     Ok(line)
 }

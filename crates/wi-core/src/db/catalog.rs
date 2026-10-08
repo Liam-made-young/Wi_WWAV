@@ -197,6 +197,7 @@ fn relation_of(kind: &str, field: &str) -> Option<&'static str> {
         "projectId" => Some("project"),
         "milestoneId" => Some("milestone"),
         "parentTaskId" | "taskId" => Some("task"),
+        "noteId" => Some("note"),
         "habitId" => Some("habit"),
         "termId" => Some("term"),
         "calendarId" => Some("calendar"),
@@ -212,22 +213,23 @@ fn type_of(kind: &str, field: &str) -> Option<ColType> {
     Some(match field {
         "due" | "doneAt" | "startedAt" | "endedAt" | "triagedAt" | "postedAt" | "clearsAt"
         | "createdAt" | "updatedAt" | "recordedAt" | "receivedAt" | "lastSyncedAt" | "syncedAt"
-        | "savedAt" | "lastMessageAt" => ColType::DateTime,
+        | "savedAt" | "lastMessageAt" | "capturedAt" => ColType::DateTime,
         "start" | "end" if kind == "calendarEvent" => ColType::DateTime,
         "scheduledDate" | "date" | "targetDate" => ColType::Date,
         "done" | "public" | "dropped" | "pending" | "showCounter" | "allDay" | "unread"
         | "archived" | "needsReply" => ColType::Bool,
         "difficulty" | "estMin" | "adjustMin" | "minutes" | "start" | "focusMin"
         | "interruptions" | "hue" | "order" | "score" | "outOf" | "weight" => ColType::Number,
-        "types" | "categories" | "scale" | "log" | "keywords" | "messages" | "labels" => {
-            ColType::Json
-        }
+        "types" | "typeDefs" | "categories" | "scale" | "log" | "keywords" | "messages"
+        | "labels" | "attachments" | "exceptions" => ColType::Json,
         "link" if kind != "grade" && kind != "capture" => ColType::Json,
         "id" | "title" | "name" | "notes" | "markdown" | "text" | "code" | "type" | "group"
         | "rrule" | "status" | "source" | "sourceId" | "claudeReason" | "estBy" | "estReason"
         | "origin" | "room" | "view" | "persona" | "groupKind" | "groupLabel" | "subject"
         | "from" | "account" | "priority" | "category" | "summary" | "resultType" | "resultId"
-        | "tag" | "kind" | "link" => ColType::Text,
+        | "tag" | "kind" | "link" | "typeBy" | "difficultyBy" | "syllabusSource" | "file" => {
+            ColType::Text
+        }
         _ => return None,
     })
 }
@@ -249,6 +251,13 @@ fn kept_by_learn(kind: &str, field: &str) -> bool {
             | "postedAt"
             | "origin"
             | "tag"
+            | "typeBy"
+            | "difficultyBy"
+            | "syllabusSource"
+            | "file"
+            | "createdAt"
+            | "updatedAt"
+            | "capturedAt"
     ) || (kind == "focusSession")
         || (kind == "taskOccurrence")
 }
@@ -439,17 +448,26 @@ mod tests {
     }
 
     #[test]
-    fn every_schema_field_has_a_type_this_build_knows() {
-        // A field added to the schema still becomes a column; this says to give it a type here.
-        for (id, k) in learn_tables() {
-            let Some(k) = k else { continue };
-            for field in k.fields {
-                assert!(
-                    type_is_known(k.kind, field),
-                    "{id}.{field} has no type in catalog.rs"
-                );
-            }
-        }
+    fn a_field_this_build_has_never_heard_of_is_still_a_column() {
+        // Another branch may add a kind or a field to the schema before this
+        // file learns its type. It must still come out as a column, named
+        // from the field, typed from what it holds when the table loads
+        // (sheet.rs), and open to typing: nothing here may stop that merge.
+        let later = KindFields {
+            kind: "flashCard",
+            key: "id",
+            fields: &["id", "front", "easeFactor", "deckId", "reviewedAt"],
+            nullable: &[],
+            switch: false,
+            locked: None,
+        };
+        let cols = columns_of(&later, &[]);
+        let names: Vec<&str> = cols.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, ["ID", "Front", "Ease factor", "Deck", "Reviewed at"]);
+        assert!(!type_is_known("flashCard", "easeFactor"));
+        assert_eq!(cols[2].ty, ColType::Text);
+        assert!(cols[1].locked.is_none() && cols[2].locked.is_none());
+        assert_eq!(table_name("flashCard"), "Flash cards");
     }
 
     #[test]

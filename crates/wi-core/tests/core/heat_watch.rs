@@ -134,7 +134,7 @@ fn settings_claude_lists_claudes_changes_with_their_reasons_and_undoes_one_out_o
     let shown = snap(&core, "2026-10-07");
     assert_eq!(
         shown["derived"]["tasks"][task["id"].as_str().unwrap()]["estimate"],
-        json!({"min": 90, "by": "claude", "reason": "Two thousand words."})
+        json!({"min": 90, "by": "claude", "reason": "Two thousand words.", "typeFrom": null})
     );
     // Undo of Claude's estimate is refused once the person changed the task since.
     ok(
@@ -207,7 +207,7 @@ fn a_tool_switched_off_in_settings_is_missing_and_refused_by_the_helper() {
     let core = heat_core(&setup, "2026-10-07 09:00");
     snap(&core, "2026-10-07");
     let mut helper = McpHelper::start(core.library());
-    assert_eq!(helper.tools().len(), 21);
+    assert_eq!(helper.tools().len(), 23);
     let tools = |core: &Core| -> Vec<(String, bool)> {
         ok(core, "heat.claude.get", json!({}))["tools"]
             .as_array()
@@ -222,7 +222,7 @@ fn a_tool_switched_off_in_settings_is_missing_and_refused_by_the_helper() {
             .collect()
     };
     let before = tools(&core);
-    assert_eq!(before.len(), 21);
+    assert_eq!(before.len(), 23);
     assert!(
         before.iter().all(|(_, on)| *on),
         "every tool is on until switched off"
@@ -301,7 +301,7 @@ fn s2_11_settings_claude_shows_the_exact_lines_with_the_helpers_real_path() {
         got.get("note").is_none(),
         "the helper is there, so nothing needs building"
     );
-    assert_eq!(got["tools"].as_array().unwrap().len(), 21);
+    assert_eq!(got["tools"].as_array().unwrap().len(), 23);
     drop(core);
 
     // A path with a space is quoted in the shell line, and escaped in the JSON.

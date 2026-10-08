@@ -293,8 +293,16 @@ fn a_block_snaps_to_fifteen_minutes_and_is_moved_and_removed_with_its_words() {
         json!({"id": block["id"], "taskId": task["id"], "date": "2026-10-07", "start": 720, "minutes": 90}),
     );
     assert_eq!(resized["undo"], "Undo resize block");
-    // Resizing changes the block, never the task's estimate.
-    assert!(records(&snap(&core, "2026-10-07"), "task")[0]["estMin"].is_null());
+    // Resizing changes the block, never the task's estimate: it is still
+    // what its type gave it ("Mix" is a creative session).
+    assert_eq!(
+        records(&snap(&core, "2026-10-07"), "task")[0]["estMin"],
+        task["estMin"]
+    );
+    assert_eq!(
+        (task["estMin"].clone(), task["estBy"].clone()),
+        (json!(120), json!("type"))
+    );
     let gone = ok(
         &core,
         "heat.delete",
@@ -746,10 +754,27 @@ fn s2_4_tasks_are_edited_checked_off_and_deleted_with_what_belongs_to_them() {
         ),
         (
             Some("Grammar quiz 4"),
-            Some(3.0),
+            Some(2.0),
             Some(false),
             Some("you"),
             Some(false)
+        )
+    );
+    // What it left out, its title picked: a quiz, with a quiz's 20 minutes.
+    assert_eq!(
+        (
+            task["type"].as_str(),
+            task["typeBy"].as_str(),
+            task["estMin"].as_f64(),
+            task["estBy"].as_str(),
+            task["difficultyBy"].as_str()
+        ),
+        (
+            Some("Quiz"),
+            Some("rule"),
+            Some(20.0),
+            Some("type"),
+            Some("type")
         )
     );
     assert_eq!(
@@ -831,7 +856,7 @@ fn s2_4_tasks_are_edited_checked_off_and_deleted_with_what_belongs_to_them() {
     let derived = &snap(&core, "2026-10-07")["derived"]["tasks"][id];
     assert_eq!(
         derived["estimate"],
-        json!({"min": 5, "by": "you", "reason": null})
+        json!({"min": 5, "by": "you", "reason": null, "typeFrom": null})
     );
     assert_eq!(derived["heat"]["level"], "Warm");
     assert_eq!(

@@ -218,14 +218,14 @@ describe('"+" on Today', () => {
     await click([...sheet.querySelectorAll('button')].find((b) => b.textContent === 'Add task'));
     const made = [...rig.fake.store.task.values()].find((t) => t.title === 'Write the liner notes')!;
     expect(made).toMatchObject({ spaceId: 'sp-classes', due: null });
-    // A new task has no average yet, so difficulty 3 makes an hour; the lecture holds the morning until 11:15.
+    // No type's word is in the title, so it starts with the catch-all's 45 minutes; the lecture holds the morning until 11:15.
     expect(blocks().find((b) => b.taskId === made.id)).toMatchObject({
       date: '2026-10-07',
       start: 11 * 60 + 15,
-      minutes: 60,
+      minutes: 45,
     });
     expect(rowsIn('Planned').some((r) => r!.includes('Write the liner notes'))).toBe(true);
-    expect(rig.status().count).toBe('Planned ‘Write the liner notes’ at 11:15 AM, 1h.');
+    expect(rig.status().count).toBe('Planned ‘Write the liner notes’ at 11:15 AM, 45m.');
   });
 
   it('asks for a name first, and N opens the same sheet', async () => {

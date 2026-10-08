@@ -7,7 +7,7 @@
 
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import type { Grade, Id } from '../client';
-import { copy } from '../fmt';
+import { copy, courseLabel } from '../fmt';
 import { useDraft } from '../frame';
 import { useHeat } from '../store';
 
@@ -129,7 +129,7 @@ export function GradeSheet({ grade, courseId, onClose }: { grade?: Grade; course
           >
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.code}
+                {snap?.derived.courses[c.id]?.label ?? courseLabel(c)}
               </option>
             ))}
           </select>

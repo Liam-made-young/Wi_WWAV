@@ -133,6 +133,8 @@ export interface FrameApi {
   /** A tab's own sheet: the frame drops it from the top over its backdrop, and Esc closes it (2.7). */
   openSheet(sheet: ReactNode): void;
   closeSheet(): void;
+  /** Whether a sheet is down now, so nothing drops a second one over what is being typed. */
+  sheetOpen: boolean;
   /** What sheets' fields held when Esc closed them (see useDraft). */
   drafts: Map<string, unknown>;
   /** The focus length the LCD offers when idle: 25, 50 or a custom 10-90. */
@@ -203,8 +205,8 @@ export function useSidebarSlot(): HTMLElement | null {
 }
 
 export function useSheets() {
-  const { newTask, askTook, openSheet, closeSheet } = useFrame();
-  return { newTask, askTook, openSheet, closeSheet };
+  const { newTask, askTook, openSheet, closeSheet, sheetOpen } = useFrame();
+  return { newTask, askTook, openSheet, closeSheet, sheetOpen };
 }
 
 /**

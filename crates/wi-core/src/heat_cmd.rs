@@ -74,7 +74,8 @@ pub(crate) fn open_heat(i: &Inner) -> Result<(), CoreError> {
         heat::wrote_made(i, &made)?;
         i.bus.emit("heat", json!({"kinds": ["space"]}));
     }
-    Ok(())
+    // A library from before homes and types is brought over, once.
+    crate::homes_cmd::tidy_once(i)
 }
 
 pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError> {
@@ -101,6 +102,8 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             snap["school"] = school;
             // The mail accounts for Mail's switcher and Settings → Learn (3.10).
             snap["mailAccounts"] = Value::Array(mail::accounts(&store).map_err(core_error)?);
+            drop(store);
+            crate::mail_cmd::for_snapshot(i, &mut snap)?;
             Ok(snap)
         }
         "heat.whatItWouldTake" => {
@@ -254,6 +257,18 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
                 None => json!({"messages": null}),
             })
         }
+        // The rest of Mail (send, reply, archive, mark, search, the outbox, sync)
+        // is mail_cmd.rs's.
+        c if c.starts_with("heat.mail.")
+            && !matches!(c, "heat.mail.accounts.set" | "heat.mail.text") =>
+        {
+            crate::mail_cmd::call(i, c, a).unwrap_or_else(|| {
+                Err(CoreError::new(
+                    "unknown_command",
+                    format!("Mail has no command called {c}."),
+                ))
+            })
+        }
         "heat.mail.accounts.set" => {
             open_heat(i)?;
             let list = a
@@ -266,6 +281,16 @@ pub(crate) fn invoke(i: &Inner, cmd: &str, a: &Args) -> Result<Value, CoreError>
             wrote_outside(i, &["heatSetting"]);
             Ok(json!({ "accounts": kept }))
         }
+
+        // ----- homes and types: courses, projects, a syllabus, a task's type -----
+        "heat.course.importSyllabus"
+        | "heat.course.update"
+        | "heat.project.update"
+        | "heat.syllabus.accept"
+        | "heat.syllabus.discard"
+        | "heat.task.setType"
+        | "heat.task.reapplyDefaults"
+        | "heat.tasks.score" => crate::homes_cmd::invoke(i, cmd, a),
 
         // ----- Settings → Claude -----
         "heat.claude.get" => claude::get(i),

@@ -32,6 +32,7 @@ fn cat(id: &str, weight: f64) -> GradeCategory {
         name: id.into(),
         weight,
         keywords: vec![],
+        drop_lowest: None,
     }
 }
 

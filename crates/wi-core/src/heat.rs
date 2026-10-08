@@ -54,8 +54,8 @@ fn with_replica<T>(i: &Inner, f: impl FnOnce(&mut Replica) -> T) -> Result<T, Co
 
 /// Kinds that never go up: what a calendar's feed held and the calendar
 /// records themselves (their addresses are in the Keychain, and another Mac
-/// has no use for this one's), what isn't a record, and the text of your
-/// mail, which stays on this Mac (3.10).
+/// has no use for this one's), what isn't a record, the text of your
+/// mail, which stays on this Mac (3.10), and a syllabus waiting to be accepted.
 fn local_only(kind: &str) -> bool {
     [
         "calendar",
@@ -63,6 +63,9 @@ fn local_only(kind: &str) -> bool {
         "heatState",
         "heatSetting",
         "mailText",
+        "mailState",
+        "mailAction",
+        "syllabusDraft",
     ]
     .iter()
     // The Database tab's own tables, columns and views stay on this Mac.

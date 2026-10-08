@@ -297,9 +297,64 @@ describe('"+" and Triage inbox', () => {
     );
     await click($$(rig, '[role="dialog"][aria-label="New task"] button').find((b) => b.textContent === 'Add task'));
     const made = [...rig.fake.store.task.values()].find((t) => t.title === 'Draft the liner notes')!;
-    expect(made).toMatchObject({ spaceId: 'sp-classes', difficulty: 3, public: false });
+    // Type, difficulty and minutes were left at Automatic: no type's word is in the title, so it gets the catch-all's.
+    expect(made).toMatchObject({
+      spaceId: 'sp-classes',
+      type: 'Other',
+      typeBy: 'rule',
+      difficulty: 2,
+      estMin: 45,
+      estBy: 'default',
+      public: false,
+    });
     expect(await undoLabel()).toBe('Undo add task');
     expect(titles()).toContain('Draft the liner notes');
+  });
+
+  it('leaves type, difficulty and minutes out of the new task unless they are chosen', async () => {
+    await openTasks();
+    const sheet = () => $(rig, '[role="dialog"][aria-label="New task"]')!;
+    const field = (label: string) =>
+      $$(sheet(), '.field')
+        .find((f) => f.querySelector('span')!.textContent === label)!
+        .querySelector('input, select') as HTMLInputElement;
+    const puts = () => rig.calls.filter((c) => c.cmd === 'heat.put').map((c) => c.args.record as Record<string, unknown>);
+
+    await click($(rig, '.heat-plus'));
+    // All three start at Automatic.
+    expect([field('Type').value, field('Difficulty').value, field('Minutes').value]).toEqual(['', '', '']);
+    expect(field('Type').querySelector('option')!.textContent).toBe('Automatic');
+    expect(field('Difficulty').querySelector('option')!.textContent).toBe('Automatic');
+    await type(field('Task'), 'Kanji quiz 5');
+    await click($$(sheet(), 'button').find((b) => b.textContent === 'Add task'));
+    expect(puts()).toHaveLength(1);
+    expect(Object.keys(puts()[0])).not.toEqual(expect.arrayContaining(['type']));
+    expect(Object.keys(puts()[0])).not.toEqual(expect.arrayContaining(['difficulty']));
+    expect(Object.keys(puts()[0])).not.toEqual(expect.arrayContaining(['estMin']));
+    // The core picked the type from the title and filled the rest from the type.
+    const auto = [...rig.fake.store.task.values()].find((t) => t.title === 'Kanji quiz 5')!;
+    expect(auto).toMatchObject({ type: 'Quiz', typeBy: 'rule', difficulty: 2, difficultyBy: 'type', estMin: 20, estBy: 'type' });
+
+    // What is chosen is sent, and is the person's own.
+    await click($(rig, '.heat-plus'));
+    await type(field('Task'), 'Kanji quiz 6');
+    await type(field('Type'), 'Homework');
+    await type(field('Difficulty'), '4');
+    await type(field('Minutes'), '50');
+    await click($$(sheet(), 'button').find((b) => b.textContent === 'Add task'));
+    expect(puts()[1]).toMatchObject({ title: 'Kanji quiz 6', type: 'Homework', difficulty: 4, estMin: 50 });
+    const own = [...rig.fake.store.task.values()].find((t) => t.title === 'Kanji quiz 6')!;
+    expect(own).toMatchObject({ type: 'Homework', typeBy: 'you', difficulty: 4, difficultyBy: 'you', estMin: 50, estBy: 'you' });
+
+    // One of the three chosen leaves the other two to the core.
+    await click($(rig, '.heat-plus'));
+    await type(field('Task'), 'Lab 3 write-up');
+    await type(field('Difficulty'), '5');
+    await click($$(sheet(), 'button').find((b) => b.textContent === 'Add task'));
+    expect(puts()[2]).toMatchObject({ difficulty: 5 });
+    expect('type' in puts()[2] || 'estMin' in puts()[2]).toBe(false);
+    const mixed = [...rig.fake.store.task.values()].find((t) => t.title === 'Lab 3 write-up')!;
+    expect(mixed).toMatchObject({ type: 'Lab', typeBy: 'rule', difficulty: 5, difficultyBy: 'you', estMin: 120, estBy: 'type' });
   });
 
   it('adds into the space that is chosen', async () => {

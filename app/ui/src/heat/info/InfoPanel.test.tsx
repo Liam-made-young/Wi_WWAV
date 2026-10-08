@@ -7,7 +7,9 @@ import { ulidAt, ulidTime } from '../ulid';
 // step with the core's label; Claude's estimate without its hint, or a task
 // Claude added without "Claude, Oct 6 …" and its reason; the Public switch
 // on by default, or a block with a switch of its own; Esc losing a typed
-// value, or not sliding Get Info back.
+// value, or not sliding Get Info back; a type set by a plain patch instead of
+// the type's own command; a type's estimate without the type and where it is
+// defined; a task not saying which course, project or space it belongs to.
 
 let rig: Rig;
 afterEach(() => rig?.unmount());
@@ -274,5 +276,133 @@ describe('a ULID’s time', () => {
     expect(ulidTime(ulidAt(at))).toBe(at);
     expect(ulidTime('t-quiz4')).toBeNull();
     expect(ulidTime('ZZZZZZZZZZ0000000000000000')).toBeNull();
+  });
+});
+
+describe('a task’s home and type in Get Info', () => {
+  const calls = (cmd: string) => rig.calls.filter((c) => c.cmd === cmd).map((c) => c.args);
+  const hints = () => $$(rig, '.heat-info .heat-hint').map((h) => h.textContent);
+  const options = (label: string) => [...field(label).querySelectorAll('option')].map((o) => o.textContent);
+
+  it('says where the task belongs: its course, else its project, else its space', async () => {
+    rig = await mountHeat();
+    await select('Grammar quiz 4');
+    expect($(rig, '.heat-home-line')!.textContent).toBe('In JPN 201 · Intermediate Japanese');
+    // The course is named once in its select too.
+    expect(options('Course')).toEqual(['None', 'JPN 201 · Intermediate Japanese', 'MTH 142 · Calculus II']);
+    await select('Mix the second verse');
+    expect($(rig, '.heat-home-line')!.textContent).toBe('In EP');
+    await select('Renew passport');
+    expect($(rig, '.heat-home-line')!.textContent).toBe('In Personal');
+  });
+
+  it('offers Automatic, then the types of the course, the space and the defaults', async () => {
+    rig = await mountHeat();
+    await rig.client.updateCourse('c-jpn201', {
+      types: [{ name: 'Kanji drill', patterns: ['kanji drill'], estMin: 15, difficulty: 1 }],
+    });
+    await select('Grammar quiz 4');
+    expect(options('Type')).toEqual([
+      'Automatic',
+      'Kanji drill',
+      'Homework',
+      'Quiz',
+      'Listening',
+      'Reading',
+      'Lab',
+      'Project',
+      'Exam prep',
+      'Other',
+      'Worksheet',
+      'Email',
+      'Errand',
+      'Admin',
+      'Creative session',
+    ]);
+  });
+
+  it('sets the type through its own command, and Automatic hands it back to the title', async () => {
+    rig = await mountHeat();
+    await select('Grammar quiz 4');
+    await type(field('Type'), 'Homework');
+    await settle();
+    expect(calls('heat.task.setType')).toEqual([{ taskId: 't-quiz4', type: 'Homework' }]);
+    expect(calls('heat.patch').filter((a) => 'type' in (a.set as object))).toEqual([]);
+    expect(task('t-quiz4')).toMatchObject({ type: 'Homework', typeBy: 'you', estMin: 90, estBy: 'type', difficulty: 3 });
+    expect(field('Type').value).toBe('Homework');
+    expect(hints()).toContain('From the type Homework (your defaults).');
+    expect(await undoLabel()).toBe('Undo set type');
+
+    await type(field('Type'), '');
+    await settle();
+    expect(calls('heat.task.setType').at(-1)).toEqual({ taskId: 't-quiz4', type: null });
+    expect(task('t-quiz4')).toMatchObject({ type: 'Quiz', typeBy: 'rule', estMin: 20, estBy: 'type', difficulty: 2 });
+    expect(field('Type').value).toBe('');
+    expect(options('Type')[0]).toBe('Automatic (Quiz)');
+  });
+
+  it('names the course, the project or the space a type’s numbers came from', async () => {
+    rig = await mountHeat();
+    await rig.client.updateCourse('c-jpn201', {
+      types: [{ name: 'Quiz', patterns: ['quiz'], estMin: 25, difficulty: 2 }],
+    });
+    await rig.client.updateProject('proj-ep', {
+      types: [{ name: 'Music', patterns: ['mix', 'master'], estMin: 180, difficulty: 4 }],
+    });
+    // A space's types go through the plain patch, which retimes its tasks too.
+    const spaced = await rig.client.patch('space', 'sp-personal', {
+      typeDefs: [{ name: 'Health', patterns: ['dentist'], estMin: 15, difficulty: 1 }],
+    });
+    expect(spaced.retimed).toBe(1);
+    await select('Grammar quiz 4');
+    expect(field('Estimate').value).toBe('25');
+    expect(hints()).toContain('From the type Quiz (JPN 201 · Intermediate Japanese).');
+    // Minutes you set stay yours when the project's types change; the cover art's hint still says so.
+    await select('Mix the second verse');
+    expect(hints()).toContain('Set by you.');
+    await click(button(rig, 'Use the type’s default'));
+    expect(hints()).toContain('From the type Music (EP).');
+    await select('Call the dentist');
+    expect(hints()).toContain('From the type Health (Personal).');
+  });
+
+  it('says Claude will estimate a task no type matched', async () => {
+    rig = await mountHeat();
+    await rig.client.put('task', {
+      spaceId: 'sp-personal',
+      title: 'Untangle the cables',
+      due: null,
+      adjustMin: 0,
+      notes: '',
+      done: false,
+      doneAt: null,
+      source: 'you',
+    });
+    await select('Untangle the cables');
+    expect(field('Type').value).toBe('');
+    expect(options('Type')[0]).toBe('Automatic (Other)');
+    expect(field('Estimate').value).toBe('45');
+    expect(hints()).toContain('No type matched. Claude will estimate it.');
+    expect(button(rig, 'Use the type’s default')).toBeUndefined();
+  });
+
+  it('offers "Use the type’s default" only where something was set by hand, and it drops what was', async () => {
+    rig = await mountHeat();
+    await select('Grammar quiz 4');
+    expect(button(rig, 'Use the type’s default')).toBeUndefined();
+    await select('Renew passport');
+    expect(field('Estimate').value).toBe('40');
+    await click(button(rig, 'Use the type’s default'));
+    expect(calls('heat.task.reapplyDefaults')).toEqual([{ taskId: 't-passport', force: true }]);
+    expect(task('t-passport')).toMatchObject({ type: 'Admin', estMin: 20, estBy: 'type', difficulty: 1 });
+    expect(field('Estimate').value).toBe('20');
+    expect(hints()).toContain('From the type Admin (your defaults).');
+    expect(button(rig, 'Use the type’s default')).toBeUndefined();
+    expect(await undoLabel()).toBe('Undo reapply defaults');
+    // Setting the difficulty by hand brings the offer back.
+    await type(field('Difficulty'), '4');
+    await settle();
+    expect(task('t-passport')).toMatchObject({ difficulty: 4, difficultyBy: 'you', estBy: 'type' });
+    expect(button(rig, 'Use the type’s default')).toBeTruthy();
   });
 });

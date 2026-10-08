@@ -1,19 +1,23 @@
-// One course (docs/SPEC.md 3.1, 3.8): code and name, its percentage and a
-// letter pill, "Based on 65% of the course so far", the weights warning when
-// the weights don't add up, yellow banners for grades waiting for a score,
-// "What it would take", the items by category, and the course's Public
-// switch. The snapshot carries every number; the card writes them out.
+// One course (docs/SPEC.md 3.1, 3.8): its name written once ("ELE 209 · Intro
+// to Computer Systems Lab"), its percentage and a letter pill, "Based on 65%
+// of the course so far", the weights warning when the weights don't add up,
+// yellow banners for grades waiting for a score, "What it would take", the
+// items by category, and the course's Public switch. A course with no weights
+// yet asks for its syllabus instead of saying what it would take, and the
+// card takes a syllabus PDF dropped on it. The snapshot carries every number;
+// the card writes them out.
 
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import type { Course, Grade, GradeCategory, Id } from '../client';
 import { openExternal } from '../external';
-import { copy, sentenceOf } from '../fmt';
+import { copy, courseLabel, sentenceOf } from '../fmt';
 import { useSheets } from '../frame';
 import { PublicSwitch } from '../public/PublicSwitch';
 import { useHeat } from '../store';
 import { CourseSheet } from './CourseSheet';
 import { GradeSheet } from './GradeSheet';
 import { pctText, pillTone } from './format';
+import { SyllabusLines, useSyllabus } from './syllabus';
 import { DEFAULT_SCALE } from '../model/grades';
 
 export function CourseCard({
@@ -27,21 +31,25 @@ export function CourseCard({
 }) {
   const { snap } = useHeat();
   const { openSheet, closeSheet } = useSheets();
+  const syllabus = useSyllabus();
   const [open, setOpen] = useState<Id | null>(null);
   if (!snap) return null;
 
   const d = snap.derived.courses[course.id];
+  const label = d?.label ?? courseLabel(course);
+  const stub = (d?.status ?? course.status) === 'stub';
+  const needsSyllabus = d?.needsSyllabus === true;
   const grades = snap.records.grade.filter((g) => g.courseId === course.id);
   const waiting = grades.filter((g) => g.pending);
   const known = new Set(course.categories.map((c) => c.id));
   const loose = grades.filter((g) => !g.pending && (g.categoryId === null || !known.has(g.categoryId)));
 
   return (
-    <article className="heat-course" aria-label={`${course.code}, ${course.name}`}>
+    <article className="heat-course" aria-label={label} data-drop="syllabus" data-course-id={course.id}>
       <header className="heat-course-head">
         <div className="heat-course-name">
-          <h2 className="heat-course-code">{course.code}</h2>
-          <span>{course.name}</span>
+          <h2 className="heat-course-code">{label}</h2>
+          {stub && <span className="heat-tag heat-tag-quiet">{copy.syllabus.needs}</span>}
         </div>
         <div className="heat-course-mark">
           <span className="heat-course-pct">{d?.currentPct == null ? '—' : `${pctText(d.currentPct)}%`}</span>
@@ -60,6 +68,7 @@ export function CourseCard({
           {d.weights}
         </p>
       )}
+      <SyllabusLines drafts={syllabus.drafts.filter((s) => s.courseId === course.id)} />
 
       {waiting.map((g) => (
         <PendingBanner
@@ -71,7 +80,18 @@ export function CourseCard({
         />
       ))}
 
-      <WhatItWouldTake course={course} />
+      {needsSyllabus ? (
+        <div className="heat-take heat-syllabus-ask" role="group" aria-label={copy.syllabus.import}>
+          <p className="heat-take-text" data-text="secondary">
+            {copy.syllabus.needsHint}
+          </p>
+          <button type="button" className="gel" onClick={() => void syllabus.pick(course.id)}>
+            {copy.syllabus.import}
+          </button>
+        </div>
+      ) : (
+        <WhatItWouldTake course={course} />
+      )}
 
       <div className="heat-cats">
         {course.categories.map((c) => (

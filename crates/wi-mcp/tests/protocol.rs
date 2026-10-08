@@ -90,13 +90,13 @@ fn the_list_has_every_tool_with_closed_schemas() {
         assert_eq!(t["description"].as_str().unwrap().starts_with(tools::WRITE_PREAMBLE), writes, "{name}");
         assert_eq!(t["annotations"]["readOnlyHint"], tools::is_read_only(name), "{name}");
     }
-    assert_eq!(names.len(), 21);
+    assert_eq!(names.len(), 23);
     // The nine that journal: every tool that is neither a read nor a draft.
     let labelled: Vec<_> = tools::NAMES.iter().filter(|t| tools::undo_label(t).is_some()).collect();
     assert_eq!(labelled.len(), 9);
     for t in tools::NAMES {
         // save_mail_text writes, but outside the journal: the mail's text is no undo step.
-        let journals = !tools::is_read_only(t) && t != "save_mail_text";
+        let journals = !tools::is_read_only(t) && !matches!(t, "save_mail_text" | "finish_mail_action");
         assert_eq!(tools::undo_label(t).is_some(), journals, "{t}");
     }
 }
@@ -108,7 +108,7 @@ fn a_tool_switched_off_is_missing_and_refused() {
     let r = ask(&mut b, json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}));
     let names: Vec<_> = r["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].clone()).collect();
     assert!(!names.contains(&json!("log_focus")));
-    assert_eq!(names.len(), 20);
+    assert_eq!(names.len(), 22);
     let r = call(&mut b, "log_focus", json!({"task_id": "t1", "minutes": 25, "reason": "Worked on it."}));
     assert_eq!(r["result"]["isError"], true);
     assert_eq!(r["result"]["content"][0]["text"], "This tool is switched off in Wi_WWAV.");
@@ -148,6 +148,10 @@ fn arguments_outside_the_table_never_reach_the_store() {
         ("draft_block", json!({"task_id": "t1", "start": "14:00", "minutes": 30})),
         ("list_habits", json!({"tick": "h1"})),
         ("list_mail_accounts", json!({"add": "a@b.edu"})),
+        ("list_mail_outbox", json!({"send": true})),
+        ("finish_mail_action", json!({"id": "a", "result": "sent"})),
+        ("finish_mail_action", json!({"result": "done"})),
+        ("record_mail_thread", json!({"thread_id": "a", "subject": "s", "from": "f", "received_at": "2026-10-07T09:00:00-04:00", "state": "nothing", "unread": "yes", "reason": "r"})),
         ("save_mail_text", json!({"thread_id": "a", "messages": []})),
         ("save_mail_text", json!({"thread_id": "a", "messages": "Dear Liam"})),
         ("save_mail_text", json!({"thread_id": "a"})),
@@ -297,7 +301,19 @@ fn the_read_mail_prompt_sorts_every_account_or_one() {
     let get = |b: &mut Fake, params: Value| ask(b, json!({"jsonrpc": "2.0", "id": 1, "method": "prompts/get", "params": params}));
     let listed = ask(&mut b, json!({"jsonrpc": "2.0", "id": 2, "method": "prompts/list"}));
     let names: Vec<_> = listed["result"]["prompts"].as_array().unwrap().iter().map(|p| p["name"].clone()).collect();
-    assert_eq!(names, [json!("school_mail"), json!("read_mail")]);
+    assert_eq!(names, [json!("school_mail"), json!("read_mail"), json!("send_mail")]);
+    // The outbox job names the outbox's tools and no tool that reads mail.
+    let job = get(&mut b, json!({"name": "send_mail"}));
+    let text = job["result"]["messages"][0]["content"]["text"].as_str().unwrap();
+    for tool in ["list_mail_outbox", "finish_mail_action"] {
+        assert!(text.contains(tool) && tools::NAMES.contains(&tool), "{tool}");
+    }
+    for line in ["character for character", "Never do an action twice", "Don't read, search or open any other mail"] {
+        assert!(text.contains(line), "{line}");
+    }
+    for reads in ["get_thread", "search_threads", "list_mail ", "record_mail_thread"] {
+        assert!(!text.contains(reads), "{reads}");
+    }
 
     let all = get(&mut b, json!({"name": "read_mail"}));
     let text = all["result"]["messages"][0]["content"]["text"].as_str().unwrap();

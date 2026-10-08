@@ -11,12 +11,13 @@ use wi_heat::model::{habits, plan, zone};
 use wi_store::{Actor, Store};
 
 use crate::derive::{self, World};
+use crate::homes::{self, Sighting};
 use crate::{
     all, change, kind, mail, num, one, parse_instant, put, refused, round, schema, Clock, Result,
 };
 
 /// The tools, in 3.13's order.
-pub const TOOLS: [&str; 21] = [
+pub const TOOLS: [&str; 23] = [
     "list_tasks",
     "add_task",
     "update_task",
@@ -38,6 +39,8 @@ pub const TOOLS: [&str; 21] = [
     "list_mail_accounts",
     "list_mail",
     "save_mail_text",
+    "list_mail_outbox",
+    "finish_mail_action",
 ];
 
 /// The most days `get_schedule` reads at once.
@@ -83,6 +86,26 @@ pub fn call(
         "add_capture" => add_capture(store, clock, args),
         "list_mail_accounts" => list_mail_accounts(store),
         "list_mail" => list_mail(store, clock, args),
+        "list_mail_outbox" => Ok(json!({"actions": mail::outbox(store)?
+            .iter()
+            .map(|a| {
+                json!({
+                    "id": a["id"], "kind": a["kind"], "thread_id": a["threadId"], "account": a["account"],
+                    "to": a["to"], "cc": a["cc"], "subject": a["subject"], "body": a["body"],
+                })
+            })
+            .collect::<Vec<_>>()})),
+        "finish_mail_action" => {
+            let done = text(args, "result") == Some("done");
+            let doc = mail::finish(
+                store,
+                clock,
+                text(args, "id").unwrap_or_default(),
+                done,
+                text(args, "error").unwrap_or_default(),
+            )?;
+            Ok(json!({"id": doc["id"], "status": doc["status"]}))
+        }
         "save_mail_text" => mail::save_text(
             store,
             clock,
@@ -172,25 +195,59 @@ pub fn add_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
             None => return refused("There's no space yet. Open Learn in Wi_WWAV once."),
         },
     };
-    let course = match text(args, "course") {
-        Some(code) => Some(world.course(code)?.id.clone()),
+    // A thread Claude already recorded points at the task it made.
+    let thread = text(args, "mail_thread_id").and_then(|t| {
+        world
+            .mail
+            .iter()
+            .find(|m| m["gmailThreadId"].as_str() == Some(t))
+            .cloned()
+    });
+    // The task's course: the one Claude names, else the one its thread is
+    // about, and that only where tasks are grouped by course: mail about
+    // work or home never gets a course. A code Learn doesn't hold yet makes
+    // the course, a stub until its syllabus comes.
+    let school = homes::school_of(&world);
+    let by_course = space.group_kind == wi_heat::model::records::GroupKind::Course;
+    let named = text(args, "course").map(str::to_string).or_else(|| {
+        thread
+            .as_ref()
+            .filter(|_| by_course)
+            .and_then(|t| t["course"].as_str().map(str::to_string))
+    });
+    let mut found = homes::Found::default();
+    let course = match &named {
         None => None,
+        Some(code) => match world.course(code) {
+            Ok(c) => Some(c.id.clone()),
+            Err(e) => {
+                let sighting =
+                    wi_heat::homes::offering_in(&school.course_pattern, &code.to_uppercase())
+                        .filter(|o| wi_heat::homes::squash(&o.code) == wi_heat::homes::squash(code))
+                        .map(|o| Sighting {
+                            code: o.code,
+                            name: None,
+                            term: None,
+                            sure: true,
+                        });
+                found =
+                    homes::courses_from(&world, clock, &sighting.into_iter().collect::<Vec<_>>());
+                match found.id_of(&world, code) {
+                    Some(id) => Some(id),
+                    // What Claude passed isn't a course code: said, when it was asked for by name.
+                    None if text(args, "course").is_some() => return Err(e),
+                    None => None,
+                }
+            }
+        },
     };
     let due = text(args, "due").map(parse_instant).transpose()?;
-    let kind_of = text(args, "type")
-        .map(str::to_string)
-        .or_else(|| space.types.first().cloned())
-        .unwrap_or_else(|| "Task".to_string());
     let id = wwav_ids::ulid();
     let mut task = json!({
         "id": id,
         "spaceId": space.id,
         "title": text(args, "title").unwrap_or_default(),
-        "type": kind_of,
         "due": due.map(num).unwrap_or(Value::Null),
-        "difficulty": num(DEFAULT_DIFFICULTY),
-        "estMin": null,
-        "estBy": "default",
         "adjustMin": 0,
         "notes": args.get("notes").and_then(Value::as_str).unwrap_or(""),
         "done": false,
@@ -207,15 +264,22 @@ pub fn add_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) -> 
     if let Some(reason) = text(args, "reason") {
         task["claudeReason"] = json!(reason);
     }
-    // A thread Claude already recorded points at the task it made.
-    let thread = text(args, "mail_thread_id").and_then(|t| {
-        world
-            .mail
-            .iter()
-            .find(|m| m["gmailThreadId"].as_str() == Some(t))
-            .cloned()
-    });
+    if let Some(kind_of) = text(args, "type") {
+        task["type"] = json!(kind_of);
+        task["typeBy"] = json!("claude");
+    }
+    // Its type, and the minutes and difficulty that type starts with: a task
+    // from mail is estimated like any other, in whatever space it lands.
+    let mut ctx = homes::Ctx::load(&world);
+    found.courses.iter().for_each(|c| ctx.set_course(c));
+    if let Some(m) = task.as_object_mut() {
+        homes::inherit(m, &ctx, true, false);
+    }
+    let made = found.writes();
     let undo = change(store, "Claude's task", claude("add_task", args), |txn| {
+        for (k, r) in &made {
+            put(txn, k, r)?;
+        }
         put(txn, kind::TASK, &task)?;
         if let Some(mut thread) = thread {
             thread["taskId"] = json!(id);
@@ -254,6 +318,7 @@ pub fn update_task(store: &mut Store, clock: &Clock, args: &Map<String, Value>) 
     }
     if let Some(d) = difficulty {
         task["difficulty"] = num(d as f64);
+        task["difficultyBy"] = json!("claude");
     }
     task["estReason"] = json!(text(args, "reason").unwrap_or_default());
     let undo = change(
@@ -336,7 +401,10 @@ pub fn add_pending_grade(store: &mut Store, args: &Map<String, Value>) -> Result
     let mut grade = json!({
         "id": wwav_ids::ulid(),
         "courseId": course.id,
-        "categoryId": derive::guess_category(item, course),
+        "categoryId": homes::guess_category(
+            world.raw_courses.iter().find(|c| c["id"] == json!(course.id)).unwrap_or(&Value::Null),
+            item,
+        ),
         "title": item,
         "score": null,
         "outOf": 100,
@@ -435,18 +503,37 @@ pub fn record_mail_thread(store: &mut Store, args: &Map<String, Value>) -> Resul
     if let Some(category) = text(args, "category") {
         thread["category"] = json!(category);
     }
+    let unread = args.get("unread").and_then(Value::as_bool);
     if let Some(course) = text(args, "course") {
         thread["course"] = json!(course);
     }
     if let Some(task) = text(args, "task_id") {
         thread["taskId"] = json!(task);
     }
+    // A course the thread names and Learn doesn't hold yet is made here, a
+    // stub until its syllabus comes, so Grades lists every course Mail does;
+    // one still named by its code takes the name the subject gives it.
+    let courses = homes::courses_from(
+        &world,
+        &Clock::at(received, jiff::tz::TimeZone::UTC),
+        &homes::mail_sightings(&homes::school_of(&world), &thread),
+    )
+    .writes();
     let undo = change(
         store,
         "Claude's mail note",
         claude("record_mail_thread", args),
-        |txn| put(txn, kind::MAIL, &thread),
+        |txn| {
+            for (k, r) in &courses {
+                put(txn, k, r)?;
+            }
+            put(txn, kind::MAIL, &thread)
+        },
     )?;
+    // Whether Gmail has it unread, kept beside the record, outside the journal.
+    if let Some(unread) = unread {
+        mail::set_flags(store, thread_id, Some(unread), None)?;
+    }
     Ok(json!({"thread": thread, "created": created, "undo_label": undo}))
 }
 

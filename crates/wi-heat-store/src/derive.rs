@@ -23,6 +23,10 @@ const DAY_STARTS_MIN: f64 = 7.0 * 60.0;
 /// reason, the Public switch) survive a write.
 pub(crate) struct World {
     pub spaces: Vec<Space>,
+    /// Beside `spaces`, `projects` and `courses`: the types each one keeps.
+    pub raw_spaces: Vec<Value>,
+    pub raw_projects: Vec<Value>,
+    pub raw_courses: Vec<Value>,
     pub raw_tasks: Vec<Value>,
     pub tasks: Vec<Task>,
     pub occurrences: Vec<TaskOccurrence>,
@@ -38,6 +42,8 @@ pub(crate) struct World {
     pub grades: Vec<Grade>,
     pub mail: Vec<Value>,
     pub events: Vec<CalendarEvent>,
+    /// The School sheet's course pattern, for reading a course out of a title.
+    pub course_pattern: String,
 }
 
 /// The records of one kind that read as their type, beside their raw JSON.
@@ -68,23 +74,33 @@ impl World {
     pub fn load(store: &Store) -> Result<World> {
         let (tasks, raw_tasks) = typed(kind::TASK, all(store, kind::TASK)?);
         let (grades, raw_grades) = typed(kind::GRADE, all(store, kind::GRADE)?);
+        let (spaces, raw_spaces) = typed(kind::SPACE, all(store, kind::SPACE)?);
+        let (projects, raw_projects) = typed(kind::PROJECT, all(store, kind::PROJECT)?);
+        let (courses, raw_courses) = typed(kind::COURSE, all(store, kind::COURSE)?);
         Ok(World {
-            spaces: typed(kind::SPACE, all(store, kind::SPACE)?).0,
+            spaces,
+            raw_spaces,
+            raw_projects,
+            raw_courses,
             tasks,
             raw_tasks,
             occurrences: typed(kind::OCCURRENCE, all(store, kind::OCCURRENCE)?).0,
             blocks: typed(kind::BLOCK, all(store, kind::BLOCK)?).0,
             sessions: typed(kind::FOCUS, all(store, kind::FOCUS)?).0,
             habits: typed(kind::HABIT, all(store, kind::HABIT)?).0,
-            projects: typed(kind::PROJECT, all(store, kind::PROJECT)?).0,
+            projects,
             milestones: typed(kind::MILESTONE, all(store, kind::MILESTONE)?).0,
             captures: typed(kind::CAPTURE, all(store, kind::CAPTURE)?).0,
             terms: typed(kind::TERM, all(store, kind::TERM)?).0,
-            courses: typed(kind::COURSE, all(store, kind::COURSE)?).0,
+            courses,
             grades,
             raw_grades,
             mail: all(store, kind::MAIL)?,
             events: typed(kind::EVENT, all(store, kind::EVENT)?).0,
+            course_pattern: crate::setting(store, "school")?
+                .and_then(|s| s["codePattern"].as_str().map(str::to_string))
+                .filter(|p| !p.is_empty())
+                .unwrap_or_else(|| wi_heat::brightspace::DEFAULT_COURSE_PATTERN.to_string()),
         })
     }
 
@@ -171,6 +187,9 @@ pub(crate) fn task_view(
     });
     if let Some(code) = course {
         view["course"] = json!(code);
+    }
+    if let Some(home) = crate::homes::home_of(world, task) {
+        view["home"] = home["label"].clone();
     }
     if let Some(day) = &task.scheduled_date {
         view["scheduled"] = json!(day);
@@ -349,13 +368,6 @@ pub(crate) fn course_view(world: &World, course: &Course) -> Value {
         "decided_pct": num(round(decided, 1)),
         "letter": current.map(|p| Value::String(grades::letter_for(p, &scale))).unwrap_or(Value::Null),
     })
-}
-
-/// The category a grade's title suggests, from the course's keywords.
-pub(crate) fn guess_category(title: &str, course: &Course) -> Value {
-    grades::guess_category(title, &course.categories)
-        .map(Value::String)
-        .unwrap_or(Value::Null)
 }
 
 /// A task's measured minutes: its focus sessions plus Get Info's "Took".

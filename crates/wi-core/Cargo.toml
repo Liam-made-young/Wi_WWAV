@@ -11,6 +11,8 @@ description = "The app's Rust core: the library, undo, the listening player, the
 wi-store.workspace = true
 wi-heat.workspace = true
 wi-heat-store = { path = "../wi-heat-store" }
+# For the words of the two mail jobs the core runs (mail_cmd.rs).
+wi-mcp = { path = "../wi-mcp" }
 wwav-formats.workspace = true
 wwav-wire.workspace = true
 wwav-ids.workspace = true
@@ -29,6 +31,7 @@ jiff = { version = "0.2", default-features = false, features = ["std", "tz-syste
 libc = "0.2"
 ureq = { version = "2", default-features = false, features = ["tls", "json"] }
 zip = { version = "8", default-features = false }
+pdf-extract = "0.12.1"
 
 [dev-dependencies]
 tempfile.workspace = true

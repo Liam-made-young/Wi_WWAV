@@ -53,7 +53,9 @@ fn key_of<'a>(k: &str, record: &'a Value) -> Option<&'a str> {
     record.get(field).and_then(Value::as_str)
 }
 
-/// Writes one record after `schema::finish`, as one entry.
+/// Writes one record after `schema::finish`, as one entry. A home whose
+/// types changed takes its tasks with it in the same entry (homes.rs); the
+/// last of the answer is how many records that moved.
 fn write_record(
     store: &mut Store,
     clock: &Clock,
@@ -62,9 +64,15 @@ fn write_record(
     candidate: Map<String, Value>,
     world: &World,
     label: Option<&str>,
-) -> Result<(Committed, Value, bool)> {
+) -> Result<(Committed, Value, bool, usize)> {
     let done = schema::finish(sp, existing, candidate, world, clock, &mut ulid)?;
     let record = Value::Object(done.record);
+    let follow = match sp.name {
+        kind::COURSE | kind::PROJECT | kind::SPACE => {
+            crate::homes::after_home_write(world, sp.name, existing, &record)
+        }
+        _ => Vec::new(),
+    };
     let label = match (label, existing) {
         (Some(l), _) => l.to_string(),
         (None, None) if sp.name == kind::BLOCK => "add block".to_string(),
@@ -72,9 +80,13 @@ fn write_record(
         (None, Some(old)) => edit_label(sp.name, old, &record),
     };
     let c = commit(store, &label, the_person(), |txn| {
-        put_value(txn, sp.name, &record)
+        put_value(txn, sp.name, &record)?;
+        for (k, r) in &follow {
+            put_value(txn, k, r)?;
+        }
+        Ok(())
     })?;
-    Ok((c, record, done.clamped))
+    Ok((c, record, done.clamped, follow.len()))
 }
 
 /// `heat.put`: a record made or replaced, checked against its kind.
@@ -89,7 +101,7 @@ pub fn put_record(store: &mut Store, clock: &Clock, k: &str, record: &Value) -> 
         Some(key) => one(store, k, key)?,
         None => None,
     };
-    let (c, record, _) = write_record(
+    let (c, record, _, moved) = write_record(
         store,
         clock,
         sp,
@@ -98,7 +110,7 @@ pub fn put_record(store: &mut Store, clock: &Clock, k: &str, record: &Value) -> 
         &world,
         None,
     )?;
-    Ok(Outcome::new(json!({ "record": record }), c))
+    Ok(Outcome::new(home_answer(k, record, moved), c))
 }
 
 /// `heat.patch`: some fields of a record changed, the rest untouched.
@@ -124,8 +136,17 @@ pub fn patch_record(
     for (field, value) in set {
         candidate.insert(field.clone(), value.clone());
     }
-    let (c, record, _) = write_record(store, clock, sp, Some(&old), candidate, &world, None)?;
-    Ok(Outcome::new(json!({ "record": record }), c))
+    let (c, record, _, moved) =
+        write_record(store, clock, sp, Some(&old), candidate, &world, None)?;
+    Ok(Outcome::new(home_answer(k, record, moved), c))
+}
+
+/// `{record}`, and for a home how many tasks and grades its change moved.
+fn home_answer(k: &str, record: Value, moved: usize) -> Value {
+    match k {
+        kind::COURSE | kind::PROJECT | kind::SPACE => json!({ "record": record, "retimed": moved }),
+        _ => json!({ "record": record }),
+    }
 }
 
 /// `heat.delete`: a record gone, with what belongs to it, as one entry.
@@ -468,7 +489,7 @@ pub fn estimate(
     if let Some(m) = est_min {
         candidate.insert("estMin".into(), m.map_or(Value::Null, num));
     }
-    let (c, record, clamped) = write_record(
+    let (c, record, clamped, _) = write_record(
         store,
         clock,
         sp,
@@ -537,7 +558,7 @@ pub fn put_block(store: &mut Store, clock: &Clock, args: &Map<String, Value>) ->
     let minutes = minutes.min(last - start);
     m.insert("start".into(), num(start));
     m.insert("minutes".into(), num(minutes));
-    let (c, record, _) = write_record(store, clock, sp, old.as_ref(), m, &world, None)?;
+    let (c, record, _, _) = write_record(store, clock, sp, old.as_ref(), m, &world, None)?;
     Ok(Outcome::new(json!({ "block": record }), c))
 }
 
@@ -900,6 +921,15 @@ pub fn import(store: &mut Store, _clock: &Clock, json_in: &Value) -> Result<Outc
     queue(kind::SPACE, values(&imported.spaces))?;
     queue(kind::TERM, values(&imported.terms))?;
     queue(kind::COURSE, values(&imported.courses))?;
+    // What moves in gets a type and its numbers like any other task; an
+    // estimate the artifact held stays the person's.
+    let mut homes = crate::homes::Ctx::load(&world);
+    for s in values(&imported.spaces) {
+        homes.set_space(&s);
+    }
+    for c in values(&imported.courses) {
+        homes.set_course(&c);
+    }
     // The ids of tasks that came through mail or the calendar are what Claude
     // and the feed match against: they become `sourceId`s too (3.16).
     let tasks: Vec<Value> = imported
@@ -911,6 +941,11 @@ pub fn import(store: &mut Store, _clock: &Clock, json_in: &Value) -> Result<Outc
                 && t.get("sourceId").is_none()
             {
                 t["sourceId"] = t["id"].clone();
+            }
+            if t["done"] != true {
+                if let Some(m) = t.as_object_mut() {
+                    crate::homes::inherit(m, &homes, true, false);
+                }
             }
             t
         })

@@ -3,15 +3,18 @@
 // it back. Every field saves as it is left, as its own undo step with the
 // core's label ("Undo rename task", "Undo estimate"); Return and ⌘I put the
 // keyboard in the first field. A task Claude added shows its source and the
-// reason it gave; an estimate Claude made says so in the field's hint. The
-// Public switch is off until it is turned on, and is one item at a time.
+// reason it gave; an estimate Claude made says so in the field's hint, and
+// one a type gave names the type and where it is defined. The line under the
+// source says where the task belongs: its course, else its project, else its
+// space. The Public switch is off until it is turned on, and is one item at
+// a time.
 
 import { type ReactNode, useState } from 'react';
 import { shortMonthDay, clock } from '../../shared/time/format';
 import { dayKey, minuteOfDay } from '../../shared/time/zone';
 import { useActions } from '../actions';
-import type { Id, Task, TimeBlock } from '../client';
-import { copy, dueText, effectiveDue, formatMinutes, plural } from '../fmt';
+import type { Id, Task, TaskEstimate, TimeBlock } from '../client';
+import { copy, courseLabel, dueText, effectiveDue, formatMinutes, homeLabel, plural } from '../fmt';
 import { useSelection } from '../frame';
 import { fieldsOf, instantOf } from '../sheets';
 import { useHeat } from '../store';
@@ -166,6 +169,40 @@ function TaskInfo({ id }: { id: Id }) {
   const courses = snap?.records.course ?? [];
   const milestones = (snap?.records.milestone ?? []).filter((m) => m.spaceId === task.spaceId);
   const projects = (snap?.records.project ?? []).filter((p) => p.spaceId === task.spaceId);
+  const nameOf = (c: (typeof courses)[number]) => snap?.derived.courses[c.id]?.label ?? courseLabel(c);
+
+  // Where the task belongs: its course, else its project, else its space.
+  const course = task.courseId ? idx.course.get(task.courseId) : undefined;
+  const home = homeLabel(d, {
+    course: course ? nameOf(course) : undefined,
+    project: task.projectId ? idx.project.get(task.projectId)?.title : undefined,
+    space: space?.name,
+  });
+
+  // The types a picker offers: the home's, the space's, the defaults, and the one the task has.
+  const offered = snap?.derived.types;
+  const typeNames = [
+    ...new Set([
+      ...(task.courseId ? (offered?.courses[task.courseId] ?? []) : []),
+      ...(task.projectId ? (offered?.projects[task.projectId] ?? []) : []),
+      ...(offered?.spaces[task.spaceId] ?? []),
+      ...(space?.types ?? []),
+      ...(offered?.global ?? []),
+      task.type,
+    ]),
+  ].filter(Boolean);
+  // A type the title or Claude picked reads as Automatic, with the type it came to.
+  const automatic = task.typeBy !== undefined && task.typeBy !== 'you';
+  const where =
+    d?.estimate.typeFrom === 'course' || d?.estimate.typeFrom === 'project'
+      ? home
+      : d?.estimate.typeFrom === 'space'
+        ? (space?.name ?? null)
+        : d?.estimate.typeFrom === 'global'
+          ? copy.types.yourDefaults
+          : null;
+  const unscored = !task.done && !d?.estimate.typeFrom && (snap?.derived.unscored ?? 0) > 0;
+  const setByHand = task.estBy === 'you' || task.difficultyBy === 'you';
 
   return (
     <Frame title={task.title} onClose={() => selectTask(null)}>
@@ -183,6 +220,11 @@ function TaskInfo({ id }: { id: Id }) {
         {source.line}
       </p>
       {source.reason && <p className="heat-reason">{source.reason}</p>}
+      {home && (
+        <p className="heat-source-line heat-home-line" data-text="secondary">
+          {copy.homes.in(home)}
+        </p>
+      )}
 
       <div className="heat-fields">
         <Select
@@ -195,7 +237,7 @@ function TaskInfo({ id }: { id: Id }) {
           <Select
             label={space.groupLabel}
             value={task.courseId ?? ''}
-            options={[{ value: '', label: 'None' }, ...courses.map((c) => ({ value: c.id, label: c.code }))]}
+            options={[{ value: '', label: 'None' }, ...courses.map((c) => ({ value: c.id, label: nameOf(c) }))]}
             onChange={(v) => patch({ courseId: v || NONE })}
           />
         )}
@@ -220,9 +262,12 @@ function TaskInfo({ id }: { id: Id }) {
         )}
         <Select
           label="Type"
-          value={task.type}
-          options={[...new Set([...(space?.types ?? []), task.type])].map((t) => ({ value: t, label: t }))}
-          onChange={(type) => patch({ type })}
+          value={automatic ? '' : task.type}
+          options={[
+            { value: '', label: automatic && task.type ? copy.types.automaticAs(task.type) : copy.types.automatic },
+            ...typeNames.map((t) => ({ value: t, label: t })),
+          ]}
+          onChange={(type) => void act(client.setType(id, type || null))}
         />
         <Field label="Due" type="date" saved={due.date} commit={(day) => commitDue(day, due.time)} />
         <Field
@@ -280,9 +325,20 @@ function TaskInfo({ id }: { id: Id }) {
           commit={(v) => Number(v) > 0 && void estimate({ estMin: Number(v) })}
         />
         <p className="heat-hint" data-text="secondary">
-          {estimateHint(task, d?.estimate)}
+          {estimateHint(task, d?.estimate, where, unscored)}
         </p>
         {d?.estimate.by === 'claude' && d.estimate.reason && <p className="heat-reason">{d.estimate.reason}</p>}
+        {setByHand && (
+          <p className="heat-hint">
+            <button
+              type="button"
+              className="gel plain"
+              onClick={() => void act(client.reapplyDefaults({ taskId: id, force: true }))}
+            >
+              {copy.types.useDefault}
+            </button>
+          </p>
+        )}
         <Field
           label={copy.tasks.took}
           type="number"
@@ -368,13 +424,19 @@ function sourceLine(task: Task, tz: string): { line: string; reason?: string } {
   return { line: copy.source[task.source as keyof typeof copy.source] ?? copy.source.you };
 }
 
-/** The estimate field's hint: who made it, and from what. */
-function estimateHint(task: Task, estimate: { min: number; by: 'you' | 'claude' | 'default' } | undefined): string {
+/**
+ * The estimate field's hint: who made it, and from what. `where` names the
+ * level a type's numbers came from ("JPN 101", "Classes", "your defaults");
+ * `unscored` says no type matched and Claude has yet to give better.
+ */
+function estimateHint(task: Task, estimate: TaskEstimate | undefined, where: string | null, unscored: boolean): string {
   if (!estimate) return '';
   if (estimate.by === 'claude') {
     return `Claude's estimate: ${formatMinutes(estimate.min)}, difficulty ${task.difficulty}. It read the title, the notes and your past averages.`;
   }
   if (estimate.by === 'you') return 'Set by you.';
+  if (estimate.by === 'type') return copy.types.fromType(task.type, where);
+  if (unscored) return copy.types.noMatch;
   return 'Learn’s estimate: your average for this type, or difficulty × 20 minutes.';
 }
 

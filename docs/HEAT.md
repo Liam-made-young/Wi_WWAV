@@ -2,7 +2,7 @@
 
 How Learn (`docs/SPEC.md` chapter 3) and its MCP server (3.13, 8.8) are built:
 where each part lives, what is stored, the core's `heat.*` commands, and the
-twenty-one tools. The spec says what Learn does; this file says how the parts talk.
+twenty-three tools. The spec says what Learn does; this file says how the parts talk.
 Where they disagree, the spec wins and this file is fixed.
 
 ## Where things live
@@ -12,12 +12,19 @@ Where they disagree, the spec wins and this file is fixed.
 | `crates/wi-heat` | The rules and the maths, as plain functions over plain records: `model/` (heat, the estimate chain, grades, Plan my day, focus, habits, recurrence, the weekly review's facts, moving in), the iCal and Brightspace parsers, the mail rules, sync's clock | I/O, the clock (time comes in as `now`), global state |
 | `crates/wi-heat-store` | Learn's reads and writes on `library.sqlite`, through `wi-store`'s journal: one function per operation below, each one transaction. The core and `wi-mcp` both call it, so a rule exists once | the network, the Keychain, the engine |
 | `crates/wi-core` | The `heat.*` commands (thin wrappers over `wi-heat-store`), the iCal fetch (network, addresses from the Keychain), Learn sync, and the watcher that notices other processes' commits | maths of its own |
-| `crates/wi-mcp` | The stdio helper: MCP over JSON-RPC, the twenty-one tools, the switches. Calls `wi-heat-store` with `actor = claude` | the network, the Keychain, any write a tool's table doesn't name |
+| `crates/wi-mcp` | The stdio helper: MCP over JSON-RPC, the twenty-three tools, the switches. Calls `wi-heat-store` with `actor = claude` | the network, the Keychain, any write a tool's table doesn't name |
 | `app/ui/src/heat/` | The views. Reads `heat.snapshot`, writes through `heat.*`, refetches on the `heat` event | sorting by heat, clamping, planning, grade arithmetic: the snapshot carries every derived value |
 
 The TS model in `app/ui/src/heat/model/` is the reference the Rust was ported
 from (`crates/wi-heat/tests/vectors/`). The views don't call it for anything
 the snapshot carries.
+
+Homes and types (below) have no TypeScript behind them. Their rules are
+`crates/wi-heat/src/model/types.rs` (types, matching, the calibration ratio)
+and `crates/wi-heat/src/homes.rs` (a course read out of an offering's name, a
+syllabus as JSON, the batch Claude scores); the store side is
+`crates/wi-heat-store/src/homes.rs`, and the commands and the worker that
+asks Claude are `crates/wi-core/src/homes_cmd.rs`.
 
 ## What is stored
 
@@ -33,6 +40,11 @@ camelCase fields. `text` is what ⌘K searches (titles, notes, note text).
 | `heatSetting` | `claude.tools`, `school`, `dayEnds`, `feed.<calendarId>`, `feedDismissed`, `seeded`, `mailIds` | `claude.tools` is `{tool: bool}`, all true by default; `feed.*` holds a feed's missed-sync counts and `feedDismissed` the Brightspace items you deleted, so a sync doesn't make them again; `seeded` marks the three first spaces as made; **not** journaled |
 | `calendar` | the record's `id` | a calendar's name, kind, sync times and `keychainRef`; added and removed in Settings → Learn, so **not** journaled: ⌘Z never takes a calendar away |
 | `calendarEvent` | `<calendarId>/<UID>` | what other calendars' feeds hold; written by sync, outside the journal, replaced each sync |
+
+| `syllabusDraft` | the draft's `id` | a syllabus read and waiting to be accepted: its file's name and path, its pages, its state (`reading`, `ready`, `failed`) and Claude's checked answer. On this Mac only: **not** journaled, never synced, never exported. A draft is not a change |
+
+`heatSetting` also holds `homes` (the library has been brought over to homes
+and types) and `score.asked` (when Claude was last asked about each task).
 
 Two fields beyond 3.16's lists: a task Claude added keeps `claudeReason`,
 the sentence Get Info shows under "Claude, Oct 6 8:41 AM" (3.6), and a
@@ -85,6 +97,12 @@ The person's labels:
 | the weekly review's note | `weekly review` |
 | moving in | `move in` |
 | a calendar sync that changed anything | `calendar sync` |
+| courses found and tasks typed, when a library is first brought over and after a sync | `course and type setup` |
+| a syllabus accepted | `import syllabus` |
+| a task's type picked, or given back to its title | `set type` |
+| types applied again | `reapply defaults` |
+
+Claude's batch of estimates is `Claude's estimates`.
 
 `history.undoEntry {txnId}` undoes one entry out of order, for Settings →
 Claude's list. It is refused, with "This changed again since. Undo the later
@@ -197,6 +215,137 @@ sun would see (3.15), from the local records: the same shape the server's
 | `heat.claude.setTool` | `{name, on}` | `{}`. Not journaled; the helper reads it on every list and call |
 | `history.undoEntry` | `{txnId}` | `{label}`, or `cant_undo` ("This changed again since. Undo the later change first."). Also emits `heat` and `history` |
 
+## Homes and types
+
+A task can belong to one **home** that tells it more about itself: a course
+(`courseId`) or a project (`projectId`). It never has to: a task with neither
+lives in its space and is estimated all the same. Spaces are as they were.
+
+**A type** is `{name, patterns, estMin, difficulty, category?}`: the words in
+a title that pick it (whole words, any case; "lab3" reads "lab 3"), and the
+minutes and difficulty a task of that type starts with. Types live at three
+levels and the most specific wins: the home's (`course.types`,
+`project.types`), the space's (`space.typeDefs`), then the defaults: Quiz
+20m/2, Worksheet 45m/2, Listening 30m/2, Lab 120m/3, Homework 90m/3, Project
+240m/4, Email 10m/1, Errand 30m/1, Admin 20m/1, Creative session 120m/3 and
+Other 45m/2. A number a home's type leaves out (a syllabus says "Labs" and
+not how long one takes) comes from the same name further down.
+
+**Every task comes through one function,** `homes::inherit`, whatever made
+it: a sheet or ⌘⇧N (`schema::finish`), Brightspace (`feed.rs`), Claude's
+`add_task`, moving in, a syllabus. In order:
+
+1. *Home.* A new task with no home is matched to one if one fits: a course
+   whose code is in its title, only in a space grouped by course, so a course
+   is never forced onto work that isn't school; else an open project of its
+   space whose name it carries.
+2. *Type.* Unless someone picked it, the title picks it: home, space,
+   defaults, and in a space grouped by course the feed's own words
+   ("Reading", "Exam prep"); else Other.
+3. *Numbers.* The type fills `estMin` and `difficulty`.
+
+Who made each is kept beside it, and that is the override flag: `typeBy`
+(`you`, `claude`, `rule`), `estBy` and `difficultyBy` (`you`, `claude`,
+`type`, `default`). A write that changes `type`, `estMin` or `difficulty`
+marks it `you`, and nothing here ever refills a field marked `you`.
+`default` means no type matched: the numbers are Other's, and the task waits
+for Claude. When a home's types change, its open tasks are filled again in
+the same journal entry, in what nobody set by hand.
+
+**Calibration.** Nothing is stored. Each finished task with measured time is
+a sample: what it took over what its type says. A new task's minutes are
+multiplied by the mean of the latest 8 samples for its home and type; with
+fewer than 2, for its space and type; then for the type anywhere; else 1.
+One sample is kept within 0.25–4 and the ratio within 0.5–3, and minutes
+round to 5. It is measured against the type, never against an estimate it
+already moved, and it is applied only when a task is filled: tasks already
+here keep their minutes.
+
+**Courses.** A school names an offering `EGR101: Intro to Engineering
+Design_R01_F26`. That is the course `EGR 101`, "Intro to Engineering Design",
+in Fall 2026, whatever the section. An offering's full name, the feed's own
+course, or the code Claude gave a school thread makes a course Learn doesn't
+hold: a **stub** (`status: "stub"`), with no weights, which Grades shows as
+needing its syllabus. A bare code in a subject finds a course and makes none.
+A course still named by its code takes the name the first full offering
+gives it. This runs in the Brightspace sync's own entry, in
+`record_mail_thread`'s, and after every calendar sync over the mail and
+events in the library (`homes::tidy`), which also brings a library from
+before types over, once, as one entry that one undo puts back. A course is
+shown as `ELE 209 · Intro to Computer Systems Lab`, and as its code alone
+when its name is its code.
+
+**A syllabus.** `heat.course.importSyllabus {path, courseId?}` leaves a
+draft that is `reading` and returns. The worker reads the PDF's text in Rust
+(`pdf-extract`), asks Claude once, with no tools, for one JSON object
+(`homes::syllabus_schema`: the course, its weights, its assignment types,
+its dated items; null for what the syllabus doesn't say), and checks it field
+by field. The draft is then `ready`, with its preview worked out against the
+library as it stands, or `failed` with one sentence. Nothing of the course
+changes until `heat.syllabus.accept`, which is one entry, "import syllabus":
+the weights (a category by a name already there keeps its id and its
+grades), the types, tasks for dated items that aren't here (by title; an
+item due over two hours ago is left out), dates that moved (never a
+Brightspace task's, never a done one's), the estimates the new types change,
+and grades without a category sorted by their type. One ⌘Z takes all of it
+back.
+
+**Claude's batch.** `heat.tasks.score` asks Claude once, on the worker, for
+minutes and difficulty for up to 40 open tasks whose `estBy` is `default`,
+soonest due first. The answer is one entry by Claude, "Claude's estimates",
+listed in Settings → Claude. The app's own core also asks after a sync when
+such tasks are waiting (`Config::auto_score`), each task at most once a day.
+
+Both jobs are one run of `claude_cli` (the person's own Claude Code, no
+tools, a JSON schema): the syllabus on `sonnet`, the batch on `haiku`.
+
+### What the snapshot adds
+
+```jsonc
+"syllabus": { "drafts": [ { "id": "...", "courseId": "…|null", "fileName": "ELE209.pdf", "pages": 6, "createdAt": 0,
+    "state": "reading|ready|failed", "error": "one sentence, when failed",
+    // when ready:
+    "course": { "code": "ELE 209", "name": "…", "term": "Fall 2026", "label": "ELE 209 · …", "isNew": false },
+    "weights": [ { "category": "Labs", "percent": 40, "dropLowest": 1 } ], "weightsTotal": 100,
+    "weightsFlag": "Weights add to 95%. The other 5% is unassigned.",   // null at 100
+    "types": [ { "name": "Lab", "patterns": ["lab"], "estMin": 150, "difficulty": 4, "category": "Labs" } ],
+    "newTasks": [ { "title": "Lab 6", "type": "Lab", "due": 0, "estMin": 150 } ],
+    "dateChanges": [ { "taskId": "…", "title": "lab4", "from": 0, "to": 0 } ],
+    "line": "ELE 209 · Intro to Computer Systems Lab. Labs 40%, Quizzes 20%, Final 40%. 5 types. 3 new tasks, 2 dates changed." } ] },
+"derived": {
+  "tasks":   { "<taskId>": { "estimate": { "min": 20, "by": "you|claude|type|default", "reason": null,
+                                           "typeFrom": "course|project|space|global|null" },
+                             "home": { "kind": "course|project", "id": "…", "label": "JPN 101 · Beginning Japanese I" } } },   // home: null for none
+  "courses": { "<courseId>": { "label": "…", "needsSyllabus": true, "status": "stub|confirmed", "term": "Fall 2026",
+                               "categories": { "<categoryId>": 91.5 } } },   // weights is null while needsSyllabus
+  "types":   { "global": ["Quiz", "…"], "spaces": { "<id>": [] }, "courses": { "<id>": [] }, "projects": { "<id>": [] } },
+  "unscored": 2
+}
+```
+
+### Commands
+
+Anything Grades and Get Info do here is one of these, so Claude inside the
+app can call what a person can click.
+
+| cmd | args | result |
+|---|---|---|
+| `heat.course.importSyllabus` | `{path, courseId?}`, or `{json, courseId?, fileName?}` when the caller has read the syllabus itself | `{draft}`. With `path`: `reading`, and the `heat` event (`syllabusDraft`) when it turns. With `json`: `ready` at once, or refused with why. No course named and none in the syllabus: "The syllabus doesn't say which course it is. Drop it on the course in Grades." |
+| `heat.syllabus.accept` | `{draftId}` | `{course, counts: {newTasks, dateChanges, retimed}, undo}` |
+| `heat.syllabus.discard` | `{draftId}` | `{}` |
+| `heat.course.update` | `{id, set}` | `{record, retimed, undo}`. A `heat.patch` that also confirms the course. Like any write to a course, project or space, a change to its types fills its tasks again in the same entry, and `retimed` counts what moved |
+| `heat.project.update` | `{id, set}` | `{record, retimed, undo}` |
+| `heat.task.setType` | `{taskId, type}` (null: the title picks again) | `{task, undo}` |
+| `heat.task.reapplyDefaults` | `{taskId}`, `{courseId}`, `{projectId}`, `{spaceId}` or `{all: true}`; `force: true` gives the person's own minutes and difficulty back to the type | `{changed, undo}`. Open tasks only, but for one asked for by id |
+| `heat.tasks.score` | `{}` | `{asked, line}` ("Asking Claude to estimate 2 tasks.") |
+
+`heat.put` for a new task: a `type`, `difficulty` or `estMin` that is sent is
+the person's; one left out is filled.
+
+Grades: a category's percentage drops its `dropLowest` lowest scores when it
+has more than that many; a pending grade's category is the one its
+assignment type counts toward, else the categories' keywords.
+
 ## The MCP server
 
 `wi-mcp` speaks MCP over stdio: one JSON-RPC 2.0 message per line on stdin
@@ -210,7 +359,7 @@ is error -32601.
   `--library <dir>` as an override for tests. No library, or a newer layout
   than it knows: one sentence, nothing written: "No Wi_WWAV library yet. Open
   the app once."
-- **Tools.** The twenty-one in 3.13, with those arguments, results and labels:
+- **Tools.** The twenty-three in 3.13, with those arguments, results and labels:
   the first eight for mail and planning, then `get_schedule`, `draft_block`,
   `list_habits`, `list_projects`, `add_project`, `add_milestone`, `get_notes`,
   `add_note`, `list_inbox` and `add_capture`. The four that add a record go
@@ -223,7 +372,8 @@ is error -32601.
   the two lines of 3.13. A result is `content: [{type: "text", text: <the JSON>}]`
   plus `structuredContent` with the same object.
 - **Mail accounts** are the setting `mail.accounts` (`crates/wi-heat-store/src/mail.rs`), set whole by `heat.mail.accounts.set {accounts}` and read back as the snapshot's `mailAccounts`. `list_mail_accounts` and `list_mail` read them and the recorded threads; a `mailThread` carries `account`, `priority` and `category`. A thread's text is a `mailText` record keyed by Gmail's thread id (`{threadId, savedAt, messages: [{id?, from, to?, sentAt, text}]}`), written by `save_mail_text` with `set_doc`, outside the journal, and read by `heat.mail.text {threadId}`. `mailText` is in the core's `local_only` list and left out of the export.
-- **Prompts.** Two. `read_mail {account?, days?}` words the whole job for every account. `school_mail {days?}` (1–60, default 7): the job of 3.12's
+- **Mail as a client** (3.10): `crates/wi-heat-store/src/mail.rs` keeps each thread's place (`mailState`: unread, archived), the outbox (`mailAction`: send, reply, archive, unarchive, markRead, markUnread; queued, done or failed) and `search`. All of it, like `mailText`, is outside the journal and in the core's `local_only` list. `crates/wi-core/src/mail_cmd.rs` answers `heat.mail.send`, `.reply`, `.archive`, `.mark`, `.search`, `.outbox`, `.outbox.retry`, `.outbox.discard`, `.sync` and `.background.set`, adds `mailState` and `mailSync` to the snapshot, and runs the worker. The worker asks Claude through `crates/wi-core/src/claude_cli.rs` (one `claude -p` run, built-in tools and skills off, only the named MCP tools allowed) for the read job and the send job, whose tool lists share nothing. `Config::background_mail` turns the timed read on; `Config::claude` or `WI_WWAV_CLAUDE` names the binary.
+- **Prompts.** Three, the third being `send_mail` (the outbox job). The first two: `read_mail {account?, days?}` words the whole job for every account. `school_mail {days?}` (1–60, default 7): the job of 3.12's
   mail rows written out for Claude, naming the school and its Brightspace
   host from Settings → Learn in a Gmail query. A prompt calls no tool and
   writes nothing; it is how the person starts the job in one step
@@ -253,6 +403,12 @@ reads and `plan_day` write no entry; a repeated `source_id` or `thread_id`
 makes no second row; a switched-off tool is missing and refused; 200 kills at
 random moments; 1,000 interleaved writes with the core writing too, none lost.
 The views are checked in Playwright through the dev bridge against a real core.
+
+Homes and types are `crates/wi-core/tests/core/heat_homes.rs`: an old
+library brought over and put back by one undo; a syllabus previewed, accepted
+and undone; types by level and never over the person's own; calibration;
+Claude's batch and a dropped PDF against a stand-in for the command line; and
+mail making tasks in any space.
 
 The core's side of S2.2–S2.6 and S2.9–S2.11 is `crates/wi-core/tests/core/heat_*.rs`:
 every check goes through the `heat.*` commands on a core standing at a fixed

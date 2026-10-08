@@ -14,9 +14,13 @@
 //! - [`timer`]: Plan my day's drafts, the current task and the focus timer.
 //! - [`snapshot`]: what the views read, and the public view.
 //! - [`feed`]: calendars and Brightspace, from a feed the core fetched.
+//! - [`homes`]: a task's home (its course or project) and its type: the
+//!   minutes and difficulty every task starts with, courses found in what a
+//!   sync brings, and a syllabus previewed and accepted.
 
 mod derive;
 pub mod feed;
+pub mod homes;
 pub mod mail;
 pub mod mcp;
 pub mod ops;
@@ -52,6 +56,11 @@ pub mod kind {
     /// A thread's messages as plain text, for Mail's reader. Kept on this
     /// Mac only: outside the journal, never synced, never exported.
     pub const MAIL_TEXT: &str = "mailText";
+    /// A thread's place in the mailbox: unread, archived. This Mac only.
+    pub const MAIL_STATE: &str = "mailState";
+    /// Something to do in the mailbox, waiting for Claude to do it: a mail
+    /// to send, a thread to archive or mark. This Mac only.
+    pub const MAIL_ACTION: &str = "mailAction";
     pub const CALENDAR: &str = "calendar";
     pub const CAPTURE: &str = "capture";
     pub const DAILY_NOTE: &str = "dailyNote";
@@ -63,6 +72,9 @@ pub mod kind {
     pub const SETTING: &str = "heatSetting";
     /// Outside the journal: what other calendars' feeds hold.
     pub const EVENT: &str = "calendarEvent";
+    /// Outside the journal, on this Mac only: a syllabus read and waiting to
+    /// be accepted. A draft is not a change.
+    pub const SYLLABUS: &str = "syllabusDraft";
 }
 
 #[derive(Debug, thiserror::Error)]

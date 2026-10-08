@@ -4,6 +4,8 @@ import './core';
 import './today';
 import './tasks';
 import './grades';
+import './types';
+import './syllabus';
 import './habits';
 import './public';
 import './claude';

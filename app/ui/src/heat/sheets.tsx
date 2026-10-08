@@ -1,6 +1,9 @@
 // The frame's two sheets (docs/SPEC.md 3.1, 3.3, 3.5). A sheet drops from the
 // top, validates in one line ("Give the task a name first."), and Esc closes
-// it keeping what was typed for next time (2.7).
+// it keeping what was typed for next time (2.7). A new task's type,
+// difficulty and minutes start at Automatic: the core picks the type from the
+// title and fills the numbers from the type, and only what is chosen here is
+// sent as the person's own.
 //
 //   New task      "+" on Today, Tasks and Calendar; N
 //   Time it took  checking off a task that has no logged time
@@ -9,7 +12,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { atMinute, dayKey, minuteOfDay } from '../shared/time/zone';
 import { useActions } from './actions';
 import type { Id } from './client';
-import { copy } from './fmt';
+import { copy, courseLabel } from './fmt';
 import type { NewTaskOptions } from './frame';
 import { useHeat } from './store';
 
@@ -43,9 +46,11 @@ export function NewTaskSheet({ options, draft, onDraft, onClose, onSaved }: NewP
   const spaces = snap?.records.space ?? [];
   const [spaceId, setSpaceId] = useState<Id>(options.spaceId ?? spaces[0]?.id ?? '');
   const space = idx.space.get(spaceId);
+  // '' is Automatic for all three: left out of the record, for the core to fill in.
   const [type, setType] = useState('');
   const [group, setGroup] = useState('');
-  const [difficulty, setDifficulty] = useState(3);
+  const [difficulty, setDifficulty] = useState('');
+  const [minutes, setMinutes] = useState('');
   const start = fieldsOf(options.due ?? null, tz);
   const [date, setDate] = useState(start.date);
   const [time, setTime] = useState(start.time);
@@ -55,9 +60,9 @@ export function NewTaskSheet({ options, draft, onDraft, onClose, onSaved }: NewP
 
   useEffect(() => title.current?.focus(), []);
   useEffect(() => {
-    setType(space?.types[0] ?? 'Other');
+    setType('');
     setGroup('');
-  }, [space]);
+  }, [space?.id]);
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -73,8 +78,9 @@ export function NewTaskSheet({ options, draft, onDraft, onClose, onSaved }: NewP
     const fields = {
       spaceId,
       title: name,
-      type,
-      difficulty,
+      ...(type ? { type } : {}),
+      ...(difficulty ? { difficulty: Number(difficulty) } : {}),
+      ...(Number(minutes) > 0 ? { estMin: Math.round(Number(minutes)) } : {}),
       due: instantOf(date, time, tz),
       ...(options.notes ? { notes: options.notes } : {}),
       ...(options.scheduledDate ? { scheduledDate: options.scheduledDate } : {}),
@@ -92,10 +98,22 @@ export function NewTaskSheet({ options, draft, onDraft, onClose, onSaved }: NewP
 
   const groups =
     space?.groupKind === 'course'
-      ? (snap?.records.course ?? []).map((c) => ({ id: c.id, name: c.code }))
+      ? (snap?.records.course ?? []).map((c) => ({
+          id: c.id,
+          name: snap?.derived.courses[c.id]?.label ?? courseLabel(c),
+        }))
       : space?.groupKind === 'milestone'
         ? (snap?.records.milestone ?? []).filter((m) => m.spaceId === spaceId).map((m) => ({ id: m.id, name: m.title }))
         : [];
+  // The types on offer: the course's own if one is picked, then the space's.
+  const offered = snap?.derived.types;
+  const types = [
+    ...new Set([
+      ...(space?.groupKind === 'course' && group ? (offered?.courses[group] ?? []) : []),
+      ...(offered?.spaces[spaceId] ?? []),
+      ...(space?.types ?? ['Other']),
+    ]),
+  ];
 
   return (
     <form className="sheet heat-sheet" role="dialog" aria-label="New task" onSubmit={save}>
@@ -130,7 +148,8 @@ export function NewTaskSheet({ options, draft, onDraft, onClose, onSaved }: NewP
         <label className="field">
           <span data-text="secondary">Type</span>
           <select value={type} onChange={(e) => setType(e.target.value)}>
-            {(space?.types ?? ['Other']).map((t) => (
+            <option value="">{copy.types.automatic}</option>
+            {types.map((t) => (
               <option key={t}>{t}</option>
             ))}
           </select>
@@ -157,13 +176,26 @@ export function NewTaskSheet({ options, draft, onDraft, onClose, onSaved }: NewP
         )}
         <label className="field">
           <span data-text="secondary">Difficulty</span>
-          <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}>
+          <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+            <option value="">{copy.types.automatic}</option>
             {[1, 2, 3, 4, 5].map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
             ))}
           </select>
+        </label>
+        <label className="field">
+          <span data-text="secondary">Minutes</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={5}
+            max={600}
+            value={minutes}
+            placeholder={copy.types.automatic}
+            onChange={(e) => setMinutes(e.target.value)}
+          />
         </label>
         <label className="field">
           <span data-text="secondary">Due</span>
