@@ -663,28 +663,27 @@ button.notes-tag {
 /* ---- The quiet notices: a small stack at the bottom left of the main view, above
    Today's timer, under every sheet -------------------------------------------------- */
 
+/* At the foot of the sidebar, which is empty there on every tab: over the
+   main view a notice would sit on the daily note, a note's backlinks or the
+   timer. */
 .notes-notices {
   position: absolute;
   bottom: var(--space-s3);
-  left: calc(190px + var(--space-s3));
+  left: var(--space-s2);
   z-index: 21;
   display: flex;
   flex-direction: column;
   gap: var(--space-s1);
-  width: 340px;
-  max-width: calc(100% - 190px - var(--space-s5));
+  width: calc(190px - 2 * var(--space-s2));
   pointer-events: none;
-}
-
-.heat[data-tab='today'] .notes-notices {
-  bottom: calc(112px + var(--space-s3));
 }
 
 .notes-notice {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-s2);
-  padding: var(--space-s1) var(--space-s1) var(--space-s1) var(--space-s3);
+  gap: var(--space-s1);
+  padding: var(--space-s2) var(--space-s1) var(--space-s1) var(--space-s2);
   font-size: var(--type-desk-body);
   color: var(--desk-ink);
   background: var(--desk-well);
@@ -696,14 +695,15 @@ button.notes-tag {
 }
 
 .notes-notice-text {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
 }
 
 .notes-notice-acts {
   display: flex;
-  flex: none;
+  flex: 1;
   align-items: center;
+  justify-content: space-between;
 }
 
 .notes-notice-x {

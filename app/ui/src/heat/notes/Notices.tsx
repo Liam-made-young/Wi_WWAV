@@ -14,8 +14,10 @@ const SHOWN = 3;
 
 export function Notices() {
   const { snap, client, act, refetch } = useHeat();
-  const { setTab } = useTabs();
-  const notices = (snap?.notices ?? []).slice(0, SHOWN);
+  const { tab, setTab } = useTabs();
+  // Today and Calendar show what a mail asked for as a row of their own, with the same one tap.
+  const elsewhere = tab === 'today' || tab === 'calendar';
+  const notices = (snap?.notices ?? []).filter((n) => !(elsewhere && n.kind === 'exception')).slice(0, SHOWN);
 
   /** Does what a notice offered; once it is done the notice has nothing left to say. */
   const answer = async (notice: Notice, going: Promise<unknown>) => {

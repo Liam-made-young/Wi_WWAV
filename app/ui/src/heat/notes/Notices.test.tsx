@@ -81,6 +81,9 @@ describe('Notices', () => {
       act: { label: 'Skip it', cmd: 'heat.test.act', args: { id: 'com-1' } },
     });
     await settle();
+    // Today lists what a mail asked for in a row of its own, so the notice keeps out of its way there.
+    expect(notices()).toEqual([]);
+    await click(button(rig, 'Tasks')!);
     await click(button(notices()[0], 'Skip it'));
     expect(ran).toEqual([{ id: 'com-1' }]);
     expect(notices()).toEqual([]);

@@ -92,3 +92,55 @@ test('a class is drawn in Calendar, and a page photographed in it lands in Notes
   await expect(page.locator('.heat-today')).toContainText(free.commitments.free.line);
   await page.screenshot({ path: join(process.env.WI_E2E_SHOTS ?? folder, 'today.png') });
 });
+
+test('typing [[ offers notes and courses, backlinks show, and a checkbox becomes a task', async ({ page, core }) => {
+  const today = day(new Date());
+  await core.call('heat.snapshot', { date: today });
+  // A course of its own, so this stands alone whatever ran before it.
+  const term = await core.call<{ record: { id: string } }>('heat.put', { kind: 'term', record: { name: 'Links term' } });
+  await core.call('heat.put', { kind: 'course', record: { termId: term.record.id, code: 'ELE 209', name: 'Circuits Lab' } });
+  await core.call('heat.note.create', { title: 'Verb groups', markdown: 'Three groups of verbs.\n' });
+  await core.call('heat.note.create', { title: 'Te-form drills', markdown: 'Twenty verbs.\n\n- [ ] Do worksheet 4\n' });
+
+  await openShell(page);
+  await page.locator('.heat-toolbar').waitFor();
+  await page.getByRole('tab', { name: 'Notes', exact: true }).click();
+  await page.locator('.notes-row', { hasText: 'Te-form drills' }).click();
+  const pane = page.locator('.notes-pane');
+  await expect(pane.getByLabel('Title')).toHaveValue('Te-form drills');
+
+  // [[ lists what can be linked: a note by its title, a course by its code.
+  await pane.getByRole('button', { name: 'Write at the end of the note' }).click();
+  const field = pane.getByLabel('Note text');
+  await field.pressSequentially('See [[');
+  const menu = pane.getByRole('listbox', { name: 'Link to' });
+  await expect(menu.getByRole('option', { name: /Verb groups/ })).toBeVisible();
+  await expect(menu.getByRole('option', { name: /ELE 209/ })).toBeVisible();
+  await field.pressSequentially('verb');
+  await expect(menu.getByRole('option')).toHaveCount(2); // the note, and "New note"
+  await page.keyboard.press('Enter');
+  await expect(field).toHaveValue('See [[Verb groups]]');
+  await page.keyboard.press('Escape');
+  // Saved through the core: the note's file on disk has the link.
+  await expect
+    .poll(async () => (await core.call<{ hits: { title: string }[] }>('heat.note.search', { q: 'See' })).hits.map((h) => h.title))
+    .toEqual(['Te-form drills']);
+
+  // The checkbox becomes a real task, and the line says so.
+  await pane.locator('.notes-block', { hasText: 'Do worksheet 4' }).hover();
+  await pane.getByRole('button', { name: 'Make task' }).click();
+  await expect
+    .poll(async () => {
+      const s = await core.call<{ records: { task: { title: string; noteId?: string }[] } }>('heat.snapshot', { date: today });
+      return s.records.task.find((t) => t.title === 'Do worksheet 4')?.noteId !== undefined;
+    })
+    .toBe(true);
+  await expect(pane.getByRole('button', { name: 'Make task' })).toHaveCount(0);
+
+  // The note that was linked to shows what links to it.
+  await page.locator('.notes-row', { hasText: 'Verb groups' }).click();
+  const back = page.locator('.notes-pane .notes-backlinks');
+  await expect(back).toContainText('Te-form drills');
+  await expect(back).toContainText('See Verb groups');
+  await page.screenshot({ path: join(process.env.WI_E2E_SHOTS ?? tmpdir(), 'notes-backlinks.png') });
+});
